@@ -1,11 +1,13 @@
 import { buildContextPack } from "../context-packs/build-context-pack.js";
 import { buildSidecarPrompt } from "../prompt-builder/build-prompt.js";
+import { parsePlayerMessage } from "./player-message.js";
 
 export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgpt" }) {
   const trimmedMessage = playerMessage.trim();
   if (!trimmedMessage) {
     throw new Error("Player message is required.");
   }
+  const parsedMessage = parsePlayerMessage(trimmedMessage);
 
   const contextPack = buildContextPack(campaign, {
     purpose: "player_turn",
@@ -13,7 +15,8 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
   const providerPrompt = buildSidecarPrompt({
     campaign,
     contextPack,
-    userIntent: trimmedMessage,
+    userIntent: parsedMessage.inWorldText || "No in-world action supplied this turn.",
+    metaInstructions: parsedMessage.metaInstructions,
   });
 
   return {
@@ -23,6 +26,7 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
     status: "prompt_ready",
     createdAt: new Date().toISOString(),
     playerMessage: trimmedMessage,
+    parsedMessage,
     contextPack,
     providerPrompt,
     importedResponse: null,
@@ -40,4 +44,3 @@ export function attachProviderResponse(turn, responseText) {
     },
   };
 }
-

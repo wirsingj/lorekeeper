@@ -144,16 +144,14 @@ elements.playerForm.addEventListener("submit", async (event) => {
   });
   state.contextPack = state.currentTurn.contextPack;
   state.prompt = state.currentTurn.providerPrompt;
-  state.playMessages.push({
-    role: "player",
-    title: "Player Action",
-    body: playerMessage,
-  });
-  state.playMessages.push({
-    role: "system",
-    title: "Lorekeeper",
-    body: "Built a focused context pack and provider-ready prompt. Sending it through the selected provider sidecar.",
-  });
+  const visiblePlayerText = state.currentTurn.parsedMessage?.inWorldText;
+  if (visiblePlayerText) {
+    state.playMessages.push({
+      role: "player",
+      title: "You",
+      body: visiblePlayerText,
+    });
+  }
   elements.playerInput.value = "";
   render();
   await runPromptThroughSidecar(state.prompt);
@@ -222,20 +220,10 @@ async function commitApprovedChanges(approved) {
       purpose: "post_commit_context",
     });
     state.reviewBatch = null;
-    state.playMessages.push({
-      role: "system",
-      title: "Canon Committed",
-      body: `${result.applied.length} approved change${result.applied.length === 1 ? "" : "s"} saved to ${result.sqlitePath}. ${result.skipped.length} skipped.`,
-    });
     elements.bridgeStatus.textContent = `${result.applied.length} change${result.applied.length === 1 ? "" : "s"} saved to SQLite`;
     render();
   } catch (error) {
     elements.bridgeStatus.textContent = "SQLite commit failed";
-    state.playMessages.push({
-      role: "system",
-      title: "Commit Failed",
-      body: error instanceof Error ? error.message : "Unknown commit failure.",
-    });
     render();
   }
 }
@@ -245,14 +233,10 @@ function seedPlayLog() {
   const currentPlace = findById(campaign.places, campaign.scene.currentPlaceId);
   state.playMessages = [
     {
-      role: "system",
-      title: "Scene Loaded",
-      body: `${campaign.title} is open at ${currentPlace?.name ?? "the current scene"}. Lorekeeper owns the binder, input, and canon review; the provider is the sidecar engine.`,
-    },
-    {
-      role: "provider",
-      title: "Mirrored Play Screen",
+      role: "dm",
+      title: "DM",
       body: campaign.scene.immediateSituation,
+      meta: currentPlace?.name ? `Scene: ${currentPlace.name}` : "",
     },
   ];
 }
@@ -290,8 +274,8 @@ function importProviderResponse(responseText) {
   }
 
   state.playMessages.push({
-    role: "provider",
-    title: "Provider Response",
+    role: "dm",
+    title: "DM",
     body: stripLorekeeperUpdateBlock(responseText),
   });
 
@@ -303,19 +287,15 @@ function importProviderResponse(responseText) {
     proposedChanges: extraction.proposedChanges,
   });
 
-  if (extraction.error) {
-    state.playMessages.push({
-      role: "system",
-      title: "Import Note",
-      body: extraction.error,
-    });
-  }
-
   elements.responseImport.value = "";
-  elements.bridgeStatus.textContent =
-    extraction.proposedChanges.length > 0
-      ? `${extraction.proposedChanges.length} proposed change${extraction.proposedChanges.length === 1 ? "" : "s"} found`
-      : "Response imported with no proposed changes";
+  if (extraction.error) {
+    elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
+  } else {
+    elements.bridgeStatus.textContent =
+      extraction.proposedChanges.length > 0
+        ? `${extraction.proposedChanges.length} proposed change${extraction.proposedChanges.length === 1 ? "" : "s"} found`
+        : "DM response imported with no proposed changes";
+  }
   render();
 }
 
@@ -415,11 +395,6 @@ async function runPromptThroughSidecar(prompt) {
         successMessage: "ChatGPT needs login; prompt copied",
         failureMessage: "ChatGPT needs login; copy from prompt drawer",
       });
-      state.playMessages.push({
-        role: "system",
-        title: "Provider Waiting",
-        body: result.message ?? "ChatGPT is open but waiting for you to log in or select the LoreKeeper project. The provider prompt is copied as a fallback.",
-      });
       render();
       return;
     }
@@ -439,11 +414,6 @@ async function runPromptThroughSidecar(prompt) {
       ready: false,
       lastRun: null,
     };
-    state.playMessages.push({
-      role: "system",
-      title: "Manual Fallback",
-      body: error instanceof Error ? error.message : "Provider bridge failed. The prompt was copied for manual paste.",
-    });
     render();
   }
 }
@@ -542,11 +512,6 @@ function handleCompanionCheckResult(result) {
       : "ChatGPT companion ready";
   } else if (result.loginRequired) {
     elements.bridgeStatus.textContent = "ChatGPT needs login or project selection";
-    state.playMessages.push({
-      role: "system",
-      title: "Provider Waiting",
-      body: "ChatGPT is open, but Lorekeeper cannot see the prompt box yet. Log in or open the LoreKeeper project tab in Firefox, then retry from here.",
-    });
   } else {
     elements.bridgeStatus.textContent = "No ChatGPT companion tab found";
   }
@@ -603,6 +568,11 @@ function renderPlayLog() {
       body.textContent = message.body;
 
       wrapper.append(title, body);
+      if (message.meta) {
+        const meta = document.createElement("small");
+        meta.textContent = message.meta;
+        wrapper.append(meta);
+      }
       return wrapper;
     }),
   );

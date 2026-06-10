@@ -38,7 +38,7 @@ async function refreshProviderTabs() {
   for (const tab of tabs.sort((a, b) => (b.companionScore ?? 0) - (a.companionScore ?? 0))) {
     const option = document.createElement("option");
     option.value = String(tab.id);
-    option.textContent = `${tab.companionScore > 0 ? "★ " : ""}${tab.title || tab.url}`;
+    option.textContent = `${tab.companionScore > 0 ? "[saved] " : ""}${tab.title || tab.url}`;
     providerTabs.append(option);
   }
 

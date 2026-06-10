@@ -279,7 +279,8 @@ button {
   border-left: 5px solid var(--blue);
 }
 
-.play-message.provider {
+.play-message.provider,
+.play-message.dm {
   border-left: 5px solid var(--amber);
 }
 
@@ -293,6 +294,13 @@ button {
 .play-message p {
   margin: 0;
   line-height: 1.5;
+}
+
+.play-message small {
+  display: block;
+  margin-top: 8px;
+  color: #5d675d;
+  font-size: 0.76rem;
 }
 
 .context-section {

@@ -1,15 +1,30 @@
 import { renderContextPackMarkdown } from "../context-packs/build-context-pack.js";
 import { renderTemplateInstructions, sidecarTurnTemplate } from "./templates.js";
 
-export function buildSidecarPrompt({ campaign, contextPack, userIntent = "", template = sidecarTurnTemplate }) {
+export function buildSidecarPrompt({
+  campaign,
+  contextPack,
+  userIntent = "",
+  metaInstructions = [],
+  template = sidecarTurnTemplate,
+}) {
   const sections = [
     "# Lorekeeper Sidecar Prompt",
     "",
     "## Role",
     renderTemplateInstructions(template),
     "",
-    "## User Intent",
+    "## Player Turn",
+    "In-world action / character-facing text:",
     userIntent || "Continue the current scene while preserving established canon.",
+    "",
+    "Meta instructions from parenthetical text:",
+    ...(metaInstructions.length
+      ? metaInstructions.map((instruction) => `- ${instruction}`)
+      : ["- None."]),
+    "",
+    "Interpret non-parenthetical player text as in-world action, speech, or scene description.",
+    "Interpret parenthetical text as out-of-world guidance to Lorekeeper and the AI sidecar, not as character dialogue or visible narration.",
     "",
     "## Campaign Summary",
     campaign.summary || "No campaign summary recorded.",
@@ -44,4 +59,3 @@ export function createEmptyUpdateContract() {
     ],
   };
 }
-

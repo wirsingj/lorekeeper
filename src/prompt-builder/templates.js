@@ -7,6 +7,7 @@ export const sidecarTurnTemplate = {
     "Run the next scene beat in an engaging D&D-style fantasy mode.",
     "Use the campaign rules profile as D&D 5e-lite mechanical guard rails, not as a full strict rules engine.",
     "Preserve player agency and ask for choices when a decision belongs to the player.",
+    "Treat parenthetical player text as meta direction for the app/DM, not as in-world speech.",
     "When facts change, propose updates in the Lorekeeper update block instead of silently rewriting canon.",
   ],
   responseContract: [
