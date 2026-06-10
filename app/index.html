@@ -31,7 +31,17 @@
 
         <section class="rail-section">
           <div class="section-title">
-            <h2>Bridge</h2>
+            <h2>Binder</h2>
+          </div>
+          <div class="button-stack">
+            <button id="new-campaign" type="button">New Campaign</button>
+            <button id="load-imported" type="button">Load Imported</button>
+          </div>
+        </section>
+
+        <section class="rail-section">
+          <div class="section-title">
+            <h2>Provider</h2>
           </div>
           <div class="bridge-card">
             <div class="status-line">
@@ -64,6 +74,22 @@
             <span id="context-count" class="count-pill">0</span>
           </div>
           <div id="context-sections" class="context-stack"></div>
+        </section>
+
+        <section class="rail-section">
+          <div class="section-title">
+            <h2>Import Response</h2>
+            <span id="review-count" class="count-pill">0</span>
+          </div>
+          <textarea id="response-import" class="rail-textarea" spellcheck="false"></textarea>
+          <div class="button-stack two-up">
+            <button id="paste-response" type="button">Paste</button>
+            <button id="import-response" type="button">Import</button>
+          </div>
+          <div class="button-stack">
+            <button id="apply-approved" type="button">Apply Approved</button>
+          </div>
+          <div id="review-list" class="review-stack"></div>
         </section>
 
         <section class="rail-section">

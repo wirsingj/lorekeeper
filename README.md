@@ -70,6 +70,7 @@ campaign-file prototype, and a secondary importer for existing continuity dumps.
 - `docs/PROVIDER_UI_BRIDGE.md`: provider UI automation approach and boundaries.
 - `docs/FIREFOX_CHATGPT_SIDECAR.md`: Firefox sidebar and ChatGPT tab bridge notes.
 - `docs/UX_HANDHELD_SHELL.md`: handheld play UI concept and input ownership.
+- `docs/UX_AUDIT.md`: current usability findings and next UX priorities.
 - `src/`: campaign engine, context packs, prompt builder, importers, storage, and bridge contracts.
 - `extension/`: placeholder browser extension source.
 

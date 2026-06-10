@@ -197,6 +197,15 @@ h3 {
   gap: 10px;
 }
 
+.button-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.button-stack.two-up {
+  grid-template-columns: 1fr 1fr;
+}
+
 .status-line {
   display: flex;
   align-items: center;
@@ -412,6 +421,62 @@ textarea {
   color: #edf5ef;
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 0.78rem;
+}
+
+.rail-textarea {
+  height: 104px;
+  min-height: 0;
+  resize: vertical;
+  background: #fffdf8;
+  color: var(--ink);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.74rem;
+}
+
+.review-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.review-card {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.review-card.approved {
+  border-left: 4px solid #78c991;
+}
+
+.review-card.rejected {
+  opacity: 0.62;
+  border-left: 4px solid var(--red);
+}
+
+.review-card p,
+.review-card small {
+  margin: 0;
+  color: #d7dde5;
+  line-height: 1.35;
+}
+
+.review-card small {
+  font-size: 0.7rem;
+}
+
+.review-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.review-actions button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 0.75rem;
 }
 
 @media (max-width: 1180px) {
