@@ -31,6 +31,16 @@ the response, import it back into Lorekeeper, and propose campaign state updates
 This is not an API client. It is a local campaign framework that uses the already-logged-in provider
 web UI as the AI execution surface.
 
+The intended ChatGPT path is a named companion tab:
+
+- Open the ChatGPT project/chat you want Lorekeeper to use, ideally the `LoreKeeper` project.
+- Mark that tab as the Lorekeeper companion from the Firefox sidebar.
+- Use Lorekeeper's own input box for play.
+- Lorekeeper builds the context-rich prompt from SQLite state, sends it to the companion tab,
+  imports the assistant response, and shows proposed canon changes for review.
+- If ChatGPT needs login or the project must be selected, Lorekeeper opens or focuses the tab and
+  waits for the user to finish that provider-side action.
+
 ## Current Status
 
 Early working scaffold. Lorekeeper now has campaign-memory primitives, context-pack generation,
@@ -43,8 +53,9 @@ campaign-file prototype, and a secondary importer for existing continuity dumps.
 2. Lorekeeper stores the campaign premise, party, places, lore, tone, style rules, and current scene.
 3. User selects a supported provider tab or window.
 4. Lorekeeper builds the next prompt from local campaign state and guard rails.
-5. Lorekeeper sends or pastes that prompt into the provider chat input.
-6. Lorekeeper imports the latest assistant response.
+5. Lorekeeper sends that prompt into the saved provider companion tab when the extension bridge is
+   available, or copies it for manual paste as a fallback.
+6. Lorekeeper imports the latest assistant response from the companion tab, or accepts a manual paste.
 7. Lorekeeper parses proposed campaign state updates.
 8. Lorekeeper shows a reviewable diff.
 9. User approves, edits, or rejects changes.
@@ -57,7 +68,7 @@ campaign-file prototype, and a secondary importer for existing continuity dumps.
 - No credential scraping.
 - No hidden account-data access.
 - No background operation on arbitrary tabs.
-- Only operate on explicitly selected supported provider tabs or windows.
+- Prefer a saved companion provider tab, and otherwise operate only on supported provider tabs.
 - Automation must be visible, pauseable, and easy to stop.
 - Provider adapters must be isolated because provider DOMs will change.
 

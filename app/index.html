@@ -48,7 +48,10 @@
               <span class="status-dot"></span>
               <span id="bridge-status">Manual copy/import ready</span>
             </div>
-            <button id="copy-provider-prompt" type="button">Copy Provider Prompt</button>
+            <div class="button-stack">
+              <button id="check-sidecar" type="button">Check / Open ChatGPT</button>
+              <button id="copy-provider-prompt" type="button">Copy Provider Prompt</button>
+            </div>
           </div>
         </section>
       </aside>
@@ -111,7 +114,7 @@
               spellcheck="true"
               placeholder="Describe your action, question, or scene intent here. Lorekeeper will build the provider prompt."
             ></textarea>
-            <button id="build-turn" type="submit">Build Turn</button>
+            <button id="build-turn" type="submit">Send Turn</button>
           </div>
         </form>
         <details class="prompt-drawer">

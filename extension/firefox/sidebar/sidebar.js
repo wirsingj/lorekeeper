@@ -7,6 +7,8 @@ const insertPrompt = document.querySelector("#insert-prompt");
 const sendPrompt = document.querySelector("#send-prompt");
 const copyPrompt = document.querySelector("#copy-prompt");
 const readResponse = document.querySelector("#read-response");
+const setCompanion = document.querySelector("#set-companion");
+const openCompanion = document.querySelector("#open-companion");
 
 refreshTabs.addEventListener("click", refreshProviderTabs);
 providerTabs.addEventListener("change", checkSelectedTab);
@@ -14,6 +16,8 @@ insertPrompt.addEventListener("click", insertPromptIntoProvider);
 sendPrompt.addEventListener("click", sendPromptToProvider);
 copyPrompt.addEventListener("click", copyPromptToClipboard);
 readResponse.addEventListener("click", readLatestProviderResponse);
+setCompanion.addEventListener("click", saveSelectedCompanion);
+openCompanion.addEventListener("click", openOrCheckCompanion);
 
 refreshProviderTabs();
 
@@ -31,10 +35,10 @@ async function refreshProviderTabs() {
     return;
   }
 
-  for (const tab of tabs) {
+  for (const tab of tabs.sort((a, b) => (b.companionScore ?? 0) - (a.companionScore ?? 0))) {
     const option = document.createElement("option");
     option.value = String(tab.id);
-    option.textContent = tab.title || tab.url;
+    option.textContent = `${tab.companionScore > 0 ? "★ " : ""}${tab.title || tab.url}`;
     providerTabs.append(option);
   }
 
@@ -91,6 +95,43 @@ async function sendPromptToProvider() {
   }
 }
 
+async function saveSelectedCompanion() {
+  const tabId = selectedTabId();
+  if (!tabId) {
+    setStatus("Select a ChatGPT tab first.");
+    return;
+  }
+
+  try {
+    const companion = await browser.runtime.sendMessage({
+      type: "lorekeeper.saveCompanionSession",
+      tabId,
+      options: companionOptions(),
+    });
+    setStatus(`Saved companion: ${companion.title || companion.url}`);
+    await refreshProviderTabs();
+  } catch (error) {
+    setStatus(`Save failed: ${error.message}`);
+  }
+}
+
+async function openOrCheckCompanion() {
+  try {
+    setStatus("Opening or checking ChatGPT companion...");
+    const result = await browser.runtime.sendMessage({
+      type: "lorekeeper.ensureCompanionSession",
+      options: {
+        ...companionOptions(),
+        readyTimeoutMs: 30000,
+      },
+    });
+    setStatus(result.ready ? "ChatGPT companion ready." : "ChatGPT opened; log in or open the LoreKeeper project, then retry.");
+    await refreshProviderTabs();
+  } catch (error) {
+    setStatus(`Companion check failed: ${error.message}`);
+  }
+}
+
 
 async function copyPromptToClipboard() {
   await navigator.clipboard.writeText(promptInput.value);
@@ -114,6 +155,13 @@ function providerCommand(command, payload = {}) {
     command,
     payload,
   });
+}
+
+function companionOptions() {
+  return {
+    providerId: "chatgpt",
+    projectHint: "LoreKeeper",
+  };
 }
 
 function selectedTabId() {

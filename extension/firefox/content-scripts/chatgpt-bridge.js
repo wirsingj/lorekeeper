@@ -10,7 +10,7 @@ browser.runtime.onMessage.addListener((message) => {
 
 async function handleCommand(command, payload) {
   if (command === "status") {
-    return getStatus();
+    return getStatus(payload.projectHint);
   }
 
   if (command === "insertPrompt") {
@@ -28,7 +28,7 @@ async function handleCommand(command, payload) {
   throw new Error(`Unsupported ChatGPT bridge command: ${command}`);
 }
 
-function getStatus() {
+function getStatus(projectHint) {
   const input = findPromptInput();
   const assistantResponses = findAssistantResponses();
 
@@ -39,6 +39,8 @@ function getStatus() {
     responseCount: assistantResponses.length,
     url: location.href,
     title: document.title,
+    projectHint,
+    projectHintVisible: projectHint ? document.body.innerText.toLowerCase().includes(projectHint.toLowerCase()) : null,
   };
 }
 

@@ -9,6 +9,7 @@ The first target is Firefox:
 - `firefox/sidebar/`: sidebar UI for selecting a logged-in ChatGPT tab and moving prompts/responses.
 - `firefox/background.js`: tab discovery and message routing.
 - `firefox/content-scripts/chatgpt-bridge.js`: ChatGPT DOM bridge content script.
+- `firefox/content-scripts/lorekeeper-app-bridge.js`: local app to extension relay.
 
 Current bridge behavior is intentionally conservative:
 
@@ -16,8 +17,11 @@ Current bridge behavior is intentionally conservative:
 - check whether the prompt input exists
 - insert a Lorekeeper prompt into the ChatGPT input
 - read the latest visible assistant response
+- save one ChatGPT tab as the Lorekeeper companion
+- let the local app send a prompt to that companion and import the response
 
-Auto-submit should remain an explicit later setting because it sends data to the provider.
+Auto-submit currently runs only through the explicit Lorekeeper turn action. If ChatGPT needs login
+or project selection, the extension opens or focuses ChatGPT and reports that user action is needed.
 
 ## Local Firefox Loading
 

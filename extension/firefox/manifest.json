@@ -9,7 +9,9 @@
     "storage",
     "clipboardWrite",
     "https://chatgpt.com/*",
-    "https://chat.openai.com/*"
+    "https://chat.openai.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "sidebar_action": {
     "default_title": "Lorekeeper",
@@ -22,6 +24,11 @@
     {
       "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
       "js": ["content-scripts/chatgpt-bridge.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content-scripts/lorekeeper-app-bridge.js"],
       "run_at": "document_idle"
     }
   ],

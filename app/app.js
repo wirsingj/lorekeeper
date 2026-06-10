@@ -10,6 +10,13 @@ import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 const bundleUrl = "/data/imports/veil-of-the-towers.bundle.json";
 const apiCampaignUrl = "/api/campaign";
 const apiCommitReviewUrl = "/api/review/commit";
+const extensionRequestType = "lorekeeper.appBridge.request";
+const extensionResponseType = "lorekeeper.appBridge.response";
+const companionOptions = {
+  providerId: "chatgpt",
+  projectHint: "LoreKeeper",
+  returnToCaller: true,
+};
 const state = {
   campaign: null,
   contextPack: null,
@@ -18,6 +25,11 @@ const state = {
   prompt: "",
   playMessages: [],
   sourceMode: "loading",
+  bridge: {
+    mode: "unknown",
+    ready: false,
+    lastRun: null,
+  },
 };
 
 const elements = {
@@ -36,6 +48,7 @@ const elements = {
   assetGrid: document.querySelector("#asset-grid"),
   assetCount: document.querySelector("#asset-count"),
   bridgeStatus: document.querySelector("#bridge-status"),
+  checkSidecar: document.querySelector("#check-sidecar"),
   copyProviderPrompt: document.querySelector("#copy-provider-prompt"),
   newCampaign: document.querySelector("#new-campaign"),
   loadImported: document.querySelector("#load-imported"),
@@ -53,6 +66,10 @@ const elements = {
 elements.copyProviderPrompt.addEventListener("click", async () => {
   await navigator.clipboard.writeText(state.prompt);
   elements.bridgeStatus.textContent = "Provider prompt copied";
+});
+
+elements.checkSidecar.addEventListener("click", async () => {
+  await ensureCompanionSidecar({ openIfMissing: true });
 });
 
 elements.newCampaign.addEventListener("click", () => {
@@ -124,12 +141,11 @@ elements.playerForm.addEventListener("submit", async (event) => {
   state.playMessages.push({
     role: "system",
     title: "Lorekeeper",
-    body: "Built a focused context pack and provider-ready prompt. Copy it to the selected provider bridge, then import the response.",
+    body: "Built a focused context pack and provider-ready prompt. Sending it through the selected provider sidecar.",
   });
   elements.playerInput.value = "";
   render();
-  await navigator.clipboard.writeText(state.prompt);
-  elements.bridgeStatus.textContent = "Turn built and prompt copied";
+  await runPromptThroughSidecar(state.prompt);
 });
 
 await boot();
@@ -237,6 +253,11 @@ function render() {
   elements.title.textContent = campaign.title;
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
   elements.providerStatus.textContent = "Provider: ChatGPT sidecar/manual";
+  if (state.bridge.mode === "extension") {
+    elements.providerStatus.textContent = state.bridge.ready
+      ? "Provider: ChatGPT companion ready"
+      : "Provider: ChatGPT companion waiting";
+  }
   elements.saveStatus.textContent = `Binder: ${state.sourceMode} / SQLite target`;
   if (state.sqlitePath) {
     elements.saveStatus.textContent = "SQLite: active campaign file";
@@ -285,6 +306,238 @@ function importProviderResponse(responseText) {
       ? `${extraction.proposedChanges.length} proposed change${extraction.proposedChanges.length === 1 ? "" : "s"} found`
       : "Response imported with no proposed changes";
   render();
+}
+
+async function ensureCompanionSidecar({ openIfMissing = false } = {}) {
+  const probe = await probeExtensionBridge();
+  if (!probe.available) {
+    state.bridge = {
+      mode: "manual",
+      ready: false,
+      lastRun: null,
+    };
+    elements.bridgeStatus.textContent = "Extension bridge unavailable; manual copy ready";
+    return probe;
+  }
+
+  if (!openIfMissing) {
+    return handleCompanionCheckResult(probe.result);
+  }
+
+  const message = {
+    type: "lorekeeper.ensureCompanionSession",
+    options: {
+      ...companionOptions,
+      readyTimeoutMs: 30000,
+    },
+  };
+
+  try {
+    elements.bridgeStatus.textContent = "Checking ChatGPT companion...";
+    const result = await sendExtensionMessage(message, 35000);
+    return handleCompanionCheckResult(result);
+  } catch (error) {
+    state.bridge = {
+      mode: "manual",
+      ready: false,
+      lastRun: null,
+    };
+    elements.bridgeStatus.textContent = "Extension bridge unavailable; manual copy ready";
+    return {
+      ready: false,
+      error: error instanceof Error ? error.message : "Extension bridge unavailable.",
+    };
+  }
+}
+
+async function runPromptThroughSidecar(prompt) {
+  if (!prompt.trim()) {
+    elements.bridgeStatus.textContent = "Build a provider prompt first";
+    return;
+  }
+
+  try {
+    const probe = await probeExtensionBridge();
+    if (!probe.available) {
+      await navigator.clipboard.writeText(prompt);
+      elements.bridgeStatus.textContent = "Extension bridge unavailable; prompt copied";
+      state.bridge = {
+        mode: "manual",
+        ready: false,
+        lastRun: null,
+      };
+      return;
+    }
+
+    elements.bridgeStatus.textContent = "Sending turn to ChatGPT companion...";
+    const progress = startSidecarProgress();
+    const result = await sendExtensionMessage(
+      {
+        type: "lorekeeper.runCompanionPrompt",
+        prompt,
+        options: {
+          ...companionOptions,
+          readyTimeoutMs: 30000,
+          responseTimeoutMs: 90000,
+        },
+      },
+      125000,
+    );
+    progress.stop();
+
+    state.bridge = {
+      mode: "extension",
+      ready: Boolean(result.ready),
+      lastRun: result,
+    };
+
+    if (result.sent && result.response?.text) {
+      importProviderResponse(result.response.text);
+      elements.bridgeStatus.textContent = "ChatGPT response imported for canon review";
+      return;
+    }
+
+    if (result.loginRequired) {
+      await navigator.clipboard.writeText(prompt);
+      elements.bridgeStatus.textContent = "ChatGPT needs login; prompt copied";
+      state.playMessages.push({
+        role: "system",
+        title: "Provider Waiting",
+        body: result.message ?? "ChatGPT is open but waiting for you to log in or select the LoreKeeper project. The provider prompt is copied as a fallback.",
+      });
+      render();
+      return;
+    }
+
+    await navigator.clipboard.writeText(prompt);
+    elements.bridgeStatus.textContent = "Sidecar did not return a response; prompt copied";
+  } catch (error) {
+    stopSidecarProgress();
+    await navigator.clipboard.writeText(prompt);
+    state.bridge = {
+      mode: "manual",
+      ready: false,
+      lastRun: null,
+    };
+    elements.bridgeStatus.textContent = "Sidecar failed; prompt copied";
+    state.playMessages.push({
+      role: "system",
+      title: "Manual Fallback",
+      body: error instanceof Error ? error.message : "Provider bridge failed. The prompt was copied for manual paste.",
+    });
+    render();
+  }
+}
+
+let activeProgressTimers = [];
+
+function startSidecarProgress() {
+  stopSidecarProgress();
+  activeProgressTimers = [
+    window.setTimeout(() => {
+      elements.bridgeStatus.textContent = "Waiting for ChatGPT response...";
+    }, 8000),
+    window.setTimeout(() => {
+      elements.bridgeStatus.textContent = "Still waiting on the companion tab...";
+    }, 30000),
+    window.setTimeout(() => {
+      elements.bridgeStatus.textContent = "Provider run is taking a while; manual fallback remains available";
+    }, 65000),
+  ];
+
+  return {
+    stop: stopSidecarProgress,
+  };
+}
+
+function stopSidecarProgress() {
+  for (const timer of activeProgressTimers) {
+    window.clearTimeout(timer);
+  }
+  activeProgressTimers = [];
+}
+
+async function probeExtensionBridge() {
+  try {
+    const result = await sendExtensionMessage(
+      {
+        type: "lorekeeper.getCompanionSession",
+        options: companionOptions,
+      },
+      2500,
+    );
+    return {
+      available: true,
+      result,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      ready: false,
+      error: error instanceof Error ? error.message : "Extension bridge unavailable.",
+    };
+  }
+}
+
+function handleCompanionCheckResult(result) {
+  state.bridge = {
+    mode: "extension",
+    ready: Boolean(result.ready),
+    lastRun: result,
+  };
+
+  if (result.ready) {
+    elements.bridgeStatus.textContent = result.created
+      ? "ChatGPT companion opened and ready"
+      : "ChatGPT companion ready";
+  } else if (result.loginRequired) {
+    elements.bridgeStatus.textContent = "ChatGPT needs login or project selection";
+    state.playMessages.push({
+      role: "system",
+      title: "Provider Waiting",
+      body: "ChatGPT is open, but Lorekeeper cannot see the prompt box yet. Log in or open the LoreKeeper project tab in Firefox, then retry from here.",
+    });
+  } else {
+    elements.bridgeStatus.textContent = "No ChatGPT companion tab found";
+  }
+
+  render();
+  return result;
+}
+
+function sendExtensionMessage(message, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const requestId = `lk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", handleResponse);
+      reject(new Error("Lorekeeper extension did not respond."));
+    }, timeoutMs);
+
+    function handleResponse(event) {
+      if (event.source !== window || event.data?.type !== extensionResponseType || event.data.requestId !== requestId) {
+        return;
+      }
+
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", handleResponse);
+
+      if (event.data.ok) {
+        resolve(event.data.result);
+      } else {
+        reject(new Error(event.data.error ?? "Lorekeeper extension bridge failed."));
+      }
+    }
+
+    window.addEventListener("message", handleResponse);
+    window.postMessage(
+      {
+        type: extensionRequestType,
+        requestId,
+        message,
+      },
+      window.location.origin,
+    );
+  });
 }
 
 function renderPlayLog() {
