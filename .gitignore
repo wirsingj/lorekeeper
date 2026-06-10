@@ -5,3 +5,4 @@ dist/
 *.log
 data/campaigns/
 data/imports/
+data/runtime/

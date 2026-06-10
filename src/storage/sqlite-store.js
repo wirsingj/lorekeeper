@@ -2,7 +2,7 @@ import initSqlJs from "sql.js";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateCampaign } from "../campaign-state/schema.js";
+import { normalizeCampaign, validateCampaign } from "../campaign-state/schema.js";
 
 const schemaPath = fileURLToPath(new URL("./sqlite-schema.sql", import.meta.url));
 
@@ -30,6 +30,24 @@ export async function writeCampaignSqliteFile(campaign, outputPath) {
     path: outputPath,
     bytes: bytes.length,
   };
+}
+
+export async function readCampaignFromSqliteFile(sqlitePath) {
+  const SQL = await initSqlJs();
+  const bytes = await readFile(sqlitePath);
+  const db = new SQL.Database(bytes);
+  const snapshot = firstRow(db, "SELECT campaign_json FROM campaign_snapshots LIMIT 1");
+  db.close();
+
+  if (!snapshot?.campaign_json) {
+    throw new Error("SQLite campaign file does not contain a campaign snapshot.");
+  }
+
+  return normalizeCampaign(JSON.parse(snapshot.campaign_json));
+}
+
+export async function overwriteCampaignSqliteFile(campaign, outputPath) {
+  return writeCampaignSqliteFile(campaign, outputPath);
 }
 
 export async function readCampaignSqliteSummary(sqlitePath) {
@@ -66,6 +84,12 @@ function insertCampaign(db, campaign) {
     summary: campaign.summary,
     schema_version: campaign.schemaVersion,
     created_at: campaign.createdAt,
+    updated_at: campaign.updatedAt,
+  });
+
+  runInsert(db, "campaign_snapshots", {
+    campaign_id: campaign.id,
+    campaign_json: JSON.stringify(campaign),
     updated_at: campaign.updatedAt,
   });
 
@@ -197,7 +221,10 @@ function runInsert(db, table, values) {
   const keys = Object.keys(values);
   const placeholders = keys.map(() => "?").join(", ");
   const sql = `INSERT INTO ${table} (${keys.join(", ")}) VALUES (${placeholders})`;
-  db.run(sql, keys.map((key) => values[key]));
+  db.run(
+    sql,
+    keys.map((key) => (values[key] === undefined ? null : values[key])),
+  );
 }
 
 function queryRows(db, sql) {

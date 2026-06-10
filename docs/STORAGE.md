@@ -93,6 +93,25 @@ The SQLite database should store:
 This lets Lorekeeper be the durable framework around provider output. The provider can improvise, but
 the SQLite file is the campaign's source of truth.
 
+## Active Local Campaign
+
+During local development, the server keeps the active campaign at:
+
+`data/runtime/active-campaign.lorekeeper.sqlite`
+
+On first run, the server seeds that file from an imported bundle when one exists, otherwise from the
+sample campaign. The app loads campaign state through `GET /api/campaign`.
+
+Approved review changes are committed through `POST /api/review/commit`. The commit path:
+
+1. loads the active SQLite campaign
+2. applies approved changes to structured campaign state
+3. rewrites normalized records and a full campaign snapshot
+4. returns the updated campaign to the UI
+
+The full snapshot is intentional while the schema is still greenfield. It keeps round-trip behavior
+safe while the normalized tables evolve.
+
 ## Browser Storage Role
 
 Browser storage may keep cached state, selected tab metadata, UI preferences, and temporary working

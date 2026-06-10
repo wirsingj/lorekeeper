@@ -3,6 +3,8 @@ import { createReadStream, existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadActiveCampaign } from "../src/storage/campaign-repository.js";
+import { commitReviewBatch } from "../src/storage/review-commit.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const port = Number(process.env.PORT ?? process.argv[2] ?? 4173);
@@ -25,6 +27,23 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/") {
       await serveFile(path.join(projectRoot, "app", "index.html"), response);
+      return;
+    }
+
+    if (url.pathname === "/api/campaign" && request.method === "GET") {
+      const payload = await loadActiveCampaign(projectRoot);
+      sendJson(response, 200, {
+        campaign: payload.campaign,
+        source: payload.source,
+        sqlitePath: payload.sqlitePath,
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/review/commit" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const result = await commitReviewBatch(projectRoot, body.reviewBatch);
+      sendJson(response, 200, result);
       return;
     }
 
@@ -101,3 +120,19 @@ function sendText(response, statusCode, body) {
   response.end(body);
 }
 
+function sendJson(response, statusCode, body) {
+  response.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+  });
+  response.end(JSON.stringify(body, null, 2));
+}
+
+async function readJsonBody(request) {
+  const chunks = [];
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+
+  const text = Buffer.concat(chunks).toString("utf8");
+  return text ? JSON.parse(text) : {};
+}

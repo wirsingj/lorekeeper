@@ -8,6 +8,8 @@ import { extractLorekeeperUpdates } from "../src/canon-review/extract-updates.js
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 
 const bundleUrl = "/data/imports/veil-of-the-towers.bundle.json";
+const apiCampaignUrl = "/api/campaign";
+const apiCommitReviewUrl = "/api/review/commit";
 const state = {
   campaign: null,
   contextPack: null,
@@ -97,13 +99,7 @@ elements.applyApproved.addEventListener("click", () => {
     return;
   }
 
-  state.playMessages.push({
-    role: "system",
-    title: "Canon Review",
-    body: `${approved.length} approved change${approved.length === 1 ? "" : "s"} staged for the SQLite commit path.`,
-  });
-  elements.bridgeStatus.textContent = `${approved.length} approved change${approved.length === 1 ? "" : "s"} staged`;
-  render();
+  commitApprovedChanges(approved);
 });
 
 elements.playerForm.addEventListener("submit", async (event) => {
@@ -145,6 +141,20 @@ async function boot() {
 }
 
 async function loadCampaign() {
+  const apiResponse = await fetch(apiCampaignUrl);
+  if (apiResponse.ok) {
+    const payload = await apiResponse.json();
+    state.campaign = normalizeCampaign(payload.campaign);
+    state.sourceMode = payload.source ?? "sqlite";
+    state.sqlitePath = payload.sqlitePath;
+    state.contextPack = buildContextPack(state.campaign, {
+      purpose: "play_screen_initial_context",
+    });
+    state.prompt = "";
+    state.reviewBatch = null;
+    return;
+  }
+
   const response = await fetch(bundleUrl);
   if (response.ok) {
     const bundle = await response.json();
@@ -160,6 +170,47 @@ async function loadCampaign() {
   });
   state.prompt = "";
   state.reviewBatch = null;
+}
+
+async function commitApprovedChanges(approved) {
+  try {
+    elements.bridgeStatus.textContent = "Committing approved changes to SQLite...";
+    const response = await fetch(apiCommitReviewUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        reviewBatch: state.reviewBatch,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const result = await response.json();
+    state.campaign = normalizeCampaign(result.campaign);
+    state.contextPack = buildContextPack(state.campaign, {
+      purpose: "post_commit_context",
+    });
+    state.reviewBatch = null;
+    state.playMessages.push({
+      role: "system",
+      title: "Canon Committed",
+      body: `${result.applied.length} approved change${result.applied.length === 1 ? "" : "s"} saved to ${result.sqlitePath}. ${result.skipped.length} skipped.`,
+    });
+    elements.bridgeStatus.textContent = `${result.applied.length} change${result.applied.length === 1 ? "" : "s"} saved to SQLite`;
+    render();
+  } catch (error) {
+    elements.bridgeStatus.textContent = "SQLite commit failed";
+    state.playMessages.push({
+      role: "system",
+      title: "Commit Failed",
+      body: error instanceof Error ? error.message : "Unknown commit failure.",
+    });
+    render();
+  }
 }
 
 function seedPlayLog() {
@@ -187,6 +238,9 @@ function render() {
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
   elements.providerStatus.textContent = "Provider: ChatGPT sidecar/manual";
   elements.saveStatus.textContent = `Binder: ${state.sourceMode} / SQLite target`;
+  if (state.sqlitePath) {
+    elements.saveStatus.textContent = "SQLite: active campaign file";
+  }
 
   renderPlayLog();
   renderParty(campaign);

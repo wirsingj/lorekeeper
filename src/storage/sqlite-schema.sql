@@ -14,6 +14,12 @@ CREATE TABLE IF NOT EXISTS campaigns (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS campaign_snapshots (
+  campaign_id TEXT PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+  campaign_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS records (
   id TEXT PRIMARY KEY,
   campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,

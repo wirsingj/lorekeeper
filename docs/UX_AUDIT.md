@@ -31,7 +31,6 @@ The core promise is not "chat with an AI." The promise is:
 ### Remaining UX Gaps
 
 - The Firefox bridge is still separate from the local app shell.
-- Approved review changes are staged in UI, not committed back to SQLite yet.
 - New campaign creation in the app is in-memory; it should write a real local SQLite file.
 - Imported document/image onboarding needs a real guided flow.
 - The right rail is dense and needs tabs or collapsible binder sections as state grows.
@@ -41,9 +40,12 @@ The core promise is not "chat with an AI." The promise is:
 
 1. Connect the local app `Build Turn` flow to the Firefox provider bridge.
 2. Add `Import Latest Response` from the bridge into the app shell.
-3. Commit approved review changes into SQLite.
-4. Add a first-run campaign wizard for scratch campaigns.
-5. Add an import wizard for folders of docs/images.
-6. Replace the right rail with binder tabs: People, Places, Inventory, Quests, Combat, Review.
-7. Add persistent session transcript storage.
+3. Add a first-run campaign wizard for scratch campaigns.
+4. Add an import wizard for folders of docs/images.
+5. Replace the right rail with binder tabs: People, Places, Inventory, Quests, Combat, Review.
+6. Add persistent session transcript storage.
 
+## Completed After Audit
+
+- Approved review changes now commit through the local server into the active SQLite campaign file.
+- The SQLite layer stores both normalized records and a full campaign snapshot for safe round-trips.
