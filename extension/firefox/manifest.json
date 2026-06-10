@@ -1,0 +1,34 @@
+{
+  "manifest_version": 2,
+  "name": "Lorekeeper",
+  "version": "0.1.0",
+  "description": "Local D&D campaign framework and guard rails using provider web UIs as AI sidecars.",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "clipboardWrite",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*"
+  ],
+  "sidebar_action": {
+    "default_title": "Lorekeeper",
+    "default_panel": "sidebar/sidebar.html"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["content-scripts/chatgpt-bridge.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "lorekeeper-local@example.invalid",
+      "strict_min_version": "109.0"
+    }
+  }
+}

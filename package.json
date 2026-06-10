@@ -1,0 +1,24 @@
+{
+  "name": "lorekeeper",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser-extension-first AI campaign continuity manager.",
+  "type": "module",
+  "scripts": {
+    "check": "node ./src/index.js",
+    "demo": "node ./src/index.js",
+    "new:campaign": "node ./scripts/new-campaign.js",
+    "import:folder": "node ./scripts/import-campaign-folder.js",
+    "dev": "node ./scripts/serve.js"
+  },
+  "keywords": [
+    "campaign",
+    "rpg",
+    "browser-extension",
+    "local-first"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "sql.js": "^1.14.1"
+  }
+}

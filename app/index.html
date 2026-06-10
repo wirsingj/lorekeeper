@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lorekeeper</title>
+    <link rel="stylesheet" href="/app/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="handheld-shell">
+      <header class="top-bar">
+        <div>
+          <p class="eyebrow">Campaign</p>
+          <h1 id="campaign-title">Loading campaign...</h1>
+        </div>
+        <div class="top-meta">
+          <span id="scene-location">Loading...</span>
+          <span id="provider-status">Provider: manual bridge</span>
+          <span id="save-status">SQLite: local file ready</span>
+        </div>
+      </header>
+
+      <aside class="left-panel panel-rail">
+        <section class="rail-section">
+          <div class="section-title">
+            <h2>Party</h2>
+            <span id="party-count" class="count-pill">0</span>
+          </div>
+          <div id="party-list" class="record-stack"></div>
+        </section>
+
+        <section class="rail-section">
+          <div class="section-title">
+            <h2>Bridge</h2>
+          </div>
+          <div class="bridge-card">
+            <div class="status-line">
+              <span class="status-dot"></span>
+              <span id="bridge-status">Manual copy/import ready</span>
+            </div>
+            <button id="copy-provider-prompt" type="button">Copy Provider Prompt</button>
+          </div>
+        </section>
+      </aside>
+
+      <main class="play-screen" aria-label="Lorekeeper play screen">
+        <div class="screen-bezel">
+          <div id="play-log" class="play-log"></div>
+        </div>
+      </main>
+
+      <aside class="right-panel panel-rail">
+        <section class="rail-section">
+          <div class="section-title">
+            <h2>Threads</h2>
+            <span id="quest-count" class="count-pill">0</span>
+          </div>
+          <div id="quest-list" class="record-stack"></div>
+        </section>
+
+        <section class="rail-section">
+          <div class="section-title">
+            <h2>Canon</h2>
+            <span id="context-count" class="count-pill">0</span>
+          </div>
+          <div id="context-sections" class="context-stack"></div>
+        </section>
+
+        <section class="rail-section">
+          <div class="section-title">
+            <h2>Assets</h2>
+            <span id="asset-count" class="count-pill">0</span>
+          </div>
+          <div id="asset-grid" class="asset-strip"></div>
+        </section>
+      </aside>
+
+      <footer class="command-deck">
+        <form id="player-form" class="player-form">
+          <label for="player-input">Lorekeeper Input</label>
+          <div class="input-row">
+            <textarea
+              id="player-input"
+              rows="3"
+              spellcheck="true"
+              placeholder="Describe your action, question, or scene intent here. Lorekeeper will build the provider prompt."
+            ></textarea>
+            <button id="build-turn" type="submit">Build Turn</button>
+          </div>
+        </form>
+        <details class="prompt-drawer">
+          <summary>
+            <span>Provider Prompt</span>
+            <span id="prompt-size">0 chars</span>
+          </summary>
+          <textarea id="prompt-output" spellcheck="false"></textarea>
+        </details>
+      </footer>
+    </div>
+
+    <script type="module" src="/app/app.js"></script>
+  </body>
+</html>
