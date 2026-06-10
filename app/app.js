@@ -63,9 +63,20 @@ const elements = {
   applyApproved: document.querySelector("#apply-approved"),
 };
 
+window.addEventListener("error", (event) => {
+  reportUiError(event.error ?? event.message);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  reportUiError(event.reason);
+});
+
 elements.copyProviderPrompt.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(state.prompt);
-  elements.bridgeStatus.textContent = "Provider prompt copied";
+  await copyPromptToClipboard(state.prompt, {
+    emptyMessage: "Build a turn first",
+    successMessage: "Provider prompt copied",
+    failureMessage: "Clipboard blocked; prompt is in the drawer",
+  });
 });
 
 elements.checkSidecar.addEventListener("click", async () => {
@@ -79,7 +90,7 @@ elements.newCampaign.addEventListener("click", () => {
   });
   state.sourceMode = "new";
   state.reviewBatch = null;
-  state.responseImport.value = "";
+  elements.responseImport.value = "";
   state.contextPack = buildContextPack(state.campaign, {
     purpose: "new_campaign_start",
   });
@@ -300,7 +311,7 @@ function importProviderResponse(responseText) {
     });
   }
 
-  state.responseImport.value = "";
+  elements.responseImport.value = "";
   elements.bridgeStatus.textContent =
     extraction.proposedChanges.length > 0
       ? `${extraction.proposedChanges.length} proposed change${extraction.proposedChanges.length === 1 ? "" : "s"} found`
@@ -316,7 +327,7 @@ async function ensureCompanionSidecar({ openIfMissing = false } = {}) {
       ready: false,
       lastRun: null,
     };
-    elements.bridgeStatus.textContent = "Extension bridge unavailable; manual copy ready";
+    elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
     return probe;
   }
 
@@ -342,7 +353,7 @@ async function ensureCompanionSidecar({ openIfMissing = false } = {}) {
       ready: false,
       lastRun: null,
     };
-    elements.bridgeStatus.textContent = "Extension bridge unavailable; manual copy ready";
+    elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
     return {
       ready: false,
       error: error instanceof Error ? error.message : "Extension bridge unavailable.",
@@ -359,8 +370,10 @@ async function runPromptThroughSidecar(prompt) {
   try {
     const probe = await probeExtensionBridge();
     if (!probe.available) {
-      await navigator.clipboard.writeText(prompt);
-      elements.bridgeStatus.textContent = "Extension bridge unavailable; prompt copied";
+      await copyPromptToClipboard(prompt, {
+        successMessage: "Extension not connected; prompt copied",
+        failureMessage: "Extension not connected; copy from prompt drawer",
+      });
       state.bridge = {
         mode: "manual",
         ready: false,
@@ -398,8 +411,10 @@ async function runPromptThroughSidecar(prompt) {
     }
 
     if (result.loginRequired) {
-      await navigator.clipboard.writeText(prompt);
-      elements.bridgeStatus.textContent = "ChatGPT needs login; prompt copied";
+      await copyPromptToClipboard(prompt, {
+        successMessage: "ChatGPT needs login; prompt copied",
+        failureMessage: "ChatGPT needs login; copy from prompt drawer",
+      });
       state.playMessages.push({
         role: "system",
         title: "Provider Waiting",
@@ -409,23 +424,58 @@ async function runPromptThroughSidecar(prompt) {
       return;
     }
 
-    await navigator.clipboard.writeText(prompt);
-    elements.bridgeStatus.textContent = "Sidecar did not return a response; prompt copied";
+    await copyPromptToClipboard(prompt, {
+      successMessage: "Sidecar did not return a response; prompt copied",
+      failureMessage: "Sidecar did not return a response; copy from prompt drawer",
+    });
   } catch (error) {
     stopSidecarProgress();
-    await navigator.clipboard.writeText(prompt);
+    await copyPromptToClipboard(prompt, {
+      successMessage: "Sidecar failed; prompt copied",
+      failureMessage: "Sidecar failed; copy from prompt drawer",
+    });
     state.bridge = {
       mode: "manual",
       ready: false,
       lastRun: null,
     };
-    elements.bridgeStatus.textContent = "Sidecar failed; prompt copied";
     state.playMessages.push({
       role: "system",
       title: "Manual Fallback",
       body: error instanceof Error ? error.message : "Provider bridge failed. The prompt was copied for manual paste.",
     });
     render();
+  }
+}
+
+async function copyPromptToClipboard(prompt, messages = {}) {
+  if (!prompt?.trim()) {
+    elements.bridgeStatus.textContent = messages.emptyMessage ?? "No provider prompt ready";
+    return false;
+  }
+
+  try {
+    await navigator.clipboard.writeText(prompt);
+    elements.bridgeStatus.textContent = messages.successMessage ?? "Prompt copied";
+    return true;
+  } catch {
+    elements.bridgeStatus.textContent = messages.failureMessage ?? "Clipboard blocked; prompt is in the drawer";
+    openPromptDrawer();
+    return false;
+  }
+}
+
+function openPromptDrawer() {
+  const drawer = document.querySelector(".prompt-drawer");
+  if (drawer) {
+    drawer.open = true;
+  }
+}
+
+function reportUiError(error) {
+  const message = error instanceof Error ? error.message : String(error ?? "Unknown UI error");
+  if (elements.bridgeStatus) {
+    elements.bridgeStatus.textContent = `UI error: ${message}`;
   }
 }
 
