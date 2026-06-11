@@ -204,6 +204,7 @@ function buildRulesProfileSection(campaign) {
       `Core stats: ${profile.coreStats.join(", ")}`,
       `Default check: ${profile.diceConventions.defaultCheck}`,
       ...profile.combatLoop.map((step) => `Combat loop: ${step}`),
+      ...(profile.combatTurnExample ?? []).map((line) => `Combat format example: ${line}`),
       ...profile.providerGuardRails.map((rule) => `Provider guard rail: ${rule}`),
     ],
   };

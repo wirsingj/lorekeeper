@@ -1683,7 +1683,7 @@ function stripTrailingStatusBlock(text) {
 }
 
 function messageBodyElements(text, role = "dm") {
-  const blocks = normalizeMessageBlocks(text, role);
+  const blocks = extractChoicePanel(normalizeMessageBlocks(text, role), role);
 
   if (!blocks.length) {
     const paragraph = document.createElement("p");
@@ -1700,6 +1700,40 @@ function messageBodyElements(text, role = "dm") {
         list.append(item);
       });
       return list;
+    }
+
+    if (block.type === "choices") {
+      const panel = document.createElement("div");
+      panel.className = "choice-panel";
+      const title = document.createElement("strong");
+      title.className = "choice-title";
+      title.textContent = block.prompt;
+      panel.append(title);
+
+      const list = document.createElement("ol");
+      block.items.forEach((itemText) => {
+        const item = document.createElement("li");
+        item.textContent = itemText;
+        list.append(item);
+      });
+      panel.append(list);
+
+      const hint = document.createElement("small");
+      hint.className = "choice-hint";
+      hint.textContent = "Pick one, combine ideas, add flavor, or try something else reasonable.";
+      panel.append(hint);
+      return panel;
+    }
+
+    if (block.type === "combat") {
+      const panel = document.createElement("div");
+      panel.className = "combat-turn";
+      block.lines.forEach((line) => {
+        const row = document.createElement("p");
+        row.textContent = line;
+        panel.append(row);
+      });
+      return panel;
     }
 
     const paragraph = document.createElement("p");
@@ -1723,6 +1757,22 @@ function normalizeMessageBlocks(text, role) {
     return rawBlocks.map(textBlockToRenderableBlock);
   }
 
+  const trailingChoices = extractTrailingChoiceBlocks(rawBlocks);
+  if (trailingChoices) {
+    return [
+      ...normalizeDmProseBlocks(rawBlocks.slice(0, trailingChoices.promptIndex)),
+      {
+        type: "choices",
+        prompt: trailingChoices.prompt,
+        items: trailingChoices.items,
+      },
+    ];
+  }
+
+  return normalizeDmProseBlocks(rawBlocks);
+}
+
+function normalizeDmProseBlocks(rawBlocks) {
   const normalized = [];
   let proseGroup = [];
 
@@ -1763,9 +1813,50 @@ function normalizeMessageBlocks(text, role) {
   }
 }
 
+function extractTrailingChoiceBlocks(rawBlocks) {
+  for (let index = rawBlocks.length - 2; index >= 0; index -= 1) {
+    const prompt = extractChoicePrompt(rawBlocks[index]);
+    if (!prompt) {
+      continue;
+    }
+
+    const choices = rawBlocks.slice(index + 1)
+      .map(cleanChoiceText)
+      .filter(Boolean);
+    if (choices.length >= 2 && choices.every(isLikelyChoiceText)) {
+      return {
+        promptIndex: index,
+        prompt,
+        items: choices,
+      };
+    }
+  }
+
+  return null;
+}
+
+function extractChoicePrompt(text) {
+  const match = text.match(/(?:^|\.|\?|!)\s*((?:What (?:does|do) .*? do|What do you do|What now|Your move|Choose)[?!.]?)\s*$/i);
+  return match?.[1]?.trim() ?? null;
+}
+
+function cleanChoiceText(text) {
+  return text
+    .trim()
+    .replace(/^[-*]\s+/, "")
+    .replace(/^\d+[.)]\s*/, "")
+    .trim();
+}
+
+function isLikelyChoiceText(text) {
+  return text.length <= 220 && !/^["“].+["”]$/.test(text);
+}
+
 function textBlockToRenderableBlock(block) {
   const lines = block.split(/\n/).map((line) => line.trim()).filter(Boolean);
   const isList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
+  const isCombatBlock = lines.some((line) => /^Options:$/i.test(line)) &&
+    lines.some((line) => /^(Chosen|Damage|Narration):/i.test(line));
 
   if (isList) {
     return {
@@ -1774,10 +1865,85 @@ function textBlockToRenderableBlock(block) {
     };
   }
 
+  if (isCombatBlock) {
+    return {
+      type: "combat",
+      lines,
+    };
+  }
+
   return {
     type: "paragraph",
     text: lines.join(" "),
   };
+}
+
+function extractChoicePanel(blocks, role) {
+  if (role !== "dm" && role !== "provider") {
+    return blocks;
+  }
+
+  if (blocks.length < 2) {
+    return blocks;
+  }
+
+  const last = blocks.at(-1);
+  const previous = blocks.at(-2);
+  if (last?.type !== "paragraph" || previous?.type !== "paragraph") {
+    return blocks;
+  }
+
+  const prompt = extractChoicePrompt(previous.text);
+  if (!prompt) {
+    return blocks;
+  }
+
+  const choices = splitChoiceText(last.text);
+  if (choices.length < 2) {
+    return blocks;
+  }
+
+  const previousText = previous.text.slice(0, previous.text.length - prompt.length).trim();
+  const nextBlocks = blocks.slice(0, -2);
+  if (previousText) {
+    nextBlocks.push({
+      ...previous,
+      text: previousText,
+    });
+  }
+
+  nextBlocks.push({
+    type: "choices",
+    prompt,
+    items: choices,
+  });
+  return nextBlocks;
+}
+
+function splitChoiceText(text) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const numbered = normalized
+    .split(/\s+(?=\d+[.)]\s+)/)
+    .map((item) => item.replace(/^\d+[.)]\s*/, "").trim())
+    .filter(Boolean);
+  if (numbered.length >= 2) {
+    return numbered;
+  }
+
+  const sentenceChoices = normalized
+    .split(/(?<=\.)\s+(?=[A-Z])/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 12 && !/^something else\.?$/i.test(item));
+  const hasFallback = /(?:^|\s)Something else\.?$/i.test(normalized);
+  if (sentenceChoices.length >= 2) {
+    return hasFallback ? [...sentenceChoices, "Something else."] : sentenceChoices;
+  }
+
+  return [];
 }
 
 function shouldKeepDmBlockSeparate(text, index, totalBlocks) {

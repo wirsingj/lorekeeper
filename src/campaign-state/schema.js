@@ -101,11 +101,16 @@ export function createEmptyCombatState() {
     enemies: [],
     conditions: [],
     stakes: "",
-    turnFormat: "Declare intent, resolve action, update HP/conditions, show next initiative.",
+    turnFormat:
+      "Combat turn format: Character name and HP, Options list, Chosen action, roll/math breakdown, HP/resource updates, short narration.",
     preferences: [
       "Keep combat tactical but cinematic.",
       "Track HP, conditions, initiative, and enemy intent when available.",
       "Ask for missing player choices instead of assuming major tactics.",
+      "Use numbered or clearly separated options before resolving a non-player combatant's chosen action.",
+      "Show damage math and HP deltas explicitly when combat resolves.",
+      "Options are suggestions, not restrictions; the player can combine options, add flavor, or attempt a reasonable different action.",
+      "When a player attempts something uncertain, resolve it with an appropriate roll or clearly stated automatic outcome.",
     ],
   };
 }
@@ -201,9 +206,22 @@ export function createDefaultRulesProfile() {
     combatLoop: [
       "Confirm scene stakes and participants.",
       "Roll or assign initiative.",
-      "On each turn, show actor, HP/AC when known, conditions, 3-5 sensible options, chosen action, roll, result, and narration.",
+      "On each turn, show actor and HP, then an Options section with 2-4 sensible actions.",
+      "State that options can be mixed, flavored, or replaced by another reasonable action.",
+      "Resolve with a Chosen line, roll/math breakdown, result, HP/resource updates, and narration.",
       "Update HP, conditions, resources, position, enemy intent, and unresolved consequences.",
       "End the round with a concise state summary.",
+    ],
+    combatTurnExample: [
+      "Character Name (HP current/max)",
+      "Options:",
+      "1. Direct attack or spell.",
+      "2. Utility/help/defense action.",
+      "3. Analysis, movement, setup, or support action.",
+      "Player may choose A+B, add flavor, or do something else reasonable; call for rolls when uncertain.",
+      "Chosen: (1) - concise action name.",
+      "Rolls/Damage: show dice, modifiers, total, and HP math.",
+      "Narration: short cinematic result with clear battlefield consequence.",
     ],
     conditions: [
       "blinded",
