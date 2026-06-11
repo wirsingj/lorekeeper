@@ -89,6 +89,11 @@ async function sendPromptToProvider() {
       timeoutMs: 90000,
     });
     responseOutput.value = result.text ?? "";
+    if (result.needsManualSubmit) {
+      setStatus("Prompt inserted. Press the ChatGPT send arrow to submit.");
+      return;
+    }
+
     setStatus(result.found ? `Imported ${result.characters} response characters.` : "Sent, but no response was found.");
   } catch (error) {
     setStatus(`Send failed: ${error.message}`);

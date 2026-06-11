@@ -390,6 +390,17 @@ async function runPromptThroughSidecar(prompt) {
       return;
     }
 
+    if (result.response?.needsManualSubmit) {
+      elements.bridgeStatus.textContent = "Prompt is in ChatGPT; press the send arrow";
+      state.bridge = {
+        mode: "extension",
+        ready: true,
+        lastRun: result,
+      };
+      render();
+      return;
+    }
+
     if (result.loginRequired) {
       await copyPromptToClipboard(prompt, {
         successMessage: "ChatGPT needs login; prompt copied",
