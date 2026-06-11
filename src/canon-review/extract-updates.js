@@ -15,6 +15,14 @@ export function extractLorekeeperUpdates(responseText) {
       error: null,
     };
   } catch (error) {
+    const partialChanges = parsePartialProposedChanges(payload.json);
+    if (partialChanges.length > 0) {
+      return {
+        proposedChanges: partialChanges.flatMap(normalizeChange),
+        error: `Recovered ${partialChanges.length} complete update${partialChanges.length === 1 ? "" : "s"} from incomplete Lorekeeper JSON.`,
+      };
+    }
+
     return {
       proposedChanges: [],
       error: error instanceof Error ? error.message : "Could not parse Lorekeeper update JSON.",
@@ -81,6 +89,14 @@ function findAnyJsonBlock(text) {
 function findInlineJsonObject(text) {
   for (let start = text.indexOf("{"); start !== -1; start = text.indexOf("{", start + 1)) {
     const end = findBalancedObjectEnd(text, start);
+    if (end === -1 && text.slice(start).includes("proposedChanges")) {
+      return {
+        json: text.slice(start).trim(),
+        start,
+        end: text.length,
+      };
+    }
+
     if (end === -1) {
       continue;
     }
@@ -141,15 +157,45 @@ function findBalancedObjectEnd(text, start) {
   return -1;
 }
 
+function parsePartialProposedChanges(json) {
+  const keyIndex = json.indexOf('"proposedChanges"');
+  if (keyIndex === -1) {
+    return [];
+  }
+
+  const arrayStart = json.indexOf("[", keyIndex);
+  if (arrayStart === -1) {
+    return [];
+  }
+
+  const changes = [];
+  for (let start = json.indexOf("{", arrayStart); start !== -1; start = json.indexOf("{", start + 1)) {
+    const end = findBalancedObjectEnd(json, start);
+    if (end === -1) {
+      break;
+    }
+
+    try {
+      changes.push(JSON.parse(json.slice(start, end + 1)));
+      start = end;
+    } catch {
+      // Skip malformed objects and keep looking for the next complete one.
+    }
+  }
+
+  return changes;
+}
+
 function normalizeChange(change) {
   const expanded = expandGroupedChange(change);
   if (expanded) {
     return expanded.map(normalizeChange);
   }
 
+  const domain = normalizeChangeDomain(change);
   return {
     operation: change.operation ?? "note",
-    domain: change.domain ?? "lore",
+    domain,
     targetId: change.targetId ?? null,
     summary: change.summary ?? "Unlabeled proposed update.",
     data: change.data ?? {},
@@ -184,4 +230,28 @@ function expandGroupedChange(change) {
   }
 
   return null;
+}
+
+function normalizeChangeDomain(change) {
+  const domain = change.domain ?? "lore";
+  if ((domain === "people" || domain === "person" || domain === "characters") && looksLikePartyMember(change)) {
+    return "party";
+  }
+
+  return domain;
+}
+
+function looksLikePartyMember(change) {
+  const data = change.data ?? {};
+  const haystack = [
+    change.summary,
+    data.playerRole,
+    data.role,
+    data.type,
+    data.relationshipToEvelynn,
+    ...(Array.isArray(data.traits) ? data.traits : []),
+    ...(Array.isArray(data.specialties) ? data.specialties : []),
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return /\bparty member\b|\bcompanion\b|\btrusted partner\b|\bplayer character\b|\bpc\b/.test(haystack);
 }

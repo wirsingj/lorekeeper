@@ -1061,7 +1061,6 @@ async function runPromptThroughSidecar(prompt) {
 
     if (result.sent && result.response?.text) {
       await importProviderResponse(result.response.text);
-      elements.bridgeStatus.textContent = "ChatGPT response imported and saved";
       return;
     }
 

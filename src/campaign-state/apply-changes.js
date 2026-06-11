@@ -172,7 +172,7 @@ function addHumanNote(record, change) {
 }
 
 function applySceneHints(campaign, domain, record) {
-  if (domain === "places" && !campaign.scene.currentPlaceId) {
+  if (domain === "places" && (!campaign.scene.currentPlaceId || campaign.scene.currentPlaceId === "place-starting-location")) {
     campaign.scene.currentPlaceId = record.id;
   }
 

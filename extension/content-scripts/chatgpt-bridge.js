@@ -190,7 +190,7 @@ async function waitForAssistantResponseChange(beforeText, timeoutMs) {
 
     if (text && text !== beforeText && text === lastText) {
       stableSince ??= Date.now();
-      if (Date.now() - stableSince > 1800 && !isGenerating()) {
+      if (Date.now() - stableSince > 4500 && !isGenerating() && !hasIncompleteLorekeeperJson(text)) {
         return;
       }
     }
@@ -320,6 +320,54 @@ function isGenerating() {
       document.querySelector('button[data-testid="stop-button"]') ||
       document.querySelector('[aria-label*="Stop generating"]'),
   );
+}
+
+function hasIncompleteLorekeeperJson(text) {
+  const markerIndex = text.indexOf('"proposedChanges"');
+  if (markerIndex === -1) {
+    return false;
+  }
+
+  const objectStart = text.lastIndexOf("{", markerIndex);
+  if (objectStart === -1) {
+    return false;
+  }
+
+  return findBalancedObjectEnd(text, objectStart) === -1;
+}
+
+function findBalancedObjectEnd(text, start) {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+  }
+
+  return -1;
 }
 
 function findPromptInput() {
