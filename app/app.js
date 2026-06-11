@@ -140,7 +140,13 @@ elements.deleteCampaign.addEventListener("click", () => {
 });
 
 elements.checkSidecar.addEventListener("click", async () => {
-  await ensureCompanionSidecar({ openIfMissing: true, focusProvider: true });
+  const result = await ensureCompanionSidecar({ openIfMissing: false });
+  if (result?.found) {
+    await ensureCompanionSidecar({ openIfMissing: true, focusProvider: true });
+    return;
+  }
+
+  elements.bridgeStatus.textContent = "No saved campaign chat found; use New Campaign Chat first";
 });
 
 elements.newProviderChat.addEventListener("click", async () => {
@@ -932,6 +938,7 @@ async function startNewProviderConversation() {
       openIfMissing: true,
       focusProvider: true,
       forceNewConversation: true,
+      allowPendingConversation: true,
     });
     if (result.ready) {
       await bootstrapProviderConversation();
@@ -968,6 +975,7 @@ async function bootstrapProviderConversation() {
           readyTimeoutMs: 30000,
           responseTimeoutMs: 45000,
           returnToCaller: false,
+          allowPendingConversation: true,
         },
       },
       75000,

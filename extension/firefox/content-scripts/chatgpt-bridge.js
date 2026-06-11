@@ -25,6 +25,10 @@ async function handleCommand(command, payload) {
     return sendPromptAndRead(payload.prompt ?? "", payload.timeoutMs ?? 90000);
   }
 
+  if (command === "startNewChat") {
+    return startNewChat();
+  }
+
   throw new Error(`Unsupported ChatGPT bridge command: ${command}`);
 }
 
@@ -119,6 +123,26 @@ async function sendPromptAndRead(prompt, timeoutMs) {
 
     throw error;
   }
+}
+
+async function startNewChat() {
+  const button = findNewChatButton();
+  if (!button) {
+    return {
+      started: false,
+      reason: "Could not find ChatGPT New chat control.",
+    };
+  }
+
+  clickButtonLikeUser(button);
+  await waitForPromptInputReady(10000);
+
+  return {
+    started: true,
+    button: describeNode(button),
+    url: location.href,
+    title: document.title,
+  };
 }
 
 function readLatestResponse() {
@@ -231,6 +255,17 @@ async function waitForSendButton(input, timeoutMs) {
   return lastButton;
 }
 
+async function waitForPromptInputReady(timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (findPromptInput()) {
+      return;
+    }
+
+    await delay(150);
+  }
+}
+
 function findSendButton(input = findPromptInput()) {
   const scopes = [
     findComposerScope(input),
@@ -268,6 +303,33 @@ function findSendButton(input = findPromptInput()) {
     buttons.find((button) => button.querySelector("svg") && button.type === "submit") ??
     findLikelyComposerSendButton(input, buttons)
   );
+}
+
+function findNewChatButton() {
+  const selectors = [
+    'a[href="/"]',
+    'a[href^="/?"]',
+    'a[aria-label*="New chat"]',
+    'button[aria-label*="New chat"]',
+    '[data-testid="create-new-chat-button"]',
+  ];
+
+  for (const selector of selectors) {
+    const candidate = [...document.querySelectorAll(selector)].find((node) => {
+      const label = `${node.getAttribute("aria-label") ?? ""} ${node.textContent ?? ""}`.toLowerCase();
+      return isVisible(node) && /new chat/.test(label);
+    });
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return [...document.querySelectorAll("a, button")]
+    .filter(isVisible)
+    .find((node) => {
+      const label = `${node.getAttribute("aria-label") ?? ""} ${node.textContent ?? ""}`.toLowerCase();
+      return /(^|\s)new chat(\s|$)/.test(label);
+    }) ?? null;
 }
 
 function findLikelyComposerSendButton(input, buttons) {

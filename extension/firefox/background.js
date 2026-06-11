@@ -137,7 +137,7 @@ async function getCompanionSession(options = {}) {
   const status = await safeProviderStatus(tab.id, settings);
   return {
     found: true,
-    ready: Boolean(status?.hasInput),
+    ready: isUsableProviderStatus(status),
     loginRequired: Boolean(status && !status.hasInput),
     tab: serializeTab(tab, settings),
     status,
@@ -158,7 +158,7 @@ async function ensureCompanionSession(options = {}, sender) {
     return {
       found: true,
       created: false,
-      ready: Boolean(status?.hasInput),
+      ready: isUsableProviderStatus(status),
       loginRequired: Boolean(status && !status.hasInput),
       tab: serializeTab(existing, settings),
       status,
@@ -186,7 +186,10 @@ async function ensureCompanionSession(options = {}, sender) {
   });
 
   const status = await waitForProviderStatus(tab.id, settings, options.readyTimeoutMs ?? 30000);
-  const ready = Boolean(status?.hasInput);
+  const preparedStatus = options.forceNewConversation && status?.hasInput
+    ? await prepareFreshConversation(tab.id, settings, status)
+    : status;
+  const ready = isUsableProviderStatus(preparedStatus);
 
   if (ready && options.returnToCaller !== false && !options.focusProvider) {
     await returnToCallerTab(callerTab);
@@ -198,7 +201,7 @@ async function ensureCompanionSession(options = {}, sender) {
     ready,
     loginRequired: !ready,
     tab: serializeTab(tab, settings),
-    status,
+    status: preparedStatus,
     settings,
   };
 }
@@ -239,6 +242,21 @@ async function runCompanionPrompt(prompt, options = {}, sender) {
     sent: true,
     response,
   };
+}
+
+async function prepareFreshConversation(tabId, settings, fallbackStatus) {
+  try {
+    const result = await sendProviderCommand(tabId, "startNewChat", settings);
+    if (result?.started) {
+      await delay(1000);
+      return await waitForProviderStatus(tabId, settings, 8000);
+    }
+  } catch {
+    // ChatGPT changes this UI often. If the button cannot be found, the bootstrap
+    // prompt still marks the chosen tab as this campaign's provider sidecar.
+  }
+
+  return fallbackStatus;
 }
 
 async function getCompanionSettings(overrides = {}) {
@@ -304,7 +322,7 @@ async function findBestCompanionTab(settings) {
       const tab = await browser.tabs.get(settings.tabId);
       if (isSupportedProviderUrl(tab.url)) {
         const status = await safeProviderStatus(tab.id, settings);
-        if (!requiresCampaignMatch(settings) || hasCampaignIdentity(tab, status, settings)) {
+        if (isStoredCampaignTabUsable(status, settings) || !requiresCampaignMatch(settings) || hasCampaignIdentity(tab, status, settings)) {
           return tab;
         }
       }
@@ -324,6 +342,10 @@ async function findBestCompanionTab(settings) {
   const best = scored.sort((a, b) => b.score - a.score)[0];
   const minimumScore = settings.campaignId ? 20 : 1;
   return best && best.score >= minimumScore ? best.tab : null;
+}
+
+function isStoredCampaignTabUsable(status, settings) {
+  return Boolean(settings.campaignId && settings.providerConversationId && isUsableProviderStatus(status));
 }
 
 async function resolveProjectUrl(settings) {
@@ -445,6 +467,10 @@ function hasCampaignIdentity(tab, status, settings) {
 
 function includesText(haystack, needle) {
   return Boolean(needle && haystack.includes(String(needle).toLowerCase()));
+}
+
+function isUsableProviderStatus(status) {
+  return Boolean(status?.hasInput);
 }
 
 async function safeProviderStatus(tabId, settings) {
