@@ -488,6 +488,7 @@ button.danger-button:disabled {
 .play-message.player {
   grid-template-columns: minmax(0, min(68ch, calc(100% - 46px))) 36px;
   justify-content: end;
+  justify-items: end;
 }
 
 .message-avatar {
@@ -654,7 +655,7 @@ button.danger-button:disabled {
 .command-deck {
   grid-area: bottom;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.34fr);
+  grid-template-columns: minmax(300px, 0.34fr) minmax(0, 1fr);
   gap: 14px;
   padding: 14px;
   background:
@@ -668,6 +669,7 @@ button.danger-button:disabled {
 
 .player-form {
   display: grid;
+  grid-column: 2;
   gap: 7px;
 }
 
@@ -715,6 +717,8 @@ textarea::placeholder {
 
 .prompt-drawer {
   display: grid;
+  grid-column: 1;
+  grid-row: 1;
   gap: 8px;
 }
 
@@ -874,5 +878,11 @@ textarea::placeholder {
   .command-deck,
   .input-row {
     grid-template-columns: 1fr;
+  }
+
+  .player-form,
+  .prompt-drawer {
+    grid-column: auto;
+    grid-row: auto;
   }
 }

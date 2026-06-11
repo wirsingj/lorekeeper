@@ -147,7 +147,7 @@ async function getCompanionSession(options = {}) {
 
 async function ensureCompanionSession(options = {}, sender) {
   const settings = await getCompanionSettings(options);
-  const existing = await findBestCompanionTab(settings);
+  const existing = options.forceNewConversation ? null : await findBestCompanionTab(settings);
 
   if (existing) {
     if (options.focusProvider) {
@@ -303,7 +303,10 @@ async function findBestCompanionTab(settings) {
     try {
       const tab = await browser.tabs.get(settings.tabId);
       if (isSupportedProviderUrl(tab.url)) {
-        return tab;
+        const status = await safeProviderStatus(tab.id, settings);
+        if (!requiresCampaignMatch(settings) || hasCampaignIdentity(tab, status, settings)) {
+          return tab;
+        }
       }
     } catch {
       // Stored tab went away; fall through to discovery.
@@ -373,11 +376,11 @@ function scoreCompanionTab(tab, settings) {
     score += 100;
   }
 
-  if (projectUrl && projectUrl !== defaultCompanion.projectUrl && tab.url?.startsWith(projectUrl)) {
+  if (!requiresCampaignMatch(settings) && projectUrl && projectUrl !== defaultCompanion.projectUrl && tab.url?.startsWith(projectUrl)) {
     score += 40;
   }
 
-  if (projectHint && haystack.includes(projectHint)) {
+  if (!requiresCampaignMatch(settings) && projectHint && haystack.includes(projectHint)) {
     score += 25;
   }
 
@@ -422,6 +425,26 @@ function scoreProviderStatus(status, settings) {
     score += 8;
   }
   return score;
+}
+
+function requiresCampaignMatch(settings) {
+  return Boolean(settings.campaignId || settings.campaignTitle || settings.conversationHint || settings.providerConversationId);
+}
+
+function hasCampaignIdentity(tab, status, settings) {
+  const haystack = `${tab.title ?? ""} ${tab.url ?? ""}`.toLowerCase();
+  return Boolean(
+    status?.conversationHintVisible ||
+      status?.campaignTitleVisible ||
+      status?.campaignIdVisible ||
+      includesText(haystack, settings.conversationHint) ||
+      includesText(haystack, settings.campaignTitle) ||
+      includesText(haystack, settings.campaignId),
+  );
+}
+
+function includesText(haystack, needle) {
+  return Boolean(needle && haystack.includes(String(needle).toLowerCase()));
 }
 
 async function safeProviderStatus(tabId, settings) {

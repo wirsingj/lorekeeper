@@ -2,7 +2,7 @@ import initSqlJs from "sql.js";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeCampaign, validateCampaign } from "../campaign-state/schema.js";
+import { createEmptyCampaign, normalizeCampaign, validateCampaign } from "../campaign-state/schema.js";
 
 const schemaPath = fileURLToPath(new URL("./sqlite-schema.sql", import.meta.url));
 
@@ -36,14 +36,24 @@ export async function readCampaignFromSqliteFile(sqlitePath) {
   const SQL = await initSqlJs();
   const bytes = await readFile(sqlitePath);
   const db = new SQL.Database(bytes);
-  const snapshot = firstRow(db, "SELECT campaign_json FROM campaign_snapshots LIMIT 1");
-  db.close();
+  const snapshot = tableExists(db, "campaign_snapshots")
+    ? firstRow(db, "SELECT campaign_json FROM campaign_snapshots LIMIT 1")
+    : null;
 
-  if (!snapshot?.campaign_json) {
-    throw new Error("SQLite campaign file does not contain a campaign snapshot.");
+  if (snapshot?.campaign_json) {
+    const campaign = normalizeCampaign(JSON.parse(snapshot.campaign_json));
+    db.close();
+    return campaign;
   }
 
-  return normalizeCampaign(JSON.parse(snapshot.campaign_json));
+  const campaign = readLegacyCampaignFromDatabase(db);
+  db.close();
+
+  if (!campaign) {
+    throw new Error("SQLite campaign file does not contain a campaign snapshot or legacy campaign rows.");
+  }
+
+  return campaign;
 }
 
 export async function overwriteCampaignSqliteFile(campaign, outputPath) {
@@ -166,6 +176,134 @@ function insertCampaign(db, campaign) {
       data_json: JSON.stringify(sourceDocument),
       created_at: now,
     });
+  }
+}
+
+function readLegacyCampaignFromDatabase(db) {
+  if (!tableExists(db, "campaigns")) {
+    return null;
+  }
+
+  const campaignRow = firstRow(db, "SELECT id, title, summary, schema_version, created_at, updated_at FROM campaigns LIMIT 1");
+  if (!campaignRow?.id || !campaignRow?.title) {
+    return null;
+  }
+
+  const records = tableExists(db, "records")
+    ? queryRows(db, "SELECT id, domain, data_json FROM records ORDER BY created_at, id")
+    : [];
+  const recordsByDomain = new Map();
+  for (const record of records) {
+    const parsed = parseJsonObject(record.data_json);
+    if (!parsed) {
+      continue;
+    }
+    const domainRecords = recordsByDomain.get(record.domain) ?? [];
+    domainRecords.push(parsed);
+    recordsByDomain.set(record.domain, domainRecords);
+  }
+
+  const base = createEmptyCampaign({
+    id: campaignRow.id,
+    title: campaignRow.title,
+    summary: campaignRow.summary ?? "",
+    schemaVersion: campaignRow.schema_version ?? undefined,
+    createdAt: campaignRow.created_at ?? undefined,
+    updatedAt: campaignRow.updated_at ?? undefined,
+  });
+
+  const firstRecord = (domain, fallback) => recordsByDomain.get(domain)?.[0] ?? fallback;
+  const sessionLog = readLegacySessionLog(db, campaignRow.id, base);
+
+  return normalizeCampaign({
+    ...base,
+    people: recordsByDomain.get("people") ?? base.people,
+    party: recordsByDomain.get("party") ?? base.party,
+    factions: recordsByDomain.get("factions") ?? base.factions,
+    places: recordsByDomain.get("places") ?? base.places,
+    maps: recordsByDomain.get("maps") ?? base.maps,
+    items: recordsByDomain.get("items") ?? base.items,
+    inventory: recordsByDomain.get("inventory") ?? base.inventory,
+    lore: recordsByDomain.get("lore") ?? base.lore,
+    timeline: recordsByDomain.get("timeline") ?? base.timeline,
+    quests: recordsByDomain.get("quests") ?? base.quests,
+    scene: firstRecord("scene", base.scene),
+    combat: firstRecord("combat", base.combat),
+    rulesProfile: firstRecord("rules_profile", base.rulesProfile),
+    style: firstRecord("style", base.style),
+    promptTemplates: {
+      ...base.promptTemplates,
+      templates: recordsByDomain.get("prompt_templates") ?? base.promptTemplates.templates,
+    },
+    recapTemplates: {
+      ...base.recapTemplates,
+      templates: recordsByDomain.get("recap_templates") ?? base.recapTemplates.templates,
+    },
+    relationships: readLegacyRows(db, "relationships"),
+    assets: readLegacyRows(db, "assets"),
+    sourceDocuments: readLegacyRows(db, "source_documents"),
+    sessionLog,
+  });
+}
+
+function readLegacySessionLog(db, campaignId, campaign) {
+  if (!tableExists(db, "sessions")) {
+    return campaign.sessionLog;
+  }
+
+  const sessions = queryRows(db, "SELECT id, title, started_at, ended_at, recap, data_json FROM sessions ORDER BY started_at, id")
+    .map((row) => parseJsonObject(row.data_json) ?? ({
+      id: row.id,
+      title: row.title,
+      startedAt: row.started_at,
+      endedAt: row.ended_at,
+      recap: row.recap ?? "",
+    }));
+
+  const messages = tableExists(db, "session_messages")
+    ? queryRows(
+        db,
+        "SELECT id, session_id, role, title, body, meta, source, provider_run_id, created_at, data_json FROM session_messages ORDER BY created_at, id",
+      ).map((row) => parseJsonObject(row.data_json) ?? ({
+        id: row.id,
+        sessionId: row.session_id,
+        role: row.role,
+        title: row.title,
+        body: row.body,
+        meta: row.meta ?? "",
+        source: row.source ?? "legacy_sqlite",
+        providerRunId: row.provider_run_id,
+        createdAt: row.created_at,
+      }))
+    : [];
+
+  return {
+    activeSessionId: sessions[0]?.id ?? campaign.sessionLog.activeSessionId,
+    sessions: sessions.length ? sessions : campaign.sessionLog.sessions,
+    messages: messages.filter((message) => !campaignId || message),
+  };
+}
+
+function readLegacyRows(db, table) {
+  if (!tableExists(db, table)) {
+    return [];
+  }
+
+  return queryRows(db, `SELECT data_json FROM ${table} ORDER BY created_at, id`)
+    .map((row) => parseJsonObject(row.data_json))
+    .filter(Boolean);
+}
+
+function parseJsonObject(value) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
@@ -321,6 +459,14 @@ function queryRows(db, sql) {
 
 function firstRow(db, sql) {
   return queryRows(db, sql)[0] ?? null;
+}
+
+function tableExists(db, tableName) {
+  const result = db.exec(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+    [tableName],
+  )[0];
+  return Boolean(result?.values?.length);
 }
 
 export function defaultCampaignSqlitePath(campaignTitle, root = process.cwd()) {

@@ -851,7 +851,7 @@ async function persistPlayMessage(message) {
   }
 }
 
-async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = false } = {}) {
+async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = false, forceNewConversation = false } = {}) {
   const probe = await probeExtensionBridge();
   if (!probe.available) {
     state.bridge = {
@@ -873,6 +873,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
       ...campaignCompanionOptions(),
       readyTimeoutMs: 30000,
       focusProvider,
+      forceNewConversation,
       returnToCaller: !focusProvider,
     },
   };
@@ -925,11 +926,67 @@ async function startNewProviderConversation() {
       lastRun: null,
     };
     const conversation = getActiveProviderConversation(state.campaign, defaultCompanionOptions.providerId);
-    elements.bridgeStatus.textContent = `Fresh campaign chat ready: ${conversation.conversationHint}`;
+    elements.bridgeStatus.textContent = `Opening fresh campaign chat: ${conversation.conversationHint}`;
     render();
-    await ensureCompanionSidecar({ openIfMissing: true, focusProvider: true });
+    const result = await ensureCompanionSidecar({
+      openIfMissing: true,
+      focusProvider: true,
+      forceNewConversation: true,
+    });
+    if (result.ready) {
+      await bootstrapProviderConversation();
+    }
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `New chat failed: ${error.message}` : "New chat failed";
+  }
+}
+
+async function bootstrapProviderConversation() {
+  const conversation = getActiveProviderConversation(state.campaign, defaultCompanionOptions.providerId);
+  const prompt = [
+    "# Lorekeeper Campaign Chat Bootstrap",
+    "",
+    `This provider chat is for the Lorekeeper campaign: ${conversation.conversationHint}.`,
+    `Campaign title: ${state.campaign.title}.`,
+    `Local campaign id: ${state.campaign.id}.`,
+    "",
+    "Please name or summarize this chat using that campaign name and id if your UI supports it.",
+    "Do not add campaign canon from this bootstrap message.",
+    "Lorekeeper SQLite is the source of truth; provider chat history is only a sidecar.",
+    "",
+    "Reply with one short sentence confirming the campaign chat is ready.",
+  ].join("\n");
+
+  try {
+    elements.bridgeStatus.textContent = `Creating provider chat entry for ${conversation.conversationHint}...`;
+    const result = await sendExtensionMessage(
+      {
+        type: "lorekeeper.runCompanionPrompt",
+        prompt,
+        options: {
+          ...campaignCompanionOptions(),
+          readyTimeoutMs: 30000,
+          responseTimeoutMs: 45000,
+          returnToCaller: false,
+        },
+      },
+      75000,
+    );
+
+    if (result.found || result.created) {
+      await persistProviderConversationFromBridge(result);
+    }
+
+    if (result.response?.needsManualSubmit) {
+      elements.bridgeStatus.textContent = `Bootstrap prompt inserted; press send in ${conversation.conversationHint}`;
+      return;
+    }
+
+    elements.bridgeStatus.textContent = `Provider chat created for ${conversation.conversationHint}`;
+  } catch (error) {
+    elements.bridgeStatus.textContent = error instanceof Error
+      ? `Provider chat opened; bootstrap failed: ${error.message}`
+      : "Provider chat opened; bootstrap failed";
   }
 }
 
