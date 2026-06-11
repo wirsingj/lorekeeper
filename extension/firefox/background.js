@@ -36,6 +36,10 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
     return runCompanionPrompt(message.prompt ?? "", message.options ?? {}, sender);
   }
 
+  if (message.type === "lorekeeper.openSidebar") {
+    return openLorekeeperSidebar(sender);
+  }
+
   return null;
 });
 
@@ -143,6 +147,10 @@ async function ensureCompanionSession(options = {}, sender) {
   const existing = await findBestCompanionTab(settings);
 
   if (existing) {
+    if (options.focusProvider) {
+      await focusProviderTab(existing);
+    }
+
     const status = await waitForProviderStatus(existing.id, settings.projectHint, options.readyTimeoutMs ?? 6000);
     return {
       found: true,
@@ -175,7 +183,7 @@ async function ensureCompanionSession(options = {}, sender) {
   const status = await waitForProviderStatus(tab.id, settings.projectHint, options.readyTimeoutMs ?? 30000);
   const ready = Boolean(status?.hasInput);
 
-  if (ready && options.returnToCaller !== false) {
+  if (ready && options.returnToCaller !== false && !options.focusProvider) {
     await returnToCallerTab(callerTab);
   }
 
@@ -332,6 +340,19 @@ async function returnToCallerTab(tab) {
   }
 }
 
+async function focusProviderTab(tab) {
+  if (!tab?.id) {
+    return;
+  }
+
+  try {
+    await browser.windows.update(tab.windowId, { focused: true });
+    await browser.tabs.update(tab.id, { active: true });
+  } catch {
+    // Focusing the provider is a convenience; status reporting still matters.
+  }
+}
+
 function serializeTab(tab, settings) {
   return {
     id: tab.id,
@@ -384,6 +405,40 @@ async function syncSidebarForTab(tabId) {
     }
   } catch {
     // Sidebar close behavior varies by Firefox version and user gesture state.
+  }
+}
+
+async function openLorekeeperSidebar(sender) {
+  const tab = sender?.tab;
+  if (!tab?.id || !isLorekeeperAppUrl(tab.url)) {
+    return {
+      opened: false,
+      reason: "Open Lorekeeper at localhost first.",
+    };
+  }
+
+  try {
+    await browser.sidebarAction.setPanel({
+      tabId: tab.id,
+      panel: "sidebar/sidebar.html",
+    });
+
+    if (browser.sidebarAction.open) {
+      await browser.sidebarAction.open();
+      return {
+        opened: true,
+      };
+    }
+
+    return {
+      opened: false,
+      reason: "Firefox did not expose sidebarAction.open for this context.",
+    };
+  } catch (error) {
+    return {
+      opened: false,
+      reason: error instanceof Error ? error.message : "Could not open sidebar.",
+    };
   }
 }
 

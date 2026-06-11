@@ -120,7 +120,7 @@ elements.campaignSelect.addEventListener("change", async () => {
 });
 
 elements.checkSidecar.addEventListener("click", async () => {
-  await ensureCompanionSidecar({ openIfMissing: true });
+  await ensureCompanionSidecar({ openIfMissing: true, focusProvider: true });
 });
 
 elements.newCampaign.addEventListener("click", async () => {
@@ -664,7 +664,7 @@ function importProviderResponse(responseText) {
   render();
 }
 
-async function ensureCompanionSidecar({ openIfMissing = false } = {}) {
+async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = false } = {}) {
   const probe = await probeExtensionBridge();
   if (!probe.available) {
     state.bridge = {
@@ -680,11 +680,15 @@ async function ensureCompanionSidecar({ openIfMissing = false } = {}) {
     return handleCompanionCheckResult(probe.result);
   }
 
+  await requestSidebarOpen();
+
   const message = {
     type: "lorekeeper.ensureCompanionSession",
     options: {
       ...companionOptions,
       readyTimeoutMs: 30000,
+      focusProvider,
+      returnToCaller: !focusProvider,
     },
   };
 
@@ -702,6 +706,29 @@ async function ensureCompanionSidecar({ openIfMissing = false } = {}) {
     return {
       ready: false,
       error: error instanceof Error ? error.message : "Extension bridge unavailable.",
+    };
+  }
+}
+
+async function requestSidebarOpen() {
+  try {
+    const result = await sendExtensionMessage(
+      {
+        type: "lorekeeper.openSidebar",
+      },
+      5000,
+    );
+
+    if (result?.opened) {
+      elements.bridgeStatus.textContent = "Lorekeeper sidebar opened";
+    } else if (result?.reason) {
+      elements.bridgeStatus.textContent = `Sidebar note: ${result.reason}`;
+    }
+
+    return result;
+  } catch {
+    return {
+      opened: false,
     };
   }
 }
