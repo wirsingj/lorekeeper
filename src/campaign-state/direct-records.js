@@ -20,13 +20,24 @@ export function addCampaignRecord(campaign, input) {
     throw new Error(`Unsupported direct-edit domain: ${input.domain}`);
   }
 
-  working[domain].push(record);
+  const existingIndex = input.id ? working[domain].findIndex((item) => item.id === input.id) : -1;
+  if (existingIndex === -1) {
+    working[domain].push(record);
+  } else {
+    record.createdAt = working[domain][existingIndex].createdAt || record.createdAt;
+    working[domain][existingIndex] = {
+      ...working[domain][existingIndex],
+      ...record,
+      id: working[domain][existingIndex].id,
+      updatedAt: now,
+    };
+  }
   applySceneHints(working, domain, record);
 
   return {
     campaign: touchCampaign(working),
     record,
-    providerSyncNote: buildProviderSyncNote(domain, record),
+    providerSyncNote: buildProviderSyncNote(domain, record, existingIndex === -1 ? "Added" : "Updated"),
   };
 }
 
@@ -151,11 +162,11 @@ function applySceneHints(campaign, domain, record) {
   }
 }
 
-function buildProviderSyncNote(domain, record) {
+function buildProviderSyncNote(domain, record, verb = "Added") {
   const label = domainLabels[domain] || domain;
   const title = record.name || record.title;
   const summary = record.summary || record.stakes || record.notes?.[0] || record.path || "No notes supplied.";
-  return `(Lorekeeper canon update: Added ${label} "${title}". ${summary} Treat this as established campaign canon.)`;
+  return `(Lorekeeper canon update: ${verb} ${label} "${title}". ${summary} Treat this as established campaign canon.)`;
 }
 
 function normalizeDomain(domain) {

@@ -84,12 +84,24 @@ function applyOneChange(campaign, change) {
 }
 
 function applyArrayChange(campaign, records, change, domain, operation) {
-  const targetId = change.targetId;
+  const targetId = change.targetId || inferTargetId(campaign, records, change, domain, operation);
+  const changeData = inferRevealedRecordData(change, domain, targetId);
 
   if (operation === "add") {
+    const existingIndex = targetId ? records.findIndex((record) => record.id === targetId) : -1;
+    if (existingIndex !== -1) {
+      records[existingIndex] = normalizeRecordForDomain(domain, {
+        ...mergeRecordPatch(records[existingIndex], changeData),
+        id: records[existingIndex].id,
+      });
+      addHumanNote(records[existingIndex], change);
+      applySceneHints(campaign, domain, records[existingIndex]);
+      return { applied: true };
+    }
+
     const record = normalizeRecordForDomain(domain, {
-      id: targetId || change.data?.id || uniqueId(domain, change.data?.name || change.data?.title || change.summary),
-      ...change.data,
+      id: targetId || changeData?.id || uniqueId(domain, changeData?.name || changeData?.title || change.summary),
+      ...changeData,
     });
     addHumanNote(record, change);
     records.push(record);
@@ -130,12 +142,127 @@ function applyArrayChange(campaign, records, change, domain, operation) {
   }
 
   records[index] = normalizeRecordForDomain(domain, {
-    ...records[index],
-    ...change.data,
+    ...mergeRecordPatch(records[index], changeData),
   });
   addHumanNote(records[index], change);
   applySceneHints(campaign, domain, records[index]);
   return { applied: true };
+}
+
+function mergeRecordPatch(record, patch) {
+  const merged = {
+    ...record,
+    ...patch,
+  };
+
+  if (patch.notes !== undefined) {
+    merged.notes = [
+      ...normalizeNotes(record.notes),
+      ...normalizeNotes(patch.notes),
+    ];
+  }
+
+  if (patch.name || patch.trueName || patch.true_name || patch.revealedName || patch.revealed_name) {
+    merged.notes = normalizeNotes(merged.notes).filter(
+      (note) => !/true name currently unknown|update this party member when .*real name is revealed/i.test(note),
+    );
+  }
+
+  return merged;
+}
+
+function inferRevealedRecordData(change, domain, targetId) {
+  const data = { ...(change.data ?? {}) };
+  if (domain !== "party" || !targetId || data.name || data.title) {
+    return data;
+  }
+
+  const revealedName = data.trueName || data.true_name || data.revealedName || data.revealed_name || extractRevealedName([
+    change.summary,
+    change.reason,
+    data.summary,
+    data.description,
+    ...(Array.isArray(data.notes) ? data.notes : []),
+  ].filter(Boolean).join(" "));
+
+  if (revealedName) {
+    data.name = revealedName;
+    data.notes = [
+      ...(Array.isArray(data.notes) ? data.notes : normalizeNotes(data.notes)),
+      `True name revealed: ${revealedName}.`,
+    ];
+  }
+
+  return data;
+}
+
+function extractRevealedName(text) {
+  const patterns = [
+    /\b(?:your|his|her|their|the character(?:'s)?|player(?:'s)?)\s+(?:true\s+|real\s+)?name\s+(?:is|was|=)\s+["“]?([A-Z][A-Za-z' -]{1,40})["”]?/i,
+    /\b(?:called|known as|named)\s+["“]?([A-Z][A-Za-z' -]{1,40})["”]?/i,
+    /\btrue name\s*:\s*["“]?([A-Z][A-Za-z' -]{1,40})["”]?/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const name = match?.[1]?.trim().replace(/[.!,;:]+$/, "");
+    if (name) {
+      return name;
+    }
+  }
+
+  return "";
+}
+
+function inferTargetId(campaign, records, change, domain, operation) {
+  if (operation === "remove") {
+    return null;
+  }
+
+  const data = change.data ?? {};
+  const requestedName = normalizeName(data.name || data.title);
+  if (requestedName) {
+    const exact = records.find((record) => normalizeName(record.name || record.title) === requestedName);
+    if (exact) {
+      return exact.id;
+    }
+  }
+
+  if (domain !== "party") {
+    return null;
+  }
+
+  const haystack = [
+    change.summary,
+    change.reason,
+    data.name,
+    data.title,
+    data.trueName,
+    data.alias,
+    data.role,
+    data.playerRole,
+    data.description,
+    data.summary,
+    ...(Array.isArray(data.notes) ? data.notes : []),
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  const placeholder = records.find((record) => {
+    const text = [
+      record.id,
+      record.name,
+      record.ancestryClass,
+      record.playerRole,
+      ...(record.notes ?? []),
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    return /\b(player character|true name|unknown|amnesiac|memory|exiled king|former king|king)\b/.test(text);
+  });
+
+  if (placeholder && /\b(name|called|known as|revealed|memory|king|player character|true name)\b/.test(haystack)) {
+    return placeholder.id;
+  }
+
+  return null;
 }
 
 function mergeObjectChange(target, change, operation) {
@@ -333,6 +460,13 @@ function normalizeList(value) {
 
 function normalizeNotes(value) {
   return normalizeList(value);
+}
+
+function normalizeName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 function uniqueId(prefix, value) {

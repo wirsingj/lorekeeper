@@ -40,6 +40,7 @@ const state = {
     ready: false,
     lastRun: null,
   },
+  editingRecord: null,
 };
 
 const elements = {
@@ -193,6 +194,7 @@ document.querySelectorAll("[data-add-domain]").forEach((button) => {
 });
 
 elements.closeRecordDialog.addEventListener("click", () => {
+  state.editingRecord = null;
   elements.recordDialog.close();
 });
 
@@ -453,6 +455,7 @@ function setCampaignFromPayload(payload, contextPurpose) {
 async function saveRecordFromDialog() {
   const payload = {
     domain: elements.recordDomain.value,
+    id: state.editingRecord?.id || undefined,
     name: elements.recordName.value.trim(),
     role: elements.recordRole.value.trim(),
     type: elements.recordRole.value.trim(),
@@ -487,6 +490,7 @@ async function saveRecordFromDialog() {
     setCampaignFromPayload(result, "direct_record_update");
     render();
     elements.recordDialog.close();
+    state.editingRecord = null;
     elements.recordForm.reset();
     elements.bridgeStatus.textContent = `${recordLabel(payload.domain)} saved to SQLite; provider sees it next turn`;
   } catch (error) {
@@ -494,10 +498,11 @@ async function saveRecordFromDialog() {
   }
 }
 
-function openRecordDialog(domain) {
+function openRecordDialog(domain, record = null) {
   const config = recordDialogConfig(domain);
+  state.editingRecord = record ? { domain, id: record.id } : null;
   elements.recordDomain.value = domain;
-  elements.recordDialogTitle.textContent = config.title;
+  elements.recordDialogTitle.textContent = record ? config.editTitle : config.title;
   elements.recordNameLabel.textContent = config.nameLabel;
   elements.recordRoleLabel.textContent = config.roleLabel;
   elements.recordName.placeholder = config.namePlaceholder;
@@ -506,6 +511,12 @@ function openRecordDialog(domain) {
   elements.recordPathRow.hidden = domain !== "assets";
   elements.recordForm.reset();
   elements.recordDomain.value = domain;
+  if (record) {
+    elements.recordName.value = record.name || record.title || "";
+    elements.recordRole.value = recordRoleValue(domain, record);
+    elements.recordNotes.value = recordNotesValue(domain, record);
+    elements.recordPath.value = record.path || "";
+  }
   elements.recordDialog.showModal();
   elements.recordName.focus();
 }
@@ -514,6 +525,7 @@ function recordDialogConfig(domain) {
   const configs = {
     party: {
       title: "Add Party Member",
+      editTitle: "Edit Party Member",
       nameLabel: "Character name",
       roleLabel: "Ancestry / class",
       namePlaceholder: "Evelynn",
@@ -522,6 +534,7 @@ function recordDialogConfig(domain) {
     },
     people: {
       title: "Add Person",
+      editTitle: "Edit Person",
       nameLabel: "Name",
       roleLabel: "Role / type",
       namePlaceholder: "Mira Vale",
@@ -530,6 +543,7 @@ function recordDialogConfig(domain) {
     },
     places: {
       title: "Add Place",
+      editTitle: "Edit Place",
       nameLabel: "Place name",
       roleLabel: "Place type",
       namePlaceholder: "Brindle Hollow",
@@ -538,6 +552,7 @@ function recordDialogConfig(domain) {
     },
     quests: {
       title: "Add Thread",
+      editTitle: "Edit Thread",
       nameLabel: "Thread title",
       roleLabel: "Status",
       namePlaceholder: "Find the missing wolf companion",
@@ -546,6 +561,7 @@ function recordDialogConfig(domain) {
     },
     lore: {
       title: "Add Lore Note",
+      editTitle: "Edit Lore Note",
       nameLabel: "Lore title",
       roleLabel: "Tags",
       namePlaceholder: "Moonlit wolf omen",
@@ -554,6 +570,7 @@ function recordDialogConfig(domain) {
     },
     assets: {
       title: "Add Source Image",
+      editTitle: "Edit Source Image",
       nameLabel: "Asset name",
       roleLabel: "Kind",
       namePlaceholder: "Brindle Hollow map",
@@ -562,6 +579,7 @@ function recordDialogConfig(domain) {
     },
     items: {
       title: "Add Thing",
+      editTitle: "Edit Thing",
       nameLabel: "Thing name",
       roleLabel: "Kind / type",
       namePlaceholder: "Silver lockpick",
@@ -571,6 +589,30 @@ function recordDialogConfig(domain) {
   };
 
   return configs[domain] ?? configs.lore;
+}
+
+function recordRoleValue(domain, record) {
+  if (domain === "party") {
+    return record.ancestryClass || record.role || record.playerRole || "";
+  }
+
+  if (domain === "quests") {
+    return record.status || "";
+  }
+
+  if (domain === "lore") {
+    return (record.tags ?? []).join(", ");
+  }
+
+  return record.role || record.type || record.kind || record.region || "";
+}
+
+function recordNotesValue(domain, record) {
+  if (domain === "quests") {
+    return [record.stakes, ...(record.openQuestions ?? []).map((question) => `Open: ${question}`)].filter(Boolean).join("\n");
+  }
+
+  return [record.summary, record.description, ...(record.notes ?? [])].filter(Boolean).join("\n");
 }
 
 function recordLabel(domain) {
@@ -1393,6 +1435,7 @@ function renderParty(campaign) {
       recordElement({
         title: member.name,
         body: `${member.ancestryClass || "unknown role"}${formatHp(member.stats?.hp)}${member.notes?.length ? ` - ${member.notes[0]}` : ""}`,
+        onEdit: () => openRecordDialog("party", member),
       }),
     ),
   );
@@ -1412,6 +1455,7 @@ function renderPeople(campaign) {
             person.locationId ? `Location: ${labelById(campaign, person.locationId)}` : "",
             person.relatedIds?.length ? `Related: ${person.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
           ]),
+          onEdit: () => openRecordDialog("people", person),
         }),
       ),
       "No people recorded yet.",
@@ -1446,6 +1490,7 @@ function renderPlaces(campaign) {
               ? `Connected: ${place.connectedPlaceIds.map((id) => labelById(campaign, id)).join(", ")}`
               : "",
           ]),
+          onEdit: () => openRecordDialog("places", place),
         }),
       ),
       "No places recorded yet.",
@@ -1457,6 +1502,8 @@ function renderThings(campaign) {
   const things = [
     ...campaign.items.map((item) => ({
       id: item.id,
+      domain: "items",
+      record: item,
       title: item.name,
       subtitle: item.type || "item",
       body: detailLines([item.summary, ...(item.notes ?? [])]),
@@ -1465,6 +1512,15 @@ function renderThings(campaign) {
       const item = findById(campaign.items, entry.itemId);
       return {
         id: entry.id || entry.itemId,
+        domain: "items",
+        record: {
+          ...(item ?? {}),
+          id: item?.id ?? entry.itemId,
+          name: entry.name || item?.name || entry.itemId,
+          type: item?.type || "inventory",
+          summary: detailLines([entry.notes, item?.summary]),
+          notes: item?.notes ?? [],
+        },
         title: entry.name || item?.name || entry.itemId,
         subtitle: `${entry.quantity ?? 1} carried by ${entry.carriedBy || entry.holderId || "party"}`,
         body: detailLines([entry.notes, item?.summary, ...(item?.notes ?? [])]),
@@ -1472,6 +1528,8 @@ function renderThings(campaign) {
     }),
     ...campaign.assets.map((asset) => ({
       id: asset.id,
+      domain: "assets",
+      record: asset,
       title: asset.name,
       subtitle: asset.kind || "asset",
       body: detailLines([asset.path, ...(asset.notes ?? [])]),
@@ -1486,6 +1544,7 @@ function renderThings(campaign) {
           title: thing.title,
           subtitle: thing.subtitle,
           body: thing.body,
+          onEdit: () => openRecordDialog(thing.domain, thing.record),
         }),
       ),
       "No things recorded yet.",
@@ -1523,6 +1582,7 @@ function renderQuests(campaign) {
             ...(quest.openQuestions ?? []).map((question) => `Open: ${question}`),
             quest.relatedIds?.length ? `Related: ${quest.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
           ]),
+          onEdit: () => openRecordDialog("quests", quest),
         }),
       ),
       "No active threads.",
@@ -1610,7 +1670,7 @@ function renderAssets(campaign) {
   );
 }
 
-function binderRecordElement({ title, subtitle, body }) {
+function binderRecordElement({ title, subtitle, body, onEdit }) {
   const wrapper = document.createElement("details");
   wrapper.className = "binder-record";
 
@@ -1624,6 +1684,19 @@ function binderRecordElement({ title, subtitle, body }) {
   const copy = document.createElement("p");
   copy.textContent = body || "No details recorded.";
   wrapper.append(summary, copy);
+
+  if (onEdit) {
+    const editButton = document.createElement("button");
+    editButton.className = "mini-action";
+    editButton.type = "button";
+    editButton.textContent = "Edit";
+    editButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onEdit();
+    });
+    wrapper.append(editButton);
+  }
 
   return wrapper;
 }
@@ -1658,9 +1731,20 @@ function labelById(campaign, id) {
   );
 }
 
-function recordElement({ title, body }) {
+function recordElement({ title, body, onEdit }) {
   const wrapper = document.createElement("article");
   wrapper.className = "record";
+  if (onEdit) {
+    wrapper.tabIndex = 0;
+    wrapper.title = "Click to edit";
+    wrapper.addEventListener("click", onEdit);
+    wrapper.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onEdit();
+      }
+    });
+  }
 
   const heading = document.createElement("h3");
   heading.textContent = title;

@@ -295,6 +295,22 @@ h3 {
   line-height: 1.35;
 }
 
+.mini-action {
+  margin: 0 8px 9px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: rgba(75, 91, 103, 0.8);
+  color: #eef3f5;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.mini-action:hover,
+.record:hover {
+  border-color: rgba(125, 213, 201, 0.45);
+}
+
 .binder-record small {
   display: block;
   padding: 0 8px 8px;
@@ -319,6 +335,10 @@ h3 {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.055);
   border: 1px solid rgba(174, 191, 202, 0.12);
+}
+
+.record[tabindex="0"] {
+  cursor: pointer;
 }
 
 .record p {
