@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeCampaign, touchCampaign } from "../campaign-state/schema.js";
 import { createStarterCampaign } from "../campaign-state/starter-campaign.js";
+import { ensureInferredPlayerCharacter } from "../campaign-state/player-character-inference.js";
 import {
   overwriteCampaignSqliteFile,
   readCampaignFromSqliteFile,
@@ -146,13 +147,14 @@ export async function selectCampaign(projectRoot, sqlitePath) {
 
 export async function createNewActiveCampaign(projectRoot, options = {}) {
   await assertUniqueCampaignTitle(projectRoot, options.title ?? "New Campaign Binder");
-  const campaign = createStarterCampaign({
+  const starterCampaign = createStarterCampaign({
     title: options.title ?? "New Campaign Binder",
     premise: options.premise ?? "A new D&D 5e-lite campaign ready to grow through play.",
     openingScene: options.openingScene,
     startingLocation: options.startingLocation,
     tone: options.tone,
   });
+  const { campaign } = ensureInferredPlayerCharacter(starterCampaign);
   const sqlitePath = await uniqueCampaignFilePath(projectRoot, campaign.title);
   await mkdir(path.dirname(sqlitePath), { recursive: true });
   await writeCampaignSqliteFile(campaign, sqlitePath);
