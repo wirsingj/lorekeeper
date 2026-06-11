@@ -80,6 +80,18 @@ const elements = {
   recordPathRow: document.querySelector("#record-path-row"),
   recordNotes: document.querySelector("#record-notes"),
   closeRecordDialog: document.querySelector("#close-record-dialog"),
+  campaignDialog: document.querySelector("#campaign-dialog"),
+  campaignForm: document.querySelector("#campaign-form"),
+  newCampaignTitle: document.querySelector("#new-campaign-title"),
+  newCampaignPremise: document.querySelector("#new-campaign-premise"),
+  closeCampaignDialog: document.querySelector("#close-campaign-dialog"),
+  confirmDialog: document.querySelector("#confirm-dialog"),
+  confirmForm: document.querySelector("#confirm-form"),
+  confirmTitle: document.querySelector("#confirm-title"),
+  confirmMessage: document.querySelector("#confirm-message"),
+  closeConfirmDialog: document.querySelector("#close-confirm-dialog"),
+  cancelConfirm: document.querySelector("#cancel-confirm"),
+  acceptConfirm: document.querySelector("#accept-confirm"),
 };
 
 window.addEventListener("error", (event) => {
@@ -112,11 +124,18 @@ elements.checkSidecar.addEventListener("click", async () => {
 });
 
 elements.newCampaign.addEventListener("click", async () => {
-  await createNewCampaign();
+  openCampaignDialog();
 });
 
 elements.loadImported.addEventListener("click", async () => {
-  if (!window.confirm("Load the imported Veil of the Towers bundle and switch the active campaign?")) {
+  const confirmed = await confirmInApp({
+    title: "Load Imported Campaign",
+    message: "This will create or open the imported Veil of the Towers bundle and switch the active campaign.",
+    acceptLabel: "Load Imported",
+  });
+
+  if (!confirmed) {
+    elements.bridgeStatus.textContent = "Imported load canceled";
     return;
   }
 
@@ -155,6 +174,31 @@ document.querySelectorAll("[data-add-domain]").forEach((button) => {
 
 elements.closeRecordDialog.addEventListener("click", () => {
   elements.recordDialog.close();
+});
+
+elements.closeCampaignDialog.addEventListener("click", () => {
+  elements.campaignDialog.close();
+});
+
+elements.campaignForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await createNewCampaign({
+    title: elements.newCampaignTitle.value,
+    premise: elements.newCampaignPremise.value,
+  });
+});
+
+elements.closeConfirmDialog.addEventListener("click", () => {
+  resolveConfirmDialog(false);
+});
+
+elements.cancelConfirm.addEventListener("click", () => {
+  resolveConfirmDialog(false);
+});
+
+elements.confirmForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  resolveConfirmDialog(true);
 });
 
 elements.recordForm.addEventListener("submit", async (event) => {
@@ -248,19 +292,9 @@ async function selectCampaignByPath(sqlitePath) {
   }
 }
 
-async function createNewCampaign() {
-  const title = window.prompt("Campaign name", "New Campaign Binder");
-  if (title === null) {
-    elements.bridgeStatus.textContent = "New campaign canceled";
-    return;
-  }
-
-  const premise = window.prompt("Campaign premise", "A new D&D 5e-lite campaign ready to grow through play.");
-  if (premise === null) {
-    elements.bridgeStatus.textContent = "New campaign canceled";
-    return;
-  }
-
+async function createNewCampaign({ title, premise }) {
+  const trimmedTitle = title.trim() || "New Campaign Binder";
+  const trimmedPremise = premise.trim() || "A new D&D 5e-lite campaign ready to grow through play.";
   try {
     elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
     const response = await fetch(apiNewCampaignUrl, {
@@ -269,8 +303,8 @@ async function createNewCampaign() {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        title: title.trim() || "New Campaign Binder",
-        premise: premise.trim() || "A new D&D 5e-lite campaign ready to grow through play.",
+        title: trimmedTitle,
+        premise: trimmedPremise,
       }),
     });
 
@@ -284,11 +318,13 @@ async function createNewCampaign() {
     elements.responseImport.value = "";
     seedPlayLog();
     render();
+    elements.campaignDialog.close();
+    elements.campaignForm.reset();
     elements.bridgeStatus.textContent = "New campaign saved to SQLite";
   } catch (error) {
     state.campaign = createStarterCampaign({
-      title: title.trim() || "New Campaign Binder",
-      premise: premise.trim() || "A new D&D 5e-lite campaign ready to grow through play.",
+      title: trimmedTitle,
+      premise: trimmedPremise,
     });
     state.sourceMode = "new";
     state.reviewBatch = null;
@@ -301,6 +337,43 @@ async function createNewCampaign() {
     render();
     elements.bridgeStatus.textContent = error instanceof Error ? `New campaign not saved: ${error.message}` : "New campaign not saved";
   }
+}
+
+function openCampaignDialog() {
+  elements.newCampaignTitle.value = "New Campaign Binder";
+  elements.newCampaignPremise.value = "A new D&D 5e-lite campaign ready to grow through play.";
+  elements.campaignDialog.showModal();
+  elements.newCampaignTitle.focus();
+  elements.newCampaignTitle.select();
+}
+
+let pendingConfirmResolve = null;
+
+function confirmInApp({ title, message, acceptLabel = "Continue" }) {
+  if (pendingConfirmResolve) {
+    pendingConfirmResolve(false);
+  }
+
+  elements.confirmTitle.textContent = title;
+  elements.confirmMessage.textContent = message;
+  elements.acceptConfirm.textContent = acceptLabel;
+  elements.confirmDialog.showModal();
+
+  return new Promise((resolve) => {
+    pendingConfirmResolve = resolve;
+  });
+}
+
+function resolveConfirmDialog(value) {
+  if (!pendingConfirmResolve) {
+    elements.confirmDialog.close();
+    return;
+  }
+
+  const resolve = pendingConfirmResolve;
+  pendingConfirmResolve = null;
+  elements.confirmDialog.close();
+  resolve(value);
 }
 
 async function loadImportedCampaign() {

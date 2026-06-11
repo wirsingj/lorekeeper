@@ -176,6 +176,46 @@
       </form>
     </dialog>
 
+    <dialog id="campaign-dialog" class="record-dialog">
+      <form id="campaign-form" method="dialog">
+        <header class="dialog-header">
+          <div>
+            <p class="eyebrow">Campaign</p>
+            <h2>New Campaign</h2>
+          </div>
+          <button id="close-campaign-dialog" class="icon-action" type="button" title="Close">x</button>
+        </header>
+        <label>
+          <span>Campaign name</span>
+          <input id="new-campaign-title" autocomplete="off" required value="New Campaign Binder" />
+        </label>
+        <label>
+          <span>Premise</span>
+          <textarea id="new-campaign-premise" rows="5">A new D&D 5e-lite campaign ready to grow through play.</textarea>
+        </label>
+        <footer class="dialog-actions">
+          <button type="submit">Create Campaign</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="confirm-dialog" class="record-dialog confirm-dialog">
+      <form id="confirm-form" method="dialog">
+        <header class="dialog-header">
+          <div>
+            <p id="confirm-eyebrow" class="eyebrow">Confirm</p>
+            <h2 id="confirm-title">Are you sure?</h2>
+          </div>
+          <button id="close-confirm-dialog" class="icon-action" type="button" title="Close">x</button>
+        </header>
+        <p id="confirm-message" class="dialog-copy"></p>
+        <footer class="dialog-actions">
+          <button id="cancel-confirm" type="button" class="secondary-action">Cancel</button>
+          <button id="accept-confirm" type="submit">Continue</button>
+        </footer>
+      </form>
+    </dialog>
+
     <script type="module" src="/app/app.js"></script>
   </body>
 </html>

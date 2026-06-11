@@ -251,6 +251,12 @@ button {
   font-weight: 850;
 }
 
+button.secondary-action {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: transparent;
+  color: #f8f2e8;
+}
+
 .icon-action {
   width: 30px;
   min-width: 30px;
@@ -568,6 +574,12 @@ textarea {
 .record-dialog textarea {
   resize: vertical;
   min-height: 112px;
+}
+
+.dialog-copy {
+  margin: 0;
+  color: #d7dde5;
+  line-height: 1.45;
 }
 
 @media (max-width: 1180px) {
