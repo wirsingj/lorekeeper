@@ -95,16 +95,33 @@ the SQLite file is the campaign's source of truth.
 
 ## Active Local Campaign
 
-During local development, the server keeps the active campaign at:
+During local development, the server treats `data/campaigns/` as the campaign library. Each campaign
+is a separate SQLite file:
 
-`data/runtime/active-campaign.lorekeeper.sqlite`
+`data/campaigns/<campaign-slug>.lorekeeper.sqlite`
 
-On first run, the server seeds that file from an imported bundle when one exists, otherwise from the
-sample campaign. The app loads campaign state through `GET /api/campaign`.
+The selected campaign is remembered in:
+
+`data/campaigns/campaign-index.json`
+
+The index stores the active campaign path and lightweight campaign metadata for the selector. It is a
+local convenience manifest; the SQLite file remains the durable source of truth.
+
+On first run, the server creates a starter campaign rather than loading an imported demo bundle.
+Imported campaigns, such as Veil of the Towers, are opt-in through the UI. If an older pre-selector
+runtime campaign exists at `data/runtime/active-campaign.lorekeeper.sqlite`, the server migrates it
+into `data/campaigns/` unless it is the old Veil demo default.
+
+The app loads campaign state through `GET /api/campaign`. Campaign library endpoints:
+
+- `GET /api/campaigns`
+- `POST /api/campaign/select`
+- `POST /api/campaign/new`
+- `POST /api/campaign/imported`
 
 Approved review changes are committed through `POST /api/review/commit`. The commit path:
 
-1. loads the active SQLite campaign
+1. loads the selected SQLite campaign from `campaign-index.json`
 2. applies approved changes to structured campaign state
 3. rewrites normalized records and a full campaign snapshot
 4. returns the updated campaign to the UI

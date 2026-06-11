@@ -3,7 +3,13 @@ import { createReadStream, existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadActiveCampaign } from "../src/storage/campaign-repository.js";
+import {
+  createNewActiveCampaign,
+  listCampaigns,
+  loadActiveCampaign,
+  loadImportedCampaign,
+  selectCampaign,
+} from "../src/storage/campaign-repository.js";
 import { commitReviewBatch } from "../src/storage/review-commit.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -36,7 +42,39 @@ const server = createServer(async (request, response) => {
         campaign: payload.campaign,
         source: payload.source,
         sqlitePath: payload.sqlitePath,
+        campaigns: payload.campaigns,
       });
+      return;
+    }
+
+    if (url.pathname === "/api/campaigns" && request.method === "GET") {
+      sendJson(response, 200, await listCampaigns(projectRoot));
+      return;
+    }
+
+    if (url.pathname === "/api/campaign/select" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await selectCampaign(projectRoot, body.sqlitePath);
+      sendJson(response, 200, payload);
+      return;
+    }
+
+    if (url.pathname === "/api/campaign/new" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await createNewActiveCampaign(projectRoot, {
+        title: body.title ?? "New Campaign Binder",
+        premise: body.premise ?? "A new D&D 5e-lite campaign ready to grow through play.",
+        openingScene: body.openingScene,
+        startingLocation: body.startingLocation,
+        tone: body.tone,
+      });
+      sendJson(response, 200, payload);
+      return;
+    }
+
+    if (url.pathname === "/api/campaign/imported" && request.method === "POST") {
+      const payload = await loadImportedCampaign(projectRoot);
+      sendJson(response, 200, payload);
       return;
     }
 

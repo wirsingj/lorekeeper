@@ -118,6 +118,10 @@ indexes local assets, and extracts a first-pass structured campaign for review.
 
 When the dev server is running, the app loads and saves through a local SQLite campaign file:
 
-`data/runtime/active-campaign.lorekeeper.sqlite`
+`data/campaigns/<campaign-slug>.lorekeeper.sqlite`
+
+The active campaign selection is remembered in:
+
+`data/campaigns/campaign-index.json`
 
 Approved review diffs are committed through the local API and persisted into that SQLite file.

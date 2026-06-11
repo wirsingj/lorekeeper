@@ -9,6 +9,10 @@ import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 
 const bundleUrl = "/data/imports/veil-of-the-towers.bundle.json";
 const apiCampaignUrl = "/api/campaign";
+const apiCampaignsUrl = "/api/campaigns";
+const apiSelectCampaignUrl = "/api/campaign/select";
+const apiNewCampaignUrl = "/api/campaign/new";
+const apiImportedCampaignUrl = "/api/campaign/imported";
 const apiCommitReviewUrl = "/api/review/commit";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
@@ -22,6 +26,7 @@ const state = {
   contextPack: null,
   currentTurn: null,
   reviewBatch: null,
+  campaigns: [],
   prompt: "",
   playMessages: [],
   sourceMode: "loading",
@@ -34,6 +39,7 @@ const state = {
 
 const elements = {
   title: document.querySelector("#campaign-title"),
+  campaignSelect: document.querySelector("#campaign-select"),
   sceneLocation: document.querySelector("#scene-location"),
   providerStatus: document.querySelector("#provider-status"),
   saveStatus: document.querySelector("#save-status"),
@@ -79,29 +85,25 @@ elements.copyProviderPrompt.addEventListener("click", async () => {
   });
 });
 
+elements.campaignSelect.addEventListener("change", async () => {
+  const sqlitePath = elements.campaignSelect.value;
+  if (!sqlitePath || sqlitePath === state.sqlitePath) {
+    return;
+  }
+
+  await selectCampaignByPath(sqlitePath);
+});
+
 elements.checkSidecar.addEventListener("click", async () => {
   await ensureCompanionSidecar({ openIfMissing: true });
 });
 
-elements.newCampaign.addEventListener("click", () => {
-  state.campaign = createStarterCampaign({
-    title: "New Campaign Binder",
-    premise: "A new D&D 5e-lite campaign ready to grow through play.",
-  });
-  state.sourceMode = "new";
-  state.reviewBatch = null;
-  elements.responseImport.value = "";
-  state.contextPack = buildContextPack(state.campaign, {
-    purpose: "new_campaign_start",
-  });
-  state.prompt = "";
-  seedPlayLog();
-  render();
-  elements.bridgeStatus.textContent = "New campaign binder opened";
+elements.newCampaign.addEventListener("click", async () => {
+  await createNewCampaign();
 });
 
 elements.loadImported.addEventListener("click", async () => {
-  await loadCampaign();
+  await loadImportedCampaign();
   seedPlayLog();
   render();
   elements.bridgeStatus.textContent = "Imported binder loaded";
@@ -169,14 +171,7 @@ async function loadCampaign() {
   const apiResponse = await fetch(apiCampaignUrl);
   if (apiResponse.ok) {
     const payload = await apiResponse.json();
-    state.campaign = normalizeCampaign(payload.campaign);
-    state.sourceMode = payload.source ?? "sqlite";
-    state.sqlitePath = payload.sqlitePath;
-    state.contextPack = buildContextPack(state.campaign, {
-      purpose: "play_screen_initial_context",
-    });
-    state.prompt = "";
-    state.reviewBatch = null;
+    setCampaignFromPayload(payload, "play_screen_initial_context");
     return;
   }
 
@@ -192,6 +187,113 @@ async function loadCampaign() {
 
   state.contextPack = buildContextPack(state.campaign, {
     purpose: "play_screen_initial_context",
+  });
+  state.prompt = "";
+  state.reviewBatch = null;
+}
+
+async function selectCampaignByPath(sqlitePath) {
+  try {
+    elements.bridgeStatus.textContent = "Opening campaign...";
+    const response = await fetch(apiSelectCampaignUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ sqlitePath }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const payload = await response.json();
+    setCampaignFromPayload(payload, "selected_campaign_context");
+    seedPlayLog();
+    render();
+    elements.bridgeStatus.textContent = "Campaign opened";
+  } catch (error) {
+    elements.bridgeStatus.textContent = error instanceof Error ? `Open failed: ${error.message}` : "Open failed";
+    renderCampaignSelector();
+  }
+}
+
+async function createNewCampaign() {
+  try {
+    elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
+    const response = await fetch(apiNewCampaignUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "New Campaign Binder",
+        premise: "A new D&D 5e-lite campaign ready to grow through play.",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const payload = await response.json();
+    setCampaignFromPayload(payload, "new_campaign_start");
+    state.reviewBatch = null;
+    elements.responseImport.value = "";
+    seedPlayLog();
+    render();
+    elements.bridgeStatus.textContent = "New campaign saved to SQLite";
+  } catch (error) {
+    state.campaign = createStarterCampaign({
+      title: "New Campaign Binder",
+      premise: "A new D&D 5e-lite campaign ready to grow through play.",
+    });
+    state.sourceMode = "new";
+    state.reviewBatch = null;
+    elements.responseImport.value = "";
+    state.contextPack = buildContextPack(state.campaign, {
+      purpose: "new_campaign_start",
+    });
+    state.prompt = "";
+    seedPlayLog();
+    render();
+    elements.bridgeStatus.textContent = error instanceof Error ? `New campaign not saved: ${error.message}` : "New campaign not saved";
+  }
+}
+
+async function loadImportedCampaign() {
+  const response = await fetch(apiImportedCampaignUrl, {
+    method: "POST",
+  });
+
+  if (response.ok) {
+    const payload = await response.json();
+    setCampaignFromPayload(payload, "imported_campaign_context");
+    return;
+  }
+
+  const fallback = await fetch(bundleUrl);
+  if (!fallback.ok) {
+    throw new Error("No imported campaign bundle found.");
+  }
+
+  const bundle = await fallback.json();
+  state.campaign = normalizeCampaign(bundle.campaign);
+  state.sourceMode = "imported";
+  state.contextPack = buildContextPack(state.campaign, {
+    purpose: "imported_campaign_context",
+  });
+  state.prompt = "";
+  state.reviewBatch = null;
+}
+
+function setCampaignFromPayload(payload, contextPurpose) {
+  state.campaign = normalizeCampaign(payload.campaign);
+  state.sourceMode = payload.source ?? "sqlite";
+  state.sqlitePath = payload.sqlitePath;
+  state.campaigns = payload.campaigns ?? state.campaigns;
+  state.contextPack = buildContextPack(state.campaign, {
+    purpose: contextPurpose,
   });
   state.prompt = "";
   state.reviewBatch = null;
@@ -265,6 +367,28 @@ function render() {
   renderPrompt(state.prompt);
   renderReviewBatch();
   renderAssets(campaign);
+  renderCampaignSelector();
+}
+
+function renderCampaignSelector() {
+  const campaigns = state.campaigns ?? [];
+  elements.campaignSelect.replaceChildren(
+    ...campaigns.map((campaign) => {
+      const option = document.createElement("option");
+      option.value = campaign.sqlitePath;
+      option.textContent = campaign.title;
+      option.selected = campaign.sqlitePath === state.sqlitePath;
+      return option;
+    }),
+  );
+
+  if (!campaigns.length) {
+    const option = document.createElement("option");
+    option.value = state.sqlitePath ?? "";
+    option.textContent = state.campaign?.title ?? "No campaigns found";
+    option.selected = true;
+    elements.campaignSelect.append(option);
+  }
 }
 
 function importProviderResponse(responseText) {

@@ -33,6 +33,7 @@ body {
 }
 
 button,
+select,
 textarea {
   font: inherit;
 }
@@ -118,6 +119,17 @@ h3 {
   padding: 5px 9px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.09);
+}
+
+.top-meta select {
+  max-width: 260px;
+  min-height: 32px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #f8f2e8;
+  color: var(--ink);
+  font-weight: 750;
 }
 
 .left-panel {
