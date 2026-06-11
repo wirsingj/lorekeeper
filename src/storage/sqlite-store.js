@@ -123,6 +123,7 @@ function insertCampaign(db, campaign) {
   );
 
   insertSessionLog(db, campaign);
+  insertReviewLog(db, campaign);
 
   for (const relationship of campaign.relationships) {
     runInsert(db, "relationships", {
@@ -165,6 +166,40 @@ function insertCampaign(db, campaign) {
       data_json: JSON.stringify(sourceDocument),
       created_at: now,
     });
+  }
+}
+
+function insertReviewLog(db, campaign) {
+  const now = new Date().toISOString();
+
+  for (const batch of campaign.reviewLog ?? []) {
+    runInsert(db, "review_batches", {
+      id: batch.id,
+      campaign_id: campaign.id,
+      provider_run_id: batch.providerRunId || null,
+      status: batch.status || "pending_review",
+      raw_response: batch.rawResponse || "",
+      created_at: batch.createdAt || now,
+      decided_at: batch.decidedAt || null,
+      data_json: JSON.stringify(batch),
+    });
+
+    for (const change of batch.proposedChanges ?? []) {
+      runInsert(db, "proposed_changes", {
+        id: `${batch.id}-${change.id}`,
+        batch_id: batch.id,
+        operation: change.operation || "note",
+        domain: change.domain || "lore",
+        target_id: change.targetId || null,
+        summary: change.summary || "Unlabeled proposed update.",
+        data_json: JSON.stringify(change.data ?? {}),
+        confidence: change.confidence || "unknown",
+        reason: change.reason || "",
+        status: change.status || "pending",
+        created_at: change.createdAt || batch.createdAt || now,
+        decided_at: change.decidedAt || null,
+      });
+    }
   }
 }
 

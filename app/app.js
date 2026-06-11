@@ -15,6 +15,7 @@ const apiSelectCampaignUrl = "/api/campaign/select";
 const apiNewCampaignUrl = "/api/campaign/new";
 const apiImportedCampaignUrl = "/api/campaign/imported";
 const apiCommitReviewUrl = "/api/review/commit";
+const apiSaveReviewUrl = "/api/review/save";
 const apiCampaignRecordUrl = "/api/campaign/record";
 const apiCampaignMessageUrl = "/api/campaign/message";
 const extensionRequestType = "lorekeeper.appBridge.request";
@@ -426,7 +427,7 @@ function setCampaignFromPayload(payload, contextPurpose) {
     purpose: contextPurpose,
   });
   state.prompt = "";
-  state.reviewBatch = null;
+  state.reviewBatch = latestPendingReviewBatch(state.campaign);
 }
 
 async function commitApprovedChanges(approved) {
@@ -707,6 +708,10 @@ async function importProviderResponse(responseText) {
     proposedChanges: extraction.proposedChanges,
   });
 
+  if (state.reviewBatch.proposedChanges.length > 0) {
+    await persistReviewBatch(state.reviewBatch);
+  }
+
   elements.responseImport.value = "";
   if (extraction.error) {
     elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
@@ -763,6 +768,50 @@ function appendMessageToSessionLog(sessionLog, message) {
     sessions,
     messages: [...(sessionLog?.messages ?? []), message],
   };
+}
+
+async function persistReviewBatch(reviewBatch) {
+  try {
+    const response = await fetch(apiSaveReviewUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ reviewBatch }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const result = await response.json();
+    state.campaign = normalizeCampaign(result.campaign);
+    state.reviewBatch = result.reviewBatch ?? latestPendingReviewBatch(state.campaign);
+    state.contextPack = buildContextPack(state.campaign, {
+      purpose: "post_review_save_context",
+    });
+    state.campaigns = result.campaigns ?? state.campaigns;
+    state.sqlitePath = result.sqlitePath ?? state.sqlitePath;
+    render();
+  } catch (error) {
+    state.campaign = {
+      ...state.campaign,
+      reviewLog: upsertReviewBatch(state.campaign.reviewLog, reviewBatch),
+    };
+    elements.bridgeStatus.textContent = "Review save failed; pending changes are only in this browser view";
+    render();
+  }
+}
+
+function latestPendingReviewBatch(campaign) {
+  return [...(campaign.reviewLog ?? [])]
+    .filter((batch) => batch.status === "pending_review")
+    .sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)))[0] ?? null;
+}
+
+function upsertReviewBatch(reviewLog, reviewBatch) {
+  const existing = Array.isArray(reviewLog) ? reviewLog : [];
+  return [...existing.filter((batch) => batch.id !== reviewBatch.id), reviewBatch];
 }
 
 async function persistPlayMessage(message) {
@@ -1328,10 +1377,11 @@ function renderReviewBatch() {
   );
 }
 
-function updateReviewDecision(changeId, decision) {
+async function updateReviewDecision(changeId, decision) {
   state.reviewBatch = decideChange(state.reviewBatch, changeId, decision);
   elements.bridgeStatus.textContent = `Change ${decision}`;
   render();
+  await persistReviewBatch(state.reviewBatch);
 }
 
 function renderPrompt(prompt) {
