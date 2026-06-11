@@ -27,7 +27,10 @@
         <section class="rail-section">
           <div class="section-title">
             <h2>Party</h2>
-            <span id="party-count" class="count-pill">0</span>
+            <div class="title-actions">
+              <button class="icon-action" data-add-domain="party" type="button" title="Add party member">+</button>
+              <span id="party-count" class="count-pill">0</span>
+            </div>
           </div>
           <div id="party-list" class="record-stack"></div>
         </section>
@@ -69,7 +72,10 @@
         <section class="rail-section">
           <div class="section-title">
             <h2>Threads</h2>
-            <span id="quest-count" class="count-pill">0</span>
+            <div class="title-actions">
+              <button class="icon-action" data-add-domain="quests" type="button" title="Add thread">+</button>
+              <span id="quest-count" class="count-pill">0</span>
+            </div>
           </div>
           <div id="quest-list" class="record-stack"></div>
         </section>
@@ -77,7 +83,12 @@
         <section class="rail-section">
           <div class="section-title">
             <h2>Canon</h2>
-            <span id="context-count" class="count-pill">0</span>
+            <div class="title-actions">
+              <button class="icon-action" data-add-domain="people" type="button" title="Add person">P</button>
+              <button class="icon-action" data-add-domain="places" type="button" title="Add place">L</button>
+              <button class="icon-action" data-add-domain="lore" type="button" title="Add lore">N</button>
+              <span id="context-count" class="count-pill">0</span>
+            </div>
           </div>
           <div id="context-sections" class="context-stack"></div>
         </section>
@@ -101,7 +112,10 @@
         <section class="rail-section">
           <div class="section-title">
             <h2>Assets</h2>
-            <span id="asset-count" class="count-pill">0</span>
+            <div class="title-actions">
+              <button class="icon-action" data-add-domain="assets" type="button" title="Add source image">+</button>
+              <span id="asset-count" class="count-pill">0</span>
+            </div>
           </div>
           <div id="asset-grid" class="asset-strip"></div>
         </section>
@@ -129,6 +143,38 @@
         </details>
       </footer>
     </div>
+
+    <dialog id="record-dialog" class="record-dialog">
+      <form id="record-form" method="dialog">
+        <header class="dialog-header">
+          <div>
+            <p class="eyebrow">Binder</p>
+            <h2 id="record-dialog-title">Add Record</h2>
+          </div>
+          <button id="close-record-dialog" class="icon-action" type="button" title="Close">x</button>
+        </header>
+        <input id="record-domain" name="domain" type="hidden" />
+        <label>
+          <span id="record-name-label">Name</span>
+          <input id="record-name" name="name" autocomplete="off" required />
+        </label>
+        <label>
+          <span id="record-role-label">Role / Type</span>
+          <input id="record-role" name="role" autocomplete="off" />
+        </label>
+        <label id="record-path-row">
+          <span>File path</span>
+          <input id="record-path" name="path" autocomplete="off" placeholder="C:\path\to\image.png" />
+        </label>
+        <label>
+          <span>Notes</span>
+          <textarea id="record-notes" name="notes" rows="5"></textarea>
+        </label>
+        <footer class="dialog-actions">
+          <button id="save-record" type="submit">Save To SQLite</button>
+        </footer>
+      </form>
+    </dialog>
 
     <script type="module" src="/app/app.js"></script>
   </body>

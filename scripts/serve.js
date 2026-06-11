@@ -9,7 +9,9 @@ import {
   loadActiveCampaign,
   loadImportedCampaign,
   selectCampaign,
+  updateActiveCampaign,
 } from "../src/storage/campaign-repository.js";
+import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { commitReviewBatch } from "../src/storage/review-commit.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -74,6 +76,13 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/campaign/imported" && request.method === "POST") {
       const payload = await loadImportedCampaign(projectRoot);
+      sendJson(response, 200, payload);
+      return;
+    }
+
+    if (url.pathname === "/api/campaign/record" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => addCampaignRecord(campaign, body));
       sendJson(response, 200, payload);
       return;
     }

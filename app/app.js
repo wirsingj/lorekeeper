@@ -14,6 +14,7 @@ const apiSelectCampaignUrl = "/api/campaign/select";
 const apiNewCampaignUrl = "/api/campaign/new";
 const apiImportedCampaignUrl = "/api/campaign/imported";
 const apiCommitReviewUrl = "/api/review/commit";
+const apiCampaignRecordUrl = "/api/campaign/record";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
 const companionOptions = {
@@ -67,6 +68,18 @@ const elements = {
   reviewList: document.querySelector("#review-list"),
   reviewCount: document.querySelector("#review-count"),
   applyApproved: document.querySelector("#apply-approved"),
+  recordDialog: document.querySelector("#record-dialog"),
+  recordForm: document.querySelector("#record-form"),
+  recordDialogTitle: document.querySelector("#record-dialog-title"),
+  recordDomain: document.querySelector("#record-domain"),
+  recordName: document.querySelector("#record-name"),
+  recordNameLabel: document.querySelector("#record-name-label"),
+  recordRole: document.querySelector("#record-role"),
+  recordRoleLabel: document.querySelector("#record-role-label"),
+  recordPath: document.querySelector("#record-path"),
+  recordPathRow: document.querySelector("#record-path-row"),
+  recordNotes: document.querySelector("#record-notes"),
+  closeRecordDialog: document.querySelector("#close-record-dialog"),
 };
 
 window.addEventListener("error", (event) => {
@@ -103,6 +116,10 @@ elements.newCampaign.addEventListener("click", async () => {
 });
 
 elements.loadImported.addEventListener("click", async () => {
+  if (!window.confirm("Load the imported Veil of the Towers bundle and switch the active campaign?")) {
+    return;
+  }
+
   await loadImportedCampaign();
   seedPlayLog();
   render();
@@ -130,6 +147,19 @@ elements.applyApproved.addEventListener("click", () => {
   }
 
   commitApprovedChanges(approved);
+});
+
+document.querySelectorAll("[data-add-domain]").forEach((button) => {
+  button.addEventListener("click", () => openRecordDialog(button.dataset.addDomain));
+});
+
+elements.closeRecordDialog.addEventListener("click", () => {
+  elements.recordDialog.close();
+});
+
+elements.recordForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveRecordFromDialog();
 });
 
 elements.playerForm.addEventListener("submit", async (event) => {
@@ -219,6 +249,18 @@ async function selectCampaignByPath(sqlitePath) {
 }
 
 async function createNewCampaign() {
+  const title = window.prompt("Campaign name", "New Campaign Binder");
+  if (title === null) {
+    elements.bridgeStatus.textContent = "New campaign canceled";
+    return;
+  }
+
+  const premise = window.prompt("Campaign premise", "A new D&D 5e-lite campaign ready to grow through play.");
+  if (premise === null) {
+    elements.bridgeStatus.textContent = "New campaign canceled";
+    return;
+  }
+
   try {
     elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
     const response = await fetch(apiNewCampaignUrl, {
@@ -227,8 +269,8 @@ async function createNewCampaign() {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        title: "New Campaign Binder",
-        premise: "A new D&D 5e-lite campaign ready to grow through play.",
+        title: title.trim() || "New Campaign Binder",
+        premise: premise.trim() || "A new D&D 5e-lite campaign ready to grow through play.",
       }),
     });
 
@@ -245,8 +287,8 @@ async function createNewCampaign() {
     elements.bridgeStatus.textContent = "New campaign saved to SQLite";
   } catch (error) {
     state.campaign = createStarterCampaign({
-      title: "New Campaign Binder",
-      premise: "A new D&D 5e-lite campaign ready to grow through play.",
+      title: title.trim() || "New Campaign Binder",
+      premise: premise.trim() || "A new D&D 5e-lite campaign ready to grow through play.",
     });
     state.sourceMode = "new";
     state.reviewBatch = null;
@@ -328,6 +370,132 @@ async function commitApprovedChanges(approved) {
     elements.bridgeStatus.textContent = "SQLite commit failed";
     render();
   }
+}
+
+async function saveRecordFromDialog() {
+  const payload = {
+    domain: elements.recordDomain.value,
+    name: elements.recordName.value.trim(),
+    role: elements.recordRole.value.trim(),
+    type: elements.recordRole.value.trim(),
+    status: elements.recordRole.value.trim(),
+    tags: elements.recordRole.value.trim(),
+    kind: elements.recordRole.value.trim(),
+    summary: elements.recordNotes.value.trim(),
+    notes: elements.recordNotes.value.trim(),
+    path: elements.recordPath.value.trim(),
+  };
+
+  if (!payload.name) {
+    elements.bridgeStatus.textContent = "Name is required";
+    return;
+  }
+
+  try {
+    elements.bridgeStatus.textContent = "Saving binder record...";
+    const response = await fetch(apiCampaignRecordUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const result = await response.json();
+    setCampaignFromPayload(result, "direct_record_update");
+    render();
+    elements.recordDialog.close();
+    elements.recordForm.reset();
+    elements.bridgeStatus.textContent = `${recordLabel(payload.domain)} saved to SQLite; provider sees it next turn`;
+  } catch (error) {
+    elements.bridgeStatus.textContent = error instanceof Error ? `Save failed: ${error.message}` : "Save failed";
+  }
+}
+
+function openRecordDialog(domain) {
+  const config = recordDialogConfig(domain);
+  elements.recordDomain.value = domain;
+  elements.recordDialogTitle.textContent = config.title;
+  elements.recordNameLabel.textContent = config.nameLabel;
+  elements.recordRoleLabel.textContent = config.roleLabel;
+  elements.recordName.placeholder = config.namePlaceholder;
+  elements.recordRole.placeholder = config.rolePlaceholder;
+  elements.recordNotes.placeholder = config.notesPlaceholder;
+  elements.recordPathRow.hidden = domain !== "assets";
+  elements.recordForm.reset();
+  elements.recordDomain.value = domain;
+  elements.recordDialog.showModal();
+  elements.recordName.focus();
+}
+
+function recordDialogConfig(domain) {
+  const configs = {
+    party: {
+      title: "Add Party Member",
+      nameLabel: "Character name",
+      roleLabel: "Ancestry / class",
+      namePlaceholder: "Evelynn",
+      rolePlaceholder: "Forest elf ranger",
+      notesPlaceholder: "Personality, goals, stats, familiar, important backstory...",
+    },
+    people: {
+      title: "Add Person",
+      nameLabel: "Name",
+      roleLabel: "Role / type",
+      namePlaceholder: "Mira Vale",
+      rolePlaceholder: "Herbalist, rival, guard captain...",
+      notesPlaceholder: "What is canon about this person?",
+    },
+    places: {
+      title: "Add Place",
+      nameLabel: "Place name",
+      roleLabel: "Place type",
+      namePlaceholder: "Brindle Hollow",
+      rolePlaceholder: "frontier town, ruin, forest road...",
+      notesPlaceholder: "Sights, factions, dangers, connections, known facts...",
+    },
+    quests: {
+      title: "Add Thread",
+      nameLabel: "Thread title",
+      roleLabel: "Status",
+      namePlaceholder: "Find the missing wolf companion",
+      rolePlaceholder: "active",
+      notesPlaceholder: "Stakes, clues, unresolved questions...",
+    },
+    lore: {
+      title: "Add Lore Note",
+      nameLabel: "Lore title",
+      roleLabel: "Tags",
+      namePlaceholder: "Moonlit wolf omen",
+      rolePlaceholder: "omen, forest, wolves",
+      notesPlaceholder: "Canon note text...",
+    },
+    assets: {
+      title: "Add Source Image",
+      nameLabel: "Asset name",
+      roleLabel: "Kind",
+      namePlaceholder: "Brindle Hollow map",
+      rolePlaceholder: "image",
+      notesPlaceholder: "What should Lorekeeper remember about this source image?",
+    },
+  };
+
+  return configs[domain] ?? configs.lore;
+}
+
+function recordLabel(domain) {
+  return {
+    party: "Party member",
+    people: "Person",
+    places: "Place",
+    quests: "Thread",
+    lore: "Lore note",
+    assets: "Asset",
+  }[domain] ?? "Record";
 }
 
 function seedPlayLog() {

@@ -126,7 +126,7 @@ export async function createNewActiveCampaign(projectRoot, options = {}) {
     startingLocation: options.startingLocation,
     tone: options.tone,
   });
-  const sqlitePath = campaignFilePath(projectRoot, campaign.title);
+  const sqlitePath = await uniqueCampaignFilePath(projectRoot, campaign.title);
   await mkdir(path.dirname(sqlitePath), { recursive: true });
   await writeCampaignSqliteFile(campaign, sqlitePath);
   await upsertCampaignIndexEntry(projectRoot, {
@@ -159,6 +159,21 @@ export async function saveActiveCampaign(projectRoot, campaign) {
   return {
     sqlitePath,
     bytes: result.bytes,
+  };
+}
+
+export async function updateActiveCampaign(projectRoot, updater) {
+  const { campaign } = await loadActiveCampaign(projectRoot);
+  const result = await updater(campaign);
+  const nextCampaign = normalizeCampaign(result.campaign ?? result);
+  const saveResult = await saveActiveCampaign(projectRoot, nextCampaign);
+
+  return {
+    ...result,
+    campaign: nextCampaign,
+    sqlitePath: saveResult.sqlitePath,
+    bytes: saveResult.bytes,
+    campaigns: (await listCampaigns(projectRoot)).campaigns,
   };
 }
 

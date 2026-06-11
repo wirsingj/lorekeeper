@@ -33,6 +33,7 @@ body {
 }
 
 button,
+input,
 select,
 textarea {
   font: inherit;
@@ -173,6 +174,12 @@ h3 {
   gap: 10px;
 }
 
+.title-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .count-pill {
   min-width: 30px;
   padding: 3px 8px;
@@ -242,6 +249,16 @@ button {
   background: #f0bd6c;
   color: #21160b;
   font-weight: 850;
+}
+
+.icon-action {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  line-height: 1;
 }
 
 .play-screen {
@@ -497,6 +514,60 @@ textarea {
   min-height: 30px;
   padding: 0 8px;
   font-size: 0.75rem;
+}
+
+.record-dialog {
+  width: min(520px, calc(100vw - 32px));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 0;
+  background: var(--shell-dark);
+  color: #f8f2e8;
+  box-shadow: var(--shadow);
+}
+
+.record-dialog::backdrop {
+  background: rgba(17, 21, 26, 0.62);
+}
+
+.record-dialog form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.dialog-header,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.record-dialog label {
+  display: grid;
+  gap: 6px;
+  color: #f8f2e8;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.record-dialog input,
+.record-dialog textarea {
+  width: 100%;
+  border: 1px solid #53606a;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fffdf8;
+  color: var(--ink);
+  text-transform: none;
+  font-weight: 500;
+}
+
+.record-dialog textarea {
+  resize: vertical;
+  min-height: 112px;
 }
 
 @media (max-width: 1180px) {
