@@ -298,7 +298,7 @@ button.secondary-action {
 }
 
 .play-message {
-  max-width: min(74ch, calc(100% - 10px));
+  max-width: min(88ch, calc(100% - 10px));
   margin-bottom: 16px;
   padding: 16px 18px;
   border-radius: 8px;
