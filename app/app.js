@@ -57,6 +57,7 @@ const elements = {
   questCount: document.querySelector("#quest-count"),
   promptOutput: document.querySelector("#prompt-output"),
   promptSize: document.querySelector("#prompt-size"),
+  sessionLabel: document.querySelector("#session-label"),
   bridgeStatus: document.querySelector("#bridge-status"),
   checkSidecar: document.querySelector("#check-sidecar"),
   copyProviderPrompt: document.querySelector("#copy-provider-prompt"),
@@ -583,8 +584,10 @@ function seedPlayLog() {
 function render() {
   const campaign = state.campaign;
   const currentPlace = findById(campaign.places, campaign.scene.currentPlaceId);
+  const activeSession = activeSessionRecord(campaign);
 
   elements.title.textContent = campaign.title;
+  elements.sessionLabel.textContent = activeSession?.title || "Campaign Play";
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
   elements.providerStatus.textContent = "Provider: ChatGPT sidecar/manual";
   if (state.bridge.mode === "extension") {
@@ -1072,19 +1075,77 @@ function renderPlayLog() {
       const wrapper = document.createElement("article");
       wrapper.className = `play-message ${message.role}`;
 
-      const title = document.createElement("strong");
-      title.textContent = message.title;
+      const avatar = document.createElement("span");
+      avatar.className = "message-avatar";
+      avatar.textContent = speakerInitial(message);
 
-      wrapper.append(title, ...messageBodyElements(message.body, message.role));
+      const bubble = document.createElement("div");
+      bubble.className = "message-bubble";
+
+      const header = document.createElement("header");
+      header.className = "message-header";
+
+      const title = document.createElement("strong");
+      title.textContent = speakerName(message);
+
+      const timestamp = document.createElement("time");
+      timestamp.dateTime = message.createdAt || "";
+      timestamp.textContent = formatMessageTime(message.createdAt);
+
+      header.append(title, timestamp);
+      bubble.append(header, ...messageBodyElements(message.body, message.role));
       if (message.meta) {
         const meta = document.createElement("small");
+        meta.className = "message-meta";
         meta.textContent = message.meta;
-        wrapper.append(meta);
+        bubble.append(meta);
       }
+      wrapper.append(avatar, bubble);
       return wrapper;
     }),
   );
   elements.playLog.scrollTop = elements.playLog.scrollHeight;
+}
+
+function activeSessionRecord(campaign) {
+  const activeId = campaign.sessionLog?.activeSessionId;
+  return (campaign.sessionLog?.sessions ?? []).find((session) => session.id === activeId) ?? campaign.sessionLog?.sessions?.[0] ?? null;
+}
+
+function speakerName(message) {
+  if (message.role === "dm" || message.role === "provider") {
+    return message.title || "DM";
+  }
+
+  if (message.role === "system") {
+    return message.title || "Lorekeeper";
+  }
+
+  return message.title || "Player";
+}
+
+function speakerInitial(message) {
+  const name = speakerName(message).trim();
+  if (message.role === "dm" || message.role === "provider") {
+    return "DM";
+  }
+  return name.slice(0, 1).toUpperCase() || "?";
+}
+
+function formatMessageTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function renderParty(campaign) {

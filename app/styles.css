@@ -380,16 +380,39 @@ button.secondary-action {
 .screen-bezel {
   height: 100%;
   min-height: 0;
-  padding: 20px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 16px;
   background: #171b20;
   border-radius: 24px;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px;
+  color: #f8f2e8;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.table-header span:last-child {
+  overflow: hidden;
+  color: #b8c3ce;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .play-log {
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 24px;
+  padding: 18px;
   background:
     linear-gradient(rgba(238, 244, 232, 0.97), rgba(238, 244, 232, 0.97)),
     url("/local-asset?name=VotT-%20City%20of%20Resonance%20map.png");
@@ -402,38 +425,97 @@ button.secondary-action {
 }
 
 .play-message {
-  max-width: min(88ch, calc(100% - 10px));
-  margin-bottom: 16px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(77, 96, 75, 0.22);
-}
-
-.play-message.system {
-  border-left: 5px solid var(--green);
+  display: grid;
+  grid-template-columns: 36px minmax(0, min(82ch, calc(100% - 46px)));
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
 }
 
 .play-message.player {
-  margin-left: auto;
-  border-left: 5px solid var(--blue);
+  grid-template-columns: minmax(0, min(68ch, calc(100% - 46px))) 36px;
+  justify-content: end;
 }
 
-.play-message.provider,
-.play-message.dm {
-  border-left: 5px solid var(--amber);
+.message-avatar {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(23, 27, 32, 0.22);
+  border-radius: 999px;
+  background: #315d87;
+  color: #fffdf8;
+  font-size: 0.72rem;
+  font-weight: 900;
+  box-shadow: 0 6px 14px rgba(23, 27, 32, 0.16);
 }
 
-.play-message strong {
+.play-message.player .message-avatar {
+  grid-column: 2;
+  grid-row: 1;
+  background: #37765d;
+}
+
+.play-message.dm .message-avatar,
+.play-message.provider .message-avatar {
+  background: #c56f2d;
+}
+
+.play-message.system .message-avatar {
+  background: #5a6572;
+}
+
+.message-bubble {
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid rgba(77, 96, 75, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 18px rgba(55, 63, 52, 0.09);
+}
+
+.play-message.player .message-bubble {
+  grid-column: 1;
+  grid-row: 1;
+  background: rgba(237, 246, 240, 0.96);
+  border-color: rgba(49, 93, 135, 0.26);
+}
+
+.play-message.dm .message-bubble,
+.play-message.provider .message-bubble {
+  border-color: rgba(197, 111, 45, 0.28);
+}
+
+.play-message.system .message-bubble {
+  background: rgba(245, 247, 249, 0.94);
+  border-color: rgba(90, 101, 114, 0.22);
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.message-header strong {
   display: block;
-  margin-bottom: 8px;
-  font-size: 0.84rem;
+  color: #24313b;
+  font-size: 0.78rem;
   text-transform: uppercase;
+}
+
+.message-header time {
+  color: #65727d;
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
 }
 
 .play-message p {
   margin: 0 0 0.48rem;
-  line-height: 1.55;
+  line-height: 1.48;
 }
 
 .play-message p:last-child {
@@ -450,9 +532,11 @@ button.secondary-action {
   margin-top: 0.28rem;
 }
 
-.play-message small {
+.message-meta {
   display: block;
-  margin-top: 8px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(77, 96, 75, 0.16);
   color: #5d675d;
   font-size: 0.76rem;
 }
@@ -516,7 +600,7 @@ button.secondary-action {
 .command-deck {
   grid-area: bottom;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.42fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.34fr);
   gap: 14px;
   padding: 14px;
   background: var(--shell-dark);
@@ -528,7 +612,7 @@ button.secondary-action {
 
 .player-form {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .player-form label,
@@ -561,6 +645,7 @@ textarea {
   min-height: 0;
   background: #fffdf8;
   color: var(--ink);
+  font-size: 0.94rem;
 }
 
 .prompt-drawer {

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lorekeeper</title>
-    <link rel="stylesheet" href="/app/styles.css?v=20260611-10" />
+    <link rel="stylesheet" href="/app/styles.css?v=20260611-11" />
   </head>
   <body>
     <div id="app" class="handheld-shell">
@@ -64,6 +64,10 @@
 
       <main class="play-screen" aria-label="Lorekeeper play screen">
         <div class="screen-bezel">
+          <div class="table-header">
+            <span>Table Chat</span>
+            <span id="session-label">Campaign Play</span>
+          </div>
           <div id="play-log" class="play-log"></div>
         </div>
       </main>
@@ -130,13 +134,13 @@
 
       <footer class="command-deck">
         <form id="player-form" class="player-form">
-          <label for="player-input">Lorekeeper Input</label>
+          <label for="player-input">Table Message</label>
           <div class="input-row">
             <textarea
               id="player-input"
               rows="3"
               spellcheck="true"
-              placeholder="Describe your action, question, or scene intent here. Lorekeeper will build the provider prompt."
+              placeholder="I check the alley for watchers. (Keep this tense and heist-focused.)"
             ></textarea>
             <button id="build-turn" type="submit">Send Turn</button>
           </div>
@@ -223,6 +227,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="/app/app.js?v=20260611-10"></script>
+    <script type="module" src="/app/app.js?v=20260611-11"></script>
   </body>
 </html>
