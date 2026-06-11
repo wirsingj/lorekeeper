@@ -34,6 +34,7 @@ export function createEmptyCampaign(overrides = {}) {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
     id: overrides.id ?? "campaign-local",
     title: overrides.title ?? "Untitled Campaign",
+    hidden: overrides.hidden ?? false,
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     summary: overrides.summary ?? "",
@@ -158,6 +159,9 @@ export function createDefaultProviderSettings() {
     requireExplicitTabSelection: true,
     automationVisible: true,
     allowBackgroundArbitraryTabs: false,
+    projectHint: "LoreKeeper",
+    activeConversationId: null,
+    conversations: [],
   };
 }
 

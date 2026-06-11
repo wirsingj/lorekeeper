@@ -8,11 +8,13 @@ import {
   listCampaigns,
   loadActiveCampaign,
   loadImportedCampaign,
+  hideCampaign,
   selectCampaign,
   updateActiveCampaign,
 } from "../src/storage/campaign-repository.js";
 import { addChatMessage } from "../src/campaign-state/chat-history.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
+import { upsertProviderConversation } from "../src/campaign-state/provider-conversations.js";
 import { commitReviewBatch } from "../src/storage/review-commit.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -81,6 +83,16 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/api/campaign/hide" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await hideCampaign(projectRoot, {
+        sqlitePath: body.sqlitePath,
+        campaignTitle: body.campaignTitle,
+      });
+      sendJson(response, 200, payload);
+      return;
+    }
+
     if (url.pathname === "/api/campaign/imported" && request.method === "POST") {
       const payload = await loadImportedCampaign(projectRoot);
       sendJson(response, 200, payload);
@@ -97,6 +109,13 @@ const server = createServer(async (request, response) => {
     if (url.pathname === "/api/campaign/message" && request.method === "POST") {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => addChatMessage(campaign, body));
+      sendJson(response, 200, payload);
+      return;
+    }
+
+    if (url.pathname === "/api/provider/conversation" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => upsertProviderConversation(campaign, body));
       sendJson(response, 200, payload);
       return;
     }

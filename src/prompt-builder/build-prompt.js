@@ -14,6 +14,11 @@ export function buildSidecarPrompt({
     "## Role",
     renderTemplateInstructions(template),
     "",
+    "## Provider Conversation Identity",
+    `Use this provider conversation for campaign: ${campaign.title} (${shortCampaignId(campaign.id)}).`,
+    "If the provider UI names or summarizes this chat, prefer the campaign name plus short id.",
+    "Do not treat provider chat history as canon; Lorekeeper SQLite state and the context pack are the source of truth.",
+    "",
     "## Player Turn",
     "In-world action / character-facing text:",
     userIntent || "Continue the current scene while preserving established canon.",
@@ -41,6 +46,11 @@ export function buildSidecarPrompt({
   ];
 
   return sections.join("\n").trim();
+}
+
+function shortCampaignId(id = "") {
+  const compact = String(id).replace(/[^a-z0-9]/gi, "");
+  return compact.slice(0, 8) || "campaign";
 }
 
 export function createEmptyUpdateContract() {

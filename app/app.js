@@ -3,6 +3,7 @@ import { findById } from "../src/campaign-state/formatters.js";
 import { normalizeCampaign } from "../src/campaign-state/schema.js";
 import { createSampleCampaign } from "../src/campaign-state/sample-campaign.js";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
+import { getActiveProviderConversation } from "../src/campaign-state/provider-conversations.js";
 import { createReviewBatch } from "../src/canon-review/proposals.js";
 import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
@@ -12,13 +13,15 @@ const apiCampaignUrl = "/api/campaign";
 const apiCampaignsUrl = "/api/campaigns";
 const apiSelectCampaignUrl = "/api/campaign/select";
 const apiNewCampaignUrl = "/api/campaign/new";
+const apiHideCampaignUrl = "/api/campaign/hide";
 const apiImportedCampaignUrl = "/api/campaign/imported";
 const apiCommitReviewUrl = "/api/review/commit";
 const apiCampaignRecordUrl = "/api/campaign/record";
 const apiCampaignMessageUrl = "/api/campaign/message";
+const apiProviderConversationUrl = "/api/provider/conversation";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
-const companionOptions = {
+const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
   returnToCaller: true,
@@ -42,6 +45,7 @@ const state = {
 const elements = {
   title: document.querySelector("#campaign-title"),
   campaignSelect: document.querySelector("#campaign-select"),
+  deleteCampaign: document.querySelector("#delete-campaign"),
   sceneLocation: document.querySelector("#scene-location"),
   providerStatus: document.querySelector("#provider-status"),
   saveStatus: document.querySelector("#save-status"),
@@ -60,6 +64,7 @@ const elements = {
   sessionLabel: document.querySelector("#session-label"),
   bridgeStatus: document.querySelector("#bridge-status"),
   checkSidecar: document.querySelector("#check-sidecar"),
+  newProviderChat: document.querySelector("#new-provider-chat"),
   copyProviderPrompt: document.querySelector("#copy-provider-prompt"),
   newCampaign: document.querySelector("#new-campaign"),
   loadImported: document.querySelector("#load-imported"),
@@ -95,6 +100,14 @@ const elements = {
   closeConfirmDialog: document.querySelector("#close-confirm-dialog"),
   cancelConfirm: document.querySelector("#cancel-confirm"),
   acceptConfirm: document.querySelector("#accept-confirm"),
+  deleteCampaignDialog: document.querySelector("#delete-campaign-dialog"),
+  deleteCampaignForm: document.querySelector("#delete-campaign-form"),
+  deleteCampaignTitle: document.querySelector("#delete-campaign-title"),
+  deleteCampaignMessage: document.querySelector("#delete-campaign-message"),
+  deleteCampaignName: document.querySelector("#delete-campaign-name"),
+  closeDeleteCampaignDialog: document.querySelector("#close-delete-campaign-dialog"),
+  cancelDeleteCampaign: document.querySelector("#cancel-delete-campaign"),
+  confirmDeleteCampaign: document.querySelector("#confirm-delete-campaign"),
 };
 
 window.addEventListener("error", (event) => {
@@ -122,8 +135,16 @@ elements.campaignSelect.addEventListener("change", async () => {
   await selectCampaignByPath(sqlitePath);
 });
 
+elements.deleteCampaign.addEventListener("click", () => {
+  openDeleteCampaignDialog();
+});
+
 elements.checkSidecar.addEventListener("click", async () => {
   await ensureCompanionSidecar({ openIfMissing: true, focusProvider: true });
+});
+
+elements.newProviderChat.addEventListener("click", async () => {
+  await startNewProviderConversation();
 });
 
 elements.newCampaign.addEventListener("click", async () => {
@@ -192,6 +213,23 @@ elements.cancelConfirm.addEventListener("click", () => {
 elements.confirmForm.addEventListener("submit", (event) => {
   event.preventDefault();
   resolveConfirmDialog(true);
+});
+
+elements.closeDeleteCampaignDialog.addEventListener("click", () => {
+  elements.deleteCampaignDialog.close();
+});
+
+elements.cancelDeleteCampaign.addEventListener("click", () => {
+  elements.deleteCampaignDialog.close();
+});
+
+elements.deleteCampaignName.addEventListener("input", () => {
+  elements.confirmDeleteCampaign.disabled = elements.deleteCampaignName.value !== state.campaign.title;
+});
+
+elements.deleteCampaignForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await hideActiveCampaign();
 });
 
 elements.recordForm.addEventListener("submit", async (event) => {
@@ -326,20 +364,8 @@ async function createNewCampaign({ title, premise }) {
     elements.campaignForm.reset();
     elements.bridgeStatus.textContent = "New campaign saved to SQLite";
   } catch (error) {
-    state.campaign = createStarterCampaign({
-      title: trimmedTitle,
-      premise: trimmedPremise,
-    });
-    state.sourceMode = "new";
-    state.reviewBatch = null;
-    elements.responseImport.value = "";
-    state.contextPack = buildContextPack(state.campaign, {
-      purpose: "new_campaign_start",
-    });
-    state.prompt = "";
-    seedPlayLog();
     render();
-    elements.bridgeStatus.textContent = error instanceof Error ? `New campaign not saved: ${error.message}` : "New campaign not saved";
+    elements.bridgeStatus.textContent = error instanceof Error ? `New campaign failed: ${error.message}` : "New campaign failed";
   }
 }
 
@@ -589,11 +615,11 @@ function render() {
   elements.title.textContent = campaign.title;
   elements.sessionLabel.textContent = activeSession?.title || "Campaign Play";
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
-  elements.providerStatus.textContent = "Provider: ChatGPT sidecar/manual";
+  elements.providerStatus.textContent = "Provider: ChatGPT campaign chat/manual";
   if (state.bridge.mode === "extension") {
     elements.providerStatus.textContent = state.bridge.ready
-      ? "Provider: ChatGPT companion ready"
-      : "Provider: ChatGPT companion waiting";
+      ? "Provider: campaign chat ready"
+      : "Provider: campaign chat waiting";
   }
   elements.saveStatus.textContent = `Binder: ${state.sourceMode} / SQLite target`;
   if (state.sqlitePath) {
@@ -613,6 +639,7 @@ function render() {
 
 function renderCampaignSelector() {
   const campaigns = state.campaigns ?? [];
+  elements.deleteCampaign.disabled = !state.sqlitePath || !state.campaign?.title;
   elements.campaignSelect.replaceChildren(
     ...campaigns.map((campaign) => {
       const option = document.createElement("option");
@@ -629,6 +656,55 @@ function renderCampaignSelector() {
     option.textContent = state.campaign?.title ?? "No campaigns found";
     option.selected = true;
     elements.campaignSelect.append(option);
+  }
+}
+
+function openDeleteCampaignDialog() {
+  if (!state.sqlitePath || !state.campaign?.title) {
+    elements.bridgeStatus.textContent = "No active campaign file to hide";
+    return;
+  }
+
+  elements.deleteCampaignTitle.textContent = `Hide ${state.campaign.title}`;
+  elements.deleteCampaignMessage.textContent =
+    `This will hide "${state.campaign.title}" from the campaign selector. The SQLite file stays on disk for now.`;
+  elements.deleteCampaignName.value = "";
+  elements.confirmDeleteCampaign.disabled = true;
+  elements.deleteCampaignDialog.showModal();
+  elements.deleteCampaignName.focus();
+}
+
+async function hideActiveCampaign() {
+  if (elements.deleteCampaignName.value !== state.campaign.title) {
+    elements.bridgeStatus.textContent = "Campaign name did not match";
+    return;
+  }
+
+  try {
+    elements.bridgeStatus.textContent = "Hiding campaign...";
+    const response = await fetch(apiHideCampaignUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sqlitePath: state.sqlitePath,
+        campaignTitle: state.campaign.title,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const payload = await response.json();
+    setCampaignFromPayload(payload, "campaign_hidden_context");
+    seedPlayLog();
+    render();
+    elements.deleteCampaignDialog.close();
+    elements.bridgeStatus.textContent = "Campaign hidden from selector";
+  } catch (error) {
+    elements.bridgeStatus.textContent = error instanceof Error ? `Hide failed: ${error.message}` : "Hide failed";
   }
 }
 
@@ -791,12 +867,10 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
     return handleCompanionCheckResult(probe.result);
   }
 
-  await requestSidebarOpen();
-
   const message = {
     type: "lorekeeper.ensureCompanionSession",
     options: {
-      ...companionOptions,
+      ...campaignCompanionOptions(),
       readyTimeoutMs: 30000,
       focusProvider,
       returnToCaller: !focusProvider,
@@ -804,7 +878,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
   };
 
   try {
-    elements.bridgeStatus.textContent = "Checking ChatGPT companion...";
+    elements.bridgeStatus.textContent = "Checking campaign ChatGPT conversation...";
     const result = await sendExtensionMessage(message, 35000);
     return handleCompanionCheckResult(result);
   } catch (error) {
@@ -818,6 +892,44 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
       ready: false,
       error: error instanceof Error ? error.message : "Extension bridge unavailable.",
     };
+  }
+}
+
+async function startNewProviderConversation() {
+  try {
+    elements.bridgeStatus.textContent = "Creating fresh campaign chat record...";
+    const response = await fetch(apiProviderConversationUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerId: defaultCompanionOptions.providerId,
+        projectHint: state.campaign.providerSettings?.projectHint || defaultCompanionOptions.projectHint,
+        status: "planned",
+        notes: "Fresh provider conversation requested from Lorekeeper UI.",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const payload = await response.json();
+    state.campaign = normalizeCampaign(payload.campaign);
+    state.campaigns = payload.campaigns ?? state.campaigns;
+    state.sqlitePath = payload.sqlitePath ?? state.sqlitePath;
+    state.bridge = {
+      mode: "manual",
+      ready: false,
+      lastRun: null,
+    };
+    const conversation = getActiveProviderConversation(state.campaign, defaultCompanionOptions.providerId);
+    elements.bridgeStatus.textContent = `Fresh campaign chat ready: ${conversation.conversationHint}`;
+    render();
+    await ensureCompanionSidecar({ openIfMissing: true, focusProvider: true });
+  } catch (error) {
+    elements.bridgeStatus.textContent = error instanceof Error ? `New chat failed: ${error.message}` : "New chat failed";
   }
 }
 
@@ -865,14 +977,14 @@ async function runPromptThroughSidecar(prompt) {
       return;
     }
 
-    elements.bridgeStatus.textContent = "Sending turn to ChatGPT companion...";
+    elements.bridgeStatus.textContent = "Sending turn to campaign ChatGPT conversation...";
     const progress = startSidecarProgress();
     const result = await sendExtensionMessage(
       {
         type: "lorekeeper.runCompanionPrompt",
         prompt,
         options: {
-          ...companionOptions,
+          ...campaignCompanionOptions(),
           readyTimeoutMs: 30000,
           responseTimeoutMs: 90000,
         },
@@ -886,15 +998,18 @@ async function runPromptThroughSidecar(prompt) {
       ready: Boolean(result.ready),
       lastRun: result,
     };
+    if (result.found || result.created) {
+      await persistProviderConversationFromBridge(result);
+    }
 
     if (result.sent && result.response?.text) {
       await importProviderResponse(result.response.text);
-      elements.bridgeStatus.textContent = "ChatGPT response imported for canon review";
+      elements.bridgeStatus.textContent = "ChatGPT response imported and saved";
       return;
     }
 
     if (result.response?.needsManualSubmit) {
-      elements.bridgeStatus.textContent = "Prompt is in ChatGPT; press the send arrow";
+      elements.bridgeStatus.textContent = "Prompt is in the campaign chat; press the send arrow";
       state.bridge = {
         mode: "extension",
         ready: true,
@@ -972,10 +1087,10 @@ function startSidecarProgress() {
       elements.bridgeStatus.textContent = "Waiting for ChatGPT response...";
     }, 8000),
     window.setTimeout(() => {
-      elements.bridgeStatus.textContent = "Still waiting on the companion tab...";
+      elements.bridgeStatus.textContent = "Still waiting on the campaign chat...";
     }, 30000),
     window.setTimeout(() => {
-      elements.bridgeStatus.textContent = "Provider run is taking a while; manual fallback remains available";
+      elements.bridgeStatus.textContent = "Campaign chat is taking a while; manual fallback remains available";
     }, 65000),
   ];
 
@@ -996,7 +1111,7 @@ async function probeExtensionBridge() {
     const result = await sendExtensionMessage(
       {
         type: "lorekeeper.getCompanionSession",
-        options: companionOptions,
+        options: campaignCompanionOptions(),
       },
       2500,
     );
@@ -1013,25 +1128,84 @@ async function probeExtensionBridge() {
   }
 }
 
-function handleCompanionCheckResult(result) {
+function campaignCompanionOptions() {
+  const campaign = state.campaign;
+  if (!campaign) {
+    return defaultCompanionOptions;
+  }
+
+  const conversation = getActiveProviderConversation(campaign, defaultCompanionOptions.providerId);
+
+  return {
+    ...defaultCompanionOptions,
+    campaignId: campaign.id,
+    campaignTitle: campaign.title,
+    providerConversationId: conversation.id,
+    conversationHint: conversation.conversationHint,
+    projectHint: conversation.projectHint || defaultCompanionOptions.projectHint,
+    projectUrl: conversation.projectUrl || undefined,
+  };
+}
+
+async function handleCompanionCheckResult(result) {
   state.bridge = {
     mode: "extension",
     ready: Boolean(result.ready),
     lastRun: result,
   };
 
+  if (result.found || result.created) {
+    await persistProviderConversationFromBridge(result);
+  }
+
   if (result.ready) {
     elements.bridgeStatus.textContent = result.created
-      ? "ChatGPT companion opened and ready"
-      : "ChatGPT companion ready";
+      ? `Campaign chat opened for ${result.settings?.conversationHint ?? "this campaign"}`
+      : `Campaign chat ready for ${result.settings?.conversationHint ?? "this campaign"}`;
   } else if (result.loginRequired) {
-    elements.bridgeStatus.textContent = "ChatGPT needs login or project selection";
+    elements.bridgeStatus.textContent = "ChatGPT needs login, project selection, or campaign chat selection";
   } else {
-    elements.bridgeStatus.textContent = "No ChatGPT companion tab found";
+    elements.bridgeStatus.textContent = "No campaign ChatGPT conversation found";
   }
 
   render();
   return result;
+}
+
+async function persistProviderConversationFromBridge(result) {
+  const settings = result.settings ?? {};
+  const tab = result.tab ?? {};
+  const status = result.status ?? {};
+
+  try {
+    const response = await fetch(apiProviderConversationUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerId: settings.providerId || defaultCompanionOptions.providerId,
+        providerConversationId: settings.providerConversationId,
+        projectHint: settings.projectHint,
+        projectUrl: settings.projectUrl,
+        conversationHint: settings.conversationHint,
+        providerUrl: tab.url || status.url,
+        providerTitle: tab.title || status.title,
+        status: result.ready ? "active" : "needs_user_action",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const payload = await response.json();
+    state.campaign = normalizeCampaign(payload.campaign);
+    state.campaigns = payload.campaigns ?? state.campaigns;
+    state.sqlitePath = payload.sqlitePath ?? state.sqlitePath;
+  } catch {
+    elements.bridgeStatus.textContent = "Campaign chat metadata could not be saved";
+  }
 }
 
 function sendExtensionMessage(message, timeoutMs = 10000) {

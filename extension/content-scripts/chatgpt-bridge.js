@@ -10,7 +10,7 @@ browser.runtime.onMessage.addListener((message) => {
 
 async function handleCommand(command, payload) {
   if (command === "status") {
-    return getStatus(payload.projectHint);
+    return getStatus(payload);
   }
 
   if (command === "insertPrompt") {
@@ -28,10 +28,11 @@ async function handleCommand(command, payload) {
   throw new Error(`Unsupported ChatGPT bridge command: ${command}`);
 }
 
-function getStatus(projectHint) {
+function getStatus(settings = {}) {
   const input = findPromptInput();
   const assistantResponses = findAssistantResponses();
   const sendButton = input ? findSendButton(input) : null;
+  const haystack = document.body.innerText.toLowerCase();
 
   return {
     provider: "chatgpt",
@@ -44,9 +45,19 @@ function getStatus(projectHint) {
     responseCount: assistantResponses.length,
     url: location.href,
     title: document.title,
-    projectHint,
-    projectHintVisible: projectHint ? document.body.innerText.toLowerCase().includes(projectHint.toLowerCase()) : null,
+    projectHint: settings.projectHint,
+    conversationHint: settings.conversationHint,
+    campaignTitle: settings.campaignTitle,
+    campaignId: settings.campaignId,
+    projectHintVisible: includesNeedle(haystack, settings.projectHint),
+    conversationHintVisible: includesNeedle(haystack, settings.conversationHint),
+    campaignTitleVisible: includesNeedle(haystack, settings.campaignTitle),
+    campaignIdVisible: includesNeedle(haystack, settings.campaignId),
   };
+}
+
+function includesNeedle(haystack, needle) {
+  return needle ? haystack.includes(String(needle).toLowerCase()) : null;
 }
 
 async function insertPrompt(prompt) {

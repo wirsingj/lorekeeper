@@ -1,6 +1,7 @@
 const providerHosts = new Set(["chatgpt.com", "chat.openai.com"]);
 const appHosts = new Set(["localhost", "127.0.0.1"]);
-const companionStorageKey = "lorekeeper.chatgptCompanion";
+const legacyCompanionStorageKey = "lorekeeper.chatgptCompanion";
+const companionStoragePrefix = "lorekeeper.providerConversation";
 const defaultCompanion = Object.freeze({
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -13,7 +14,7 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
   }
 
   if (message.type === "lorekeeper.findProviderTabs") {
-    return findProviderTabs();
+    return findProviderTabs(message.options ?? {});
   }
 
   if (message.type === "lorekeeper.providerCommand") {
@@ -64,9 +65,9 @@ browser.windows.onFocusChanged.addListener(async (windowId) => {
   }
 });
 
-async function findProviderTabs() {
+async function findProviderTabs(options = {}) {
   const tabs = await browser.tabs.query({});
-  const settings = await getCompanionSettings();
+  const settings = await getCompanionSettings(options);
 
   return tabs
     .filter((tab) => isSupportedProviderUrl(tab.url))
@@ -77,6 +78,8 @@ async function findProviderTabs() {
       active: tab.active,
       windowId: tab.windowId,
       companionScore: scoreCompanionTab(tab, settings),
+      conversationHint: settings.conversationHint,
+      campaignId: settings.campaignId,
     }));
 }
 
@@ -115,7 +118,7 @@ async function saveCompanionSession(tabId, options = {}) {
     savedAt: new Date().toISOString(),
   };
 
-  await browser.storage.local.set({ [companionStorageKey]: companion });
+  await browser.storage.local.set({ [settings.storageKey]: companion });
   return companion;
 }
 
@@ -131,7 +134,7 @@ async function getCompanionSession(options = {}) {
     };
   }
 
-  const status = await safeProviderStatus(tab.id, settings.projectHint);
+  const status = await safeProviderStatus(tab.id, settings);
   return {
     found: true,
     ready: Boolean(status?.hasInput),
@@ -151,7 +154,7 @@ async function ensureCompanionSession(options = {}, sender) {
       await focusProviderTab(existing);
     }
 
-    const status = await waitForProviderStatus(existing.id, settings.projectHint, options.readyTimeoutMs ?? 6000);
+    const status = await waitForProviderStatus(existing.id, settings, options.readyTimeoutMs ?? 6000);
     return {
       found: true,
       created: false,
@@ -164,23 +167,25 @@ async function ensureCompanionSession(options = {}, sender) {
   }
 
   const callerTab = sender?.tab;
+  const projectUrl = await resolveProjectUrl(settings);
   const tab = await browser.tabs.create({
-    url: settings.projectUrl,
+    url: projectUrl,
     active: true,
   });
 
   await browser.storage.local.set({
-    [companionStorageKey]: {
+    [settings.storageKey]: {
       ...settings,
       tabId: tab.id,
       windowId: tab.windowId,
-      url: settings.projectUrl,
-      title: "ChatGPT LoreKeeper companion",
+      url: projectUrl,
+      projectUrl,
+      title: `ChatGPT ${settings.conversationHint || "LoreKeeper"} conversation`,
       savedAt: new Date().toISOString(),
     },
   });
 
-  const status = await waitForProviderStatus(tab.id, settings.projectHint, options.readyTimeoutMs ?? 30000);
+  const status = await waitForProviderStatus(tab.id, settings, options.readyTimeoutMs ?? 30000);
   const ready = Boolean(status?.hasInput);
 
   if (ready && options.returnToCaller !== false && !options.focusProvider) {
@@ -237,20 +242,54 @@ async function runCompanionPrompt(prompt, options = {}, sender) {
 }
 
 async function getCompanionSettings(overrides = {}) {
-  const stored = await browser.storage.local.get(companionStorageKey);
+  const requested = withoutEmptyOverrides(overrides);
+  const storageKey = companionStorageKeyFor(requested);
+  const stored = await browser.storage.local.get([storageKey, legacyCompanionStorageKey]);
+  const storedSettings = stored[storageKey] ?? (requested.campaignId ? {} : stored[legacyCompanionStorageKey] ?? {});
   return mergeCompanionSettings({
-    ...(stored[companionStorageKey] ?? {}),
-    ...withoutEmptyOverrides(overrides),
+    ...storedSettings,
+    ...requested,
+    storageKey,
   });
 }
 
 function mergeCompanionSettings(overrides = {}) {
+  const providerId = overrides.providerId || defaultCompanion.providerId;
+  const campaignId = overrides.campaignId || "";
+  const providerConversationId = overrides.providerConversationId || "";
   return {
     ...defaultCompanion,
     ...overrides,
+    providerId,
+    campaignId,
+    providerConversationId,
+    campaignTitle: overrides.campaignTitle || "",
+    conversationHint: overrides.conversationHint || overrides.campaignTitle || "",
+    storageKey: overrides.storageKey || companionStorageKeyFor({ providerId, campaignId, providerConversationId }),
     projectHint: overrides.projectHint || defaultCompanion.projectHint,
     projectUrl: normalizeProjectUrl(overrides.projectUrl || defaultCompanion.projectUrl),
   };
+}
+
+function companionStorageKeyFor(options = {}) {
+  const providerId = sanitizeStorageSegment(options.providerId || defaultCompanion.providerId);
+  const campaignId = sanitizeStorageSegment(options.campaignId || "");
+  const providerConversationId = sanitizeStorageSegment(options.providerConversationId || "");
+
+  if (!campaignId) {
+    return legacyCompanionStorageKey;
+  }
+
+  return [companionStoragePrefix, providerId, campaignId, providerConversationId || "active"].join(".");
+}
+
+function sanitizeStorageSegment(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96);
 }
 
 function withoutEmptyOverrides(overrides) {
@@ -272,25 +311,86 @@ async function findBestCompanionTab(settings) {
   }
 
   const tabs = (await browser.tabs.query({})).filter((tab) => isSupportedProviderUrl(tab.url));
-  return tabs.sort((a, b) => scoreCompanionTab(b, settings) - scoreCompanionTab(a, settings))[0] ?? null;
+  const scored = await Promise.all(
+    tabs.map(async (tab) => ({
+      tab,
+      score: scoreCompanionTab(tab, settings) + scoreProviderStatus(await safeProviderStatus(tab.id, settings), settings),
+    })),
+  );
+
+  const best = scored.sort((a, b) => b.score - a.score)[0];
+  const minimumScore = settings.campaignId ? 20 : 1;
+  return best && best.score >= minimumScore ? best.tab : null;
+}
+
+async function resolveProjectUrl(settings) {
+  if (settings.projectUrl && settings.projectUrl !== defaultCompanion.projectUrl) {
+    return settings.projectUrl;
+  }
+
+  const tabs = (await browser.tabs.query({})).filter((tab) => isSupportedProviderUrl(tab.url));
+  for (const tab of tabs) {
+    const status = await safeProviderStatus(tab.id, settings);
+    if (status?.projectHintVisible) {
+      const projectUrl = deriveProjectRootUrl(tab.url);
+      if (projectUrl) {
+        return projectUrl;
+      }
+    }
+  }
+
+  return settings.projectUrl || defaultCompanion.projectUrl;
+}
+
+function deriveProjectRootUrl(url) {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const match = parsed.pathname.match(/^\/g\/([^/]+)/);
+    if (!match) {
+      return null;
+    }
+
+    return `${parsed.origin}/g/${match[1]}`;
+  } catch {
+    return null;
+  }
 }
 
 function scoreCompanionTab(tab, settings) {
   let score = 0;
   const haystack = `${tab.title ?? ""} ${tab.url ?? ""}`.toLowerCase();
   const projectHint = (settings.projectHint ?? "").toLowerCase();
+  const conversationHint = (settings.conversationHint ?? "").toLowerCase();
+  const campaignTitle = (settings.campaignTitle ?? "").toLowerCase();
+  const campaignId = (settings.campaignId ?? "").toLowerCase();
   const projectUrl = normalizeProjectUrl(settings.projectUrl ?? "");
 
   if (settings.tabId && tab.id === settings.tabId) {
     score += 100;
   }
 
-  if (projectUrl && tab.url?.startsWith(projectUrl)) {
+  if (projectUrl && projectUrl !== defaultCompanion.projectUrl && tab.url?.startsWith(projectUrl)) {
     score += 40;
   }
 
   if (projectHint && haystack.includes(projectHint)) {
     score += 25;
+  }
+
+  if (conversationHint && haystack.includes(conversationHint)) {
+    score += 35;
+  }
+
+  if (campaignTitle && haystack.includes(campaignTitle)) {
+    score += 25;
+  }
+
+  if (campaignId && haystack.includes(campaignId)) {
+    score += 20;
   }
 
   if (tab.active) {
@@ -300,19 +400,43 @@ function scoreCompanionTab(tab, settings) {
   return score;
 }
 
-async function safeProviderStatus(tabId, projectHint) {
+function scoreProviderStatus(status, settings) {
+  if (!status) {
+    return 0;
+  }
+
+  let score = 0;
+  if (status.projectHintVisible) {
+    score += settings.campaignId ? 0 : 12;
+  }
+  if (status.conversationHintVisible) {
+    score += 30;
+  }
+  if (status.campaignTitleVisible) {
+    score += 18;
+  }
+  if (status.campaignIdVisible) {
+    score += 16;
+  }
+  if (status.url && settings.projectUrl && status.url.startsWith(settings.projectUrl)) {
+    score += 8;
+  }
+  return score;
+}
+
+async function safeProviderStatus(tabId, settings) {
   try {
-    return await sendProviderCommand(tabId, "status", { projectHint });
+    return await sendProviderCommand(tabId, "status", settings);
   } catch {
     return null;
   }
 }
 
-async function waitForProviderStatus(tabId, projectHint, timeoutMs) {
+async function waitForProviderStatus(tabId, settings, timeoutMs) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
-    const status = await safeProviderStatus(tabId, projectHint);
+    const status = await safeProviderStatus(tabId, settings);
     if (status?.hasInput) {
       return status;
     }
@@ -324,7 +448,7 @@ async function waitForProviderStatus(tabId, projectHint, timeoutMs) {
     await delay(750);
   }
 
-  return safeProviderStatus(tabId, projectHint);
+  return safeProviderStatus(tabId, settings);
 }
 
 async function returnToCallerTab(tab) {

@@ -34,22 +34,32 @@ The bridge uses:
 This keeps ChatGPT visible and user-controlled while Lorekeeper handles campaign state, prompts,
 review, and storage.
 
-## Companion Tab Contract
+## Campaign Provider Conversation Contract
 
-Lorekeeper should prefer a single saved companion tab for a campaign/provider pair. For ChatGPT, the
-default project hint is `LoreKeeper`. The user can open the desired ChatGPT project or chat, mark it
-as the companion, and then return to the Lorekeeper app.
+Lorekeeper should prefer a saved provider conversation for a campaign/provider pair, not one global
+ChatGPT scratch chat. For ChatGPT, the default project hint is `LoreKeeper`. A local campaign can
+have one or more provider conversations over time:
+
+- `Campaign Name [campaignid-01]`
+- `Campaign Name [campaignid-02]`
+- later chats used after the provider context grows stale or too large
+
+The active provider conversation id, provider title, provider URL, project hint, and conversation
+hint are stored in the campaign SQLite file under `providerSettings`.
 
 When a turn is submitted from Lorekeeper:
 
-1. The app asks the extension for the companion session.
-2. The extension reuses the saved tab if it still exists.
-3. If the saved tab is gone, the extension prefers an existing ChatGPT tab matching the project hint
-   or saved URL.
-4. If no suitable tab exists, the extension opens ChatGPT.
-5. If the provider is logged out or the prompt input is unavailable, the extension reports
+1. The app asks the extension for the active campaign provider conversation.
+2. The extension reuses the saved browser surface if it still exists.
+3. If the saved browser surface is gone, the extension prefers an existing ChatGPT conversation that
+   visibly matches the campaign conversation hint, campaign title, or campaign id.
+4. A matching `LoreKeeper` project alone is not enough to reuse a conversation, because several
+   campaigns may live in that project.
+5. If no suitable campaign conversation exists, the extension opens ChatGPT, preferring a detected
+   `LoreKeeper` project URL when possible.
+6. If the provider is logged out or the prompt input is unavailable, the extension reports
    `loginRequired` and Lorekeeper waits for user action.
-6. If the prompt input is available, the extension sends the prompt, waits for a stable assistant
+7. If the prompt input is available, the extension sends the prompt, waits for a stable assistant
    response, returns focus to Lorekeeper, and gives the response text back to the app.
 
 Lorekeeper never handles provider credentials. Login, account selection, project selection,

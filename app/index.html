@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lorekeeper</title>
-    <link rel="stylesheet" href="/app/styles.css?v=20260611-12" />
+    <link rel="stylesheet" href="/app/styles.css?v=20260611-15" />
   </head>
   <body>
     <div id="app" class="handheld-shell">
@@ -14,9 +14,18 @@
           <h1 id="campaign-title">Loading campaign...</h1>
         </div>
         <div class="top-meta">
-          <select id="campaign-select" aria-label="Campaign selector">
-            <option>Loading campaigns...</option>
-          </select>
+          <div class="campaign-picker">
+            <select id="campaign-select" aria-label="Campaign selector">
+              <option>Loading campaigns...</option>
+            </select>
+            <button id="delete-campaign" class="icon-action danger-action" type="button" title="Hide campaign" aria-label="Hide campaign">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
+                <path d="M6 9h12l-1 11H7L6 9Z"></path>
+                <path d="M10 11v7M14 11v7"></path>
+              </svg>
+            </button>
+          </div>
           <span id="scene-location">Loading...</span>
           <span id="provider-status">Provider: manual bridge</span>
           <span id="save-status">SQLite: local file ready</span>
@@ -55,8 +64,9 @@
               <span id="bridge-status">Manual copy/import ready</span>
             </div>
             <div class="button-stack">
-              <button id="check-sidecar" type="button">Check / Open ChatGPT</button>
+              <button id="check-sidecar" type="button">Check / Open Campaign Chat</button>
               <button id="copy-provider-prompt" type="button">Copy Provider Prompt</button>
+              <button id="new-provider-chat" type="button">New Campaign Chat</button>
             </div>
           </div>
         </section>
@@ -227,6 +237,27 @@
       </form>
     </dialog>
 
-    <script type="module" src="/app/app.js?v=20260611-12"></script>
+    <dialog id="delete-campaign-dialog" class="record-dialog confirm-dialog">
+      <form id="delete-campaign-form" method="dialog">
+        <header class="dialog-header">
+          <div>
+            <p class="eyebrow">Hide Campaign</p>
+            <h2 id="delete-campaign-title">Hide Campaign</h2>
+          </div>
+          <button id="close-delete-campaign-dialog" class="icon-action" type="button" title="Close">x</button>
+        </header>
+        <p id="delete-campaign-message" class="dialog-copy"></p>
+        <label>
+          <span>Type campaign name</span>
+          <input id="delete-campaign-name" autocomplete="off" />
+        </label>
+        <footer class="dialog-actions">
+          <button id="cancel-delete-campaign" type="button" class="secondary-action">Cancel</button>
+          <button id="confirm-delete-campaign" type="submit" class="danger-button" disabled>Hide Campaign</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <script type="module" src="/app/app.js?v=20260611-15"></script>
   </body>
 </html>

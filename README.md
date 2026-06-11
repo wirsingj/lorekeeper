@@ -31,13 +31,17 @@ the response, import it back into Lorekeeper, and propose campaign state updates
 This is not an API client. It is a local campaign framework that uses the already-logged-in provider
 web UI as the AI execution surface.
 
-The intended ChatGPT path is a named companion tab:
+The intended ChatGPT path is a named campaign conversation inside the `LoreKeeper` project:
 
-- Open the ChatGPT project/chat you want Lorekeeper to use, ideally the `LoreKeeper` project.
-- Mark that tab as the Lorekeeper companion from the Firefox sidebar.
+- Open the ChatGPT project/chat you want Lorekeeper to use, ideally inside the `LoreKeeper` project.
+- Lorekeeper tracks the active provider conversation per local campaign, using campaign name plus a
+  short id such as `Blackthorn Crossing [abc123-01]`.
+- Long campaigns can rotate to later provider conversations while keeping one SQLite campaign file
+  as the source of truth.
 - Use Lorekeeper's own input box for play.
-- Lorekeeper builds the context-rich prompt from SQLite state, sends it to the companion tab,
-  imports the assistant response, and shows proposed canon changes for review.
+- Lorekeeper builds the context-rich prompt from SQLite state, sends it to the active campaign
+  provider conversation, imports the assistant response, extracts campaign state changes, and saves
+  them locally.
 - If ChatGPT needs login or the project must be selected, Lorekeeper opens or focuses the tab and
   waits for the user to finish that provider-side action.
 
@@ -53,11 +57,11 @@ campaign-file prototype, and a secondary importer for existing continuity dumps.
 2. Lorekeeper stores the campaign premise, party, places, lore, tone, style rules, and current scene.
 3. User selects a supported provider tab or window.
 4. Lorekeeper builds the next prompt from local campaign state and guard rails.
-5. Lorekeeper sends that prompt into the saved provider companion tab when the extension bridge is
+5. Lorekeeper sends that prompt into the saved provider campaign conversation when the extension bridge is
    available, or copies it for manual paste as a fallback.
-6. Lorekeeper imports the latest assistant response from the companion tab, or accepts a manual paste.
+6. Lorekeeper imports the latest assistant response from the provider conversation, or accepts a manual paste.
 7. Lorekeeper parses proposed campaign state updates.
-8. Lorekeeper shows a reviewable diff.
+8. Lorekeeper saves extracted state updates into SQLite.
 9. User approves, edits, or rejects changes.
 10. Approved updates are saved to the local SQLite campaign file.
 

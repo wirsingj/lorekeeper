@@ -140,6 +140,17 @@ h3 {
   font-weight: 750;
 }
 
+.campaign-picker {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 32px;
+  gap: 6px;
+  align-items: center;
+}
+
+.campaign-picker select {
+  width: 100%;
+}
+
 .left-panel {
   grid-area: left;
 }
@@ -378,6 +389,17 @@ button.secondary-action {
   color: #edf2f4;
 }
 
+button.danger-button,
+button.danger-action {
+  border-color: rgba(179, 104, 98, 0.34);
+  background: linear-gradient(180deg, #573b3c, #3d2b2d);
+}
+
+button.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .icon-action {
   width: 30px;
   min-width: 30px;
@@ -386,6 +408,16 @@ button.secondary-action {
   border-radius: 8px;
   font-size: 0.78rem;
   line-height: 1;
+}
+
+.icon-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .play-screen {
