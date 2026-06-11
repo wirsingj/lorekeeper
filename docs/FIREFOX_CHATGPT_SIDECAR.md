@@ -6,8 +6,8 @@ The intended shape:
 
 1. User opens Firefox and logs into ChatGPT normally.
 2. User loads the Lorekeeper Firefox extension.
-3. Lorekeeper opens as a Firefox sidebar.
-4. The sidebar finds explicitly selected ChatGPT tabs.
+3. User opens the local Lorekeeper app.
+4. Lorekeeper uses the headless extension bridge to find or open campaign ChatGPT tabs.
 5. Lorekeeper inserts prompts into the visible ChatGPT UI.
 6. User reviews and submits, or later enables explicit auto-submit.
 7. Lorekeeper reads the latest visible assistant response.
@@ -26,7 +26,8 @@ It currently supports:
 - reading the latest visible assistant response
 
 Auto-submit should remain attached to an explicit user action because it sends campaign context to
-the provider. The current scaffold exposes this as a `Send + Read` button in the sidebar.
+the provider. The local app exposes this through its turn controls and setup dialog; the extension
+does not present its own UI.
 
 ## Development Loading
 
@@ -35,8 +36,8 @@ In Firefox:
 1. Open `about:debugging#/runtime/this-firefox`.
 2. Click `Load Temporary Add-on...`.
 3. Select `extension/firefox/manifest.json`.
-4. Open the Lorekeeper sidebar from Firefox's sidebar menu.
-5. Open or select a logged-in ChatGPT tab.
+4. Open the local Lorekeeper app.
+5. Open or select a logged-in ChatGPT tab from Lorekeeper's setup dialog.
 
 ## Boundaries
 

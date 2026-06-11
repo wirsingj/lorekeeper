@@ -50,6 +50,9 @@ const elements = {
   sceneLocation: document.querySelector("#scene-location"),
   providerStatus: document.querySelector("#provider-status"),
   saveStatus: document.querySelector("#save-status"),
+  openSetup: document.querySelector("#open-setup"),
+  setupDialog: document.querySelector("#setup-dialog"),
+  closeSetup: document.querySelector("#close-setup"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
   peopleList: document.querySelector("#people-list"),
@@ -125,6 +128,14 @@ elements.copyProviderPrompt.addEventListener("click", async () => {
     successMessage: "Provider prompt copied",
     failureMessage: "Clipboard blocked; prompt is in the drawer",
   });
+});
+
+elements.openSetup.addEventListener("click", () => {
+  elements.setupDialog.showModal();
+});
+
+elements.closeSetup.addEventListener("click", () => {
+  elements.setupDialog.close();
 });
 
 elements.campaignSelect.addEventListener("change", async () => {
@@ -1037,29 +1048,6 @@ async function bootstrapProviderConversation() {
     elements.bridgeStatus.textContent = error instanceof Error
       ? `Provider chat opened; bootstrap failed: ${error.message}`
       : "Provider chat opened; bootstrap failed";
-  }
-}
-
-async function requestSidebarOpen() {
-  try {
-    const result = await sendExtensionMessage(
-      {
-        type: "lorekeeper.openSidebar",
-      },
-      5000,
-    );
-
-    if (result?.opened) {
-      elements.bridgeStatus.textContent = "Lorekeeper sidebar opened";
-    } else if (result?.reason) {
-      elements.bridgeStatus.textContent = `Sidebar note: ${result.reason}`;
-    }
-
-    return result;
-  } catch {
-    return {
-      opened: false,
-    };
   }
 }
 

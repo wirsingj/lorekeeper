@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Lorekeeper",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Local D&D campaign framework and guard rails using provider web UIs as AI sidecars.",
   "permissions": [
     "activeTab",
@@ -13,10 +13,6 @@
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
-  "sidebar_action": {
-    "default_title": "Lorekeeper",
-    "default_panel": "sidebar/sidebar.html"
-  },
   "background": {
     "scripts": ["background.js"]
   },

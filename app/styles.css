@@ -129,6 +129,11 @@ h3 {
   border: 1px solid rgba(174, 191, 202, 0.08);
 }
 
+.top-meta .icon-action {
+  width: 34px;
+  height: 34px;
+}
+
 .top-meta select {
   max-width: 260px;
   min-height: 32px;
@@ -902,6 +907,29 @@ textarea::placeholder {
   display: grid;
   gap: 12px;
   padding: 16px;
+}
+
+.setup-dialog {
+  width: min(580px, calc(100vw - 32px));
+}
+
+.setup-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(174, 191, 202, 0.13);
+  border-radius: 10px;
+  background: rgba(10, 13, 15, 0.28);
+}
+
+.setup-section h3 {
+  margin: 0;
+  color: #f0f4f6;
+  font-size: 0.84rem;
+}
+
+.setup-dialog .rail-textarea {
+  min-height: 100px;
 }
 
 .dialog-header,

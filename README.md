@@ -1,6 +1,6 @@
 # Lorekeeper
 
-Lorekeeper is an early scaffold for a browser-extension-first AI campaign framework and guard-rail
+Lorekeeper is an early scaffold for a local-first AI campaign framework and guard-rail
 system. It is meant for people who want an engaging D&D-style world experience while using ChatGPT,
 Claude, or another provider web UI as the AI sidecar.
 
@@ -23,9 +23,10 @@ Lorekeeper should act as the save system the campaign deserved.
 
 The MVP must not require provider API keys.
 
-Lorekeeper runs locally as a browser extension/app tab. The user starts or opens a local campaign
-file, then keeps ChatGPT, Claude, or another supported provider open in a nearby tab or window.
-Lorekeeper uses a provider UI bridge to send prompts through the visible provider web UI, wait for
+Lorekeeper runs as a local React/Vite app backed by a local API that owns portable SQLite campaign
+files. A small headless browser extension acts as the provider bridge. The user starts or opens a
+local campaign file, then keeps ChatGPT, Claude, or another supported provider open in a nearby tab
+or window. Lorekeeper uses the bridge to send prompts through the visible provider web UI, wait for
 the response, import it back into Lorekeeper, and propose campaign state updates.
 
 This is not an API client. It is a local campaign framework that uses the already-logged-in provider
@@ -47,9 +48,10 @@ The intended ChatGPT path is a named campaign conversation inside the `LoreKeepe
 
 ## Current Status
 
-Early working scaffold. Lorekeeper now has campaign-memory primitives, context-pack generation,
-sidecar prompt generation, canon review proposal objects, provider bridge contracts, a local SQLite
-campaign-file prototype, and a secondary importer for existing continuity dumps.
+Early working scaffold. Lorekeeper now has a React/Vite app shell, campaign-memory primitives,
+context-pack generation, sidecar prompt generation, canon review proposal objects, provider bridge
+contracts, a local SQLite campaign-file prototype, and a secondary importer for existing continuity
+dumps.
 
 ## Core Workflow
 
@@ -83,11 +85,12 @@ campaign-file prototype, and a secondary importer for existing continuity dumps.
 - `docs/ROADMAP.md`: phased implementation plan.
 - `docs/VOTT_USE_CASE.md`: motivating long-campaign use case.
 - `docs/PROVIDER_UI_BRIDGE.md`: provider UI automation approach and boundaries.
-- `docs/FIREFOX_CHATGPT_SIDECAR.md`: Firefox sidebar and ChatGPT tab bridge notes.
+- `docs/FIREFOX_CHATGPT_SIDECAR.md`: Firefox headless extension and ChatGPT tab bridge notes.
 - `docs/UX_HANDHELD_SHELL.md`: handheld play UI concept and input ownership.
 - `docs/UX_AUDIT.md`: current usability findings and next UX priorities.
 - `src/`: campaign engine, context packs, prompt builder, importers, storage, and bridge contracts.
-- `extension/`: placeholder browser extension source.
+- `app/`: React/Vite app shell and transitional controller.
+- `extension/`: headless browser extension source for provider web UI bridging.
 
 ## Local Commands
 

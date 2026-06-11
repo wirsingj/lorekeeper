@@ -9,7 +9,10 @@
     "demo": "node ./src/index.js",
     "new:campaign": "node ./scripts/new-campaign.js",
     "import:folder": "node ./scripts/import-campaign-folder.js",
-    "dev": "node ./scripts/serve.js"
+    "api": "node ./scripts/serve.js 4174",
+    "dev": "node ./scripts/dev.js",
+    "vite": "vite --host 127.0.0.1",
+    "build": "vite build"
   },
   "keywords": [
     "campaign",
@@ -19,6 +22,10 @@
   ],
   "license": "UNLICENSED",
   "dependencies": {
-    "sql.js": "^1.14.1"
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sql.js": "^1.14.1",
+    "vite": "^8.0.16"
   }
 }

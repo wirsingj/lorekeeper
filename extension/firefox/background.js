@@ -1,5 +1,4 @@
 const providerHosts = new Set(["chatgpt.com", "chat.openai.com"]);
-const appHosts = new Set(["localhost", "127.0.0.1"]);
 const legacyCompanionStorageKey = "lorekeeper.chatgptCompanion";
 const companionStoragePrefix = "lorekeeper.providerConversation";
 const defaultCompanion = Object.freeze({
@@ -37,32 +36,7 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
     return runCompanionPrompt(message.prompt ?? "", message.options ?? {}, sender);
   }
 
-  if (message.type === "lorekeeper.openSidebar") {
-    return openLorekeeperSidebar(sender);
-  }
-
   return null;
-});
-
-browser.tabs.onActivated.addListener(({ tabId }) => {
-  syncSidebarForTab(tabId);
-});
-
-browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.url || changeInfo.status === "complete") {
-    syncSidebarForTab(tabId);
-  }
-});
-
-browser.windows.onFocusChanged.addListener(async (windowId) => {
-  if (windowId === browser.windows.WINDOW_ID_NONE) {
-    return;
-  }
-
-  const [tab] = await browser.tabs.query({ active: true, windowId });
-  if (tab?.id) {
-    syncSidebarForTab(tab.id);
-  }
 });
 
 async function findProviderTabs(options = {}) {
@@ -557,72 +531,6 @@ function isSupportedProviderUrl(url) {
   try {
     const parsed = new URL(url);
     return providerHosts.has(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
-
-async function syncSidebarForTab(tabId) {
-  try {
-    const tab = await browser.tabs.get(tabId);
-    if (isLorekeeperAppUrl(tab.url)) {
-      await browser.sidebarAction.setPanel({
-        tabId,
-        panel: "sidebar/sidebar.html",
-      });
-      return;
-    }
-
-    if (browser.sidebarAction.close) {
-      await browser.sidebarAction.close();
-    }
-  } catch {
-    // Sidebar close behavior varies by Firefox version and user gesture state.
-  }
-}
-
-async function openLorekeeperSidebar(sender) {
-  const tab = sender?.tab;
-  if (!tab?.id || !isLorekeeperAppUrl(tab.url)) {
-    return {
-      opened: false,
-      reason: "Open Lorekeeper at localhost first.",
-    };
-  }
-
-  try {
-    await browser.sidebarAction.setPanel({
-      tabId: tab.id,
-      panel: "sidebar/sidebar.html",
-    });
-
-    if (browser.sidebarAction.open) {
-      await browser.sidebarAction.open();
-      return {
-        opened: true,
-      };
-    }
-
-    return {
-      opened: false,
-      reason: "Firefox did not expose sidebarAction.open for this context.",
-    };
-  } catch (error) {
-    return {
-      opened: false,
-      reason: error instanceof Error ? error.message : "Could not open sidebar.",
-    };
-  }
-}
-
-function isLorekeeperAppUrl(url) {
-  if (!url) {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(url);
-    return appHosts.has(parsed.hostname);
   } catch {
     return false;
   }

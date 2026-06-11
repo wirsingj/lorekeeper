@@ -17,18 +17,17 @@ remains the local campaign app that builds prompts, imports responses, and manag
 7. Lorekeeper reads the latest assistant response.
 8. Lorekeeper imports the response for review and state extraction.
 
-## Firefox Sidecar Shape
+## Firefox Headless Bridge Shape
 
-For Firefox, Lorekeeper can run as a WebExtension sidebar while ChatGPT remains open in a logged-in
-provider tab.
+For Firefox, Lorekeeper runs as the local app while a headless WebExtension bridges to ChatGPT in a
+logged-in provider tab.
 
 The bridge uses:
 
-- `sidebar_action` for the Lorekeeper sidecar UI
 - a content script on `https://chatgpt.com/*` and `https://chat.openai.com/*`
 - a local-app content script on `localhost` / `127.0.0.1` to relay app requests to the extension
 - tab discovery in the background script
-- tab-scoped messages from the sidebar to the ChatGPT content script
+- tab-scoped messages from the local app to the ChatGPT content script
 - a saved companion session in extension local storage
 
 This keeps ChatGPT visible and user-controlled while Lorekeeper handles campaign state, prompts,

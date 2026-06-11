@@ -19,6 +19,7 @@ import { commitReviewBatch } from "../src/storage/review-commit.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const port = Number(process.env.PORT ?? process.argv[2] ?? 4173);
+const builtAppRoot = path.join(projectRoot, "dist", "app");
 
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -43,7 +44,12 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
 
     if (url.pathname === "/") {
-      await serveFile(path.join(projectRoot, "app", "index.html"), response);
+      const builtIndex = path.join(builtAppRoot, "index.html");
+      if (existsSync(builtIndex)) {
+        await serveFile(builtIndex, response);
+      } else {
+        sendText(response, 200, "Lorekeeper API is running. Start the React app with npm run dev.");
+      }
       return;
     }
 
@@ -129,6 +135,12 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/local-asset") {
       await serveLocalAsset(url, response);
+      return;
+    }
+
+    const builtAsset = path.resolve(builtAppRoot, decodeURIComponent(url.pathname.slice(1)));
+    if (builtAsset.startsWith(builtAppRoot) && existsSync(builtAsset)) {
+      await serveFile(builtAsset, response);
       return;
     }
 
