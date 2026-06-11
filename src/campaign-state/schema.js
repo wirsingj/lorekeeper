@@ -15,6 +15,7 @@ export const entityTypes = Object.freeze({
 
 export const contextPackKinds = Object.freeze({
   SCENE: "current_scene",
+  HISTORY: "recent_play_history",
   PARTY: "active_party",
   NEARBY: "nearby_people_places",
   LORE: "relevant_lore",
@@ -48,6 +49,7 @@ export function createEmptyCampaign(overrides = {}) {
     quests: overrides.quests ?? [],
     relationships: overrides.relationships ?? [],
     scene: overrides.scene ?? createEmptyScene(),
+    sessionLog: overrides.sessionLog ?? createEmptySessionLog(),
     combat: overrides.combat ?? createEmptyCombatState(),
     rulesProfile: overrides.rulesProfile ?? createDefaultRulesProfile(),
     style: overrides.style ?? createDefaultStyleRules(),
@@ -71,6 +73,22 @@ export function createEmptyScene() {
     activeQuestIds: [],
     localNotes: [],
     immediateSituation: "",
+  };
+}
+
+export function createEmptySessionLog() {
+  return {
+    activeSessionId: "session-main",
+    sessions: [
+      {
+        id: "session-main",
+        title: "Campaign Play",
+        startedAt: new Date().toISOString(),
+        endedAt: null,
+        recap: "",
+      },
+    ],
+    messages: [],
   };
 }
 
@@ -235,6 +253,10 @@ export function validateCampaign(campaign) {
 
   if (!campaign.scene || typeof campaign.scene !== "object") {
     errors.push("scene must be an object.");
+  }
+
+  if (!campaign.sessionLog || typeof campaign.sessionLog !== "object") {
+    errors.push("sessionLog must be an object.");
   }
 
   if (!campaign.combat || typeof campaign.combat !== "object") {

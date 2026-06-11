@@ -75,6 +75,26 @@ CREATE TABLE IF NOT EXISTS sessions (
   data_json TEXT NOT NULL DEFAULT '{}'
 );
 
+CREATE TABLE IF NOT EXISTS session_messages (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  meta TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'unknown',
+  provider_run_id TEXT,
+  created_at TEXT NOT NULL,
+  data_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_messages_campaign_created
+ON session_messages (campaign_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_session_messages_session_created
+ON session_messages (session_id, created_at);
+
 CREATE TABLE IF NOT EXISTS provider_runs (
   id TEXT PRIMARY KEY,
   campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,

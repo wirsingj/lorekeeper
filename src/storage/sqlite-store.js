@@ -75,7 +75,7 @@ function insertCampaign(db, campaign) {
   db.run(
     `INSERT INTO metadata (key, value) VALUES
       ('lorekeeper.storage', 'sqlite'),
-      ('lorekeeper.sqlite_schema', '0.1.0')`,
+      ('lorekeeper.sqlite_schema', '0.1.1')`,
   );
 
   runInsert(db, "campaigns", {
@@ -122,6 +122,8 @@ function insertCampaign(db, campaign) {
     (record) => record.name,
   );
 
+  insertSessionLog(db, campaign);
+
   for (const relationship of campaign.relationships) {
     runInsert(db, "relationships", {
       id: relationship.id,
@@ -162,6 +164,50 @@ function insertCampaign(db, campaign) {
       source_order: sourceDocument.sourceOrder ?? 0,
       data_json: JSON.stringify(sourceDocument),
       created_at: now,
+    });
+  }
+}
+
+function insertSessionLog(db, campaign) {
+  const now = new Date().toISOString();
+  const sessionLog = campaign.sessionLog ?? {};
+  const sessions = Array.isArray(sessionLog.sessions) && sessionLog.sessions.length
+    ? sessionLog.sessions
+    : [
+        {
+          id: sessionLog.activeSessionId || "session-main",
+          title: "Campaign Play",
+          startedAt: campaign.createdAt || now,
+          endedAt: null,
+          recap: "",
+        },
+      ];
+
+  for (const session of sessions) {
+    runInsert(db, "sessions", {
+      id: session.id,
+      campaign_id: campaign.id,
+      title: session.title || "Campaign Play",
+      started_at: session.startedAt || now,
+      ended_at: session.endedAt || null,
+      recap: session.recap || "",
+      data_json: JSON.stringify(session),
+    });
+  }
+
+  for (const message of sessionLog.messages ?? []) {
+    runInsert(db, "session_messages", {
+      id: message.id,
+      campaign_id: campaign.id,
+      session_id: message.sessionId || sessionLog.activeSessionId || sessions[0].id,
+      role: message.role,
+      title: message.title,
+      body: message.body,
+      meta: message.meta || "",
+      source: message.source || "unknown",
+      provider_run_id: message.providerRunId || null,
+      created_at: message.createdAt || now,
+      data_json: JSON.stringify(message),
     });
   }
 }

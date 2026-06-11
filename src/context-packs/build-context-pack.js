@@ -3,6 +3,7 @@ import { findById, labelEntity } from "../campaign-state/formatters.js";
 
 const DEFAULT_PACK_KINDS = [
   contextPackKinds.SCENE,
+  contextPackKinds.HISTORY,
   contextPackKinds.PARTY,
   contextPackKinds.NEARBY,
   contextPackKinds.INVENTORY,
@@ -51,6 +52,8 @@ function buildSection(kind, campaign) {
   switch (kind) {
     case contextPackKinds.SCENE:
       return buildSceneSection(campaign);
+    case contextPackKinds.HISTORY:
+      return buildHistorySection(campaign);
     case contextPackKinds.PARTY:
       return buildPartySection(campaign);
     case contextPackKinds.NEARBY:
@@ -72,6 +75,19 @@ function buildSection(kind, campaign) {
     default:
       return null;
   }
+}
+
+function buildHistorySection(campaign) {
+  const messages = (campaign.sessionLog?.messages ?? []).slice(-8);
+
+  return {
+    kind: contextPackKinds.HISTORY,
+    title: "Recent Play History",
+    entries: messages.map((message) => {
+      const speaker = message.title || (message.role === "player" ? "Player" : "DM");
+      return `${speaker}: ${message.body}`;
+    }),
+  };
 }
 
 function buildSceneSection(campaign) {

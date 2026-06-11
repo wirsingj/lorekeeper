@@ -16,6 +16,7 @@ const apiNewCampaignUrl = "/api/campaign/new";
 const apiImportedCampaignUrl = "/api/campaign/imported";
 const apiCommitReviewUrl = "/api/review/commit";
 const apiCampaignRecordUrl = "/api/campaign/record";
+const apiCampaignMessageUrl = "/api/campaign/message";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
 const companionOptions = {
@@ -146,8 +147,8 @@ elements.loadImported.addEventListener("click", async () => {
   elements.bridgeStatus.textContent = "Imported binder loaded";
 });
 
-elements.importResponse.addEventListener("click", () => {
-  importProviderResponse(elements.responseImport.value.trim());
+elements.importResponse.addEventListener("click", async () => {
+  await importProviderResponse(elements.responseImport.value.trim());
 });
 
 elements.pasteResponse.addEventListener("click", async () => {
@@ -222,11 +223,22 @@ elements.playerForm.addEventListener("submit", async (event) => {
   state.contextPack = state.currentTurn.contextPack;
   state.prompt = state.currentTurn.providerPrompt;
   const visiblePlayerText = state.currentTurn.parsedMessage?.inWorldText;
+  const metaText = (state.currentTurn.parsedMessage?.metaInstructions ?? []).join(" ");
   if (visiblePlayerText) {
-    state.playMessages.push({
+    await appendPlayMessage({
       role: "player",
       title: "You",
       body: visiblePlayerText,
+      meta: metaText ? `Meta: ${metaText}` : "",
+      source: "player_input",
+    });
+  } else if (metaText) {
+    await appendPlayMessage({
+      role: "player",
+      title: "You (meta)",
+      body: metaText,
+      meta: "Out-of-world instruction",
+      source: "player_meta",
     });
   }
   elements.playerInput.value = "";
@@ -574,6 +586,21 @@ function recordLabel(domain) {
 
 function seedPlayLog() {
   const campaign = state.campaign;
+  const storedMessages = campaign.sessionLog?.messages ?? [];
+  if (storedMessages.length > 0) {
+    state.playMessages = storedMessages.map((message) => ({
+      id: message.id,
+      sessionId: message.sessionId,
+      role: message.role,
+      title: message.title,
+      body: message.body,
+      meta: message.meta,
+      source: message.source,
+      createdAt: message.createdAt,
+    }));
+    return;
+  }
+
   const currentPlace = findById(campaign.places, campaign.scene.currentPlaceId);
   state.playMessages = [
     {
@@ -650,16 +677,17 @@ function renderCampaignSelector() {
   }
 }
 
-function importProviderResponse(responseText) {
+async function importProviderResponse(responseText) {
   if (!responseText) {
     elements.bridgeStatus.textContent = "Paste a provider response first";
     return;
   }
 
-  state.playMessages.push({
+  await appendPlayMessage({
     role: "dm",
     title: "DM",
     body: cleanProviderResponseForPlay(responseText),
+    source: "provider_response",
   });
 
   const extraction = extractLorekeeperUpdates(responseText);
@@ -680,6 +708,79 @@ function importProviderResponse(responseText) {
         : "DM response imported with no proposed changes";
   }
   render();
+}
+
+async function appendPlayMessage(message) {
+  const normalized = {
+    id: message.id || `msg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    sessionId: message.sessionId || state.campaign.sessionLog?.activeSessionId || "session-main",
+    role: message.role,
+    title: message.title,
+    body: message.body,
+    meta: message.meta || "",
+    source: message.source || "lorekeeper_ui",
+    providerRunId: message.providerRunId || null,
+    createdAt: message.createdAt || new Date().toISOString(),
+  };
+
+  state.playMessages.push(normalized);
+  state.campaign = {
+    ...state.campaign,
+    sessionLog: appendMessageToSessionLog(state.campaign.sessionLog, normalized),
+  };
+
+  render();
+  await persistPlayMessage(normalized);
+  return normalized;
+}
+
+function appendMessageToSessionLog(sessionLog, message) {
+  const now = new Date().toISOString();
+  const activeSessionId = sessionLog?.activeSessionId || "session-main";
+  const sessions = Array.isArray(sessionLog?.sessions) && sessionLog.sessions.length
+    ? sessionLog.sessions
+    : [
+        {
+          id: activeSessionId,
+          title: "Campaign Play",
+          startedAt: now,
+          endedAt: null,
+          recap: "",
+        },
+      ];
+
+  return {
+    activeSessionId,
+    sessions,
+    messages: [...(sessionLog?.messages ?? []), message],
+  };
+}
+
+async function persistPlayMessage(message) {
+  try {
+    const response = await fetch(apiCampaignMessageUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(message),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const result = await response.json();
+    state.campaign = normalizeCampaign(result.campaign);
+    state.contextPack = buildContextPack(state.campaign, {
+      purpose: "post_message_context",
+    });
+    state.campaigns = result.campaigns ?? state.campaigns;
+    state.sqlitePath = result.sqlitePath ?? state.sqlitePath;
+    render();
+  } catch (error) {
+    elements.bridgeStatus.textContent = "Chat history save failed; message is only in this browser view";
+  }
 }
 
 async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = false } = {}) {
@@ -795,7 +896,7 @@ async function runPromptThroughSidecar(prompt) {
     };
 
     if (result.sent && result.response?.text) {
-      importProviderResponse(result.response.text);
+      await importProviderResponse(result.response.text);
       elements.bridgeStatus.textContent = "ChatGPT response imported for canon review";
       return;
     }
