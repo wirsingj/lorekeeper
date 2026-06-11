@@ -285,23 +285,24 @@ button.secondary-action {
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 22px;
+  padding: 24px;
   background:
-    linear-gradient(rgba(238, 244, 232, 0.94), rgba(238, 244, 232, 0.94)),
+    linear-gradient(rgba(238, 244, 232, 0.97), rgba(238, 244, 232, 0.97)),
     url("/local-asset?name=VotT-%20City%20of%20Resonance%20map.png");
   background-size: cover;
   background-position: center;
   border: 4px solid #4b5960;
   border-radius: 10px;
   color: #20261f;
+  font-size: 1rem;
 }
 
 .play-message {
-  max-width: 86ch;
-  margin-bottom: 14px;
-  padding: 13px 14px;
+  max-width: min(74ch, calc(100% - 10px));
+  margin-bottom: 16px;
+  padding: 16px 18px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(77, 96, 75, 0.22);
 }
 
@@ -321,14 +322,28 @@ button.secondary-action {
 
 .play-message strong {
   display: block;
-  margin-bottom: 5px;
-  font-size: 0.82rem;
+  margin-bottom: 8px;
+  font-size: 0.84rem;
   text-transform: uppercase;
 }
 
 .play-message p {
-  margin: 0;
-  line-height: 1.5;
+  margin: 0 0 0.85rem;
+  line-height: 1.62;
+}
+
+.play-message p:last-child {
+  margin-bottom: 0;
+}
+
+.play-message ul {
+  margin: 0 0 0.85rem;
+  padding-left: 1.25rem;
+  line-height: 1.56;
+}
+
+.play-message li + li {
+  margin-top: 0.28rem;
 }
 
 .play-message small {

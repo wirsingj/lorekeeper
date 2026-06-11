@@ -11,9 +11,10 @@ export const sidecarTurnTemplate = {
     "When facts change, propose updates in the Lorekeeper update block instead of silently rewriting canon.",
   ],
   responseContract: [
-    "First, write the in-world response for the player.",
-    "Then include a concise mechanical/status section when relevant.",
+    "First, write only the in-world DM response for the player. This text is displayed directly in Lorekeeper.",
+    "Keep any mechanical/status notes concise, player-facing, and relevant to the immediate choice.",
     "Finally include a fenced JSON block named lorekeeper_updates with proposed state changes.",
+    "Do not write raw JSON inline, and do not put any visible prose after the lorekeeper_updates block.",
     "Do not claim updates are canon. Lorekeeper will ask the user to review them.",
   ],
 };

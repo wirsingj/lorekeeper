@@ -1,6 +1,6 @@
 export function extractLorekeeperUpdates(responseText) {
-  const block = findLorekeeperJsonBlock(responseText) ?? findAnyJsonBlock(responseText);
-  if (!block) {
+  const payload = findLorekeeperJsonPayload(responseText);
+  if (!payload) {
     return {
       proposedChanges: [],
       error: "No Lorekeeper update JSON block found.",
@@ -8,7 +8,7 @@ export function extractLorekeeperUpdates(responseText) {
   }
 
   try {
-    const parsed = JSON.parse(block);
+    const parsed = JSON.parse(payload.json);
     const proposedChanges = Array.isArray(parsed.proposedChanges) ? parsed.proposedChanges : [];
     return {
       proposedChanges: proposedChanges.map(normalizeChange),
@@ -22,6 +22,24 @@ export function extractLorekeeperUpdates(responseText) {
   }
 }
 
+export function stripLorekeeperUpdates(responseText) {
+  const payload = findLorekeeperJsonPayload(responseText);
+  if (!payload) {
+    return responseText.trim();
+  }
+
+  const before = responseText.slice(0, payload.start).replace(
+    /(?:^|\n|\s)(?:JSON|Lorekeeper Updates|lorekeeper_updates)\s*[:\-]?\s*$/i,
+    "",
+  );
+  const after = responseText.slice(payload.end);
+  return `${before}${after}`.trim();
+}
+
+function findLorekeeperJsonPayload(text) {
+  return findLorekeeperJsonBlock(text) ?? findAnyJsonBlock(text) ?? findInlineJsonObject(text);
+}
+
 function findLorekeeperJsonBlock(text) {
   const patterns = [
     /```json\s+lorekeeper_updates\s*([\s\S]*?)```/i,
@@ -32,7 +50,11 @@ function findLorekeeperJsonBlock(text) {
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match?.[1]) {
-      return match[1].trim();
+      return {
+        json: match[1].trim(),
+        start: match.index,
+        end: match.index + match[0].length,
+      };
     }
   }
 
@@ -40,21 +62,83 @@ function findLorekeeperJsonBlock(text) {
 }
 
 function findAnyJsonBlock(text) {
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (match?.[1]?.includes("proposedChanges")) {
-    return match[1].trim();
-  }
+  const pattern = /```(?:json)?\s*([\s\S]*?)```/gi;
+  let match;
 
-  const objectStart = text.indexOf("{");
-  const objectEnd = text.lastIndexOf("}");
-  if (objectStart !== -1 && objectEnd > objectStart) {
-    const candidate = text.slice(objectStart, objectEnd + 1);
-    if (candidate.includes("proposedChanges")) {
-      return candidate;
+  while ((match = pattern.exec(text))) {
+    if (match[1]?.includes("proposedChanges")) {
+      return {
+        json: match[1].trim(),
+        start: match.index,
+        end: match.index + match[0].length,
+      };
     }
   }
 
   return null;
+}
+
+function findInlineJsonObject(text) {
+  for (let start = text.indexOf("{"); start !== -1; start = text.indexOf("{", start + 1)) {
+    const end = findBalancedObjectEnd(text, start);
+    if (end === -1) {
+      continue;
+    }
+
+    const candidate = text.slice(start, end + 1);
+    if (!candidate.includes("proposedChanges")) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(candidate);
+      if (Array.isArray(parsed.proposedChanges)) {
+        return {
+          json: candidate,
+          start,
+          end: end + 1,
+        };
+      }
+    } catch {
+      // Keep scanning. The provider may include prose braces before the actual update object.
+    }
+  }
+
+  return null;
+}
+
+function findBalancedObjectEnd(text, start) {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+  }
+
+  return -1;
 }
 
 function normalizeChange(change) {
@@ -68,4 +152,3 @@ function normalizeChange(change) {
     reason: change.reason ?? "",
   };
 }
-

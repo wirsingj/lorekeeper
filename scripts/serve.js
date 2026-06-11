@@ -29,6 +29,12 @@ const mimeTypes = new Map([
   [".gif", "image/gif"],
 ]);
 
+const noCacheHeaders = {
+  "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  pragma: "no-cache",
+  expires: "0",
+};
+
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, `http://${request.headers.host}`);
@@ -156,6 +162,7 @@ async function serveFile(filePath, response) {
   response.writeHead(200, {
     "content-type": mimeTypes.get(extension) ?? "application/octet-stream",
     "content-length": fileStat.size,
+    ...noCacheHeaders,
   });
   createReadStream(filePath).pipe(response);
 }
@@ -163,6 +170,7 @@ async function serveFile(filePath, response) {
 function sendText(response, statusCode, body) {
   response.writeHead(statusCode, {
     "content-type": "text/plain; charset=utf-8",
+    ...noCacheHeaders,
   });
   response.end(body);
 }
@@ -170,6 +178,7 @@ function sendText(response, statusCode, body) {
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
+    ...noCacheHeaders,
   });
   response.end(JSON.stringify(body, null, 2));
 }

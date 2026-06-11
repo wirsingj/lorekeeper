@@ -4,7 +4,7 @@ import { normalizeCampaign } from "../src/campaign-state/schema.js";
 import { createSampleCampaign } from "../src/campaign-state/sample-campaign.js";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
 import { createReviewBatch, decideChange, getCommittableChanges } from "../src/canon-review/proposals.js";
-import { extractLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
+import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 
 const bundleUrl = "/data/imports/veil-of-the-towers.bundle.json";
@@ -641,7 +641,7 @@ function importProviderResponse(responseText) {
   state.playMessages.push({
     role: "dm",
     title: "DM",
-    body: stripLorekeeperUpdateBlock(responseText),
+    body: cleanProviderResponseForPlay(responseText),
   });
 
   const extraction = extractLorekeeperUpdates(responseText);
@@ -967,10 +967,7 @@ function renderPlayLog() {
       const title = document.createElement("strong");
       title.textContent = message.title;
 
-      const body = document.createElement("p");
-      body.textContent = message.body;
-
-      wrapper.append(title, body);
+      wrapper.append(title, ...messageBodyElements(message.body));
       if (message.meta) {
         const meta = document.createElement("small");
         meta.textContent = message.meta;
@@ -1121,9 +1118,53 @@ function recordElement({ title, body }) {
   return wrapper;
 }
 
-function stripLorekeeperUpdateBlock(text) {
-  return text
-    .replace(/```json\s+lorekeeper_updates\s*[\s\S]*?```/gi, "")
-    .replace(/```lorekeeper_updates\s*[\s\S]*?```/gi, "")
-    .trim();
+function cleanProviderResponseForPlay(text) {
+  const withoutUpdates = stripLorekeeperUpdates(text);
+  return stripTrailingStatusBlock(withoutUpdates).trim() || "The DM response was imported for review.";
+}
+
+function stripTrailingStatusBlock(text) {
+  const statusMarker = text.search(
+    /(?:^|\n)\s*(?:Current Scene|Scene Status|Scene|Location|Time|Party Status|Immediate Tension|Choices Ahead|Next Choices)\s*:/i,
+  );
+
+  if (statusMarker === -1) {
+    return text;
+  }
+
+  const narrativeBeforeMarker = text.slice(0, statusMarker).trim();
+  return narrativeBeforeMarker.length >= 160 ? narrativeBeforeMarker : text;
+}
+
+function messageBodyElements(text) {
+  const blocks = text
+    .trim()
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "No visible narration returned.";
+    return [paragraph];
+  }
+
+  return blocks.map((block) => {
+    const lines = block.split(/\n/).map((line) => line.trim()).filter(Boolean);
+    const isList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
+
+    if (isList) {
+      const list = document.createElement("ul");
+      lines.forEach((line) => {
+        const item = document.createElement("li");
+        item.textContent = line.replace(/^[-*]\s+/, "");
+        list.append(item);
+      });
+      return list;
+    }
+
+    const paragraph = document.createElement("p");
+    paragraph.textContent = lines.join(" ");
+    return paragraph;
+  });
 }
