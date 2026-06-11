@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lorekeeper</title>
-    <link rel="stylesheet" href="/app/styles.css?v=20260611-7" />
+    <link rel="stylesheet" href="/app/styles.css?v=20260611-8" />
   </head>
   <body>
     <div id="app" class="handheld-shell">
@@ -69,7 +69,40 @@
       </main>
 
       <aside class="right-panel panel-rail">
-        <section class="rail-section">
+        <section class="rail-section binder-section">
+          <div class="section-title">
+            <h2>People</h2>
+            <div class="title-actions">
+              <button class="icon-action" data-add-domain="people" type="button" title="Add person">+</button>
+              <span id="people-count" class="count-pill">0</span>
+            </div>
+          </div>
+          <div id="people-list" class="binder-list"></div>
+        </section>
+
+        <section class="rail-section binder-section">
+          <div class="section-title">
+            <h2>Places</h2>
+            <div class="title-actions">
+              <button class="icon-action" data-add-domain="places" type="button" title="Add place">+</button>
+              <span id="place-count" class="count-pill">0</span>
+            </div>
+          </div>
+          <div id="place-list" class="binder-list"></div>
+        </section>
+
+        <section class="rail-section binder-section">
+          <div class="section-title">
+            <h2>Things</h2>
+            <div class="title-actions">
+              <button class="icon-action" data-add-domain="items" type="button" title="Add thing">+</button>
+              <span id="thing-count" class="count-pill">0</span>
+            </div>
+          </div>
+          <div id="thing-list" class="binder-list"></div>
+        </section>
+
+        <section class="rail-section binder-section">
           <div class="section-title">
             <h2>Threads</h2>
             <div class="title-actions">
@@ -77,25 +110,12 @@
               <span id="quest-count" class="count-pill">0</span>
             </div>
           </div>
-          <div id="quest-list" class="record-stack"></div>
+          <div id="quest-list" class="binder-list"></div>
         </section>
 
         <section class="rail-section">
           <div class="section-title">
-            <h2>Canon</h2>
-            <div class="title-actions">
-              <button class="icon-action" data-add-domain="people" type="button" title="Add person">P</button>
-              <button class="icon-action" data-add-domain="places" type="button" title="Add place">L</button>
-              <button class="icon-action" data-add-domain="lore" type="button" title="Add lore">N</button>
-              <span id="context-count" class="count-pill">0</span>
-            </div>
-          </div>
-          <div id="context-sections" class="context-stack"></div>
-        </section>
-
-        <section class="rail-section">
-          <div class="section-title">
-            <h2>Import Response</h2>
+            <h2>Canon Review</h2>
             <span id="review-count" class="count-pill">0</span>
           </div>
           <textarea id="response-import" class="rail-textarea" spellcheck="false"></textarea>
@@ -109,16 +129,6 @@
           <div id="review-list" class="review-stack"></div>
         </section>
 
-        <section class="rail-section">
-          <div class="section-title">
-            <h2>Assets</h2>
-            <div class="title-actions">
-              <button class="icon-action" data-add-domain="assets" type="button" title="Add source image">+</button>
-              <span id="asset-count" class="count-pill">0</span>
-            </div>
-          </div>
-          <div id="asset-grid" class="asset-strip"></div>
-        </section>
       </aside>
 
       <footer class="command-deck">
@@ -216,6 +226,6 @@
       </form>
     </dialog>
 
-    <script type="module" src="/app/app.js?v=20260611-7"></script>
+    <script type="module" src="/app/app.js?v=20260611-8"></script>
   </body>
 </html>

@@ -6,6 +6,7 @@ const domainLabels = {
   places: "place",
   quests: "quest",
   lore: "lore note",
+  items: "thing",
   assets: "asset",
 };
 
@@ -104,6 +105,18 @@ function createRecord(domain, input, now) {
     };
   }
 
+  if (domain === "items") {
+    return {
+      id: input.id || uniqueId("item", name),
+      name,
+      type: input.type || input.role || "thing",
+      summary: input.summary || notes[0] || "",
+      notes,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
   if (domain === "assets") {
     return {
       id: input.id || uniqueId("asset", name),
@@ -160,6 +173,10 @@ function normalizeDomain(domain) {
 
   if (domain === "lore_note") {
     return "lore";
+  }
+
+  if (domain === "item" || domain === "thing" || domain === "things" || domain === "artifact") {
+    return "items";
   }
 
   if (domain === "asset" || domain === "source_image") {

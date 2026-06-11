@@ -382,7 +382,7 @@ function normalizeDomain(domain) {
     return "lore";
   }
 
-  if (domain === "item" || domain === "artifact") {
+  if (domain === "item" || domain === "thing" || domain === "things" || domain === "artifact") {
     return "items";
   }
 

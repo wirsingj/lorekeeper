@@ -48,14 +48,16 @@ const elements = {
   saveStatus: document.querySelector("#save-status"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
+  peopleList: document.querySelector("#people-list"),
+  peopleCount: document.querySelector("#people-count"),
+  placeList: document.querySelector("#place-list"),
+  placeCount: document.querySelector("#place-count"),
+  thingList: document.querySelector("#thing-list"),
+  thingCount: document.querySelector("#thing-count"),
   questList: document.querySelector("#quest-list"),
   questCount: document.querySelector("#quest-count"),
-  contextSections: document.querySelector("#context-sections"),
-  contextCount: document.querySelector("#context-count"),
   promptOutput: document.querySelector("#prompt-output"),
   promptSize: document.querySelector("#prompt-size"),
-  assetGrid: document.querySelector("#asset-grid"),
-  assetCount: document.querySelector("#asset-count"),
   bridgeStatus: document.querySelector("#bridge-status"),
   checkSidecar: document.querySelector("#check-sidecar"),
   copyProviderPrompt: document.querySelector("#copy-provider-prompt"),
@@ -568,6 +570,14 @@ function recordDialogConfig(domain) {
       rolePlaceholder: "image",
       notesPlaceholder: "What should Lorekeeper remember about this source image?",
     },
+    items: {
+      title: "Add Thing",
+      nameLabel: "Thing name",
+      roleLabel: "Kind / type",
+      namePlaceholder: "Silver lockpick",
+      rolePlaceholder: "tool, clue, artifact, weapon...",
+      notesPlaceholder: "What is known about it, who has it, and why it matters...",
+    },
   };
 
   return configs[domain] ?? configs.lore;
@@ -581,6 +591,7 @@ function recordLabel(domain) {
     quests: "Thread",
     lore: "Lore note",
     assets: "Asset",
+    items: "Thing",
   }[domain] ?? "Record";
 }
 
@@ -615,9 +626,6 @@ function seedPlayLog() {
 function render() {
   const campaign = state.campaign;
   const visibleCampaign = buildVisibleCampaign();
-  const visibleContextPack = buildContextPack(visibleCampaign, {
-    purpose: "ui_working_campaign_view",
-  });
   const currentPlace = findById(visibleCampaign.places, visibleCampaign.scene.currentPlaceId);
 
   elements.title.textContent = campaign.title;
@@ -635,11 +643,12 @@ function render() {
 
   renderPlayLog();
   renderParty(visibleCampaign, campaign);
+  renderPeople(visibleCampaign, campaign);
+  renderPlaces(visibleCampaign, campaign);
+  renderThings(visibleCampaign, campaign);
   renderQuests(visibleCampaign, campaign);
-  renderContextPack(visibleContextPack);
   renderPrompt(state.prompt);
   renderReviewBatch();
-  renderAssets(visibleCampaign);
   renderCampaignSelector();
 }
 
@@ -1112,6 +1121,112 @@ function renderParty(campaign, canonicalCampaign = campaign) {
   );
 }
 
+function renderPeople(campaign, canonicalCampaign = campaign) {
+  const canonIds = new Set(canonicalCampaign.people.map((person) => person.id));
+  elements.peopleCount.textContent = String(campaign.people.length);
+  elements.peopleList.replaceChildren(
+    ...emptyOrRecords(
+      campaign.people.map((person) =>
+        binderRecordElement({
+          title: person.name,
+          subtitle: person.role || person.type || "person",
+          body: detailLines([
+            person.summary,
+            ...(person.notes ?? []),
+            person.locationId ? `Location: ${labelById(campaign, person.locationId)}` : "",
+            person.relatedIds?.length ? `Related: ${person.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
+          ]),
+          pending: !canonIds.has(person.id),
+        }),
+      ),
+      "No people recorded yet.",
+    ),
+  );
+}
+
+function renderPlaces(campaign, canonicalCampaign = campaign) {
+  const canonIds = new Set(canonicalCampaign.places.map((place) => place.id));
+  const currentPlaceId = campaign.scene.currentPlaceId;
+  const places = [...campaign.places].sort((a, b) => {
+    if (a.id === currentPlaceId) {
+      return -1;
+    }
+    if (b.id === currentPlaceId) {
+      return 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  elements.placeCount.textContent = String(places.length);
+  elements.placeList.replaceChildren(
+    ...emptyOrRecords(
+      places.map((place) =>
+        binderRecordElement({
+          title: place.name,
+          subtitle: place.id === currentPlaceId ? `${place.type || "place"} / current` : place.type || place.region || "place",
+          body: detailLines([
+            place.summary,
+            place.region ? `Region: ${place.region}` : "",
+            ...(place.notes ?? []),
+            place.connectedPlaceIds?.length
+              ? `Connected: ${place.connectedPlaceIds.map((id) => labelById(campaign, id)).join(", ")}`
+              : "",
+          ]),
+          pending: !canonIds.has(place.id),
+        }),
+      ),
+      "No places recorded yet.",
+    ),
+  );
+}
+
+function renderThings(campaign, canonicalCampaign = campaign) {
+  const canonItemIds = new Set(canonicalCampaign.items.map((item) => item.id));
+  const canonInventoryIds = new Set(canonicalCampaign.inventory.map((entry) => entry.id || entry.itemId));
+  const canonAssetIds = new Set(canonicalCampaign.assets.map((asset) => asset.id));
+  const things = [
+    ...campaign.items.map((item) => ({
+      id: item.id,
+      title: item.name,
+      subtitle: item.type || "item",
+      body: detailLines([item.summary, ...(item.notes ?? [])]),
+      pending: !canonItemIds.has(item.id),
+    })),
+    ...campaign.inventory.map((entry) => {
+      const item = findById(campaign.items, entry.itemId);
+      return {
+        id: entry.id || entry.itemId,
+        title: entry.name || item?.name || entry.itemId,
+        subtitle: `${entry.quantity ?? 1} carried by ${entry.carriedBy || entry.holderId || "party"}`,
+        body: detailLines([entry.notes, item?.summary, ...(item?.notes ?? [])]),
+        pending: !canonInventoryIds.has(entry.id || entry.itemId),
+      };
+    }),
+    ...campaign.assets.map((asset) => ({
+      id: asset.id,
+      title: asset.name,
+      subtitle: asset.kind || "asset",
+      body: detailLines([asset.path, ...(asset.notes ?? [])]),
+      pending: !canonAssetIds.has(asset.id),
+    })),
+  ].sort((a, b) => a.title.localeCompare(b.title));
+
+  elements.thingCount.textContent = String(things.length);
+  elements.thingList.replaceChildren(
+    ...emptyOrRecords(
+      things.map((thing) =>
+        binderRecordElement({
+          title: thing.title,
+          subtitle: thing.subtitle,
+          body: thing.body,
+          pending: thing.pending,
+        }),
+      ),
+      "No things recorded yet.",
+    ),
+  );
+}
+
 function formatHp(hp) {
   if (!hp) {
     return "";
@@ -1133,12 +1248,20 @@ function renderQuests(campaign, canonicalCampaign = campaign) {
   const active = campaign.quests.filter((quest) => quest.status !== "completed").slice(0, 8);
   elements.questCount.textContent = String(active.length);
   elements.questList.replaceChildren(
-    ...active.map((quest) =>
-      recordElement({
-        title: quest.title,
-        body: quest.stakes || quest.openQuestions?.join(" "),
-        pending: !canonIds.has(quest.id),
-      }),
+    ...emptyOrRecords(
+      active.map((quest) =>
+        binderRecordElement({
+          title: quest.title,
+          subtitle: quest.status || "thread",
+          body: detailLines([
+            quest.stakes,
+            ...(quest.openQuestions ?? []).map((question) => `Open: ${question}`),
+            quest.relatedIds?.length ? `Related: ${quest.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
+          ]),
+          pending: !canonIds.has(quest.id),
+        }),
+      ),
+      "No active threads.",
     ),
   );
 }
@@ -1240,6 +1363,60 @@ function renderAssets(campaign) {
 
       return wrapper;
     }),
+  );
+}
+
+function binderRecordElement({ title, subtitle, body, pending = false }) {
+  const wrapper = document.createElement("details");
+  wrapper.className = pending ? "binder-record pending-record" : "binder-record";
+
+  const summary = document.createElement("summary");
+  const titleNode = document.createElement("strong");
+  titleNode.textContent = title || "Untitled";
+  const subtitleNode = document.createElement("span");
+  subtitleNode.textContent = subtitle || "record";
+  summary.append(titleNode, subtitleNode);
+
+  const copy = document.createElement("p");
+  copy.textContent = body || "No details recorded.";
+  wrapper.append(summary, copy);
+
+  if (pending) {
+    const pendingLabel = document.createElement("small");
+    pendingLabel.textContent = "Pending canon review";
+    wrapper.append(pendingLabel);
+  }
+
+  return wrapper;
+}
+
+function emptyOrRecords(records, message) {
+  if (records.length > 0) {
+    return records;
+  }
+
+  const empty = document.createElement("p");
+  empty.className = "empty-state";
+  empty.textContent = message;
+  return [empty];
+}
+
+function detailLines(values) {
+  return values
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function labelById(campaign, id) {
+  return (
+    findById(campaign.party, id)?.name ||
+    findById(campaign.people, id)?.name ||
+    findById(campaign.places, id)?.name ||
+    findById(campaign.items, id)?.name ||
+    findById(campaign.quests, id)?.title ||
+    id
   );
 }
 

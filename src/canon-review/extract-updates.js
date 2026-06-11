@@ -164,7 +164,7 @@ function expandGroupedChange(change) {
     ["party", data.members || data.party || data.characters],
     ["people", data.people || data.npcs || data.characters],
     ["places", data.places || data.locations],
-    ["items", data.items || data.artifacts],
+    ["items", data.items || data.things || data.artifacts],
     ["inventory", data.inventory],
     ["quests", data.quests || data.threads],
   ];

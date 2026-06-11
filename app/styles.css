@@ -197,6 +197,101 @@ h3 {
   gap: 8px;
 }
 
+.binder-section {
+  gap: 8px;
+  padding: 10px;
+}
+
+.binder-list {
+  display: grid;
+  gap: 7px;
+  max-height: 136px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.binder-record {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.binder-record summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(48px, auto) 20px;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.binder-record summary::-webkit-details-marker {
+  display: none;
+}
+
+.binder-record summary::after {
+  content: "+";
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8f2e8;
+  font-weight: 900;
+}
+
+.binder-record[open] summary::after {
+  content: "-";
+}
+
+.binder-record strong {
+  overflow: hidden;
+  color: #fff8ef;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binder-record summary span {
+  overflow: hidden;
+  max-width: 94px;
+  color: #c8d1db;
+  font-size: 0.68rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binder-record p {
+  margin: 0;
+  padding: 0 8px 9px;
+  color: #d7dde5;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.binder-record small {
+  display: block;
+  padding: 0 8px 8px;
+  color: #f0bd6c;
+  font-size: 0.66rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+  color: #c8d1db;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
 .record {
   padding: 9px;
   border-radius: 8px;

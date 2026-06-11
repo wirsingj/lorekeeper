@@ -49,7 +49,7 @@ export function createEmptyUpdateContract() {
       {
         operation: "add | update | remove | note",
         domain:
-          "people | party | factions | places | maps | items | inventory | lore | timeline | quests | relationships | scene | combat | style",
+          "people | party | factions | places | maps | items | things | inventory | lore | timeline | quests | relationships | scene | combat | style",
         targetId: "existing-id-or-null",
         summary: "Human-readable change summary.",
         data: {},
