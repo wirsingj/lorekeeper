@@ -128,13 +128,19 @@ function buildPartySection(campaign) {
     kind: contextPackKinds.PARTY,
     title: "Active Party",
     entries: party.map((member) => {
-      const hp = member.stats?.hp ? `HP ${member.stats.hp.current}/${member.stats.hp.max}` : "HP unknown";
-      const abilities = formatCompactList(member.abilities ?? member.specialties ?? member.traits ?? member.stats?.abilities, 5);
+      const hp = formatCompactHp(member.stats?.hp ?? member.hp ?? member.hitPoints);
+      const level = member.level ?? member.stats?.level ?? member.characterLevel;
+      const stats = formatAbilityScores(member.abilityScores ?? member.stats?.abilityScores ?? member.stats?.abilities);
+      const skills = formatCompactList(member.skills ?? member.specialties ?? member.proficiencies ?? member.stats?.skills, 5);
+      const abilities = formatCompactList(member.abilities ?? member.features ?? member.traits, 5);
       const spells = formatCompactList(member.spells ?? member.stats?.spells, 5);
       const notes = formatCompactList(member.notes, 2);
       const details = [
         member.ancestryClass || member.role || member.class || "party member",
+        level ? `level ${level}` : null,
         hp,
+        stats ? `stats: ${stats}` : null,
+        skills ? `checks: ${skills}` : null,
         abilities ? `abilities: ${abilities}` : null,
         spells ? `spells: ${spells}` : null,
         notes ? `notes: ${notes}` : null,
@@ -343,4 +349,49 @@ function formatCompactList(value, limit = 4) {
   }
 
   return compactText(value, 120);
+}
+
+function formatAbilityScores(value) {
+  if (!value || Array.isArray(value) || typeof value !== "object") {
+    return "";
+  }
+
+  const aliases = {
+    STR: ["STR", "str", "strength"],
+    DEX: ["DEX", "dex", "dexterity"],
+    CON: ["CON", "con", "constitution"],
+    INT: ["INT", "int", "intelligence"],
+    WIS: ["WIS", "wis", "wisdom"],
+    CHA: ["CHA", "cha", "charisma"],
+  };
+
+  return Object.entries(aliases)
+    .map(([label, keys]) => {
+      const score = keys.map((key) => value[key]).find((entry) => entry !== undefined && entry !== null);
+      if (score === undefined) {
+        return null;
+      }
+      const numeric = Number(score);
+      const modifier = Number.isFinite(numeric) ? Math.floor((numeric - 10) / 2) : null;
+      const formattedModifier = modifier === null ? "" : ` ${modifier >= 0 ? "+" : ""}${modifier}`;
+      return `${label} ${score}${formattedModifier}`;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
+function formatCompactHp(hp) {
+  if (!hp) {
+    return "HP unknown";
+  }
+
+  if (typeof hp === "string" || typeof hp === "number") {
+    return `HP ${hp}`;
+  }
+
+  if (hp.current !== undefined && hp.max !== undefined) {
+    return `HP ${hp.current}/${hp.max}`;
+  }
+
+  return "HP unknown";
 }

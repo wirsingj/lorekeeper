@@ -41,6 +41,7 @@ const state = {
     lastRun: null,
   },
   editingRecord: null,
+  activeCharacterSheet: null,
 };
 
 const elements = {
@@ -49,10 +50,23 @@ const elements = {
   deleteCampaign: document.querySelector("#delete-campaign"),
   sceneLocation: document.querySelector("#scene-location"),
   providerStatus: document.querySelector("#provider-status"),
+  providerActivity: document.querySelector("#provider-activity"),
   saveStatus: document.querySelector("#save-status"),
   openSetup: document.querySelector("#open-setup"),
   setupDialog: document.querySelector("#setup-dialog"),
   closeSetup: document.querySelector("#close-setup"),
+  characterSheetDialog: document.querySelector("#character-sheet-dialog"),
+  closeCharacterSheet: document.querySelector("#close-character-sheet"),
+  editCharacterSheet: document.querySelector("#edit-character-sheet"),
+  characterSheetTitle: document.querySelector("#character-sheet-title"),
+  characterSheetSubtitle: document.querySelector("#character-sheet-subtitle"),
+  characterSheetLevel: document.querySelector("#character-sheet-level"),
+  characterSheetHp: document.querySelector("#character-sheet-hp"),
+  characterSheetBackground: document.querySelector("#character-sheet-background"),
+  characterSheetStats: document.querySelector("#character-sheet-stats"),
+  characterSheetSkills: document.querySelector("#character-sheet-skills"),
+  characterSheetAbilities: document.querySelector("#character-sheet-abilities"),
+  characterSheetNotes: document.querySelector("#character-sheet-notes"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
   peopleList: document.querySelector("#people-list"),
@@ -136,6 +150,19 @@ elements.openSetup.addEventListener("click", () => {
 
 elements.closeSetup.addEventListener("click", () => {
   elements.setupDialog.close();
+});
+
+elements.closeCharacterSheet.addEventListener("click", () => {
+  elements.characterSheetDialog.close();
+});
+
+elements.editCharacterSheet.addEventListener("click", () => {
+  const member = findById(state.campaign.party, state.activeCharacterSheet);
+  if (!member) {
+    return;
+  }
+  elements.characterSheetDialog.close();
+  openRecordDialog("party", member);
 });
 
 elements.campaignSelect.addEventListener("change", async () => {
@@ -261,9 +288,11 @@ elements.playerForm.addEventListener("submit", async (event) => {
   const playerMessage = elements.playerInput.value.trim();
   if (!playerMessage) {
     elements.bridgeStatus.textContent = "Type an action first";
+    setProviderActivity("Type a table message first", "idle");
     return;
   }
 
+  setProviderActivity("Building provider prompt...", "working");
   state.currentTurn = createPlayerTurn({
     campaign: state.campaign,
     playerMessage,
@@ -330,6 +359,7 @@ async function loadCampaign() {
 async function selectCampaignByPath(sqlitePath) {
   try {
     elements.bridgeStatus.textContent = "Opening campaign...";
+    setProviderActivity("Opening campaign from SQLite...", "working");
     const response = await fetch(apiSelectCampaignUrl, {
       method: "POST",
       headers: {
@@ -347,8 +377,10 @@ async function selectCampaignByPath(sqlitePath) {
     seedPlayLog();
     render();
     elements.bridgeStatus.textContent = "Campaign opened";
+    setProviderActivity("Campaign opened", "idle");
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `Open failed: ${error.message}` : "Open failed";
+    setProviderActivity("Campaign open failed", "error");
     renderCampaignSelector();
   }
 }
@@ -358,6 +390,7 @@ async function createNewCampaign({ title, premise }) {
   const trimmedPremise = premise.trim() || "A new D&D 5e-lite campaign ready to grow through play.";
   try {
     elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
+    setProviderActivity("Creating campaign SQLite file...", "working");
     const response = await fetch(apiNewCampaignUrl, {
       method: "POST",
       headers: {
@@ -382,9 +415,11 @@ async function createNewCampaign({ title, premise }) {
     elements.campaignDialog.close();
     elements.campaignForm.reset();
     elements.bridgeStatus.textContent = "New campaign saved to SQLite";
+    setProviderActivity("New campaign saved", "idle");
   } catch (error) {
     render();
     elements.bridgeStatus.textContent = error instanceof Error ? `New campaign failed: ${error.message}` : "New campaign failed";
+    setProviderActivity("New campaign failed", "error");
   }
 }
 
@@ -770,17 +805,17 @@ async function hideActiveCampaign() {
 async function importProviderResponse(responseText) {
   if (!responseText) {
     elements.bridgeStatus.textContent = "Paste a provider response first";
+    setProviderActivity("Paste a provider response first", "idle");
     return;
   }
 
-  await appendPlayMessage({
-    role: "dm",
-    title: "DM",
-    body: cleanProviderResponseForPlay(responseText),
-    source: "provider_response",
-  });
-
   const extraction = extractLorekeeperUpdates(responseText);
+  const cleanedText = cleanProviderResponseForPlay(responseText);
+  const tableMessages = splitProviderTableMessages(cleanedText, state.campaign, extraction.proposedChanges);
+  for (const message of tableMessages) {
+    await appendPlayMessage(message);
+  }
+
   const reviewBatch = createReviewBatch({
     campaignId: state.campaign.id,
     source: "manual_import",
@@ -793,15 +828,143 @@ async function importProviderResponse(responseText) {
   elements.responseImport.value = "";
   if (extraction.error) {
     elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
+    setProviderActivity("Imported provider response; update JSON needs attention", "error");
   } else if (extraction.proposedChanges.length > 0 && !commitResult) {
     elements.bridgeStatus.textContent = "State save failed; response text was still imported";
+    setProviderActivity("Imported response; state save failed", "error");
   } else {
     elements.bridgeStatus.textContent =
       extraction.proposedChanges.length > 0
         ? `${commitResult?.applied?.length ?? 0} state change${commitResult?.applied?.length === 1 ? "" : "s"} saved`
         : "DM response imported with no proposed changes";
+    setProviderActivity("Imported provider response and saved campaign state", "idle");
   }
   render();
+}
+
+function splitProviderTableMessages(text, campaign, proposedChanges = []) {
+  const speakerLookup = buildPartySpeakerLookup(campaign, proposedChanges);
+  if (!text.trim()) {
+    return [
+      {
+        role: "dm",
+        title: "DM",
+        body: "The DM response was imported for review.",
+        source: "provider_response",
+      },
+    ];
+  }
+
+  const messages = [];
+  let dmLines = [];
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const speakerLine = parseSpeakerLine(line, speakerLookup);
+    if (speakerLine) {
+      flushDmLines();
+      messages.push({
+        role: "party",
+        title: speakerLine.name,
+        body: speakerLine.body || "Acts at the table.",
+        source: "provider_response",
+      });
+      continue;
+    }
+
+    dmLines.push(line);
+  }
+
+  flushDmLines();
+
+  return messages.length
+    ? messages
+    : [
+        {
+          role: "dm",
+          title: "DM",
+          body: text,
+          source: "provider_response",
+        },
+      ];
+
+  function flushDmLines() {
+    if (!dmLines.length) {
+      return;
+    }
+
+    messages.push({
+      role: "dm",
+      title: "DM",
+      body: dmLines.join("\n\n"),
+      source: "provider_response",
+    });
+    dmLines = [];
+  }
+}
+
+function buildPartySpeakerLookup(campaign, proposedChanges = []) {
+  const records = [
+    ...(campaign.party ?? []),
+    ...proposedChanges
+      .filter((change) => normalizeChangeDomain(change.domain) === "party")
+      .map((change) => change.data ?? {}),
+  ];
+  const names = records
+    .map((record) => record.name || record.title)
+    .filter(Boolean)
+    .map((name) => String(name).trim())
+    .filter(Boolean);
+  const firstNames = new Map();
+
+  names.forEach((name) => {
+    const first = name.split(/\s+/)[0];
+    if (!first) {
+      return;
+    }
+    const key = first.toLowerCase();
+    firstNames.set(key, firstNames.has(key) ? null : name);
+  });
+
+  const lookup = new Map();
+  names.forEach((name) => lookup.set(name.toLowerCase(), name));
+  for (const [first, fullName] of firstNames) {
+    if (fullName) {
+      lookup.set(first, fullName);
+    }
+  }
+
+  return [...lookup.entries()]
+    .sort((a, b) => b[0].length - a[0].length)
+    .map(([alias, name]) => ({ alias, name }));
+}
+
+function parseSpeakerLine(line, speakerLookup) {
+  const normalized = line.replace(/^[-*]\s+/, "").replace(/^\*\*(.+?)\*\*/, "$1").trim();
+  for (const speaker of speakerLookup) {
+    const escaped = escapeRegExp(speaker.alias);
+    const pattern = new RegExp(`^(?:["“”']?)(?:\\*\\*)?${escaped}(?:\\*\\*)?\\s*[:\\-]\\s*(.+)$`, "i");
+    const match = normalized.match(pattern);
+    if (match) {
+      return {
+        name: speaker.name,
+        body: match[1].trim(),
+      };
+    }
+  }
+
+  return null;
+}
+
+function normalizeChangeDomain(domain) {
+  if (domain === "party_member" || domain === "player_character") {
+    return "party";
+  }
+  return domain;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function commitExtractedChanges(reviewBatch) {
@@ -919,6 +1082,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
       lastRun: null,
     };
     elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
+    setProviderActivity("Provider bridge unavailable; manual copy/import ready", "error");
     return probe;
   }
 
@@ -939,6 +1103,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
 
   try {
     elements.bridgeStatus.textContent = "Checking campaign ChatGPT conversation...";
+    setProviderActivity("Checking ChatGPT campaign chat...", "working");
     const result = await sendExtensionMessage(message, 35000);
     return handleCompanionCheckResult(result);
   } catch (error) {
@@ -948,6 +1113,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
       lastRun: null,
     };
     elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
+    setProviderActivity("Provider bridge unavailable; manual copy/import ready", "error");
     return {
       ready: false,
       error: error instanceof Error ? error.message : "Extension bridge unavailable.",
@@ -958,6 +1124,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
 async function startNewProviderConversation() {
   try {
     elements.bridgeStatus.textContent = "Creating fresh campaign chat record...";
+    setProviderActivity("Creating campaign chat record...", "working");
     const response = await fetch(apiProviderConversationUrl, {
       method: "POST",
       headers: {
@@ -986,6 +1153,7 @@ async function startNewProviderConversation() {
     };
     const conversation = getActiveProviderConversation(state.campaign, defaultCompanionOptions.providerId);
     elements.bridgeStatus.textContent = `Opening fresh campaign chat: ${conversation.conversationHint}`;
+    setProviderActivity(`Opening ChatGPT chat for ${conversation.conversationHint}...`, "working");
     render();
     const result = await ensureCompanionSidecar({
       openIfMissing: true,
@@ -998,6 +1166,7 @@ async function startNewProviderConversation() {
     }
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `New chat failed: ${error.message}` : "New chat failed";
+    setProviderActivity("New provider chat failed", "error");
   }
 }
 
@@ -1019,6 +1188,7 @@ async function bootstrapProviderConversation() {
 
   try {
     elements.bridgeStatus.textContent = `Creating provider chat entry for ${conversation.conversationHint}...`;
+    setProviderActivity(`Bootstrapping ${conversation.conversationHint} in ChatGPT...`, "working");
     const result = await sendExtensionMessage(
       {
         type: "lorekeeper.runCompanionPrompt",
@@ -1040,20 +1210,24 @@ async function bootstrapProviderConversation() {
 
     if (result.response?.needsManualSubmit) {
       elements.bridgeStatus.textContent = `Bootstrap prompt inserted; press send in ${conversation.conversationHint}`;
+      setProviderActivity("Bootstrap prompt inserted; waiting for manual send", "waiting");
       return;
     }
 
     elements.bridgeStatus.textContent = `Provider chat created for ${conversation.conversationHint}`;
+    setProviderActivity(`Provider chat ready: ${conversation.conversationHint}`, "idle");
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error
       ? `Provider chat opened; bootstrap failed: ${error.message}`
       : "Provider chat opened; bootstrap failed";
+    setProviderActivity("Provider chat opened; bootstrap needs manual follow-up", "error");
   }
 }
 
 async function runPromptThroughSidecar(prompt) {
   if (!prompt.trim()) {
     elements.bridgeStatus.textContent = "Build a provider prompt first";
+    setProviderActivity("Build a provider prompt first", "idle");
     return;
   }
 
@@ -1069,10 +1243,12 @@ async function runPromptThroughSidecar(prompt) {
         ready: false,
         lastRun: null,
       };
+      setProviderActivity("Extension unavailable; prompt copied for manual paste", "error");
       return;
     }
 
     elements.bridgeStatus.textContent = "Sending turn to campaign ChatGPT conversation...";
+    setProviderActivity("Submitting turn to ChatGPT...", "working");
     const progress = startSidecarProgress();
     const result = await sendExtensionMessage(
       {
@@ -1098,12 +1274,14 @@ async function runPromptThroughSidecar(prompt) {
     }
 
     if (result.sent && result.response?.text) {
+      setProviderActivity("ChatGPT response received; importing...", "working");
       await importProviderResponse(result.response.text);
       return;
     }
 
     if (result.response?.needsManualSubmit) {
       elements.bridgeStatus.textContent = "Prompt is in the campaign chat; press the send arrow";
+      setProviderActivity("Prompt inserted in ChatGPT; press send in provider tab", "waiting");
       state.bridge = {
         mode: "extension",
         ready: true,
@@ -1118,6 +1296,7 @@ async function runPromptThroughSidecar(prompt) {
         successMessage: "ChatGPT needs login; prompt copied",
         failureMessage: "ChatGPT needs login; copy from prompt drawer",
       });
+      setProviderActivity("ChatGPT needs login; prompt copied", "error");
       render();
       return;
     }
@@ -1126,6 +1305,7 @@ async function runPromptThroughSidecar(prompt) {
       successMessage: "Sidecar did not return a response; prompt copied",
       failureMessage: "Sidecar did not return a response; copy from prompt drawer",
     });
+    setProviderActivity("No provider response returned; prompt copied", "error");
   } catch (error) {
     stopSidecarProgress();
     await copyPromptToClipboard(prompt, {
@@ -1137,6 +1317,7 @@ async function runPromptThroughSidecar(prompt) {
       ready: false,
       lastRun: null,
     };
+    setProviderActivity("Provider run failed; prompt copied for manual paste", "error");
     render();
   }
 }
@@ -1150,9 +1331,11 @@ async function copyPromptToClipboard(prompt, messages = {}) {
   try {
     await navigator.clipboard.writeText(prompt);
     elements.bridgeStatus.textContent = messages.successMessage ?? "Prompt copied";
+    setProviderActivity(messages.successMessage ?? "Prompt copied", "idle");
     return true;
   } catch {
     elements.bridgeStatus.textContent = messages.failureMessage ?? "Clipboard blocked; prompt is in the drawer";
+    setProviderActivity(messages.failureMessage ?? "Clipboard blocked; prompt is in the drawer", "error");
     openPromptDrawer();
     return false;
   }
@@ -1170,6 +1353,16 @@ function reportUiError(error) {
   if (elements.bridgeStatus) {
     elements.bridgeStatus.textContent = `UI error: ${message}`;
   }
+  setProviderActivity(`UI error: ${message}`, "error");
+}
+
+function setProviderActivity(message, status = "idle") {
+  if (!elements.providerActivity) {
+    return;
+  }
+
+  elements.providerActivity.textContent = message;
+  elements.providerActivity.dataset.state = status;
 }
 
 let activeProgressTimers = [];
@@ -1179,12 +1372,15 @@ function startSidecarProgress() {
   activeProgressTimers = [
     window.setTimeout(() => {
       elements.bridgeStatus.textContent = "Waiting for ChatGPT response...";
+      setProviderActivity("Waiting on ChatGPT response...", "waiting");
     }, 8000),
     window.setTimeout(() => {
       elements.bridgeStatus.textContent = "Still waiting on the campaign chat...";
+      setProviderActivity("Still waiting on ChatGPT...", "waiting");
     }, 30000),
     window.setTimeout(() => {
       elements.bridgeStatus.textContent = "Campaign chat is taking a while; manual fallback remains available";
+      setProviderActivity("ChatGPT is taking a while; manual fallback is ready", "waiting");
     }, 65000),
   ];
 
@@ -1256,10 +1452,13 @@ async function handleCompanionCheckResult(result) {
     elements.bridgeStatus.textContent = result.created
       ? `Campaign chat opened for ${result.settings?.conversationHint ?? "this campaign"}`
       : `Campaign chat ready for ${result.settings?.conversationHint ?? "this campaign"}`;
+    setProviderActivity(`ChatGPT campaign chat ready: ${result.settings?.conversationHint ?? state.campaign.title}`, "idle");
   } else if (result.loginRequired) {
     elements.bridgeStatus.textContent = "ChatGPT needs login, project selection, or campaign chat selection";
+    setProviderActivity("ChatGPT needs login or campaign chat selection", "error");
   } else {
     elements.bridgeStatus.textContent = "No campaign ChatGPT conversation found";
+    setProviderActivity("No campaign ChatGPT conversation found", "idle");
   }
 
   render();
@@ -1423,10 +1622,191 @@ function renderParty(campaign) {
       recordElement({
         title: member.name,
         body: `${member.ancestryClass || "unknown role"}${formatHp(member.stats?.hp)}${member.notes?.length ? ` - ${member.notes[0]}` : ""}`,
-        onEdit: () => openRecordDialog("party", member),
+        onEdit: () => openCharacterSheet(member),
       }),
     ),
   );
+}
+
+function openCharacterSheet(member) {
+  state.activeCharacterSheet = member.id;
+  renderCharacterSheet(member);
+  elements.characterSheetDialog.showModal();
+}
+
+function renderCharacterSheet(member) {
+  elements.characterSheetTitle.textContent = member.name || "Unnamed party member";
+  elements.characterSheetSubtitle.textContent = [
+    member.ancestryClass,
+    member.playerRole,
+    member.role,
+    member.type,
+  ].filter(Boolean).join(" / ") || "Party member";
+  elements.characterSheetLevel.textContent = formatLevelAndXp(member);
+  elements.characterSheetHp.textContent = formatSheetHp(member.stats?.hp ?? member.hp ?? member.hitPoints);
+  elements.characterSheetBackground.textContent = characterBackground(member);
+
+  const abilityScores = characterAbilityScores(member);
+  elements.characterSheetStats.replaceChildren(
+    ...(
+      abilityScores.length
+        ? abilityScores.map(([label, score]) => statPill(label, score))
+        : [emptyInline("No ability scores recorded yet.")]
+    ),
+  );
+
+  renderSheetList(elements.characterSheetSkills, characterSkills(member), "No specialties or checks recorded yet.");
+  renderSheetList(elements.characterSheetAbilities, characterAbilities(member), "No abilities or spells recorded yet.");
+  renderSheetList(elements.characterSheetNotes, member.notes ?? [], "No extra notes recorded yet.");
+}
+
+function formatLevelAndXp(member) {
+  const level = member.level ?? member.stats?.level ?? member.characterLevel;
+  const xp = member.experience ?? member.xp ?? member.stats?.experience ?? member.stats?.xp;
+  if (level && xp) {
+    return `Level ${level} / ${xp} XP`;
+  }
+  if (level) {
+    return `Level ${level}`;
+  }
+  if (xp) {
+    return `${xp} XP`;
+  }
+  return "Level unknown";
+}
+
+function formatSheetHp(hp) {
+  if (!hp) {
+    return "HP unknown";
+  }
+
+  if (typeof hp === "string" || typeof hp === "number") {
+    return `HP ${hp}`;
+  }
+
+  if (hp.current !== undefined && hp.max !== undefined) {
+    return `HP ${hp.current}/${hp.max}`;
+  }
+
+  return "HP unknown";
+}
+
+function characterBackground(member) {
+  return [
+    member.background,
+    member.backstory,
+    member.summary,
+    member.description,
+    ...(member.notes ?? []).slice(0, 2),
+  ].filter(Boolean).join(" ") || "No background recorded yet.";
+}
+
+function characterAbilityScores(member) {
+  const source = member.abilityScores ?? member.ability_scores ?? member.stats?.abilityScores ?? member.stats?.ability_scores ?? member.stats?.abilities;
+  if (!source || Array.isArray(source) || typeof source !== "object") {
+    return [];
+  }
+
+  const aliases = {
+    STR: ["STR", "str", "strength"],
+    DEX: ["DEX", "dex", "dexterity"],
+    CON: ["CON", "con", "constitution"],
+    INT: ["INT", "int", "intelligence"],
+    WIS: ["WIS", "wis", "wisdom"],
+    CHA: ["CHA", "cha", "charisma"],
+  };
+
+  return Object.entries(aliases)
+    .map(([label, keys]) => {
+      const score = keys.map((key) => source[key]).find((value) => value !== undefined && value !== null);
+      return score !== undefined ? [label, score] : null;
+    })
+    .filter(Boolean);
+}
+
+function statPill(label, score) {
+  const wrapper = document.createElement("span");
+  wrapper.className = "stat-pill";
+  const numeric = Number(score);
+  const modifier = Number.isFinite(numeric) ? ` (${formatModifier(Math.floor((numeric - 10) / 2))})` : "";
+  wrapper.textContent = `${label} ${score}${modifier}`;
+  return wrapper;
+}
+
+function formatModifier(value) {
+  return value >= 0 ? `+${value}` : String(value);
+}
+
+function characterSkills(member) {
+  return uniqueTextList([
+    member.skills,
+    member.specialties,
+    member.proficiencies,
+    member.expertise,
+    member.stats?.skills,
+    member.stats?.proficiencies,
+  ]);
+}
+
+function characterAbilities(member) {
+  return uniqueTextList([
+    member.abilities,
+    member.features,
+    member.traits,
+    member.spells,
+    member.stats?.spells,
+  ]);
+}
+
+function uniqueTextList(values) {
+  const seen = new Set();
+  return values
+    .flatMap((value) => {
+      if (!value) {
+        return [];
+      }
+      if (Array.isArray(value)) {
+        return value;
+      }
+      if (typeof value === "object") {
+        return Object.entries(value).map(([key, entry]) => `${key}: ${entry}`);
+      }
+      return String(value).split(/[,;\n]+/);
+    })
+    .map((value) => String(value).trim())
+    .filter((value) => {
+      if (!value || seen.has(value.toLowerCase())) {
+        return false;
+      }
+      seen.add(value.toLowerCase());
+      return true;
+    });
+}
+
+function renderSheetList(list, values, emptyMessage) {
+  list.replaceChildren(
+    ...(values.length
+      ? values.map((value) => {
+          const item = document.createElement("li");
+          item.textContent = value;
+          return item;
+        })
+      : [emptyListItem(emptyMessage)]),
+  );
+}
+
+function emptyListItem(message) {
+  const item = document.createElement("li");
+  item.className = "empty-list-item";
+  item.textContent = message;
+  return item;
+}
+
+function emptyInline(message) {
+  const node = document.createElement("p");
+  node.className = "empty-inline";
+  node.textContent = message;
+  return node;
 }
 
 function renderPeople(campaign) {
@@ -1724,7 +2104,7 @@ function recordElement({ title, body, onEdit }) {
   wrapper.className = "record";
   if (onEdit) {
     wrapper.tabIndex = 0;
-    wrapper.title = "Click to edit";
+    wrapper.title = "Click to open";
     wrapper.addEventListener("click", onEdit);
     wrapper.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {

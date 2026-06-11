@@ -111,6 +111,9 @@ export function LorekeeperShell() {
       </aside>
 
       <footer className="command-deck">
+        <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
+          Provider idle
+        </div>
         <form id="player-form" className="player-form">
           <label htmlFor="player-input">Table Message</label>
           <div className="input-row">
@@ -135,6 +138,7 @@ export function LorekeeperShell() {
       <RecordDialog />
       <CampaignDialog />
       <SetupDialog />
+      <CharacterSheetDialog />
       <ConfirmDialog />
       <DeleteCampaignDialog />
     </div>
@@ -245,6 +249,58 @@ function SetupDialog() {
           </div>
           <div id="review-list" className="review-stack"></div>
         </section>
+      </form>
+    </dialog>
+  );
+}
+
+function CharacterSheetDialog() {
+  return (
+    <dialog id="character-sheet-dialog" className="record-dialog character-sheet-dialog">
+      <form method="dialog">
+        <header className="dialog-header">
+          <div>
+            <p className="eyebrow">Character Sheet</p>
+            <h2 id="character-sheet-title">Character</h2>
+            <p id="character-sheet-subtitle" className="sheet-subtitle"></p>
+          </div>
+          <button id="close-character-sheet" className="icon-action" type="button" title="Close">x</button>
+        </header>
+
+        <section className="sheet-grid" aria-label="Character details">
+          <article className="sheet-card compact">
+            <span>Level / XP</span>
+            <strong id="character-sheet-level">Unknown</strong>
+          </article>
+          <article className="sheet-card compact">
+            <span>Health</span>
+            <strong id="character-sheet-hp">HP unknown</strong>
+          </article>
+          <article className="sheet-card">
+            <span>Background</span>
+            <p id="character-sheet-background"></p>
+          </article>
+          <article className="sheet-card">
+            <span>Stats</span>
+            <div id="character-sheet-stats" className="stat-grid"></div>
+          </article>
+          <article className="sheet-card">
+            <span>Specialties / Checks</span>
+            <ul id="character-sheet-skills" className="sheet-list"></ul>
+          </article>
+          <article className="sheet-card">
+            <span>Abilities / Spells</span>
+            <ul id="character-sheet-abilities" className="sheet-list"></ul>
+          </article>
+          <article className="sheet-card">
+            <span>Notes</span>
+            <ul id="character-sheet-notes" className="sheet-list"></ul>
+          </article>
+        </section>
+
+        <footer className="dialog-actions">
+          <button id="edit-character-sheet" type="button">Edit Character</button>
+        </footer>
       </form>
     </dialog>
   );
