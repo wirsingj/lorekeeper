@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS proposed_changes (
   data_json TEXT NOT NULL,
   confidence TEXT NOT NULL DEFAULT 'unknown',
   reason TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'pending',
+  status TEXT NOT NULL DEFAULT 'approved',
   created_at TEXT NOT NULL,
   decided_at TEXT
 );

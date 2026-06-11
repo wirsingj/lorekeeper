@@ -13,7 +13,6 @@ import {
 } from "../src/storage/campaign-repository.js";
 import { addChatMessage } from "../src/campaign-state/chat-history.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
-import { storeReviewBatch } from "../src/campaign-state/review-log.js";
 import { commitReviewBatch } from "../src/storage/review-commit.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -106,13 +105,6 @@ const server = createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const result = await commitReviewBatch(projectRoot, body.reviewBatch);
       sendJson(response, 200, result);
-      return;
-    }
-
-    if (url.pathname === "/api/review/save" && request.method === "POST") {
-      const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => storeReviewBatch(campaign, body.reviewBatch));
-      sendJson(response, 200, payload);
       return;
     }
 

@@ -25,17 +25,6 @@ export function applyCanonicalChanges(campaign, changes) {
   };
 }
 
-export function previewCanonicalChanges(campaign, changes) {
-  const working = structuredClone(campaign);
-  const result = applyChangesToWorkingCampaign(working, changes);
-
-  return {
-    campaign: working,
-    applied: result.applied,
-    skipped: result.skipped,
-  };
-}
-
 function applyChangesToWorkingCampaign(working, changes) {
   const applied = [];
   const skipped = [];

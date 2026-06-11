@@ -177,7 +177,7 @@ function insertReviewLog(db, campaign) {
       id: batch.id,
       campaign_id: campaign.id,
       provider_run_id: batch.providerRunId || null,
-      status: batch.status || "pending_review",
+      status: batch.status || "committed",
       raw_response: batch.rawResponse || "",
       created_at: batch.createdAt || now,
       decided_at: batch.decidedAt || null,
@@ -195,7 +195,7 @@ function insertReviewLog(db, campaign) {
         data_json: JSON.stringify(change.data ?? {}),
         confidence: change.confidence || "unknown",
         reason: change.reason || "",
-        status: change.status || "pending",
+        status: change.status || "approved",
         created_at: change.createdAt || batch.createdAt || now,
         decided_at: change.decidedAt || null,
       });

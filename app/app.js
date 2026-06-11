@@ -3,8 +3,7 @@ import { findById } from "../src/campaign-state/formatters.js";
 import { normalizeCampaign } from "../src/campaign-state/schema.js";
 import { createSampleCampaign } from "../src/campaign-state/sample-campaign.js";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
-import { previewCanonicalChanges } from "../src/campaign-state/apply-changes.js";
-import { createReviewBatch, decideChange, getCommittableChanges } from "../src/canon-review/proposals.js";
+import { createReviewBatch } from "../src/canon-review/proposals.js";
 import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 
@@ -15,7 +14,6 @@ const apiSelectCampaignUrl = "/api/campaign/select";
 const apiNewCampaignUrl = "/api/campaign/new";
 const apiImportedCampaignUrl = "/api/campaign/imported";
 const apiCommitReviewUrl = "/api/review/commit";
-const apiSaveReviewUrl = "/api/review/save";
 const apiCampaignRecordUrl = "/api/campaign/record";
 const apiCampaignMessageUrl = "/api/campaign/message";
 const extensionRequestType = "lorekeeper.appBridge.request";
@@ -72,7 +70,6 @@ const elements = {
   importResponse: document.querySelector("#import-response"),
   reviewList: document.querySelector("#review-list"),
   reviewCount: document.querySelector("#review-count"),
-  applyApproved: document.querySelector("#apply-approved"),
   recordDialog: document.querySelector("#record-dialog"),
   recordForm: document.querySelector("#record-form"),
   recordDialogTitle: document.querySelector("#record-dialog-title"),
@@ -161,16 +158,6 @@ elements.pasteResponse.addEventListener("click", async () => {
   } catch {
     elements.bridgeStatus.textContent = "Clipboard paste unavailable";
   }
-});
-
-elements.applyApproved.addEventListener("click", () => {
-  const approved = state.reviewBatch ? getCommittableChanges(state.reviewBatch) : [];
-  if (approved.length === 0) {
-    elements.bridgeStatus.textContent = "No approved changes to apply";
-    return;
-  }
-
-  commitApprovedChanges(approved);
 });
 
 document.querySelectorAll("[data-add-domain]").forEach((button) => {
@@ -427,38 +414,7 @@ function setCampaignFromPayload(payload, contextPurpose) {
     purpose: contextPurpose,
   });
   state.prompt = "";
-  state.reviewBatch = latestPendingReviewBatch(state.campaign);
-}
-
-async function commitApprovedChanges(approved) {
-  try {
-    elements.bridgeStatus.textContent = "Committing approved changes to SQLite...";
-    const response = await fetch(apiCommitReviewUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        reviewBatch: state.reviewBatch,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    const result = await response.json();
-    state.campaign = normalizeCampaign(result.campaign);
-    state.contextPack = buildContextPack(state.campaign, {
-      purpose: "post_commit_context",
-    });
-    state.reviewBatch = null;
-    elements.bridgeStatus.textContent = `${result.applied.length} change${result.applied.length === 1 ? "" : "s"} saved to SQLite`;
-    render();
-  } catch (error) {
-    elements.bridgeStatus.textContent = "SQLite commit failed";
-    render();
-  }
+  state.reviewBatch = null;
 }
 
 async function saveRecordFromDialog() {
@@ -626,8 +582,7 @@ function seedPlayLog() {
 
 function render() {
   const campaign = state.campaign;
-  const visibleCampaign = buildVisibleCampaign();
-  const currentPlace = findById(visibleCampaign.places, visibleCampaign.scene.currentPlaceId);
+  const currentPlace = findById(campaign.places, campaign.scene.currentPlaceId);
 
   elements.title.textContent = campaign.title;
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
@@ -643,27 +598,14 @@ function render() {
   }
 
   renderPlayLog();
-  renderParty(visibleCampaign, campaign);
-  renderPeople(visibleCampaign, campaign);
-  renderPlaces(visibleCampaign, campaign);
-  renderThings(visibleCampaign, campaign);
-  renderQuests(visibleCampaign, campaign);
+  renderParty(campaign);
+  renderPeople(campaign);
+  renderPlaces(campaign);
+  renderThings(campaign);
+  renderQuests(campaign);
   renderPrompt(state.prompt);
   renderReviewBatch();
   renderCampaignSelector();
-}
-
-function buildVisibleCampaign() {
-  const changes = reviewPreviewChanges();
-  if (!changes.length) {
-    return state.campaign;
-  }
-
-  return previewCanonicalChanges(state.campaign, changes).campaign;
-}
-
-function reviewPreviewChanges() {
-  return (state.reviewBatch?.proposedChanges ?? []).filter((change) => change.status !== "rejected");
 }
 
 function renderCampaignSelector() {
@@ -701,27 +643,60 @@ async function importProviderResponse(responseText) {
   });
 
   const extraction = extractLorekeeperUpdates(responseText);
-  state.reviewBatch = createReviewBatch({
+  const reviewBatch = createReviewBatch({
     campaignId: state.campaign.id,
     source: "manual_import",
     rawResponse: responseText,
     proposedChanges: extraction.proposedChanges,
   });
 
-  if (state.reviewBatch.proposedChanges.length > 0) {
-    await persistReviewBatch(state.reviewBatch);
-  }
+  const commitResult = reviewBatch.proposedChanges.length > 0 ? await commitExtractedChanges(reviewBatch) : null;
 
   elements.responseImport.value = "";
   if (extraction.error) {
     elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
+  } else if (extraction.proposedChanges.length > 0 && !commitResult) {
+    elements.bridgeStatus.textContent = "State save failed; response text was still imported";
   } else {
     elements.bridgeStatus.textContent =
       extraction.proposedChanges.length > 0
-        ? `${extraction.proposedChanges.length} proposed change${extraction.proposedChanges.length === 1 ? "" : "s"} found`
+        ? `${commitResult?.applied?.length ?? 0} state change${commitResult?.applied?.length === 1 ? "" : "s"} saved`
         : "DM response imported with no proposed changes";
   }
   render();
+}
+
+async function commitExtractedChanges(reviewBatch) {
+  try {
+    elements.bridgeStatus.textContent = "Saving extracted campaign state...";
+    const response = await fetch(apiCommitReviewUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        reviewBatch,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const result = await response.json();
+    state.campaign = normalizeCampaign(result.campaign);
+    state.contextPack = buildContextPack(state.campaign, {
+      purpose: "post_auto_commit_context",
+    });
+    state.reviewBatch = null;
+    state.sqlitePath = result.sqlitePath ?? state.sqlitePath;
+    elements.bridgeStatus.textContent = `${result.applied.length} state change${result.applied.length === 1 ? "" : "s"} saved to SQLite`;
+    render();
+    return result;
+  } catch (error) {
+    elements.bridgeStatus.textContent = "State save failed; response text was still imported";
+    return null;
+  }
 }
 
 async function appendPlayMessage(message) {
@@ -768,50 +743,6 @@ function appendMessageToSessionLog(sessionLog, message) {
     sessions,
     messages: [...(sessionLog?.messages ?? []), message],
   };
-}
-
-async function persistReviewBatch(reviewBatch) {
-  try {
-    const response = await fetch(apiSaveReviewUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ reviewBatch }),
-    });
-
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-
-    const result = await response.json();
-    state.campaign = normalizeCampaign(result.campaign);
-    state.reviewBatch = result.reviewBatch ?? latestPendingReviewBatch(state.campaign);
-    state.contextPack = buildContextPack(state.campaign, {
-      purpose: "post_review_save_context",
-    });
-    state.campaigns = result.campaigns ?? state.campaigns;
-    state.sqlitePath = result.sqlitePath ?? state.sqlitePath;
-    render();
-  } catch (error) {
-    state.campaign = {
-      ...state.campaign,
-      reviewLog: upsertReviewBatch(state.campaign.reviewLog, reviewBatch),
-    };
-    elements.bridgeStatus.textContent = "Review save failed; pending changes are only in this browser view";
-    render();
-  }
-}
-
-function latestPendingReviewBatch(campaign) {
-  return [...(campaign.reviewLog ?? [])]
-    .filter((batch) => batch.status === "pending_review")
-    .sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)))[0] ?? null;
-}
-
-function upsertReviewBatch(reviewLog, reviewBatch) {
-  const existing = Array.isArray(reviewLog) ? reviewLog : [];
-  return [...existing.filter((batch) => batch.id !== reviewBatch.id), reviewBatch];
 }
 
 async function persistPlayMessage(message) {
@@ -1156,22 +1087,19 @@ function renderPlayLog() {
   elements.playLog.scrollTop = elements.playLog.scrollHeight;
 }
 
-function renderParty(campaign, canonicalCampaign = campaign) {
-  const canonIds = new Set(canonicalCampaign.party.map((member) => member.id));
+function renderParty(campaign) {
   elements.partyCount.textContent = String(campaign.party.length);
   elements.partyList.replaceChildren(
     ...campaign.party.map((member) =>
       recordElement({
         title: member.name,
         body: `${member.ancestryClass || "unknown role"}${formatHp(member.stats?.hp)}${member.notes?.length ? ` - ${member.notes[0]}` : ""}`,
-        pending: !canonIds.has(member.id),
       }),
     ),
   );
 }
 
-function renderPeople(campaign, canonicalCampaign = campaign) {
-  const canonIds = new Set(canonicalCampaign.people.map((person) => person.id));
+function renderPeople(campaign) {
   elements.peopleCount.textContent = String(campaign.people.length);
   elements.peopleList.replaceChildren(
     ...emptyOrRecords(
@@ -1185,7 +1113,6 @@ function renderPeople(campaign, canonicalCampaign = campaign) {
             person.locationId ? `Location: ${labelById(campaign, person.locationId)}` : "",
             person.relatedIds?.length ? `Related: ${person.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
           ]),
-          pending: !canonIds.has(person.id),
         }),
       ),
       "No people recorded yet.",
@@ -1193,8 +1120,7 @@ function renderPeople(campaign, canonicalCampaign = campaign) {
   );
 }
 
-function renderPlaces(campaign, canonicalCampaign = campaign) {
-  const canonIds = new Set(canonicalCampaign.places.map((place) => place.id));
+function renderPlaces(campaign) {
   const currentPlaceId = campaign.scene.currentPlaceId;
   const places = [...campaign.places].sort((a, b) => {
     if (a.id === currentPlaceId) {
@@ -1221,7 +1147,6 @@ function renderPlaces(campaign, canonicalCampaign = campaign) {
               ? `Connected: ${place.connectedPlaceIds.map((id) => labelById(campaign, id)).join(", ")}`
               : "",
           ]),
-          pending: !canonIds.has(place.id),
         }),
       ),
       "No places recorded yet.",
@@ -1229,17 +1154,13 @@ function renderPlaces(campaign, canonicalCampaign = campaign) {
   );
 }
 
-function renderThings(campaign, canonicalCampaign = campaign) {
-  const canonItemIds = new Set(canonicalCampaign.items.map((item) => item.id));
-  const canonInventoryIds = new Set(canonicalCampaign.inventory.map((entry) => entry.id || entry.itemId));
-  const canonAssetIds = new Set(canonicalCampaign.assets.map((asset) => asset.id));
+function renderThings(campaign) {
   const things = [
     ...campaign.items.map((item) => ({
       id: item.id,
       title: item.name,
       subtitle: item.type || "item",
       body: detailLines([item.summary, ...(item.notes ?? [])]),
-      pending: !canonItemIds.has(item.id),
     })),
     ...campaign.inventory.map((entry) => {
       const item = findById(campaign.items, entry.itemId);
@@ -1248,7 +1169,6 @@ function renderThings(campaign, canonicalCampaign = campaign) {
         title: entry.name || item?.name || entry.itemId,
         subtitle: `${entry.quantity ?? 1} carried by ${entry.carriedBy || entry.holderId || "party"}`,
         body: detailLines([entry.notes, item?.summary, ...(item?.notes ?? [])]),
-        pending: !canonInventoryIds.has(entry.id || entry.itemId),
       };
     }),
     ...campaign.assets.map((asset) => ({
@@ -1256,7 +1176,6 @@ function renderThings(campaign, canonicalCampaign = campaign) {
       title: asset.name,
       subtitle: asset.kind || "asset",
       body: detailLines([asset.path, ...(asset.notes ?? [])]),
-      pending: !canonAssetIds.has(asset.id),
     })),
   ].sort((a, b) => a.title.localeCompare(b.title));
 
@@ -1268,7 +1187,6 @@ function renderThings(campaign, canonicalCampaign = campaign) {
           title: thing.title,
           subtitle: thing.subtitle,
           body: thing.body,
-          pending: thing.pending,
         }),
       ),
       "No things recorded yet.",
@@ -1292,8 +1210,7 @@ function formatHp(hp) {
   return "";
 }
 
-function renderQuests(campaign, canonicalCampaign = campaign) {
-  const canonIds = new Set(canonicalCampaign.quests.map((quest) => quest.id));
+function renderQuests(campaign) {
   const active = campaign.quests.filter((quest) => quest.status !== "completed").slice(0, 8);
   elements.questCount.textContent = String(active.length);
   elements.questList.replaceChildren(
@@ -1307,7 +1224,6 @@ function renderQuests(campaign, canonicalCampaign = campaign) {
             ...(quest.openQuestions ?? []).map((question) => `Open: ${question}`),
             quest.relatedIds?.length ? `Related: ${quest.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
           ]),
-          pending: !canonIds.has(quest.id),
         }),
       ),
       "No active threads.",
@@ -1341,47 +1257,26 @@ function renderContextPack(contextPack) {
 }
 
 function renderReviewBatch() {
-  const changes = state.reviewBatch?.proposedChanges ?? [];
+  const lastCommitted = latestCommittedReviewBatch(state.campaign);
+  const changes = lastCommitted?.applied ?? [];
   elements.reviewCount.textContent = String(changes.length);
   elements.reviewList.replaceChildren(
-    ...changes.map((change) => {
-      const wrapper = document.createElement("article");
-      wrapper.className = `review-card ${change.status}`;
-
-      const heading = document.createElement("h3");
-      heading.textContent = `${change.operation} / ${change.domain}`;
-
-      const summary = document.createElement("p");
-      summary.textContent = change.summary;
-
-      const meta = document.createElement("small");
-      meta.textContent = `${change.confidence ?? "unknown"} confidence${change.targetId ? ` / ${change.targetId}` : ""}`;
-
-      const actions = document.createElement("div");
-      actions.className = "review-actions";
-
-      const approve = document.createElement("button");
-      approve.type = "button";
-      approve.textContent = "Approve";
-      approve.addEventListener("click", () => updateReviewDecision(change.id, "approved"));
-
-      const reject = document.createElement("button");
-      reject.type = "button";
-      reject.textContent = "Reject";
-      reject.addEventListener("click", () => updateReviewDecision(change.id, "rejected"));
-
-      actions.append(approve, reject);
-      wrapper.append(heading, summary, meta, actions);
-      return wrapper;
-    }),
+    ...emptyOrRecords(
+      changes.slice(0, 6).map((change) =>
+        recordElement({
+          title: `${change.operation} / ${change.domain}`,
+          body: change.summary,
+        }),
+      ),
+      "Imported state changes save automatically.",
+    ),
   );
 }
 
-async function updateReviewDecision(changeId, decision) {
-  state.reviewBatch = decideChange(state.reviewBatch, changeId, decision);
-  elements.bridgeStatus.textContent = `Change ${decision}`;
-  render();
-  await persistReviewBatch(state.reviewBatch);
+function latestCommittedReviewBatch(campaign) {
+  return [...(campaign.reviewLog ?? [])]
+    .filter((batch) => batch.status === "committed")
+    .sort((a, b) => String(b.decidedAt || b.updatedAt || b.createdAt).localeCompare(String(a.decidedAt || a.updatedAt || a.createdAt)))[0] ?? null;
 }
 
 function renderPrompt(prompt) {
@@ -1416,9 +1311,9 @@ function renderAssets(campaign) {
   );
 }
 
-function binderRecordElement({ title, subtitle, body, pending = false }) {
+function binderRecordElement({ title, subtitle, body }) {
   const wrapper = document.createElement("details");
-  wrapper.className = pending ? "binder-record pending-record" : "binder-record";
+  wrapper.className = "binder-record";
 
   const summary = document.createElement("summary");
   const titleNode = document.createElement("strong");
@@ -1430,12 +1325,6 @@ function binderRecordElement({ title, subtitle, body, pending = false }) {
   const copy = document.createElement("p");
   copy.textContent = body || "No details recorded.";
   wrapper.append(summary, copy);
-
-  if (pending) {
-    const pendingLabel = document.createElement("small");
-    pendingLabel.textContent = "Pending canon review";
-    wrapper.append(pendingLabel);
-  }
 
   return wrapper;
 }
@@ -1470,9 +1359,9 @@ function labelById(campaign, id) {
   );
 }
 
-function recordElement({ title, body, pending = false }) {
+function recordElement({ title, body }) {
   const wrapper = document.createElement("article");
-  wrapper.className = pending ? "record pending-record" : "record";
+  wrapper.className = "record";
 
   const heading = document.createElement("h3");
   heading.textContent = title;
@@ -1481,11 +1370,6 @@ function recordElement({ title, body, pending = false }) {
   copy.textContent = body || "No notes recorded.";
 
   wrapper.append(heading, copy);
-  if (pending) {
-    const pendingLabel = document.createElement("small");
-    pendingLabel.textContent = "Pending canon review";
-    wrapper.append(pendingLabel);
-  }
   return wrapper;
 }
 

@@ -315,11 +315,6 @@ h3 {
   text-transform: uppercase;
 }
 
-.pending-record {
-  border-color: rgba(240, 189, 108, 0.42);
-  background: rgba(240, 189, 108, 0.12);
-}
-
 .bridge-card {
   display: grid;
   gap: 10px;

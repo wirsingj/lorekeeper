@@ -13,12 +13,6 @@ export function storeReviewBatch(campaign, reviewBatch) {
   };
 }
 
-export function getLatestPendingReviewBatch(campaign) {
-  return [...(campaign.reviewLog ?? [])]
-    .filter((batch) => batch.status === "pending_review")
-    .sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)))[0] ?? null;
-}
-
 export function markReviewBatchCommitted(campaign, reviewBatch, result) {
   const batch = {
     ...normalizeReviewBatch(reviewBatch),
@@ -37,7 +31,7 @@ function normalizeReviewBatch(reviewBatch) {
     id: reviewBatch.id || `review-${Date.now()}`,
     campaignId: reviewBatch.campaignId,
     source: reviewBatch.source || "unknown",
-    status: reviewBatch.status || "pending_review",
+    status: reviewBatch.status || "committed",
     createdAt: reviewBatch.createdAt || now,
     updatedAt: now,
     rawResponse: reviewBatch.rawResponse || "",
@@ -45,7 +39,7 @@ function normalizeReviewBatch(reviewBatch) {
     proposedChanges: Array.isArray(reviewBatch.proposedChanges)
       ? reviewBatch.proposedChanges.map((change, index) => ({
           id: change.id || `change-${index + 1}`,
-          status: change.status || "pending",
+          status: change.status || "approved",
           operation: change.operation || "note",
           domain: change.domain || "lore",
           targetId: change.targetId ?? null,
