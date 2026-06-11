@@ -342,8 +342,8 @@ button.secondary-action {
 }
 
 .play-message p {
-  margin: 0 0 0.85rem;
-  line-height: 1.62;
+  margin: 0 0 0.48rem;
+  line-height: 1.55;
 }
 
 .play-message p:last-child {

@@ -1086,7 +1086,7 @@ function renderPlayLog() {
       const title = document.createElement("strong");
       title.textContent = message.title;
 
-      wrapper.append(title, ...messageBodyElements(message.body));
+      wrapper.append(title, ...messageBodyElements(message.body, message.role));
       if (message.meta) {
         const meta = document.createElement("small");
         meta.textContent = message.meta;
@@ -1280,12 +1280,8 @@ function stripTrailingStatusBlock(text) {
   return narrativeBeforeMarker.length >= 160 ? narrativeBeforeMarker : text;
 }
 
-function messageBodyElements(text) {
-  const blocks = text
-    .trim()
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+function messageBodyElements(text, role = "dm") {
+  const blocks = normalizeMessageBlocks(text, role);
 
   if (!blocks.length) {
     const paragraph = document.createElement("p");
@@ -1294,21 +1290,106 @@ function messageBodyElements(text) {
   }
 
   return blocks.map((block) => {
-    const lines = block.split(/\n/).map((line) => line.trim()).filter(Boolean);
-    const isList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
-
-    if (isList) {
+    if (block.type === "list") {
       const list = document.createElement("ul");
-      lines.forEach((line) => {
+      block.items.forEach((itemText) => {
         const item = document.createElement("li");
-        item.textContent = line.replace(/^[-*]\s+/, "");
+        item.textContent = itemText;
         list.append(item);
       });
       return list;
     }
 
     const paragraph = document.createElement("p");
-    paragraph.textContent = lines.join(" ");
+    paragraph.textContent = block.text;
     return paragraph;
   });
+}
+
+function normalizeMessageBlocks(text, role) {
+  const rawBlocks = text
+    .trim()
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!rawBlocks.length) {
+    return [];
+  }
+
+  if (role !== "dm" && role !== "provider") {
+    return rawBlocks.map(textBlockToRenderableBlock);
+  }
+
+  const normalized = [];
+  let proseGroup = [];
+
+  rawBlocks.forEach((block, index) => {
+    const renderable = textBlockToRenderableBlock(block);
+    if (renderable.type === "list") {
+      flushProseGroup();
+      normalized.push(renderable);
+      return;
+    }
+
+    if (shouldKeepDmBlockSeparate(renderable.text, index, rawBlocks.length)) {
+      flushProseGroup();
+      normalized.push(renderable);
+      return;
+    }
+
+    proseGroup.push(renderable.text);
+    const joinedLength = proseGroup.join(" ").length;
+    if (proseGroup.length >= 4 || joinedLength >= 480) {
+      flushProseGroup();
+    }
+  });
+
+  flushProseGroup();
+  return normalized;
+
+  function flushProseGroup() {
+    if (!proseGroup.length) {
+      return;
+    }
+
+    normalized.push({
+      type: "paragraph",
+      text: proseGroup.join(" "),
+    });
+    proseGroup = [];
+  }
+}
+
+function textBlockToRenderableBlock(block) {
+  const lines = block.split(/\n/).map((line) => line.trim()).filter(Boolean);
+  const isList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
+
+  if (isList) {
+    return {
+      type: "list",
+      items: lines.map((line) => line.replace(/^[-*]\s+/, "")),
+    };
+  }
+
+  return {
+    type: "paragraph",
+    text: lines.join(" "),
+  };
+}
+
+function shouldKeepDmBlockSeparate(text, index, totalBlocks) {
+  if (text.length > 260) {
+    return true;
+  }
+
+  if (index === totalBlocks - 1 && /\?\s*$/.test(text) && text.length <= 120) {
+    return true;
+  }
+
+  if (/^(what do you do|what now|your move|choose|options?)\b/i.test(text)) {
+    return true;
+  }
+
+  return false;
 }
