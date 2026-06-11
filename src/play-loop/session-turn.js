@@ -11,6 +11,7 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
 
   const contextPack = buildContextPack(campaign, {
     purpose: "player_turn",
+    includeCombatDetail: isCombatRelevant(parsedMessage),
   });
   const providerPrompt = buildSidecarPrompt({
     campaign,
@@ -32,6 +33,15 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
     importedResponse: null,
     proposedChanges: [],
   };
+}
+
+function isCombatRelevant(parsedMessage) {
+  const haystack = [
+    parsedMessage.inWorldText,
+    ...(parsedMessage.metaInstructions ?? []),
+  ].join(" ").toLowerCase();
+
+  return /\b(combat|fight|attack|spell|damage|hp|initiative|roll|enemy|weapon|cast|shoot|stab|strike)\b/.test(haystack);
 }
 
 export function attachProviderResponse(turn, responseText) {

@@ -8,44 +8,33 @@ export function buildSidecarPrompt({
   metaInstructions = [],
   template = sidecarTurnTemplate,
 }) {
+  const metaLines = metaInstructions.length
+    ? metaInstructions.map((instruction) => `- ${compactLine(instruction, 240)}`)
+    : ["- None."];
+  const updateSchema = JSON.stringify(createEmptyUpdateContract());
   const sections = [
     "# Lorekeeper Sidecar Prompt",
     "",
     "## Role",
     renderTemplateInstructions(template),
     "",
-    "## Provider Conversation Identity",
-    `Use this provider conversation for campaign: ${campaign.title} (${shortCampaignId(campaign.id)}).`,
-    "If the provider UI names or summarizes this chat, prefer the campaign name plus short id.",
-    "Do not treat provider chat history as canon; Lorekeeper SQLite state and the context pack are the source of truth.",
+    `Provider chat hint: ${campaign.title} [${shortCampaignId(campaign.id)}].`,
     "",
     "## Player Turn",
-    "In-world action / character-facing text:",
-    userIntent || "Continue the current scene while preserving established canon.",
+    compactLine(userIntent || "Continue the current scene while preserving established canon.", 1200),
     "",
-    "Meta instructions from parenthetical text:",
-    ...(metaInstructions.length
-      ? metaInstructions.map((instruction) => `- ${instruction}`)
-      : ["- None."]),
+    "Meta:",
+    ...metaLines,
     "",
-    "Interpret non-parenthetical player text as in-world action, speech, or scene description.",
-    "Interpret parenthetical text as out-of-world guidance to Lorekeeper and the AI sidecar, not as character dialogue or visible narration.",
-    "",
-    "## Campaign Summary",
-    campaign.summary || "No campaign summary recorded.",
+    `Campaign Summary: ${compactLine(campaign.summary || "No campaign summary recorded.", 900)}`,
     "",
     renderContextPackMarkdown(contextPack),
     "",
     "## Lorekeeper Update Contract",
-    "At the end of your response, include proposed changes only for facts that changed or new facts that matter.",
-    "If the player establishes the user's character, party members, companions, locations, inventory, or active goals, include those records in proposedChanges immediately.",
-    "Use domain party for player characters and trusted party members; use domain people only for NPCs outside the party.",
-    "Use domain places for taverns, towns, cities, roads, dungeons, regions, and other named locations.",
-    "Use domain items for notable objects and inventory for carried possessions.",
-    "Use this exact fenced block shape:",
+    "Only include changed/new canon that matters. Prefer compact data. One record per party/person/place/item/quest/etc. Use party for PCs and trusted companions.",
     "",
     "```json lorekeeper_updates",
-    JSON.stringify(createEmptyUpdateContract(), null, 2),
+    updateSchema,
     "```",
   ];
 
@@ -61,15 +50,23 @@ export function createEmptyUpdateContract() {
   return {
     proposedChanges: [
       {
-        operation: "add | update | remove | note",
-        domain:
-          "people | party | factions | places | maps | items | things | inventory | lore | timeline | quests | relationships | scene | combat | style",
-        targetId: "existing-id-or-null",
-        summary: "Human-readable change summary.",
+        operation: "add|update|remove|note",
+        domain: "party|people|factions|places|items|inventory|lore|timeline|quests|relationships|scene|combat|style",
+        targetId: null,
+        summary: "",
         data: {},
-        confidence: "low | medium | high",
-        reason: "Why this should become canon.",
+        confidence: "low|medium|high",
+        reason: "",
       },
     ],
   };
+}
+
+function compactLine(value, limit) {
+  const compact = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (compact.length <= limit) {
+    return compact;
+  }
+
+  return `${compact.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 }

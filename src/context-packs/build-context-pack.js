@@ -15,6 +15,12 @@ const DEFAULT_PACK_KINDS = [
   contextPackKinds.STYLE,
 ];
 
+const HISTORY_MESSAGE_LIMIT = 4;
+const HISTORY_DM_CHAR_LIMIT = 700;
+const HISTORY_PLAYER_CHAR_LIMIT = 320;
+const SHORT_ENTRY_LIMIT = 220;
+const MEDIUM_ENTRY_LIMIT = 360;
+
 export function buildContextPack(campaign, options = {}) {
   const kinds = options.kinds ?? DEFAULT_PACK_KINDS;
 
@@ -24,7 +30,7 @@ export function buildContextPack(campaign, options = {}) {
     generatedAt: new Date().toISOString(),
     purpose: options.purpose ?? "next_campaign_turn",
     sections: kinds
-      .map((kind) => buildSection(kind, campaign))
+      .map((kind) => buildSection(kind, campaign, options))
       .filter((section) => section && section.entries.length > 0),
   };
 }
@@ -48,7 +54,7 @@ export function renderContextPackMarkdown(contextPack) {
   return lines.join("\n").trim();
 }
 
-function buildSection(kind, campaign) {
+function buildSection(kind, campaign, options) {
   switch (kind) {
     case contextPackKinds.SCENE:
       return buildSceneSection(campaign);
@@ -65,7 +71,7 @@ function buildSection(kind, campaign) {
     case contextPackKinds.COMBAT:
       return buildCombatSection(campaign);
     case contextPackKinds.RULES:
-      return buildRulesProfileSection(campaign);
+      return buildRulesProfileSection(campaign, options);
     case contextPackKinds.RELATIONSHIPS:
       return buildRelationshipSection(campaign);
     case contextPackKinds.LORE:
@@ -78,31 +84,38 @@ function buildSection(kind, campaign) {
 }
 
 function buildHistorySection(campaign) {
-  const messages = (campaign.sessionLog?.messages ?? []).slice(-8);
+  const messages = (campaign.sessionLog?.messages ?? []).slice(-HISTORY_MESSAGE_LIMIT);
 
   return {
     kind: contextPackKinds.HISTORY,
     title: "Recent Play History",
-    entries: messages.map((message) => {
-      const speaker = message.title || (message.role === "player" ? "Player" : "DM");
-      return `${speaker}: ${message.body}`;
-    }),
+    entries: messages
+      .map((message) => {
+        const speaker = message.title || (message.role === "player" ? "Player" : "DM");
+        const limit = message.role === "player" ? HISTORY_PLAYER_CHAR_LIMIT : HISTORY_DM_CHAR_LIMIT;
+        const body = compactText(message.body, limit);
+        return body ? `${speaker}: ${body}` : null;
+      })
+      .filter(Boolean),
   };
 }
 
 function buildSceneSection(campaign) {
   const place = findById(campaign.places, campaign.scene.currentPlaceId);
   const presentPeople = campaign.scene.presentPeopleIds.map((id) => labelEntity(campaign, id));
+  const sceneLocation = campaign.scene.location || campaign.scene.place || campaign.scene.currentLocation;
+  const location = sceneLocation || (place ? `${place.name} - ${place.summary}` : "Unknown");
+  const situation = campaign.scene.situation || campaign.scene.immediateSituation || "Not set.";
 
   return {
     kind: contextPackKinds.SCENE,
     title: "Current Scene",
     entries: [
       `Status: ${campaign.scene.status}`,
-      `Location: ${place ? `${place.name} - ${place.summary}` : "Unknown"}`,
-      `Immediate situation: ${campaign.scene.immediateSituation || "Not set."}`,
+      `Location: ${compactText(location, SHORT_ENTRY_LIMIT)}`,
+      `Immediate situation: ${compactText(situation, MEDIUM_ENTRY_LIMIT)}`,
       `Present NPCs: ${presentPeople.length > 0 ? presentPeople.join(", ") : "None recorded."}`,
-      ...campaign.scene.localNotes.map((note) => `Scene note: ${note}`),
+      ...campaign.scene.localNotes.slice(0, 3).map((note) => `Scene note: ${compactText(note, SHORT_ENTRY_LIMIT)}`),
     ],
   };
 }
@@ -116,9 +129,17 @@ function buildPartySection(campaign) {
     title: "Active Party",
     entries: party.map((member) => {
       const hp = member.stats?.hp ? `HP ${member.stats.hp.current}/${member.stats.hp.max}` : "HP unknown";
-      const abilities = member.stats?.abilities?.length ? member.stats.abilities.join(", ") : "abilities unknown";
-      const spells = member.stats?.spells?.length ? ` Spells: ${member.stats.spells.join(", ")}.` : "";
-      return `${member.name} (${member.ancestryClass}, ${hp}). Abilities: ${abilities}.${spells} Notes: ${(member.notes ?? []).join(" ")}`;
+      const abilities = formatCompactList(member.abilities ?? member.specialties ?? member.traits ?? member.stats?.abilities, 5);
+      const spells = formatCompactList(member.spells ?? member.stats?.spells, 5);
+      const notes = formatCompactList(member.notes, 2);
+      const details = [
+        member.ancestryClass || member.role || member.class || "party member",
+        hp,
+        abilities ? `abilities: ${abilities}` : null,
+        spells ? `spells: ${spells}` : null,
+        notes ? `notes: ${notes}` : null,
+      ].filter(Boolean);
+      return compactText(`${member.name}: ${details.join("; ")}`, MEDIUM_ENTRY_LIMIT);
     }),
   };
 }
@@ -137,8 +158,10 @@ function buildNearbySection(campaign) {
     kind: contextPackKinds.NEARBY,
     title: "Nearby People And Places",
     entries: [
-      ...nearbyPeople.map((person) => `${person.name}: ${person.role}. ${(person.notes ?? []).join(" ")}`),
-      ...nearbyPlaces.map((place) => `${place.name}: ${place.summary}`),
+      ...nearbyPeople.slice(0, 6).map((person) =>
+        compactText(`${person.name}: ${person.role}. ${(person.notes ?? []).join(" ")}`, SHORT_ENTRY_LIMIT),
+      ),
+      ...nearbyPlaces.slice(0, 6).map((place) => compactText(`${place.name}: ${place.summary}`, SHORT_ENTRY_LIMIT)),
     ],
   };
 }
@@ -147,10 +170,13 @@ function buildInventorySection(campaign) {
   return {
     kind: contextPackKinds.INVENTORY,
     title: "Current Inventory",
-    entries: campaign.inventory.map((entry) => {
+    entries: campaign.inventory.slice(0, 12).map((entry) => {
       const holder = labelEntity(campaign, entry.holderId);
       const item = findById(campaign.items, entry.itemId);
-      return `${holder} carries ${entry.quantity} x ${item?.name ?? entry.itemId}. ${entry.notes ?? ""} ${(item?.notes ?? []).join(" ")}`.trim();
+      return compactText(
+        `${holder} carries ${entry.quantity} x ${item?.name ?? entry.itemId}. ${entry.notes ?? ""} ${(item?.notes ?? []).join(" ")}`.trim(),
+        SHORT_ENTRY_LIMIT,
+      );
     }),
   };
 }
@@ -161,9 +187,9 @@ function buildThreadsSection(campaign) {
   return {
     kind: contextPackKinds.THREADS,
     title: "Active Quests And Unresolved Threads",
-    entries: active.map((quest) => {
-      const questions = quest.openQuestions?.length ? ` Open questions: ${quest.openQuestions.join(" ")}` : "";
-      return `${quest.title} (${quest.status}). Stakes: ${quest.stakes}.${questions}`;
+    entries: active.slice(0, 6).map((quest) => {
+      const questions = quest.openQuestions?.length ? ` Questions: ${quest.openQuestions.slice(0, 3).join(" ")}` : "";
+      return compactText(`${quest.title} (${quest.status}). Stakes: ${quest.stakes}.${questions}`, MEDIUM_ENTRY_LIMIT);
     }),
   };
 }
@@ -172,15 +198,17 @@ function buildCombatSection(campaign) {
   const combat = campaign.combat;
   const entries = [
     `In combat: ${combat.inCombat ? "yes" : "no"}`,
-    `Turn format: ${combat.turnFormat}`,
-    ...combat.preferences.map((preference) => `Preference: ${preference}`),
+    `Turn format: ${compactText(combat.turnFormat, SHORT_ENTRY_LIMIT)}`,
   ];
 
   if (combat.inCombat) {
+    entries.push(...combat.preferences.slice(0, 4).map((preference) => `Preference: ${compactText(preference, SHORT_ENTRY_LIMIT)}`));
     entries.push(`Round: ${combat.round ?? "unknown"}`);
     entries.push(`Initiative: ${combat.initiative.map((id) => labelEntity(campaign, id)).join(", ") || "unknown"}`);
     entries.push(`Enemies: ${combat.enemies.map((enemy) => `${enemy.name} (${enemy.hp ?? "HP unknown"})`).join(", ")}`);
     entries.push(`Conditions: ${combat.conditions.join(", ") || "none recorded"}`);
+  } else {
+    entries.push("When danger starts, present options, allow mixes/other actions, and roll uncertain outcomes.");
   }
 
   return {
@@ -190,11 +218,14 @@ function buildCombatSection(campaign) {
   };
 }
 
-function buildRulesProfileSection(campaign) {
+function buildRulesProfileSection(campaign, options = {}) {
   const profile = campaign.rulesProfile;
   if (!profile) {
     return null;
   }
+  const includeCombatDetail = campaign.combat?.inCombat || options.includeCombatDetail;
+  const compactCombatFormat =
+    "Combat format: actor + HP, Options, Chosen action, rolls/math, HP/resource updates, short narration.";
 
   return {
     kind: contextPackKinds.RULES,
@@ -203,9 +234,10 @@ function buildRulesProfileSection(campaign) {
       `${profile.name}: ${profile.purpose}`,
       `Core stats: ${profile.coreStats.join(", ")}`,
       `Default check: ${profile.diceConventions.defaultCheck}`,
-      ...profile.combatLoop.map((step) => `Combat loop: ${step}`),
-      ...(profile.combatTurnExample ?? []).map((line) => `Combat format example: ${line}`),
-      ...profile.providerGuardRails.map((rule) => `Provider guard rail: ${rule}`),
+      compactCombatFormat,
+      "Options are suggestions, not restrictions; the player can combine options or attempt something reasonable.",
+      ...(includeCombatDetail ? profile.combatLoop.slice(0, 4).map((step) => `Combat loop: ${compactText(step, SHORT_ENTRY_LIMIT)}`) : []),
+      ...profile.providerGuardRails.slice(0, 3).map((rule) => `Guard rail: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
     ],
   };
 }
@@ -214,9 +246,12 @@ function buildRelationshipSection(campaign) {
   return {
     kind: contextPackKinds.RELATIONSHIPS,
     title: "Relationship Notes",
-    entries: campaign.relationships.map(
+    entries: campaign.relationships.slice(0, 8).map(
       (relationship) =>
-        `${labelEntity(campaign, relationship.sourceId)} -> ${labelEntity(campaign, relationship.targetId)} (${relationship.type}): ${relationship.notes}`,
+        compactText(
+          `${labelEntity(campaign, relationship.sourceId)} -> ${labelEntity(campaign, relationship.targetId)} (${relationship.type}): ${relationship.notes}`,
+          SHORT_ENTRY_LIMIT,
+        ),
     ),
   };
 }
@@ -238,7 +273,7 @@ function buildLoreSection(campaign) {
   return {
     kind: contextPackKinds.LORE,
     title: "Relevant Lore",
-    entries: lore.map((note) => `${note.title}: ${(note.notes ?? []).join(" ")}`),
+    entries: lore.slice(0, 5).map((note) => compactText(`${note.title}: ${(note.notes ?? []).join(" ")}`, MEDIUM_ENTRY_LIMIT)),
   };
 }
 
@@ -249,8 +284,8 @@ function buildStyleSection(campaign) {
     entries: [
       `Tone: ${campaign.style.tone}`,
       `Pacing: ${campaign.style.pacing}`,
-      ...campaign.style.narrationRules.map((rule) => `Narration rule: ${rule}`),
-      ...campaign.style.formattingRules.map((rule) => `Formatting rule: ${rule}`),
+      ...campaign.style.narrationRules.slice(0, 2).map((rule) => `Narration: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
+      ...campaign.style.formattingRules.slice(0, 2).map((rule) => `Format: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
     ],
   };
 }
@@ -264,4 +299,48 @@ function uniqueById(records) {
     seen.add(record.id);
     return true;
   });
+}
+
+function compactText(value, limit = SHORT_ENTRY_LIMIT) {
+  const stripped = stripUpdatePayloads(String(value ?? ""));
+  const compact = stripped.replace(/\s+/g, " ").trim();
+  if (compact.length <= limit) {
+    return compact;
+  }
+
+  return `${compact.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+}
+
+function stripUpdatePayloads(value) {
+  const fenced = value.replace(/```(?:json\s+)?lorekeeper_updates[\s\S]*?```/gi, "");
+  const jsonMarker = fenced.search(/\bJSON\s*\{\s*"proposedChanges"/i);
+  if (jsonMarker !== -1) {
+    return fenced.slice(0, jsonMarker);
+  }
+
+  const inlineMarker = fenced.search(/\{\s*"proposedChanges"\s*:/i);
+  if (inlineMarker !== -1) {
+    return fenced.slice(0, inlineMarker);
+  }
+
+  return fenced;
+}
+
+function formatCompactList(value, limit = 4) {
+  if (!value) {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, limit).map((entry) => compactText(entry, 80)).filter(Boolean).join(", ");
+  }
+
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .slice(0, limit)
+      .map(([key, entry]) => `${key} ${entry}`)
+      .join(", ");
+  }
+
+  return compactText(value, 120);
 }
