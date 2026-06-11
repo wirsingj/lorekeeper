@@ -11,7 +11,7 @@ export function extractLorekeeperUpdates(responseText) {
     const parsed = JSON.parse(payload.json);
     const proposedChanges = Array.isArray(parsed.proposedChanges) ? parsed.proposedChanges : [];
     return {
-      proposedChanges: proposedChanges.map(normalizeChange),
+      proposedChanges: proposedChanges.flatMap(normalizeChange),
       error: null,
     };
   } catch (error) {
@@ -142,6 +142,11 @@ function findBalancedObjectEnd(text, start) {
 }
 
 function normalizeChange(change) {
+  const expanded = expandGroupedChange(change);
+  if (expanded) {
+    return expanded.map(normalizeChange);
+  }
+
   return {
     operation: change.operation ?? "note",
     domain: change.domain ?? "lore",
@@ -151,4 +156,32 @@ function normalizeChange(change) {
     confidence: change.confidence ?? "unknown",
     reason: change.reason ?? "",
   };
+}
+
+function expandGroupedChange(change) {
+  const data = change.data ?? {};
+  const groups = [
+    ["party", data.members || data.party || data.characters],
+    ["people", data.people || data.npcs || data.characters],
+    ["places", data.places || data.locations],
+    ["items", data.items || data.artifacts],
+    ["inventory", data.inventory],
+    ["quests", data.quests || data.threads],
+  ];
+
+  for (const [domain, records] of groups) {
+    if (Array.isArray(records) && records.length > 0) {
+      return records.map((record, index) => ({
+        operation: change.operation ?? "add",
+        domain,
+        targetId: record.id ?? null,
+        summary: record.summary ?? record.name ?? record.title ?? `${change.summary ?? "Proposed record"} ${index + 1}`,
+        data: record,
+        confidence: change.confidence ?? "unknown",
+        reason: change.reason ?? "",
+      }));
+    }
+  }
+
+  return null;
 }

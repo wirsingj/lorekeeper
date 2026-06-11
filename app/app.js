@@ -3,6 +3,7 @@ import { findById } from "../src/campaign-state/formatters.js";
 import { normalizeCampaign } from "../src/campaign-state/schema.js";
 import { createSampleCampaign } from "../src/campaign-state/sample-campaign.js";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
+import { previewCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { createReviewBatch, decideChange, getCommittableChanges } from "../src/canon-review/proposals.js";
 import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
@@ -586,7 +587,11 @@ function seedPlayLog() {
 
 function render() {
   const campaign = state.campaign;
-  const currentPlace = findById(campaign.places, campaign.scene.currentPlaceId);
+  const visibleCampaign = buildVisibleCampaign();
+  const visibleContextPack = buildContextPack(visibleCampaign, {
+    purpose: "ui_working_campaign_view",
+  });
+  const currentPlace = findById(visibleCampaign.places, visibleCampaign.scene.currentPlaceId);
 
   elements.title.textContent = campaign.title;
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
@@ -602,13 +607,26 @@ function render() {
   }
 
   renderPlayLog();
-  renderParty(campaign);
-  renderQuests(campaign);
-  renderContextPack(state.contextPack);
+  renderParty(visibleCampaign, campaign);
+  renderQuests(visibleCampaign, campaign);
+  renderContextPack(visibleContextPack);
   renderPrompt(state.prompt);
   renderReviewBatch();
-  renderAssets(campaign);
+  renderAssets(visibleCampaign);
   renderCampaignSelector();
+}
+
+function buildVisibleCampaign() {
+  const changes = reviewPreviewChanges();
+  if (!changes.length) {
+    return state.campaign;
+  }
+
+  return previewCanonicalChanges(state.campaign, changes).campaign;
+}
+
+function reviewPreviewChanges() {
+  return (state.reviewBatch?.proposedChanges ?? []).filter((change) => change.status !== "rejected");
 }
 
 function renderCampaignSelector() {
@@ -979,19 +997,38 @@ function renderPlayLog() {
   elements.playLog.scrollTop = elements.playLog.scrollHeight;
 }
 
-function renderParty(campaign) {
+function renderParty(campaign, canonicalCampaign = campaign) {
+  const canonIds = new Set(canonicalCampaign.party.map((member) => member.id));
   elements.partyCount.textContent = String(campaign.party.length);
   elements.partyList.replaceChildren(
     ...campaign.party.map((member) =>
       recordElement({
         title: member.name,
-        body: `${member.ancestryClass || "unknown role"}${member.stats?.hp ? `, HP ${member.stats.hp.current}/${member.stats.hp.max}` : ""}${member.notes?.length ? ` - ${member.notes[0]}` : ""}`,
+        body: `${member.ancestryClass || "unknown role"}${formatHp(member.stats?.hp)}${member.notes?.length ? ` - ${member.notes[0]}` : ""}`,
+        pending: !canonIds.has(member.id),
       }),
     ),
   );
 }
 
-function renderQuests(campaign) {
+function formatHp(hp) {
+  if (!hp) {
+    return "";
+  }
+
+  if (typeof hp === "string" || typeof hp === "number") {
+    return `, HP ${hp}`;
+  }
+
+  if (hp.current !== undefined && hp.max !== undefined) {
+    return `, HP ${hp.current}/${hp.max}`;
+  }
+
+  return "";
+}
+
+function renderQuests(campaign, canonicalCampaign = campaign) {
+  const canonIds = new Set(canonicalCampaign.quests.map((quest) => quest.id));
   const active = campaign.quests.filter((quest) => quest.status !== "completed").slice(0, 8);
   elements.questCount.textContent = String(active.length);
   elements.questList.replaceChildren(
@@ -999,6 +1036,7 @@ function renderQuests(campaign) {
       recordElement({
         title: quest.title,
         body: quest.stakes || quest.openQuestions?.join(" "),
+        pending: !canonIds.has(quest.id),
       }),
     ),
   );
@@ -1069,7 +1107,7 @@ function renderReviewBatch() {
 function updateReviewDecision(changeId, decision) {
   state.reviewBatch = decideChange(state.reviewBatch, changeId, decision);
   elements.bridgeStatus.textContent = `Change ${decision}`;
-  renderReviewBatch();
+  render();
 }
 
 function renderPrompt(prompt) {
@@ -1104,9 +1142,9 @@ function renderAssets(campaign) {
   );
 }
 
-function recordElement({ title, body }) {
+function recordElement({ title, body, pending = false }) {
   const wrapper = document.createElement("article");
-  wrapper.className = "record";
+  wrapper.className = pending ? "record pending-record" : "record";
 
   const heading = document.createElement("h3");
   heading.textContent = title;
@@ -1115,6 +1153,11 @@ function recordElement({ title, body }) {
   copy.textContent = body || "No notes recorded.";
 
   wrapper.append(heading, copy);
+  if (pending) {
+    const pendingLabel = document.createElement("small");
+    pendingLabel.textContent = "Pending canon review";
+    wrapper.append(pendingLabel);
+  }
   return wrapper;
 }
 

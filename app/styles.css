@@ -211,6 +211,20 @@ h3 {
   line-height: 1.35;
 }
 
+.record small {
+  display: block;
+  margin-top: 6px;
+  color: #f0bd6c;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pending-record {
+  border-color: rgba(240, 189, 108, 0.42);
+  background: rgba(240, 189, 108, 0.12);
+}
+
 .bridge-card {
   display: grid;
   gap: 10px;
