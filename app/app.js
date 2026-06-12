@@ -7,6 +7,7 @@ import { getActiveProviderConversation } from "../src/campaign-state/provider-co
 import { createReviewBatch } from "../src/canon-review/proposals.js";
 import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
+import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 
 const bundleUrl = "/data/imports/veil-of-the-towers.bundle.json";
 const apiCampaignUrl = "/api/campaign";
@@ -104,7 +105,9 @@ const elements = {
   questCount: document.querySelector("#quest-count"),
   promptOutput: document.querySelector("#prompt-output"),
   promptSize: document.querySelector("#prompt-size"),
+  promptDrawer: document.querySelector("#prompt-drawer"),
   sessionLabel: document.querySelector("#session-label"),
+  bridgeCard: document.querySelector("#bridge-card"),
   bridgeStatus: document.querySelector("#bridge-status"),
   checkSidecar: document.querySelector("#check-sidecar"),
   newProviderChat: document.querySelector("#new-provider-chat"),
@@ -112,9 +115,9 @@ const elements = {
   providerMode: document.querySelector("#provider-mode"),
   ollamaStatus: document.querySelector("#ollama-status"),
   ollamaModel: document.querySelector("#ollama-model"),
+  ollamaModelSummary: document.querySelector("#ollama-model-summary"),
   refreshOllama: document.querySelector("#refresh-ollama"),
   testOllama: document.querySelector("#test-ollama"),
-  pullModelName: document.querySelector("#pull-model-name"),
   pullOllamaModel: document.querySelector("#pull-ollama-model"),
   ollamaBenchmark: document.querySelector("#ollama-benchmark"),
   generationTimeout: document.querySelector("#generation-timeout"),
@@ -607,7 +610,7 @@ async function saveProviderSettingsFromControls() {
   const timeoutSeconds = Number(elements.generationTimeout.value) || 120;
   const patch = {
     preferredProvider: elements.providerMode.value || "bridge",
-    selectedModel: elements.ollamaModel.value || elements.pullModelName.value.trim() || "llama3.1:8b",
+    selectedModel: elements.ollamaModel.value || "llama3.1:8b",
     generationTimeoutMs: Math.max(10, timeoutSeconds) * 1000,
     outputLimit: Math.max(128, Number(elements.outputLimit.value) || 900),
     fastMode: elements.fastMode.checked,
@@ -674,39 +677,135 @@ function renderProviderControls() {
   if (ollama) {
     elements.ollamaStatus.textContent = providerStatusLabel(ollama);
     elements.ollamaBenchmark.textContent = ollama.selectedModelAvailable
-      ? `${settings.selectedModel} is installed and ready.`
+      ? `${modelDisplayName(settings.selectedModel)} is installed and ready.`
       : providerSetupHint(ollama, settings.selectedModel);
+    renderSelectedModelSummary(settings, ollama);
   }
 
   elements.checkSidecar.disabled = settings.preferredProvider !== "bridge";
   elements.newProviderChat.disabled = settings.preferredProvider !== "bridge";
   elements.recheckProvider.hidden = settings.preferredProvider !== "bridge";
+  elements.bridgeCard.hidden = settings.preferredProvider !== "bridge";
+  elements.promptDrawer.hidden = settings.preferredProvider !== "bridge";
 }
 
 function renderModelOptions(settings) {
   const ollama = state.providerStatus?.providers?.ollama;
   const installed = (ollama?.models ?? []).map((model) => model.name || model.model).filter(Boolean);
   const recommended = (ollama?.recommendedModels ?? []).map((model) => model.id);
-  const options = [...new Set([settings.selectedModel, ...installed, ...recommended].filter(Boolean))];
+  const options = dedupeModelOptions([settings.selectedModel, ...installed, ...recommended].filter(Boolean), settings.selectedModel);
 
   elements.ollamaModel.replaceChildren(
     ...options.map((model) => {
       const option = document.createElement("option");
       option.value = model;
-      option.textContent = installed.includes(model) ? `${model} (installed)` : model;
-      option.selected = model === settings.selectedModel;
+      option.textContent = formatModelOptionLabel(model, isOllamaModelInstalled(model, installed));
+      option.selected = normalizeOllamaModelId(model) === normalizeOllamaModelId(settings.selectedModel);
       return option;
     }),
   );
-  elements.pullModelName.value ||= settings.selectedModel;
+}
+
+function dedupeModelOptions(modelIds, selectedModel) {
+  const byCanonicalId = new Map();
+  const selectedCanonicalId = normalizeOllamaModelId(selectedModel);
+  for (const modelId of modelIds) {
+    const canonicalId = normalizeOllamaModelId(modelId);
+    if (!canonicalId) {
+      continue;
+    }
+
+    const current = byCanonicalId.get(canonicalId);
+    const candidateIsSelected = canonicalId === selectedCanonicalId;
+    const currentIsSelected = normalizeOllamaModelId(current) === selectedCanonicalId;
+    if (!current || (candidateIsSelected && !currentIsSelected)) {
+      byCanonicalId.set(canonicalId, modelId);
+    }
+  }
+
+  return [...byCanonicalId.values()];
+}
+
+function isOllamaModelInstalled(modelId, installedModels) {
+  const canonicalId = normalizeOllamaModelId(modelId);
+  return installedModels.some((installed) => normalizeOllamaModelId(installed) === canonicalId);
+}
+
+function formatModelOptionLabel(modelId, isInstalled) {
+  const descriptor = getRecommendedModelDescriptor(modelId);
+  const label = descriptor?.label ?? modelId;
+  const badges = [
+    isInstalled ? "installed" : "download needed",
+    descriptor?.recommended ? "recommended" : null,
+    descriptor?.spec ? `${descriptor.spec} spec` : null,
+  ].filter(Boolean);
+  return `${label} - ${badges.join(" / ")}`;
+}
+
+function renderSelectedModelSummary(settings, ollama) {
+  const modelId = settings.selectedModel;
+  const installedModelNames = (ollama.models ?? []).map((model) => model.name || model.model).filter(Boolean);
+  const installed = isOllamaModelInstalled(modelId, installedModelNames);
+  const descriptor = getRecommendedModelDescriptor(modelId);
+  const chips = [
+    descriptor?.recommended ? "Recommended" : null,
+    descriptor?.spec ? `${descriptor.spec} Spec` : null,
+    descriptor?.speed ? `Speed: ${descriptor.speed}` : null,
+    descriptor?.quality ? `Quality: ${descriptor.quality}` : null,
+    installed ? "Installed" : "Not Downloaded",
+  ].filter(Boolean);
+
+  elements.ollamaModelSummary.replaceChildren(
+    ...chips.map((chip) => {
+      const span = document.createElement("span");
+      span.className = `model-chip ${chip === "Not Downloaded" ? "missing" : ""}`;
+      span.textContent = chip;
+      return span;
+    }),
+  );
+
+  elements.pullOllamaModel.hidden = installed;
+  elements.pullOllamaModel.disabled = ollama.state === "ollama_not_installed" || ollama.state === "ollama_not_running";
+  elements.pullOllamaModel.textContent = "Download";
+  elements.pullOllamaModel.title = `Download ${modelId} with Ollama`;
+}
+
+function getRecommendedModelDescriptor(modelId) {
+  const canonicalId = normalizeOllamaModelId(modelId);
+  const model = recommendedOllamaModels.find((candidate) => normalizeOllamaModelId(candidate.id) === canonicalId);
+  if (!model) {
+    return {
+      label: modelId,
+      spec: "Custom",
+      speed: null,
+      quality: null,
+      recommended: false,
+    };
+  }
+
+  return {
+    ...model,
+    spec: model.spec ?? inferModelSpec(model.id),
+    recommended: Boolean(model.recommended),
+  };
+}
+
+function inferModelSpec(modelId) {
+  if (/14b|27b|70b/i.test(modelId)) {
+    return "High";
+  }
+  if (/nemo|12b/i.test(modelId)) {
+    return "Medium";
+  }
+  return "Low";
 }
 
 function providerStatusLabel(ollama) {
   if (ollama.state === "ready") {
-    return `Ollama ready: ${ollama.selectedModel}`;
+    return `Ollama ready: ${modelDisplayName(ollama.selectedModel)}`;
   }
   if (ollama.state === "selected_model_missing") {
-    return `Ollama running; ${ollama.selectedModel} is not downloaded`;
+    return `Ollama running; ${modelDisplayName(ollama.selectedModel)} is not downloaded`;
   }
   if (ollama.state === "ollama_not_running") {
     return "Ollama installed but not running";
@@ -724,7 +823,11 @@ function providerSetupHint(ollama, selectedModel) {
   if (ollama.state === "ollama_not_running") {
     return "Start Ollama, then refresh local AI.";
   }
-  return `${selectedModel} is missing. Use Download to pull it locally.`;
+  return `${modelDisplayName(selectedModel)} is missing. Use Download to pull it locally.`;
+}
+
+function modelDisplayName(modelId) {
+  return getRecommendedModelDescriptor(modelId)?.label ?? modelId;
 }
 
 async function testOllamaModel() {
@@ -753,13 +856,15 @@ async function testOllamaModel() {
 }
 
 async function pullOllamaModel() {
-  const model = elements.pullModelName.value.trim() || elements.ollamaModel.value;
+  const model = elements.ollamaModel.value;
   if (!model) {
-    elements.ollamaBenchmark.textContent = "Enter a model name to download.";
+    elements.ollamaBenchmark.textContent = "Choose a model to download.";
     return;
   }
 
   try {
+    elements.pullOllamaModel.disabled = true;
+    elements.pullOllamaModel.textContent = "Downloading...";
     setProviderActivity(`Downloading ${model}...`, "working");
     const response = await fetch(apiOllamaPullUrl, {
       method: "POST",
@@ -787,6 +892,8 @@ async function pullOllamaModel() {
   } catch (error) {
     elements.ollamaBenchmark.textContent = error instanceof Error ? error.message : "Model download failed.";
     setProviderActivity("Model download failed", "error");
+  } finally {
+    renderProviderControls();
   }
 }
 
@@ -1179,7 +1286,7 @@ async function importProviderResponse(responseText, options = {}) {
   elements.responseImport.value = "";
   if (extraction.error) {
     elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
-    setProviderActivity("Imported provider response; update JSON needs attention", "error");
+    setProviderActivity("Imported response; no state updates saved", "waiting");
   } else if (extraction.proposedChanges.length > 0 && !commitResult) {
     elements.bridgeStatus.textContent = "State save failed; response text was still imported";
     setProviderActivity("Imported response; state save failed", "error");
@@ -2849,7 +2956,15 @@ function recordElement({ title, body, onEdit }) {
 
 function cleanProviderResponseForPlay(text) {
   const withoutUpdates = stripLorekeeperUpdates(text);
-  return stripTrailingStatusBlock(withoutUpdates).trim() || "The DM response was imported for review.";
+  const withoutRolePrefix = stripProviderRolePrefix(withoutUpdates);
+  return stripTrailingStatusBlock(withoutRolePrefix).trim() || "The DM response was imported for review.";
+}
+
+function stripProviderRolePrefix(text) {
+  return String(text ?? "")
+    .replace(/^\s*(?:\*\*)?\s*(?:DM|Dungeon Master|Lorekeeper|Assistant)\s*(?:\*\*)?\s*[:\-]\s*/i, "")
+    .replace(/^\s*(?:#|##)\s*(?:DM|Dungeon Master|Lorekeeper|Assistant)\s*$/gim, "")
+    .trim();
 }
 
 function stripTrailingStatusBlock(text) {

@@ -7,22 +7,28 @@ export const recommendedOllamaModels = Object.freeze([
   {
     id: "llama3.1:8b",
     label: "Llama 3.1 8B",
+    spec: "Low",
     speed: "fast",
     quality: "good",
+    recommended: true,
     notes: "Good first local model for interactive campaign play on consumer hardware.",
   },
   {
     id: "mistral-nemo",
     label: "Mistral Nemo",
+    spec: "Medium",
     speed: "medium",
     quality: "strong",
+    recommended: false,
     notes: "Often a nice storytelling balance when the machine has enough memory.",
   },
   {
     id: "qwen3:14b",
     label: "Qwen3 14B",
+    spec: "High",
     speed: "slower",
     quality: "strong",
+    recommended: false,
     notes: "Heavier local option to evaluate for instruction following and context handling.",
   },
 ]);
@@ -59,6 +65,10 @@ export function normalizeProviderMode(value) {
   }
 
   return Object.values(providerModes).includes(value) ? value : providerModes.BRIDGE;
+}
+
+export function normalizeOllamaModelId(value) {
+  return String(value ?? "").trim().replace(/:latest$/i, "");
 }
 
 function normalizePositiveInteger(value, fallback) {

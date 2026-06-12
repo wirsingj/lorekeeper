@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
-import { recommendedOllamaModels } from "./provider-settings.js";
+import { normalizeOllamaModelId, recommendedOllamaModels } from "./provider-settings.js";
 
 const execFileAsync = promisify(execFile);
 const defaultBaseUrl = "http://127.0.0.1:11434";
@@ -22,7 +22,7 @@ export class OllamaProvider {
     }));
     const models = runtime.models ?? [];
     const selectedModelAvailable = selectedModel
-      ? models.some((model) => model.name === selectedModel || model.model === selectedModel)
+      ? models.some((model) => normalizeOllamaModelId(model.name || model.model) === normalizeOllamaModelId(selectedModel))
       : false;
 
     return {

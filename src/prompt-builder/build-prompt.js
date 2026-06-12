@@ -11,7 +11,7 @@ export function buildSidecarPrompt({
   const metaLines = metaInstructions.length
     ? metaInstructions.map((instruction) => `- ${compactLine(instruction, 240)}`)
     : ["- None."];
-  const updateSchema = JSON.stringify(createEmptyUpdateContract());
+  const updateSchema = JSON.stringify(createEmptyUpdateContract(), null, 2);
   const sections = [
     "# Lorekeeper Sidecar Prompt",
     "",
@@ -32,6 +32,7 @@ export function buildSidecarPrompt({
     "",
     "## Lorekeeper Update Contract",
     "Only include changed/new canon that matters. Prefer compact data. One record per party/person/place/item/quest/etc. Use party for PCs and trusted companions.",
+    "Your final lines must be exactly one fenced block like this. If nothing changed, use an empty proposedChanges array.",
     "",
     "```json lorekeeper_updates",
     updateSchema,

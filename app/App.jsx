@@ -236,39 +236,42 @@ function SetupDialog() {
               <span className="status-dot"></span>
               <span id="ollama-status">Checking Ollama...</span>
             </div>
-            <label>
-              <span>Local Model</span>
-              <select id="ollama-model">
-                <option value="llama3.1:8b">llama3.1:8b</option>
-                <option value="mistral-nemo">mistral-nemo</option>
-                <option value="qwen3:14b">qwen3:14b</option>
-              </select>
-            </label>
-            <div className="settings-grid">
+            <div className="model-picker-row">
               <label>
-                <span>Timeout</span>
-                <input id="generation-timeout" type="number" min="10" step="5" defaultValue="120" />
+                <span>Local Model</span>
+                <select id="ollama-model">
+                  <option value="llama3.1:8b">Llama 3.1 8B</option>
+                  <option value="mistral-nemo">Mistral Nemo</option>
+                  <option value="qwen3:14b">Qwen3 14B</option>
+                </select>
               </label>
-              <label>
-                <span>Output Tokens</span>
-                <input id="output-limit" type="number" min="128" step="64" defaultValue="900" />
-              </label>
-              <label className="check-row">
-                <input id="fast-mode" type="checkbox" />
-                <span>Fast Mode</span>
-              </label>
-            </div>
-            <div className="button-stack two-up">
-              <button id="refresh-ollama" type="button">Refresh Local AI</button>
-              <button id="test-ollama" type="button">Test Model</button>
-            </div>
-            <div className="pull-row">
-              <input id="pull-model-name" placeholder="model to download, e.g. llama3.1:8b" />
               <button id="pull-ollama-model" type="button">Download</button>
             </div>
+            <div id="ollama-model-summary" className="model-summary" aria-live="polite"></div>
             <p id="ollama-benchmark" className="setup-note">Local AI status will appear here.</p>
+            <details className="advanced-provider-settings">
+              <summary>Advanced generation settings</summary>
+              <div className="settings-grid">
+                <label>
+                  <span>Timeout</span>
+                  <input id="generation-timeout" type="number" min="10" step="5" defaultValue="120" />
+                </label>
+                <label>
+                  <span>Output Tokens</span>
+                  <input id="output-limit" type="number" min="128" step="64" defaultValue="900" />
+                </label>
+                <label className="check-row">
+                  <input id="fast-mode" type="checkbox" />
+                  <span>Fast Mode</span>
+                </label>
+              </div>
+              <div className="button-stack two-up">
+                <button id="refresh-ollama" type="button">Refresh Local AI</button>
+                <button id="test-ollama" type="button">Test Model</button>
+              </div>
+            </details>
           </div>
-          <div className="bridge-card">
+          <div id="bridge-card" className="bridge-card">
             <div className="status-line">
               <span className="status-dot"></span>
               <span id="bridge-status">Manual copy/import ready</span>
@@ -279,7 +282,7 @@ function SetupDialog() {
               <button id="new-provider-chat" type="button">New Campaign Chat</button>
             </div>
           </div>
-          <details className="prompt-drawer">
+          <details id="prompt-drawer" className="prompt-drawer">
             <summary>
               <span>Provider Prompt</span>
               <span id="prompt-size">0 chars</span>

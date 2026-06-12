@@ -362,13 +362,72 @@ h3 {
 
 .local-ai-card {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 10px;
   border: 1px solid rgba(125, 213, 201, 0.18);
   border-radius: 9px;
   background:
     linear-gradient(135deg, rgba(125, 213, 201, 0.055), transparent 44%),
     rgba(255, 255, 255, 0.04);
+}
+
+.model-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.model-picker-row label {
+  min-width: 0;
+}
+
+.model-picker-row button {
+  min-width: 104px;
+}
+
+.model-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.model-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(174, 191, 202, 0.16);
+  border-radius: 999px;
+  color: #d7e4dc;
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.model-chip.missing {
+  border-color: rgba(217, 154, 112, 0.38);
+  color: #f1c6a5;
+  background: rgba(217, 154, 112, 0.1);
+}
+
+.advanced-provider-settings {
+  border-top: 1px solid rgba(174, 191, 202, 0.1);
+  padding-top: 8px;
+}
+
+.advanced-provider-settings summary {
+  cursor: pointer;
+  color: var(--steel);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.advanced-provider-settings[open] {
+  display: grid;
+  gap: 10px;
 }
 
 .settings-grid {
@@ -394,12 +453,6 @@ h3 {
 
 .check-row input {
   width: auto;
-}
-
-.pull-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
 }
 
 .setup-note {
