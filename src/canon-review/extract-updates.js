@@ -193,15 +193,94 @@ function normalizeChange(change) {
   }
 
   const domain = normalizeChangeDomain(change);
+  const data = inferChangeRecordName(domain, change, { ...(change.data ?? {}) });
   return {
     operation: change.operation ?? "note",
     domain,
     targetId: change.targetId ?? null,
     summary: change.summary ?? "Unlabeled proposed update.",
-    data: change.data ?? {},
+    data,
     confidence: change.confidence ?? "unknown",
     reason: change.reason ?? "",
   };
+}
+
+function inferChangeRecordName(domain, change, data) {
+  if (data.name || data.title || !isNamedRecordDomain(domain)) {
+    return data;
+  }
+
+  const inferredName = inferRecordDisplayName(change, data);
+  if (!inferredName) {
+    return data;
+  }
+
+  if (domain === "quests" || domain === "lore") {
+    data.title = inferredName;
+  } else {
+    data.name = inferredName;
+  }
+
+  return data;
+}
+
+function isNamedRecordDomain(domain) {
+  return ["party", "people", "places", "items", "inventory", "quests", "lore", "factions", "maps"].includes(domain);
+}
+
+function inferRecordDisplayName(change, data) {
+  const targetName = humanizeId(change.targetId);
+  if (targetName) {
+    return targetName;
+  }
+
+  const summary = String(change.summary ?? "").trim();
+  if (!summary) {
+    return "";
+  }
+
+  const countedPeople = summary.match(/^\s*((?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+[^,.]{3,42}?)(?:\s+(?:entered|arrived|appeared|approached|attacked|searched|joined|met|waited)\b|[,.]|$)/i);
+  if (countedPeople?.[1] && (data.count || /people|party/i.test(change.domain ?? ""))) {
+    return titleCase(countedPeople[1]);
+  }
+
+  const createdRecord = summary.match(/\b(?:created|introduced|added|revealed|identified)\s+(?:the\s+)?([^,.]{2,48}?)(?:\s+(?:as|to|in|for)\b|[,.]|$)/i);
+  if (createdRecord?.[1]) {
+    return titleCase(createdRecord[1].replace(/^(party member|npc|person|place|item|thread)\s+/i, ""));
+  }
+
+  return compactTitle(summary);
+}
+
+function humanizeId(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw === "null" || raw === "undefined") {
+    return "";
+  }
+
+  return titleCase(raw.replace(/[_-]+/g, " "));
+}
+
+function compactTitle(value) {
+  const firstSentence = String(value).split(/[.!?]/)[0]?.trim() || String(value).trim();
+  const title = firstSentence.length > 54 ? `${firstSentence.slice(0, 51).trim()}...` : firstSentence;
+  return titleCase(title);
+}
+
+function titleCase(value) {
+  const minorWords = new Set(["a", "an", "and", "as", "at", "for", "from", "in", "of", "on", "or", "the", "to", "with"]);
+  return String(value)
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((word, index) => {
+      const lower = word.toLowerCase();
+      if (index > 0 && minorWords.has(lower)) {
+        return lower;
+      }
+      return lower.replace(/^\w/, (char) => char.toUpperCase());
+    })
+    .join(" ");
 }
 
 function expandGroupedChange(change) {

@@ -40,6 +40,7 @@ const state = {
     mode: "unknown",
     ready: false,
     lastRun: null,
+    lastImportedProviderText: "",
   },
   editingRecord: null,
   activeCharacterSheet: null,
@@ -52,6 +53,8 @@ const elements = {
   sceneLocation: document.querySelector("#scene-location"),
   providerStatus: document.querySelector("#provider-status"),
   providerActivity: document.querySelector("#provider-activity"),
+  providerActivityLabel: document.querySelector("#provider-activity-label"),
+  recheckProvider: document.querySelector("#recheck-provider"),
   saveStatus: document.querySelector("#save-status"),
   openSetup: document.querySelector("#open-setup"),
   setupDialog: document.querySelector("#setup-dialog"),
@@ -235,6 +238,10 @@ elements.importResponse.addEventListener("click", async () => {
   await importProviderResponse(elements.responseImport.value.trim());
 });
 
+elements.recheckProvider.addEventListener("click", async () => {
+  await importLatestProviderResponse({ requireNewerThanLastImport: true });
+});
+
 setupCommandDeckResize();
 
 elements.pasteResponse.addEventListener("click", async () => {
@@ -304,7 +311,8 @@ elements.recordForm.addEventListener("submit", async (event) => {
 
 elements.playerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const playerMessage = elements.playerInput.value.trim();
+  const originalInput = elements.playerInput.value;
+  const playerMessage = originalInput.trim();
   if (!playerMessage) {
     elements.bridgeStatus.textContent = "Type an action first";
     setProviderActivity("Type a table message first", "idle");
@@ -337,9 +345,13 @@ elements.playerForm.addEventListener("submit", async (event) => {
       source: "player_meta",
     });
   }
-  elements.playerInput.value = "";
   render();
-  await runPromptThroughSidecar(state.prompt);
+  const runResult = await runPromptThroughSidecar(state.prompt);
+  if (runResult?.providerReceived) {
+    elements.playerInput.value = "";
+  } else if (!elements.playerInput.value.trim()) {
+    elements.playerInput.value = originalInput;
+  }
 });
 
 await boot();
@@ -831,7 +843,7 @@ async function hideActiveCampaign() {
   }
 }
 
-async function importProviderResponse(responseText) {
+async function importProviderResponse(responseText, options = {}) {
   if (!responseText) {
     elements.bridgeStatus.textContent = "Paste a provider response first";
     setProviderActivity("Paste a provider response first", "idle");
@@ -869,6 +881,15 @@ async function importProviderResponse(responseText) {
     setProviderActivity("Imported provider response and saved campaign state", "idle");
   }
   render();
+  if (options.rememberProviderText !== false) {
+    state.bridge.lastImportedProviderText = responseText;
+  }
+  return {
+    imported: true,
+    proposedChanges: extraction.proposedChanges.length,
+    commitResult,
+    extraction,
+  };
 }
 
 function splitProviderTableMessages(text, campaign, proposedChanges = []) {
@@ -1109,6 +1130,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
       mode: "manual",
       ready: false,
       lastRun: null,
+      lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
     elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
     setProviderActivity("Provider bridge unavailable; manual copy/import ready", "error");
@@ -1140,6 +1162,7 @@ async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = f
       mode: "manual",
       ready: false,
       lastRun: null,
+      lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
     elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
     setProviderActivity("Provider bridge unavailable; manual copy/import ready", "error");
@@ -1179,6 +1202,7 @@ async function startNewProviderConversation() {
       mode: "manual",
       ready: false,
       lastRun: null,
+      lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
     const conversation = getActiveProviderConversation(state.campaign, defaultCompanionOptions.providerId);
     elements.bridgeStatus.textContent = `Opening fresh campaign chat: ${conversation.conversationHint}`;
@@ -1257,8 +1281,10 @@ async function runPromptThroughSidecar(prompt) {
   if (!prompt.trim()) {
     elements.bridgeStatus.textContent = "Build a provider prompt first";
     setProviderActivity("Build a provider prompt first", "idle");
-    return;
+    return { providerReceived: false };
   }
+
+  let baselineProviderText = "";
 
   try {
     const probe = await probeExtensionBridge();
@@ -1271,11 +1297,14 @@ async function runPromptThroughSidecar(prompt) {
         mode: "manual",
         ready: false,
         lastRun: null,
+        lastImportedProviderText: state.bridge.lastImportedProviderText,
       };
       setProviderActivity("Extension unavailable; prompt copied for manual paste", "error");
-      return;
+      return { providerReceived: false };
     }
 
+    const baselineResponse = await readLatestCompanionResponse().catch(() => null);
+    baselineProviderText = baselineResponse?.text ?? "";
     elements.bridgeStatus.textContent = "Sending turn to campaign ChatGPT conversation...";
     setProviderActivity("Submitting turn to ChatGPT...", "working");
     const progress = startSidecarProgress();
@@ -1286,10 +1315,10 @@ async function runPromptThroughSidecar(prompt) {
         options: {
           ...campaignCompanionOptions(),
           readyTimeoutMs: 30000,
-          responseTimeoutMs: 90000,
+          responseTimeoutMs: 150000,
         },
       },
-      125000,
+      190000,
     );
     progress.stop();
 
@@ -1297,6 +1326,7 @@ async function runPromptThroughSidecar(prompt) {
       mode: "extension",
       ready: Boolean(result.ready),
       lastRun: result,
+      lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
     if (result.found || result.created) {
       await persistProviderConversationFromBridge(result);
@@ -1305,7 +1335,7 @@ async function runPromptThroughSidecar(prompt) {
     if (result.sent && result.response?.text) {
       setProviderActivity("ChatGPT response received; importing...", "working");
       await importProviderResponse(result.response.text);
-      return;
+      return { providerReceived: true, imported: true };
     }
 
     if (result.response?.needsManualSubmit) {
@@ -1315,9 +1345,10 @@ async function runPromptThroughSidecar(prompt) {
         mode: "extension",
         ready: true,
         lastRun: result,
+        lastImportedProviderText: state.bridge.lastImportedProviderText,
       };
       render();
-      return;
+      return { providerReceived: false, needsManualSubmit: true };
     }
 
     if (result.loginRequired) {
@@ -1327,7 +1358,15 @@ async function runPromptThroughSidecar(prompt) {
       });
       setProviderActivity("ChatGPT needs login; prompt copied", "error");
       render();
-      return;
+      return { providerReceived: false };
+    }
+
+    const recovered = await importLatestProviderResponse({
+      newerThanText: baselineProviderText,
+      quietIfUnchanged: true,
+    });
+    if (recovered?.imported) {
+      return { providerReceived: Boolean(result.sent), imported: true, recovered: true };
     }
 
     await copyPromptToClipboard(prompt, {
@@ -1335,8 +1374,18 @@ async function runPromptThroughSidecar(prompt) {
       failureMessage: "Sidecar did not return a response; copy from prompt drawer",
     });
     setProviderActivity("No provider response returned; prompt copied", "error");
+    return { providerReceived: Boolean(result.sent) };
   } catch (error) {
     stopSidecarProgress();
+    const recovered = await importLatestProviderResponse({
+      newerThanText: baselineProviderText,
+      quietIfUnchanged: true,
+    }).catch(() => null);
+    if (recovered?.imported) {
+      setProviderActivity("Recovered ChatGPT response after bridge timeout", "idle");
+      return { providerReceived: true, imported: true, recovered: true };
+    }
+
     await copyPromptToClipboard(prompt, {
       successMessage: "Sidecar failed; prompt copied",
       failureMessage: "Sidecar failed; copy from prompt drawer",
@@ -1345,10 +1394,66 @@ async function runPromptThroughSidecar(prompt) {
       mode: "manual",
       ready: false,
       lastRun: null,
+      lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
     setProviderActivity("Provider run failed; prompt copied for manual paste", "error");
     render();
+    return { providerReceived: false, error };
   }
+}
+
+async function importLatestProviderResponse({
+  newerThanText = "",
+  requireNewerThanLastImport = false,
+  quietIfUnchanged = false,
+} = {}) {
+  setProviderActivity("Reading latest ChatGPT response...", "working");
+  const latest = await readLatestCompanionResponse();
+  const latestText = latest?.text?.trim() ?? "";
+
+  if (!latestText) {
+    elements.bridgeStatus.textContent = "No provider response found to import";
+    setProviderActivity("No provider response found", "idle");
+    return { imported: false, reason: "empty" };
+  }
+
+  if (newerThanText && latestText === newerThanText.trim()) {
+    if (!quietIfUnchanged) {
+      elements.bridgeStatus.textContent = "Latest provider response has not changed";
+      setProviderActivity("Latest provider response has not changed", "idle");
+    }
+    return { imported: false, reason: "unchanged" };
+  }
+
+  if (requireNewerThanLastImport && latestText === state.bridge.lastImportedProviderText?.trim()) {
+    elements.bridgeStatus.textContent = "Latest provider response is already imported";
+    setProviderActivity("Latest provider response already imported", "idle");
+    return { imported: false, reason: "duplicate" };
+  }
+
+  elements.bridgeStatus.textContent = "Importing latest ChatGPT response...";
+  setProviderActivity("Importing latest ChatGPT response...", "working");
+  await importProviderResponse(latestText);
+  return { imported: true, response: latest };
+}
+
+async function readLatestCompanionResponse() {
+  const probe = await probeExtensionBridge();
+  if (!probe.available || !probe.result?.found || !probe.result?.tab?.id) {
+    return null;
+  }
+
+  const response = await sendExtensionMessage(
+    {
+      type: "lorekeeper.providerCommand",
+      tabId: probe.result.tab.id,
+      command: "readLatestResponse",
+      payload: {},
+    },
+    12000,
+  );
+
+  return response?.found ? response : null;
 }
 
 async function copyPromptToClipboard(prompt, messages = {}) {
@@ -1390,7 +1495,11 @@ function setProviderActivity(message, status = "idle") {
     return;
   }
 
-  elements.providerActivity.textContent = message;
+  if (elements.providerActivityLabel) {
+    elements.providerActivityLabel.textContent = message;
+  } else {
+    elements.providerActivity.textContent = message;
+  }
   elements.providerActivity.dataset.state = status;
 }
 
@@ -1563,6 +1672,7 @@ async function handleCompanionCheckResult(result) {
     mode: "extension",
     ready: Boolean(result.ready),
     lastRun: result,
+    lastImportedProviderText: state.bridge.lastImportedProviderText,
   };
 
   if (result.found || result.created) {

@@ -782,9 +782,9 @@ button.danger-button:disabled {
   border: 1px solid rgba(174, 191, 202, 0.12);
   border-radius: 10px;
   background: rgba(10, 13, 15, 0.34);
-  display: flex;
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
   min-height: 20px;
   color: #b9c6cc;
@@ -799,6 +799,21 @@ button.danger-button:disabled {
   border-radius: 999px;
   background: #7891a4;
   box-shadow: 0 0 0 2px rgba(120, 145, 164, 0.14);
+}
+
+#provider-activity-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#recheck-provider {
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 
 .provider-activity[data-state="working"]::before {

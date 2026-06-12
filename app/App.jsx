@@ -98,7 +98,10 @@ export function LorekeeperShell() {
           <div id="quest-list" className="binder-list"></div>
         </section>
         <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
-          Provider idle
+          <span id="provider-activity-label">Provider idle</span>
+          <button id="recheck-provider" className="mini-action" type="button" title="Read latest provider response">
+            Read Latest
+          </button>
         </div>
       </aside>
 

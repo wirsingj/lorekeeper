@@ -16,6 +16,7 @@ export const sidecarTurnTemplate = {
     "For party dialogue/actions, use plain prefixed lines such as Roderic: \"I'll watch the door.\" so Lorekeeper can render separate table voices.",
     "End with one fenced json lorekeeper_updates block and no prose after it.",
     "Use party for PCs/trusted companions, people for NPCs, places/items/quests/etc. for new records.",
+    "Every add/update for party, people, places, items, inventory, quests, lore, factions, or maps must include data.name or data.title.",
     "Use proposedChanges: [] when nothing important changed.",
   ],
 };

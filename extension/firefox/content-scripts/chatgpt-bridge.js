@@ -108,6 +108,18 @@ async function sendPromptAndRead(prompt, timeoutMs) {
       needsManualSubmit: false,
     };
   } catch (error) {
+    const latest = readLatestResponse();
+    if (latest.found && latest.text && latest.text !== beforeText && !hasIncompleteLorekeeperJson(latest.text)) {
+      return {
+        ...latest,
+        inserted: insertResult,
+        submit: null,
+        needsManualSubmit: false,
+        recoveredAfterError: true,
+        error: error instanceof Error ? error.message : "Recovered latest ChatGPT response after bridge error.",
+      };
+    }
+
     const promptStillInComposer = readPromptInputText(input).includes(prompt.trim().slice(0, 80));
     if (promptStillInComposer) {
       return {
@@ -218,6 +230,11 @@ async function waitForAssistantResponseChange(beforeText, timeoutMs) {
         return;
       }
     }
+  }
+
+  const latest = readLatestResponse();
+  if (latest.found && latest.text && latest.text !== beforeText && !hasIncompleteLorekeeperJson(latest.text)) {
+    return;
   }
 
   throw new Error("Timed out waiting for ChatGPT response.");
