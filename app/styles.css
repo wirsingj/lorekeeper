@@ -443,33 +443,12 @@ button.danger-button:disabled {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 8px;
+  grid-template-rows: minmax(0, 1fr);
   padding: 10px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 34%),
     var(--stone-dark);
   border-radius: 16px;
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 0 4px;
-  color: #edf2f4;
-  font-size: 0.78rem;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.table-header span:last-child {
-  overflow: hidden;
-  color: #aebbc4;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .play-log {
@@ -746,10 +725,11 @@ button.danger-button:disabled {
 .command-deck {
   grid-area: bottom;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 8px;
-  padding: 10px 14px;
+  column-gap: 10px;
+  row-gap: 6px;
+  padding: 10px 14px 16px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 38%),
     var(--stone-dark);
@@ -760,7 +740,9 @@ button.danger-button:disabled {
 }
 
 .provider-activity {
-  grid-column: 1;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -796,9 +778,9 @@ button.danger-button:disabled {
 
 .player-form {
   display: grid;
-  grid-column: 1;
+  grid-column: 1 / -1;
   grid-row: 2;
-  gap: 7px;
+  gap: 0;
 }
 
 .player-form label,

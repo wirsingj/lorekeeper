@@ -48,10 +48,7 @@ export function LorekeeperShell() {
 
       <main className="play-screen" aria-label="Lorekeeper play screen">
         <div className="screen-bezel">
-          <div className="table-header">
-            <span>Table Chat</span>
-            <span id="session-label">Campaign Play</span>
-          </div>
+          <span id="session-label" className="visually-hidden">Campaign Play</span>
           <div id="play-log" className="play-log"></div>
         </div>
       </main>
@@ -107,7 +104,7 @@ export function LorekeeperShell() {
           Provider idle
         </div>
         <form id="player-form" className="player-form">
-          <label htmlFor="player-input">Table Message</label>
+          <label className="visually-hidden" htmlFor="player-input">Table Message</label>
           <div className="input-row">
             <textarea
               id="player-input"
