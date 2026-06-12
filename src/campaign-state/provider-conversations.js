@@ -67,7 +67,14 @@ export function getActiveProviderConversation(campaign, providerId = "chatgpt") 
 
 function normalizeProviderSettings(providerSettings = {}) {
   return {
-    preferredProvider: providerSettings.preferredProvider || "chatgpt",
+    preferredProvider: providerSettings.preferredProvider === "chatgpt"
+      ? "bridge"
+      : providerSettings.preferredProvider || "bridge",
+    selectedModel: providerSettings.selectedModel || "llama3.1:8b",
+    generationTimeoutMs: providerSettings.generationTimeoutMs || 120000,
+    outputLimit: providerSettings.outputLimit || 900,
+    fastMode: providerSettings.fastMode ?? false,
+    ollamaBaseUrl: providerSettings.ollamaBaseUrl || "http://127.0.0.1:11434",
     bridgeMode: providerSettings.bridgeMode || "manual_until_adapter_ready",
     requireExplicitTabSelection: providerSettings.requireExplicitTabSelection ?? true,
     automationVisible: providerSettings.automationVisible ?? true,

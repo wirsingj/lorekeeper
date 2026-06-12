@@ -19,6 +19,11 @@ const apiCommitReviewUrl = "/api/review/commit";
 const apiCampaignRecordUrl = "/api/campaign/record";
 const apiCampaignMessageUrl = "/api/campaign/message";
 const apiProviderConversationUrl = "/api/provider/conversation";
+const apiProviderStatusUrl = "/api/provider/status";
+const apiProviderSettingsUrl = "/api/provider/settings";
+const apiProviderGenerateTurnUrl = "/api/provider/generate-turn";
+const apiOllamaPullUrl = "/api/ollama/pull";
+const apiOllamaTestUrl = "/api/ollama/test";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
 const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
@@ -42,6 +47,9 @@ const state = {
     lastRun: null,
     lastImportedProviderText: "",
   },
+  providerStatus: null,
+  activeGeneration: null,
+  streamingMessage: null,
   editingRecord: null,
   activeCharacterSheet: null,
 };
@@ -101,6 +109,18 @@ const elements = {
   checkSidecar: document.querySelector("#check-sidecar"),
   newProviderChat: document.querySelector("#new-provider-chat"),
   copyProviderPrompt: document.querySelector("#copy-provider-prompt"),
+  providerMode: document.querySelector("#provider-mode"),
+  ollamaStatus: document.querySelector("#ollama-status"),
+  ollamaModel: document.querySelector("#ollama-model"),
+  refreshOllama: document.querySelector("#refresh-ollama"),
+  testOllama: document.querySelector("#test-ollama"),
+  pullModelName: document.querySelector("#pull-model-name"),
+  pullOllamaModel: document.querySelector("#pull-ollama-model"),
+  ollamaBenchmark: document.querySelector("#ollama-benchmark"),
+  generationTimeout: document.querySelector("#generation-timeout"),
+  outputLimit: document.querySelector("#output-limit"),
+  fastMode: document.querySelector("#fast-mode"),
+  cancelGeneration: document.querySelector("#cancel-generation"),
   newCampaign: document.querySelector("#new-campaign"),
   loadImported: document.querySelector("#load-imported"),
   playLog: document.querySelector("#play-log"),
@@ -164,6 +184,7 @@ elements.copyProviderPrompt.addEventListener("click", async () => {
 
 elements.openSetup.addEventListener("click", () => {
   elements.setupDialog.showModal();
+  refreshProviderStatus({ quiet: true });
 });
 
 elements.closeSetup.addEventListener("click", () => {
@@ -240,6 +261,42 @@ elements.importResponse.addEventListener("click", async () => {
 
 elements.recheckProvider.addEventListener("click", async () => {
   await importLatestProviderResponse({ requireNewerThanLastImport: true });
+});
+
+elements.providerMode.addEventListener("change", async () => {
+  await saveProviderSettingsFromControls();
+});
+
+elements.ollamaModel.addEventListener("change", async () => {
+  await saveProviderSettingsFromControls();
+});
+
+elements.generationTimeout.addEventListener("change", async () => {
+  await saveProviderSettingsFromControls();
+});
+
+elements.outputLimit.addEventListener("change", async () => {
+  await saveProviderSettingsFromControls();
+});
+
+elements.fastMode.addEventListener("change", async () => {
+  await saveProviderSettingsFromControls();
+});
+
+elements.refreshOllama.addEventListener("click", async () => {
+  await refreshProviderStatus();
+});
+
+elements.testOllama.addEventListener("click", async () => {
+  await testOllamaModel();
+});
+
+elements.pullOllamaModel.addEventListener("click", async () => {
+  await pullOllamaModel();
+});
+
+elements.cancelGeneration.addEventListener("click", () => {
+  cancelActiveGeneration();
 });
 
 setupCommandDeckResize();
@@ -346,7 +403,10 @@ elements.playerForm.addEventListener("submit", async (event) => {
     });
   }
   render();
-  const runResult = await runPromptThroughSidecar(state.prompt);
+  const providerMode = currentProviderSettings().preferredProvider;
+  const runResult = providerMode === "ollama"
+    ? await runPromptThroughLocalProvider(state.currentTurn)
+    : await runPromptThroughSidecar(state.prompt);
   if (runResult?.providerReceived) {
     elements.playerInput.value = "";
   } else if (!elements.playerInput.value.trim()) {
@@ -358,6 +418,7 @@ await boot();
 
 async function boot() {
   await loadCampaign();
+  await refreshProviderStatus({ quiet: true });
   seedPlayLog();
   render();
 }
@@ -527,6 +588,247 @@ function setCampaignFromPayload(payload, contextPurpose) {
   });
   state.prompt = "";
   state.reviewBatch = null;
+}
+
+function currentProviderSettings() {
+  const settings = state.campaign?.providerSettings ?? {};
+  const preferredProvider = settings.preferredProvider === "chatgpt" ? "bridge" : settings.preferredProvider || "bridge";
+  return {
+    preferredProvider,
+    selectedModel: settings.selectedModel || "llama3.1:8b",
+    generationTimeoutMs: Number(settings.generationTimeoutMs) || 120000,
+    outputLimit: Number(settings.outputLimit) || 900,
+    fastMode: Boolean(settings.fastMode),
+    ollamaBaseUrl: settings.ollamaBaseUrl || "http://127.0.0.1:11434",
+  };
+}
+
+async function saveProviderSettingsFromControls() {
+  const timeoutSeconds = Number(elements.generationTimeout.value) || 120;
+  const patch = {
+    preferredProvider: elements.providerMode.value || "bridge",
+    selectedModel: elements.ollamaModel.value || elements.pullModelName.value.trim() || "llama3.1:8b",
+    generationTimeoutMs: Math.max(10, timeoutSeconds) * 1000,
+    outputLimit: Math.max(128, Number(elements.outputLimit.value) || 900),
+    fastMode: elements.fastMode.checked,
+  };
+
+  try {
+    setProviderActivity("Saving provider settings...", "working");
+    const response = await fetch(apiProviderSettingsUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const payload = await response.json();
+    setCampaignFromPayload(payload, "provider_settings_update");
+    state.providerStatus = payload.providerStatus ?? state.providerStatus;
+    render();
+    setProviderActivity("Provider settings saved", "idle");
+  } catch (error) {
+    elements.bridgeStatus.textContent = error instanceof Error ? `Provider settings failed: ${error.message}` : "Provider settings failed";
+    setProviderActivity("Provider settings save failed", "error");
+  }
+}
+
+async function refreshProviderStatus({ quiet = false } = {}) {
+  try {
+    if (!quiet) {
+      setProviderActivity("Checking local AI...", "working");
+    }
+    const response = await fetch(apiProviderStatusUrl);
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    state.providerStatus = await response.json();
+    renderProviderControls();
+    if (!quiet) {
+      setProviderActivity("Provider status refreshed", "idle");
+    }
+  } catch (error) {
+    elements.ollamaStatus.textContent = error instanceof Error ? `Status check failed: ${error.message}` : "Status check failed";
+    if (!quiet) {
+      setProviderActivity("Provider status check failed", "error");
+    }
+  }
+}
+
+function renderProviderControls() {
+  if (!state.campaign) {
+    return;
+  }
+
+  const settings = currentProviderSettings();
+  elements.providerMode.value = settings.preferredProvider;
+  elements.generationTimeout.value = String(Math.round(settings.generationTimeoutMs / 1000));
+  elements.outputLimit.value = String(settings.outputLimit);
+  elements.fastMode.checked = settings.fastMode;
+  renderModelOptions(settings);
+
+  const ollama = state.providerStatus?.providers?.ollama;
+  if (ollama) {
+    elements.ollamaStatus.textContent = providerStatusLabel(ollama);
+    elements.ollamaBenchmark.textContent = ollama.selectedModelAvailable
+      ? `${settings.selectedModel} is installed and ready.`
+      : providerSetupHint(ollama, settings.selectedModel);
+  }
+
+  elements.checkSidecar.disabled = settings.preferredProvider !== "bridge";
+  elements.newProviderChat.disabled = settings.preferredProvider !== "bridge";
+  elements.recheckProvider.hidden = settings.preferredProvider !== "bridge";
+}
+
+function renderModelOptions(settings) {
+  const ollama = state.providerStatus?.providers?.ollama;
+  const installed = (ollama?.models ?? []).map((model) => model.name || model.model).filter(Boolean);
+  const recommended = (ollama?.recommendedModels ?? []).map((model) => model.id);
+  const options = [...new Set([settings.selectedModel, ...installed, ...recommended].filter(Boolean))];
+
+  elements.ollamaModel.replaceChildren(
+    ...options.map((model) => {
+      const option = document.createElement("option");
+      option.value = model;
+      option.textContent = installed.includes(model) ? `${model} (installed)` : model;
+      option.selected = model === settings.selectedModel;
+      return option;
+    }),
+  );
+  elements.pullModelName.value ||= settings.selectedModel;
+}
+
+function providerStatusLabel(ollama) {
+  if (ollama.state === "ready") {
+    return `Ollama ready: ${ollama.selectedModel}`;
+  }
+  if (ollama.state === "selected_model_missing") {
+    return `Ollama running; ${ollama.selectedModel} is not downloaded`;
+  }
+  if (ollama.state === "ollama_not_running") {
+    return "Ollama installed but not running";
+  }
+  if (ollama.state === "ollama_not_installed") {
+    return "Ollama is not installed";
+  }
+  return ollama.runtimeMessage || "Ollama status unknown";
+}
+
+function providerSetupHint(ollama, selectedModel) {
+  if (ollama.state === "ollama_not_installed") {
+    return "Install Ollama from ollama.com, then reopen setup and refresh local AI.";
+  }
+  if (ollama.state === "ollama_not_running") {
+    return "Start Ollama, then refresh local AI.";
+  }
+  return `${selectedModel} is missing. Use Download to pull it locally.`;
+}
+
+async function testOllamaModel() {
+  try {
+    setProviderActivity("Testing Ollama model...", "working");
+    const startedAt = performance.now();
+    const response = await fetch(apiOllamaTestUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: elements.ollamaModel.value }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const result = await response.json();
+    const elapsed = Math.round(performance.now() - startedAt);
+    elements.ollamaBenchmark.textContent =
+      `Test ${result.ok ? "passed" : "returned"} in ${Math.round((result.durationMs ?? elapsed) / 1000)}s: ${result.text.trim()}`;
+    setProviderActivity("Ollama test complete", result.ok ? "idle" : "waiting");
+  } catch (error) {
+    elements.ollamaBenchmark.textContent = error instanceof Error ? error.message : "Ollama test failed.";
+    setProviderActivity("Ollama test failed", "error");
+  }
+}
+
+async function pullOllamaModel() {
+  const model = elements.pullModelName.value.trim() || elements.ollamaModel.value;
+  if (!model) {
+    elements.ollamaBenchmark.textContent = "Enter a model name to download.";
+    return;
+  }
+
+  try {
+    setProviderActivity(`Downloading ${model}...`, "working");
+    const response = await fetch(apiOllamaPullUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model }),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(await response.text());
+    }
+
+    for await (const event of readNdjsonResponse(response.body)) {
+      if (event.type === "progress") {
+        const progress = event.progress ?? {};
+        elements.ollamaBenchmark.textContent = formatPullProgress(model, progress);
+      } else if (event.type === "done") {
+        elements.ollamaBenchmark.textContent = `${model} downloaded. Refreshing local models...`;
+        await saveProviderSettingsPatch({ selectedModel: model, preferredProvider: "ollama" });
+        await refreshProviderStatus({ quiet: true });
+        setProviderActivity(`${model} ready`, "idle");
+      } else if (event.type === "error") {
+        throw new Error(event.error || "Model download failed.");
+      }
+    }
+  } catch (error) {
+    elements.ollamaBenchmark.textContent = error instanceof Error ? error.message : "Model download failed.";
+    setProviderActivity("Model download failed", "error");
+  }
+}
+
+async function saveProviderSettingsPatch(patch) {
+  const response = await fetch(apiProviderSettingsUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const payload = await response.json();
+  setCampaignFromPayload(payload, "provider_settings_update");
+  state.providerStatus = payload.providerStatus ?? state.providerStatus;
+  render();
+  return payload;
+}
+
+function formatPullProgress(model, progress) {
+  if (progress.total && progress.completed) {
+    const pct = Math.round((progress.completed / progress.total) * 100);
+    return `Downloading ${model}: ${pct}% (${formatBytes(progress.completed)} / ${formatBytes(progress.total)})`;
+  }
+
+  return `Downloading ${model}: ${progress.status || "working..."}`;
+}
+
+function formatBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes)) {
+    return "?";
+  }
+  if (bytes > 1024 ** 3) {
+    return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+  }
+  if (bytes > 1024 ** 2) {
+    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+  }
+  return `${Math.round(bytes / 1024)} KB`;
 }
 
 async function saveRecordFromDialog() {
@@ -740,8 +1042,11 @@ function render() {
   elements.title.textContent = campaign.title;
   elements.sessionLabel.textContent = activeSession?.title || "Campaign Play";
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
-  elements.providerStatus.textContent = "Provider: ChatGPT campaign chat/manual";
-  if (state.bridge.mode === "extension") {
+  const providerSettings = currentProviderSettings();
+  elements.providerStatus.textContent = providerSettings.preferredProvider === "ollama"
+    ? `Provider: Ollama ${providerSettings.selectedModel}`
+    : "Provider: ChatGPT campaign chat/manual";
+  if (providerSettings.preferredProvider === "bridge" && state.bridge.mode === "extension") {
     elements.providerStatus.textContent = state.bridge.ready
       ? "Provider: campaign chat ready"
       : "Provider: campaign chat waiting";
@@ -760,6 +1065,7 @@ function render() {
   renderPrompt(state.prompt);
   renderReviewBatch();
   renderCampaignSelector();
+  renderProviderControls();
 }
 
 function renderCampaignSelector() {
@@ -854,12 +1160,16 @@ async function importProviderResponse(responseText, options = {}) {
   const cleanedText = cleanProviderResponseForPlay(responseText);
   const tableMessages = splitProviderTableMessages(cleanedText, state.campaign, extraction.proposedChanges);
   for (const message of tableMessages) {
-    await appendPlayMessage(message);
+    await appendPlayMessage({
+      ...message,
+      meta: message.meta || options.meta || "",
+      source: options.source ? `${options.source}_response` : message.source,
+    });
   }
 
   const reviewBatch = createReviewBatch({
     campaignId: state.campaign.id,
-    source: "manual_import",
+    source: options.source || "manual_import",
     rawResponse: responseText,
     proposedChanges: extraction.proposedChanges,
   });
@@ -1402,6 +1712,134 @@ async function runPromptThroughSidecar(prompt) {
   }
 }
 
+async function runPromptThroughLocalProvider(turn) {
+  if (!turn?.playerMessage?.trim()) {
+    setProviderActivity("Build a table turn first", "idle");
+    return { providerReceived: false };
+  }
+
+  const controller = new AbortController();
+  state.activeGeneration = controller;
+  state.streamingMessage = {
+    id: `stream-${Date.now()}`,
+    role: "dm",
+    title: "DM",
+    body: "",
+    meta: "Streaming from local Ollama",
+    source: "ollama_stream",
+    createdAt: new Date().toISOString(),
+  };
+  elements.cancelGeneration.hidden = false;
+  elements.cancelGeneration.disabled = false;
+  setProviderActivity("Generating locally with Ollama...", "working");
+  render();
+
+  let responseText = "";
+  let providerReceived = false;
+
+  try {
+    const response = await fetch(apiProviderGenerateTurnUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        playerMessage: turn.playerMessage,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(await response.text());
+    }
+
+    for await (const event of readNdjsonResponse(response.body)) {
+      if (event.type === "start") {
+        providerReceived = true;
+        setProviderActivity(`Ollama generating with ${event.model}...`, "working");
+      } else if (event.type === "token") {
+        responseText += event.text ?? "";
+        state.streamingMessage.body = cleanProviderResponseForPlay(responseText);
+        renderPlayLog();
+      } else if (event.type === "done") {
+        responseText = event.result?.text ?? responseText;
+        state.streamingMessage = null;
+        const meta = event.result
+          ? `Ollama ${event.result.model}; ${Math.round((event.result.durationMs ?? 0) / 1000)}s; context ${event.result.contextSize ?? 0} chars`
+          : "";
+        await importProviderResponse(responseText, {
+          source: "ollama",
+          meta,
+        });
+        setProviderActivity(meta ? `Local response imported (${meta})` : "Local response imported", "idle");
+        return { providerReceived: true, imported: true };
+      } else if (event.type === "error") {
+        throw new Error(event.error || "Local provider generation failed.");
+      }
+    }
+
+    if (responseText.trim()) {
+      state.streamingMessage = null;
+      await importProviderResponse(responseText, { source: "ollama" });
+      return { providerReceived, imported: true };
+    }
+
+    throw new Error("Ollama returned no response text.");
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      setProviderActivity("Local generation canceled", "idle");
+      elements.bridgeStatus.textContent = "Local generation canceled";
+      state.streamingMessage = null;
+      render();
+      return { providerReceived, canceled: true };
+    }
+    setProviderActivity(error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed", "error");
+    elements.bridgeStatus.textContent = error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed";
+    state.streamingMessage = null;
+    render();
+    return { providerReceived: false, error };
+  } finally {
+    if (state.activeGeneration === controller) {
+      state.activeGeneration = null;
+    }
+    elements.cancelGeneration.hidden = true;
+    elements.cancelGeneration.disabled = true;
+  }
+}
+
+function cancelActiveGeneration() {
+  if (state.activeGeneration) {
+    state.activeGeneration.abort();
+  }
+}
+
+async function* readNdjsonResponse(body) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line) {
+        yield JSON.parse(line);
+      }
+      newlineIndex = buffer.indexOf("\n");
+    }
+  }
+
+  const final = buffer.trim();
+  if (final) {
+    yield JSON.parse(final);
+  }
+}
+
 async function importLatestProviderResponse({
   newerThanText = "",
   requireNewerThanLastImport = false,
@@ -1768,8 +2206,12 @@ function sendExtensionMessage(message, timeoutMs = 10000) {
 }
 
 function renderPlayLog() {
+  const messages = state.streamingMessage
+    ? [...state.playMessages, state.streamingMessage]
+    : state.playMessages;
+
   elements.playLog.replaceChildren(
-    ...state.playMessages.map((message) => {
+    ...messages.map((message) => {
       const wrapper = document.createElement("article");
       wrapper.className = `play-message ${message.role}`;
 

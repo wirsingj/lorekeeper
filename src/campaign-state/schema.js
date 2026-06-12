@@ -56,7 +56,14 @@ export function createEmptyCampaign(overrides = {}) {
     style: overrides.style ?? createDefaultStyleRules(),
     promptTemplates: overrides.promptTemplates ?? createDefaultPromptTemplateSettings(),
     recapTemplates: overrides.recapTemplates ?? createDefaultRecapTemplateSettings(),
-    providerSettings: overrides.providerSettings ?? createDefaultProviderSettings(),
+    providerSettings: {
+      ...createDefaultProviderSettings(),
+      ...(overrides.providerSettings ?? {}),
+      preferredProvider:
+        overrides.providerSettings?.preferredProvider === "chatgpt"
+          ? "bridge"
+          : overrides.providerSettings?.preferredProvider ?? createDefaultProviderSettings().preferredProvider,
+    },
     sourceDocuments: overrides.sourceDocuments ?? [],
     assets: overrides.assets ?? [],
     reviewLog: overrides.reviewLog ?? [],
@@ -159,7 +166,12 @@ export function createDefaultRecapTemplateSettings() {
 
 export function createDefaultProviderSettings() {
   return {
-    preferredProvider: "chatgpt",
+    preferredProvider: "bridge",
+    selectedModel: "llama3.1:8b",
+    generationTimeoutMs: 120000,
+    outputLimit: 900,
+    fastMode: false,
+    ollamaBaseUrl: "http://127.0.0.1:11434",
     bridgeMode: "manual_until_adapter_ready",
     requireExplicitTabSelection: true,
     automationVisible: true,

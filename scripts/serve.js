@@ -16,6 +16,16 @@ import { addChatMessage } from "../src/campaign-state/chat-history.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { upsertProviderConversation } from "../src/campaign-state/provider-conversations.js";
 import { commitReviewBatch } from "../src/storage/review-commit.js";
+import { buildContextPack } from "../src/context-packs/build-context-pack.js";
+import { contextPackKinds } from "../src/campaign-state/schema.js";
+import { parsePlayerMessage } from "../src/play-loop/player-message.js";
+import {
+  generateTurnWithProvider,
+  getCampaignProviderSettings,
+  getProviderStatusForCampaign,
+  updateCampaignProviderSettings,
+} from "../src/ai/provider-service.js";
+import { OllamaProvider } from "../src/ai/ollama-provider.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const port = Number(process.env.PORT ?? process.argv[2] ?? 4173);
@@ -126,6 +136,58 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/api/provider/status" && request.method === "GET") {
+      const { campaign } = await loadActiveCampaign(projectRoot);
+      sendJson(response, 200, await getProviderStatusForCampaign(campaign));
+      return;
+    }
+
+    if (url.pathname === "/api/provider/settings" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
+        campaign: updateCampaignProviderSettings(campaign, body),
+      }));
+      sendJson(response, 200, {
+        ...payload,
+        providerStatus: await getProviderStatusForCampaign(payload.campaign),
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/provider/generate-turn" && request.method === "POST") {
+      await streamProviderTurn(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/ollama/pull" && request.method === "POST") {
+      await streamOllamaPull(request, response);
+      return;
+    }
+
+    if (url.pathname === "/api/ollama/test" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const { campaign } = await loadActiveCampaign(projectRoot);
+      const settings = getCampaignProviderSettings(campaign);
+      const provider = new OllamaProvider({ baseUrl: settings.ollamaBaseUrl });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), settings.generationTimeoutMs);
+      response.on("close", () => {
+        if (!response.writableEnded) {
+          controller.abort();
+        }
+      });
+      try {
+        const result = await provider.testGeneration({
+          model: body.model || settings.selectedModel,
+          signal: controller.signal,
+        });
+        sendJson(response, 200, result);
+      } finally {
+        clearTimeout(timer);
+      }
+      return;
+    }
+
     if (url.pathname === "/api/review/commit" && request.method === "POST") {
       const body = await readJsonBody(request);
       const result = await commitReviewBatch(projectRoot, body.reviewBatch);
@@ -159,6 +221,130 @@ const server = createServer(async (request, response) => {
 server.listen(port, () => {
   console.log(`Lorekeeper local app: http://localhost:${port}`);
 });
+
+async function streamProviderTurn(request, response) {
+  const body = await readJsonBody(request);
+  const { campaign } = await loadActiveCampaign(projectRoot);
+  const settings = getCampaignProviderSettings(campaign);
+  const parsedMessage = parsePlayerMessage(body.playerMessage ?? "");
+  const contextPack = buildContextPack(campaign, {
+    purpose: settings.fastMode ? "fast_player_turn" : "player_turn",
+    includeCombatDetail: isCombatRelevant(parsedMessage),
+    kinds: settings.fastMode ? fastContextKinds() : undefined,
+  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), settings.generationTimeoutMs);
+  response.on("close", () => {
+    if (!response.writableEnded) {
+      controller.abort();
+    }
+  });
+
+  response.writeHead(200, {
+    "content-type": "application/x-ndjson; charset=utf-8",
+    ...noCacheHeaders,
+  });
+
+  try {
+    writeNdjson(response, {
+      type: "start",
+      provider: settings.preferredProvider,
+      model: settings.selectedModel,
+      fastMode: settings.fastMode,
+      contextSections: contextPack.sections.length,
+    });
+
+    const result = await generateTurnWithProvider({
+      campaign,
+      contextPack,
+      playerTurn: parsedMessage.inWorldText || body.playerMessage || "",
+      parsedMessage,
+      providerSettings: settings,
+      signal: controller.signal,
+      onToken: (token) => writeNdjson(response, { type: "token", text: token }),
+    });
+
+    writeNdjson(response, {
+      type: "done",
+      result: {
+        providerId: result.providerId,
+        model: result.model,
+        durationMs: result.durationMs,
+        contextSize: result.contextSize,
+        tokenCounts: result.tokenCounts,
+        text: result.text,
+      },
+    });
+  } catch (error) {
+    writeNdjson(response, {
+      type: "error",
+      error: error instanceof Error ? error.message : "Provider generation failed.",
+    });
+  } finally {
+    clearTimeout(timer);
+    response.end();
+  }
+}
+
+async function streamOllamaPull(request, response) {
+  const body = await readJsonBody(request);
+  const { campaign } = await loadActiveCampaign(projectRoot);
+  const settings = getCampaignProviderSettings(campaign);
+  const model = body.model || settings.selectedModel;
+  const provider = new OllamaProvider({ baseUrl: settings.ollamaBaseUrl });
+  const controller = new AbortController();
+  response.on("close", () => {
+    if (!response.writableEnded) {
+      controller.abort();
+    }
+  });
+
+  response.writeHead(200, {
+    "content-type": "application/x-ndjson; charset=utf-8",
+    ...noCacheHeaders,
+  });
+
+  try {
+    writeNdjson(response, { type: "start", model });
+    const result = await provider.pullModel({
+      model,
+      signal: controller.signal,
+      onProgress: (progress) => writeNdjson(response, { type: "progress", progress }),
+    });
+    writeNdjson(response, { type: "done", result });
+  } catch (error) {
+    writeNdjson(response, {
+      type: "error",
+      error: error instanceof Error ? error.message : "Ollama model pull failed.",
+    });
+  } finally {
+    response.end();
+  }
+}
+
+function writeNdjson(response, payload) {
+  response.write(`${JSON.stringify(payload)}\n`);
+}
+
+function isCombatRelevant(parsedMessage) {
+  const haystack = [
+    parsedMessage.inWorldText,
+    ...(parsedMessage.metaInstructions ?? []),
+  ].join(" ").toLowerCase();
+
+  return /\b(combat|fight|attack|spell|damage|hp|initiative|roll|enemy|weapon|cast|shoot|stab|strike)\b/.test(haystack);
+}
+
+function fastContextKinds() {
+  return [
+    contextPackKinds.SCENE,
+    contextPackKinds.HISTORY,
+    contextPackKinds.PARTY,
+    contextPackKinds.THREADS,
+    contextPackKinds.COMBAT,
+    contextPackKinds.STYLE,
+  ];
+}
 
 async function serveLocalAsset(url, response) {
   const assetPath = url.searchParams.get("path");

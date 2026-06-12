@@ -99,6 +99,9 @@ export function LorekeeperShell() {
         </section>
         <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
           <span id="provider-activity-label">Provider idle</span>
+          <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel generation" hidden>
+            Cancel
+          </button>
           <button id="recheck-provider" className="mini-action" type="button" title="Read latest provider response">
             Read Latest
           </button>
@@ -220,13 +223,51 @@ function SetupDialog() {
           <label>
             <span>Provider Mode</span>
             <select id="provider-mode">
-              <option>ChatGPT Tab</option>
+              <option value="ollama">Ollama Local</option>
+              <option value="bridge">ChatGPT Tab / Bridge</option>
               <option disabled>Claude Tab</option>
               <option disabled>ChatGPT API</option>
               <option disabled>Claude API</option>
               <option disabled>Manual</option>
             </select>
           </label>
+          <div className="local-ai-card">
+            <div className="status-line">
+              <span className="status-dot"></span>
+              <span id="ollama-status">Checking Ollama...</span>
+            </div>
+            <label>
+              <span>Local Model</span>
+              <select id="ollama-model">
+                <option value="llama3.1:8b">llama3.1:8b</option>
+                <option value="mistral-nemo">mistral-nemo</option>
+                <option value="qwen3:14b">qwen3:14b</option>
+              </select>
+            </label>
+            <div className="settings-grid">
+              <label>
+                <span>Timeout</span>
+                <input id="generation-timeout" type="number" min="10" step="5" defaultValue="120" />
+              </label>
+              <label>
+                <span>Output Tokens</span>
+                <input id="output-limit" type="number" min="128" step="64" defaultValue="900" />
+              </label>
+              <label className="check-row">
+                <input id="fast-mode" type="checkbox" />
+                <span>Fast Mode</span>
+              </label>
+            </div>
+            <div className="button-stack two-up">
+              <button id="refresh-ollama" type="button">Refresh Local AI</button>
+              <button id="test-ollama" type="button">Test Model</button>
+            </div>
+            <div className="pull-row">
+              <input id="pull-model-name" placeholder="model to download, e.g. llama3.1:8b" />
+              <button id="pull-ollama-model" type="button">Download</button>
+            </div>
+            <p id="ollama-benchmark" className="setup-note">Local AI status will appear here.</p>
+          </div>
           <div className="bridge-card">
             <div className="status-line">
               <span className="status-dot"></span>

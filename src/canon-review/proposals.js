@@ -1,3 +1,5 @@
+import { validateProposedChange } from "./validate-updates.js";
+
 export function createReviewBatch({ campaignId, source, rawResponse, proposedChanges }) {
   const decidedAt = new Date().toISOString();
   return {
@@ -8,12 +10,16 @@ export function createReviewBatch({ campaignId, source, rawResponse, proposedCha
     createdAt: decidedAt,
     decidedAt,
     rawResponse,
-    proposedChanges: proposedChanges.map((change, index) => ({
-      id: `change-${index + 1}`,
-      status: "approved",
-      decidedAt,
-      ...change,
-    })),
+    proposedChanges: proposedChanges.map((change, index) => {
+      const validation = validateProposedChange(change);
+      return {
+        id: `change-${index + 1}`,
+        ...change,
+        status: validation.valid ? "approved" : "rejected",
+        decidedAt,
+        validation,
+      };
+    }),
   };
 }
 
@@ -30,5 +36,8 @@ export function summarizeReviewBatch(batch) {
 }
 
 export function getCommittableChanges(batch) {
-  return batch.proposedChanges.filter((change) => change.status === "approved" || change.status === "edited");
+  return batch.proposedChanges.filter((change) => {
+    const validation = validateProposedChange(change);
+    return validation.valid && (change.status === "approved" || change.status === "edited");
+  });
 }
