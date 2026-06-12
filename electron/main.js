@@ -5,12 +5,14 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const port = Number(process.env.LOREKEEPER_PORT || 4173);
+const appIconPath = path.join(rootDir, "assets", "brand", "lorekeeper-icon.ico");
 let apiProcess = null;
 let mainWindow = null;
 
 async function createWindow() {
   await startApiServer();
   Menu.setApplicationMenu(null);
+  app.setAppUserModelId("LoreKeeper");
   const windowBounds = preferredWindowBounds();
 
   mainWindow = new BrowserWindow({
@@ -18,6 +20,7 @@ async function createWindow() {
     minWidth: 1120,
     minHeight: 720,
     title: "LoreKeeper",
+    icon: appIconPath,
     backgroundColor: "#171a1d",
     webPreferences: {
       preload: path.join(rootDir, "electron", "preload.js"),
