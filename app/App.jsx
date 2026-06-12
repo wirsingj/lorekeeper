@@ -97,6 +97,9 @@ export function LorekeeperShell() {
           </div>
           <div id="quest-list" className="binder-list"></div>
         </section>
+        <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
+          Provider idle
+        </div>
       </aside>
 
       <footer className="command-deck">
@@ -108,9 +111,6 @@ export function LorekeeperShell() {
           tabIndex="0"
           title="Resize input panel"
         ></div>
-        <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
-          Provider idle
-        </div>
         <form id="player-form" className="player-form">
           <label className="visually-hidden" htmlFor="player-input">Table Message</label>
           <div className="input-row">
