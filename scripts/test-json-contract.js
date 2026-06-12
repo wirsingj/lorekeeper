@@ -83,6 +83,7 @@ const requestEnvelope = buildTurnRequestEnvelope({
 assert.equal(requestEnvelope.type, "lorekeeper.turn.request");
 assert.equal(requestEnvelope.schemaVersion, 1);
 assert.equal(requestEnvelope.user.actionIntent, "skill_or_scene_check");
+assert.equal(requestEnvelope.generation.responseMode, "resolve_check");
 assert.equal(requestEnvelope.user.requestedRolls.length, 2);
 assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
@@ -95,6 +96,7 @@ const fastEnvelope = buildTurnRequestEnvelope({
   options: { mode: "fast" },
 });
 assert.equal(fastEnvelope.generation.mode, "fast");
+assert.equal(fastEnvelope.generation.responseMode, "turn");
 assert.ok(fastEnvelope.context.sections[0].entries.length <= 4);
 
 const combatEnvelope = buildTurnRequestEnvelope({
@@ -104,6 +106,7 @@ const combatEnvelope = buildTurnRequestEnvelope({
   parsedMessage: { raw: "I attack with my bow.", inWorldText: "I attack with my bow.", metaInstructions: [] },
 });
 assert.equal(combatEnvelope.generation.mode, "combat");
+assert.equal(combatEnvelope.generation.responseMode, "resolve_combat");
 assert.equal(combatEnvelope.context.scene.mode, "combat");
 assert.equal(combatEnvelope.context.party[0].hp, null);
 
@@ -132,16 +135,22 @@ assert.equal(partialStructured.ok, false);
 assert.equal(partialStructured.response.proposedChanges.length, 0);
 
 const invalidRole = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
-  table: [{ speaker: "DM", speakerId: null, role: "wizard", kind: "narration", text: "Bad role." }],
+  table: [{ speaker: "DM", speakerId: null, role: "wizard", kind: "narration", visibility: "table", text: "Bad role." }],
 })));
 assert.equal(invalidRole.ok, false);
 assert.match(invalidRole.error, /table\[0\]\.role/);
 
 const invalidKind = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
-  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "cutscene", text: "Bad kind." }],
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "cutscene", visibility: "table", text: "Bad kind." }],
 })));
 assert.equal(invalidKind.ok, false);
 assert.match(invalidKind.error, /table\[0\]\.kind/);
+
+const invalidTableVisibility = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "secret_player", text: "Bad visibility." }],
+})));
+assert.equal(invalidTableVisibility.ok, false);
+assert.match(invalidTableVisibility.error, /table\[0\]\.visibility/);
 
 const invalidOperation = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   proposedChanges: [{ ...validChange(), operation: "teleport" }],
@@ -177,7 +186,7 @@ assert.match(majorWithoutReview.error, /importance major/);
 const dmOnlyTable = renderTurnResponseForImport(validTurnResponse({
   table: [
     { speaker: "DM", speakerId: null, role: "dm", kind: "aside", text: "Secret.", visibility: "dm_only" },
-    { speaker: "DM", speakerId: null, role: "dm", kind: "narration", text: "Visible." },
+    { speaker: "DM", speakerId: null, role: "dm", kind: "narration", text: "Visible.", visibility: "table" },
   ],
 }));
 assert.doesNotMatch(dmOnlyTable, /Secret/);
@@ -237,7 +246,7 @@ function validTurnResponse(overrides = {}) {
     type: "lorekeeper.turn.response",
     schemaVersion: 1,
     requestId: "turn-test",
-    table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", text: "A branch snaps ahead." }],
+    table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "A branch snaps ahead." }],
     sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
     choices: {
       prompt: "What does Jarin do?",

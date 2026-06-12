@@ -62,10 +62,14 @@ Normal mode sends:
 - nearby entities
 - combat/style/rules sections when relevant
 
-Fast mode trims section entries and choice limits.
+Fast mode trims section entries and choice limits. It is separate from `generation.responseMode`, which describes the job the model is doing: `turn`, `continue`, `resolve_check`, `resolve_combat`, or `summarize`.
 
 Combat mode allows more character/resource detail.
+
+The app should keep request JSON lean by sending retrieved context sections instead of the whole campaign. The embedded response schema remains in v1 prompts for local model reliability; a future provider layer can move stable schema instructions into a reusable system prompt to reduce per-turn tokens.
 
 ## Provider Notes
 
 Ollama uses JSON mode (`format: "json"`) and receives the request as a compact JSON envelope. Browser bridge compatibility remains available, but the target path is provider-independent JSON in and JSON out.
+
+The app derives secondary state such as `hasProposedChanges` from the response instead of asking the model to self-report it. Per-change confidence and `warnings` are the preferred way to surface uncertainty.

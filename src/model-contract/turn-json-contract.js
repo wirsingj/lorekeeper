@@ -10,10 +10,12 @@ const allowedActionIntents = new Set([
   "freeform_table_action",
 ]);
 const allowedGenerationModes = new Set(["normal", "fast", "combat", "summary"]);
+const allowedResponseModes = new Set(["turn", "continue", "resolve_check", "resolve_combat", "summarize"]);
 const allowedSceneModes = new Set(["social", "exploration", "combat", "downtime", "travel"]);
 const allowedDangerLevels = new Set(["none", "tense", "immediate", "combat"]);
 const allowedTableRoles = new Set(["dm", "player", "party", "npc", "system"]);
 const allowedTableKinds = new Set(["narration", "dialogue", "action", "mechanics", "status", "aside"]);
+const allowedTableVisibility = new Set(["table", "dm_only", "party"]);
 const allowedMechanicTypes = new Set(["suggested_check", "check", "save", "attack", "damage", "initiative", "resource_note", "status", "none"]);
 const allowedMechanicOutcomes = new Set(["success", "failure", "mixed", "pending", "none"]);
 const allowedOperations = new Set(["add", "update", "remove", "note"]);
@@ -69,6 +71,7 @@ export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedM
 
 export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, parsedMessage, options = {} } = {}) {
   const mode = normalizeEnum(options.mode, allowedGenerationModes, inferGenerationMode(campaign, parsedMessage, options));
+  const responseMode = normalizeEnum(options.responseMode, allowedResponseModes, inferResponseMode(campaign, parsedMessage, options));
   const request = {
     type: REQUEST_TYPE,
     schemaVersion: SCHEMA_VERSION,
@@ -97,6 +100,7 @@ export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, pa
     },
     generation: {
       mode,
+      responseMode,
       maxTableEntries: mode === "fast" ? 4 : 8,
       maxChoices: mode === "fast" ? 4 : 6,
       allowMechanics: true,
@@ -215,6 +219,7 @@ export function validateTurnRequest(request) {
   requireEnum(request.user?.actionIntent, "user.actionIntent", allowedActionIntents, errors);
   requireObject(request.generation, "generation", errors);
   requireEnum(request.generation?.mode, "generation.mode", allowedGenerationModes, errors);
+  requireEnum(request.generation?.responseMode, "generation.responseMode", allowedResponseModes, errors);
   requireObject(request.context, "context", errors);
   requireObject(request.context?.scene, "context.scene", errors);
   requireEnum(request.context?.scene?.mode, "context.scene.mode", allowedSceneModes, errors);
@@ -245,6 +250,7 @@ export function validateTurnResponse(response, options = {}) {
     requireString(entry, `table[${index}].speaker`, errors);
     requireEnum(entry.role, `table[${index}].role`, allowedTableRoles, errors);
     requireEnum(entry.kind, `table[${index}].kind`, allowedTableKinds, errors);
+    requireEnum(entry.visibility, `table[${index}].visibility`, allowedTableVisibility, errors);
     requireString(entry, `table[${index}].text`, errors);
   }
 
@@ -301,6 +307,7 @@ function createResponseFormatSchema() {
           speakerId: null,
           role: "dm|player|party|npc|system",
           kind: "narration|dialogue|action|mechanics|status|aside",
+          visibility: "table|dm_only|party",
           text: "player-facing table chat text",
         },
       ],
@@ -371,7 +378,7 @@ function normalizeTurnResponse(response, options = {}) {
     type: response.type || RESPONSE_TYPE,
     schemaVersion: Number(response.schemaVersion) || SCHEMA_VERSION,
     requestId: response.requestId || options.expectedRequestId || "",
-    table: table.length ? table : [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", text: fallbackNarration(response) }],
+    table: table.length ? table : [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: fallbackNarration(response) }],
     sceneStatus,
     choices,
     mechanics,
@@ -386,7 +393,7 @@ function createFallbackResponse({ requestId = "", text, warning }) {
     type: RESPONSE_TYPE,
     schemaVersion: SCHEMA_VERSION,
     requestId,
-    table: [{ speaker: "System", speakerId: null, role: "system", kind: "status", text }],
+    table: [{ speaker: "System", speakerId: null, role: "system", kind: "status", visibility: "table", text }],
     sceneStatus: { mode: "social", danger: "none", awaitingPlayer: true },
     choices: { prompt: "The model response needs recovery. What would you like to do?", options: [], allowOther: true },
     mechanics: [],
@@ -398,7 +405,7 @@ function createFallbackResponse({ requestId = "", text, warning }) {
 
 function normalizeTableEntry(entry) {
   if (typeof entry === "string") {
-    return { speaker: "DM", speakerId: null, role: "dm", kind: "narration", text: compactWhitespace(entry) };
+    return { speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: compactWhitespace(entry) };
   }
 
   return {
@@ -406,9 +413,14 @@ function normalizeTableEntry(entry) {
     speakerId: entry?.speakerId ?? null,
     role: compactWhitespace(entry?.role || ""),
     kind: compactWhitespace(entry?.kind || ""),
+    visibility: normalizeTableVisibility(entry?.visibility),
     text: compactWhitespace(entry?.text || entry?.body || ""),
-    visibility: entry?.visibility === "dm_only" ? "dm_only" : "player_visible",
   };
+}
+
+function normalizeTableVisibility(value) {
+  const text = compactWhitespace(value || "");
+  return text || "table";
 }
 
 function normalizeSceneStatus(sceneStatus = {}) {
@@ -568,6 +580,22 @@ function inferGenerationMode(campaign, parsedMessage, options = {}) {
     return "combat";
   }
   return "normal";
+}
+
+function inferResponseMode(campaign, parsedMessage, options = {}) {
+  if (options.responseMode) {
+    return options.responseMode;
+  }
+  if (options.mode === "summary") {
+    return "summarize";
+  }
+  if (campaign.combat?.inCombat || inferActionIntent(parsedMessage?.inWorldText ?? "") === "combat_action") {
+    return "resolve_combat";
+  }
+  if (inferRequestedRolls(parsedMessage?.raw ?? "").length > 0) {
+    return "resolve_check";
+  }
+  return "turn";
 }
 
 function inferSceneMode(campaign, options = {}) {

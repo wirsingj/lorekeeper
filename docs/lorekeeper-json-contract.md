@@ -41,6 +41,7 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
           "speakerId": null,
           "role": "dm|player|party|npc|system",
           "kind": "narration|dialogue|action|mechanics|status|aside",
+          "visibility": "table|dm_only|party",
           "text": "player-facing table chat text"
         }
       ],
@@ -107,6 +108,7 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
   },
   "generation": {
     "mode": "normal|fast|combat|summary",
+    "responseMode": "turn|continue|resolve_check|resolve_combat|summarize",
     "maxTableEntries": 8,
     "maxChoices": 6,
     "allowMechanics": true,
@@ -171,6 +173,7 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
       "speakerId": null,
       "role": "dm",
       "kind": "narration",
+      "visibility": "table",
       "text": "The tavern door opens, and the room goes quiet."
     },
     {
@@ -178,6 +181,7 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
       "speakerId": "roderic-vale",
       "role": "party",
       "kind": "dialogue",
+      "visibility": "table",
       "text": "\"I'll watch the door.\""
     }
   ],
@@ -242,6 +246,8 @@ Allowed table roles: `dm`, `player`, `party`, `npc`, `system`.
 
 Allowed table kinds: `narration`, `dialogue`, `action`, `mechanics`, `status`, `aside`.
 
+Allowed table visibility values: `table`, `dm_only`, `party`.
+
 Allowed mechanic types: `suggested_check`, `check`, `save`, `attack`, `damage`, `initiative`, `resource_note`, `status`, `none`.
 
 Allowed operations: `add`, `update`, `remove`, `note`.
@@ -250,11 +256,25 @@ Allowed domains: `party`, `people`, `factions`, `places`, `items`, `inventory`, 
 
 Allowed importance values: `minor`, `normal`, `major`.
 
-Allowed visibility values: `player_visible`, `dm_only`, `system_only`.
+Allowed proposed change visibility values: `player_visible`, `dm_only`, `system_only`.
 
 Major proposed changes require `flags.requiresReview: true`.
 
 When validation fails, LoreKeeper quarantines proposed changes, renders a recoverable status, and reports a contract warning.
+
+## Contract Review Decisions
+
+These notes capture the v1 review choices so the contract stays stable and lean.
+
+- `generation.responseMode`: accepted in v1. This separates the task type from context size. `generation.mode` controls budget/shape; `responseMode` tells the model whether the app wants a normal turn, continuation, check resolution, combat resolution, or summary.
+- Human-readable choice IDs: deferred to v1.1 as app-owned presentation. The model may return simple ids such as `"1"`, and the UI can render richer labels later without spending model tokens.
+- Table entry visibility: accepted in v1 with the small enum `table|dm_only|party`. Player-specific audiences are a multiplayer v1.1 feature.
+- Speaker entity references: kept as optional `speakerId` in v1. The app should fill or resolve stable ids where possible, but the model is not required to invent ids.
+- `flags.hasProposedChanges`: rejected as a model field. The app derives it from `proposedChanges.length` to avoid drift.
+- `responseConfidence`: rejected for v1. Per-change confidence plus `warnings` is enough signal without adding noisy self-scoring.
+- Renaming `mechanics` to `suggestedMechanics`: rejected for v1. The field remains `mechanics`; entries are suggestions unless the request explicitly asks the model to resolve a provided roll/combat event.
+- `contextUsed`: deferred to v1.1 as app-generated debug instrumentation. The provider should not echo retrieval bookkeeping into every response.
+- Replacing the embedded `responseFormat.schema` with only `schemaVersion`: deferred to provider-layer optimization. The full schema/rules stay in v1 prompts because local models benefit from the extra structure.
 
 ## Legacy Bridge Compatibility
 

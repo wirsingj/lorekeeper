@@ -47,6 +47,8 @@ The player-facing chat view is rendered from `response.table`.
 
 Entries with `visibility: "dm_only"` are not rendered as player-facing table messages.
 
+Missing table visibility defaults to `table`; unknown visibility values fail validation. The v1 visibility enum is intentionally small: `table`, `party`, and `dm_only`.
+
 Choices are rendered from `response.choices`, not inferred from prose.
 
 Mechanics are rendered from `response.mechanics`, with suggested checks preferred when the app has not provided exact stats.
@@ -66,6 +68,7 @@ Mechanics are rendered from `response.mechanics`, with suggested checks preferre
 - malformed/partial JSON
 - invalid role
 - invalid kind
+- invalid table visibility
 - invalid operation
 - invalid domain
 - request id mismatch

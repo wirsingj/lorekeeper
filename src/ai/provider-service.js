@@ -79,7 +79,17 @@ export async function generateTurnWithProvider({
       fastMode: settings.fastMode,
     },
   });
-  const prompt = buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedMessage, options: { requestId: request.requestId, mode: request.generation.mode } });
+  const prompt = buildTurnJsonPrompt({
+    campaign,
+    contextPack,
+    playerTurn,
+    parsedMessage,
+    options: {
+      requestId: request.requestId,
+      mode: request.generation.mode,
+      responseMode: request.generation.responseMode,
+    },
+  });
 
   const provider = new OllamaProvider({ baseUrl: settings.ollamaBaseUrl });
   const result = await provider.generateTurn({
