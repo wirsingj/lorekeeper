@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createReviewBatch, getCommittableChanges } from "../src/canon-review/proposals.js";
+import {
+  buildTurnRequestEnvelope,
+  parseTurnJsonResponse,
+  renderTurnResponseForImport,
+} from "../src/model-contract/turn-json-contract.js";
 
 const validResponse = [
   "The room goes quiet.",
@@ -62,5 +67,65 @@ const streamed = [
 const streamedParsed = extractLorekeeperUpdates(streamed);
 assert.equal(streamedParsed.proposedChanges.length, 1);
 assert.equal(streamedParsed.proposedChanges[0].domain, "scene");
+
+const requestEnvelope = buildTurnRequestEnvelope({
+  campaign: {
+    id: "test-campaign",
+    title: "Test Campaign",
+    summary: "A compact test campaign.",
+    scene: {
+      status: "active",
+      currentPlaceId: "forest",
+      presentPeopleIds: ["trainer"],
+      presentPartyMemberIds: ["jarin"],
+      activeQuestIds: ["flag-test"],
+    },
+    party: [
+      {
+        id: "jarin",
+        name: "Jarin",
+        role: "Player character ranger",
+        skills: ["Perception", "Stealth"],
+        notes: ["Training scout."],
+      },
+    ],
+  },
+  contextPack: {
+    sections: [
+      {
+        kind: "current_scene",
+        title: "Current Scene",
+        entries: ["Jarin and Kevric are running through the forest toward a training camp."],
+      },
+    ],
+  },
+  playerTurn: "I roll d20+3 perception to spot the other trainee. (Keep it tense.)",
+  parsedMessage: {
+    raw: "I roll d20+3 perception to spot the other trainee. (Keep it tense.)",
+    inWorldText: "I roll d20+3 perception to spot the other trainee.",
+    metaInstructions: ["Keep it tense."],
+  },
+});
+assert.equal(requestEnvelope.lorekeeperRequest, "turn-json-v1");
+assert.equal(requestEnvelope.user.actionIntent, "skill_or_scene_check");
+assert.equal(requestEnvelope.user.requestedRolls.length, 2);
+assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
+
+const structured = parseTurnJsonResponse(JSON.stringify({
+  lorekeeperResponse: "turn-json-v1",
+  table: [{ speaker: "DM", role: "dm", text: "A branch snaps ahead." }],
+  choices: {
+    prompt: "What does Jarin do?",
+    options: [{ id: "1", text: "Drop low and listen." }],
+    allowOther: true,
+  },
+  mechanics: [{ type: "check", actor: "Jarin", roll: "d20+3", dc: 12, outcome: "pending", label: "Perception", text: "Roll if Jarin pauses to locate the sound." }],
+  proposedChanges: [],
+}));
+assert.equal(structured.error, null);
+const renderedStructured = renderTurnResponseForImport(structured.response);
+assert.match(renderedStructured, /A branch snaps ahead/);
+assert.match(renderedStructured, /Perception: Roll if Jarin pauses/);
+assert.match(renderedStructured, /```json lorekeeper_updates/);
 
 console.log("Lorekeeper JSON contract tests passed.");

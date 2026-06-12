@@ -101,6 +101,7 @@ export class OllamaProvider {
         model: model.trim(),
         prompt,
         stream: true,
+        format: options.format,
         keep_alive: options.keepAlive ?? "10m",
         options: {
           num_predict: options.outputLimit ?? 900,

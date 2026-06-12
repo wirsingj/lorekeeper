@@ -1,4 +1,8 @@
-import { buildSidecarPrompt } from "../prompt-builder/build-prompt.js";
+import {
+  buildTurnJsonPrompt,
+  parseTurnJsonResponse,
+  renderTurnResponseForImport,
+} from "../model-contract/turn-json-contract.js";
 import { OllamaProvider } from "./ollama-provider.js";
 import {
   mergeProviderRuntimeSettings,
@@ -64,15 +68,15 @@ export async function generateTurnWithProvider({
     throw new Error("Server generation currently supports the Ollama provider. Bridge generation stays in the renderer extension adapter.");
   }
 
-  const prompt = buildSidecarPrompt({
+  const prompt = buildTurnJsonPrompt({
     campaign,
     contextPack,
-    userIntent: playerTurn || "No in-world action supplied this turn.",
-    metaInstructions: parsedMessage?.metaInstructions ?? [],
+    playerTurn: playerTurn || "No in-world action supplied this turn.",
+    parsedMessage,
   });
 
   const provider = new OllamaProvider({ baseUrl: settings.ollamaBaseUrl });
-  return provider.generateTurn({
+  const result = await provider.generateTurn({
     prompt,
     model: settings.selectedModel,
     signal,
@@ -80,7 +84,17 @@ export async function generateTurnWithProvider({
     onEvent,
     options: {
       outputLimit: settings.fastMode ? Math.min(settings.outputLimit, 550) : settings.outputLimit,
-      temperature: settings.fastMode ? 0.65 : 0.75,
+      temperature: settings.fastMode ? 0.45 : 0.6,
+      format: "json",
     },
   });
+
+  const parsed = parseTurnJsonResponse(result.text);
+  return {
+    ...result,
+    text: renderTurnResponseForImport(parsed.response),
+    structured: parsed.response,
+    parseError: parsed.error,
+    rawText: result.text,
+  };
 }

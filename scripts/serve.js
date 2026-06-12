@@ -274,6 +274,7 @@ async function streamProviderTurn(request, response) {
         contextSize: result.contextSize,
         tokenCounts: result.tokenCounts,
         text: result.text,
+        parseError: result.parseError,
       },
     });
   } catch (error) {
