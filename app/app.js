@@ -21,6 +21,7 @@ const apiCampaignMessageUrl = "/api/campaign/message";
 const apiProviderConversationUrl = "/api/provider/conversation";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
+const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -105,6 +106,7 @@ const elements = {
   responseImport: document.querySelector("#response-import"),
   pasteResponse: document.querySelector("#paste-response"),
   importResponse: document.querySelector("#import-response"),
+  commandResizeHandle: document.querySelector("#command-resize-handle"),
   reviewList: document.querySelector("#review-list"),
   reviewCount: document.querySelector("#review-count"),
   recordDialog: document.querySelector("#record-dialog"),
@@ -232,6 +234,8 @@ elements.loadImported.addEventListener("click", async () => {
 elements.importResponse.addEventListener("click", async () => {
   await importProviderResponse(elements.responseImport.value.trim());
 });
+
+setupCommandDeckResize();
 
 elements.pasteResponse.addEventListener("click", async () => {
   try {
@@ -1388,6 +1392,98 @@ function setProviderActivity(message, status = "idle") {
 
   elements.providerActivity.textContent = message;
   elements.providerActivity.dataset.state = status;
+}
+
+function setupCommandDeckResize() {
+  const handle = elements.commandResizeHandle;
+  if (!handle) {
+    return;
+  }
+
+  let startY = 0;
+  let startHeight = 0;
+
+  setCommandDeckHeight(readStoredCommandDeckHeight());
+
+  handle.addEventListener("pointerdown", (event) => {
+    startY = event.clientY;
+    startHeight = currentCommandDeckHeight();
+    handle.setPointerCapture(event.pointerId);
+    document.body.classList.add("resizing-command-deck");
+    document.querySelector(".command-deck")?.classList.add("resizing");
+    event.preventDefault();
+  });
+
+  handle.addEventListener("pointermove", (event) => {
+    if (!handle.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+
+    setCommandDeckHeight(startHeight + startY - event.clientY, true);
+  });
+
+  handle.addEventListener("pointerup", (event) => {
+    if (handle.hasPointerCapture(event.pointerId)) {
+      handle.releasePointerCapture(event.pointerId);
+    }
+    finishCommandDeckResize();
+  });
+
+  handle.addEventListener("pointercancel", finishCommandDeckResize);
+
+  handle.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+      return;
+    }
+
+    event.preventDefault();
+    const delta = event.key === "ArrowUp" ? 12 : -12;
+    setCommandDeckHeight(currentCommandDeckHeight() + delta, true);
+  });
+
+  window.addEventListener("resize", () => {
+    setCommandDeckHeight(currentCommandDeckHeight(), true);
+  });
+}
+
+function finishCommandDeckResize() {
+  document.body.classList.remove("resizing-command-deck");
+  document.querySelector(".command-deck")?.classList.remove("resizing");
+  localStorage.setItem(commandDeckHeightStorageKey, String(currentCommandDeckHeight()));
+}
+
+function readStoredCommandDeckHeight() {
+  const stored = Number(localStorage.getItem(commandDeckHeightStorageKey));
+  return Number.isFinite(stored) ? stored : 120;
+}
+
+function currentCommandDeckHeight() {
+  const rawValue = getComputedStyle(document.documentElement).getPropertyValue("--command-deck-height");
+  const parsed = Number.parseFloat(rawValue);
+  return Number.isFinite(parsed) ? parsed : readStoredCommandDeckHeight();
+}
+
+function setCommandDeckHeight(value, persist = false) {
+  const height = clampCommandDeckHeight(value);
+  document.documentElement.style.setProperty("--command-deck-height", `${height}px`);
+  elements.commandResizeHandle?.setAttribute("aria-valuenow", String(height));
+  elements.commandResizeHandle?.setAttribute("aria-valuemin", String(commandDeckMinHeight()));
+  elements.commandResizeHandle?.setAttribute("aria-valuemax", String(commandDeckMaxHeight()));
+  if (persist) {
+    localStorage.setItem(commandDeckHeightStorageKey, String(height));
+  }
+}
+
+function clampCommandDeckHeight(value) {
+  return Math.min(commandDeckMaxHeight(), Math.max(commandDeckMinHeight(), Math.round(Number(value) || 120)));
+}
+
+function commandDeckMinHeight() {
+  return 92;
+}
+
+function commandDeckMaxHeight() {
+  return Math.max(140, Math.round(window.innerHeight * 0.42));
 }
 
 let activeProgressTimers = [];

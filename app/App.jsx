@@ -100,6 +100,14 @@ export function LorekeeperShell() {
       </aside>
 
       <footer className="command-deck">
+        <div
+          id="command-resize-handle"
+          className="command-resize-handle"
+          role="separator"
+          aria-orientation="horizontal"
+          tabIndex="0"
+          title="Resize input panel"
+        ></div>
         <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
           Provider idle
         </div>

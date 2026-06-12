@@ -14,6 +14,7 @@
   --copper: #a8845b;
   --red: #b36862;
   --shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  --command-deck-height: 120px;
 }
 
 * {
@@ -47,7 +48,7 @@ textarea {
   height: 100vh;
   display: grid;
   grid-template-columns: 260px minmax(520px, 1fr) 320px;
-  grid-template-rows: minmax(0, 1fr) 120px;
+  grid-template-rows: minmax(0, 1fr) var(--command-deck-height);
   grid-template-areas:
     "left screen right"
     "bottom bottom bottom";
@@ -724,12 +725,12 @@ button.danger-button:disabled {
 
 .command-deck {
   grid-area: bottom;
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   column-gap: 10px;
-  row-gap: 6px;
-  padding: 10px 14px 16px;
+  padding: 16px 14px 18px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 38%),
     var(--stone-dark);
@@ -739,10 +740,38 @@ button.danger-button:disabled {
   overflow: hidden;
 }
 
+.command-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 10px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.command-resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 74px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(174, 191, 202, 0.22);
+  transform: translateX(-50%);
+}
+
+.command-resize-handle:hover::before,
+.command-resize-handle:focus-visible::before,
+.command-deck.resizing .command-resize-handle::before {
+  background: rgba(125, 213, 201, 0.58);
+}
+
 .provider-activity {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
+  position: absolute;
+  top: 13px;
+  right: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -779,8 +808,10 @@ button.danger-button:disabled {
 .player-form {
   display: grid;
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 1;
   gap: 0;
+  height: 100%;
+  min-height: 0;
 }
 
 .player-form label,
@@ -795,6 +826,8 @@ button.danger-button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: stretch;
+  height: 100%;
+  min-height: 0;
 }
 
 textarea {
@@ -811,11 +844,22 @@ textarea {
 }
 
 #player-input {
-  height: 64px;
+  height: 100%;
   min-height: 0;
+  resize: none;
   background: #15191d;
   color: #f2f6f8;
   font-size: 0.94rem;
+}
+
+#build-turn {
+  width: 108px;
+  margin-top: 24px;
+}
+
+.resizing-command-deck {
+  cursor: ns-resize;
+  user-select: none;
 }
 
 #player-input::placeholder,
