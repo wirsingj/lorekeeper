@@ -179,7 +179,7 @@ function RecordDialog() {
 
 function CampaignDialog() {
   return (
-    <dialog id="campaign-dialog" className="record-dialog">
+    <dialog id="campaign-dialog" className="record-dialog campaign-dialog">
       <form id="campaign-form" method="dialog">
         <header className="dialog-header">
           <div>
@@ -188,16 +188,77 @@ function CampaignDialog() {
           </div>
           <button id="close-campaign-dialog" className="icon-action" type="button" title="Close">x</button>
         </header>
-        <label>
-          <span>Campaign name</span>
-          <input id="new-campaign-title" autoComplete="off" required defaultValue="New Campaign Binder" />
-        </label>
-        <label>
-          <span>Premise</span>
-          <textarea id="new-campaign-premise" rows="5" defaultValue="A new D&D 5e-lite campaign ready to grow through play."></textarea>
-        </label>
+
+        <section className="campaign-wizard-section">
+          <div className="wizard-heading">
+            <span>Campaign Seed</span>
+          </div>
+          <div className="campaign-wizard-grid">
+            <label>
+              <span>Campaign name</span>
+              <input id="new-campaign-title" autoComplete="off" required defaultValue="New Campaign Binder" />
+            </label>
+            <label>
+              <span>Starting place</span>
+              <input id="new-campaign-starting-location" autoComplete="off" placeholder="Tavern, forest road, ruined keep..." />
+            </label>
+          </div>
+          <label>
+            <span>Opening prompt</span>
+            <textarea
+              id="new-campaign-premise"
+              rows="5"
+              placeholder="Describe the adventure you want to start. This becomes the first prompt LoreKeeper sends to the DM."
+            ></textarea>
+          </label>
+          <label>
+            <span>Tone / style</span>
+            <input
+              id="new-campaign-tone"
+              autoComplete="off"
+              placeholder="tense heist fantasy, cozy exploration, political intrigue..."
+            />
+          </label>
+        </section>
+
+        <section className="campaign-wizard-section">
+          <div className="wizard-heading">
+            <span>Player Character</span>
+          </div>
+          <div className="campaign-wizard-grid">
+            <label>
+              <span>Name</span>
+              <input id="new-character-name" autoComplete="off" placeholder="Evelynn, Jarin, Rowan..." />
+            </label>
+            <label>
+              <span>Ancestry</span>
+              <input id="new-character-ancestry" autoComplete="off" placeholder="Elf, human, dwarf..." />
+            </label>
+            <label>
+              <span>Class / role</span>
+              <input id="new-character-class" autoComplete="off" placeholder="Druid, thief, ranger, fighter..." />
+            </label>
+            <label>
+              <span>Level</span>
+              <input id="new-character-level" inputMode="numeric" defaultValue="1" />
+            </label>
+          </div>
+          <label>
+            <span>Concept</span>
+            <textarea
+              id="new-character-concept"
+              rows="3"
+              placeholder="A quick background, goal, personality hook, or secret."
+            ></textarea>
+          </label>
+          <label className="check-row">
+            <input id="new-character-auto-sheet" type="checkbox" defaultChecked />
+            <span>Auto-fill a 5E-lite sheet from these basics</span>
+          </label>
+        </section>
+
         <footer className="dialog-actions">
-          <button type="submit">Create Campaign</button>
+          <button type="submit">Create And Start</button>
         </footer>
       </form>
     </dialog>
@@ -348,6 +409,9 @@ function CharacterSheetDialog() {
               <span>Role</span>
               <input id="sheet-role" autoComplete="off" placeholder="Player character, scout, loyalist..." />
             </label>
+            <button id="auto-fill-character-sheet" className="secondary-action sheet-helper-button" type="button">
+              Auto-Fill 5E Lite
+            </button>
           </article>
 
           <article className="sheet-card vitals-card">

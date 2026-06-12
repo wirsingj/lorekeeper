@@ -1102,8 +1102,43 @@ textarea::placeholder {
   width: min(580px, calc(100vw - 32px));
 }
 
+.campaign-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+
 .character-sheet-dialog {
   width: min(980px, calc(100vw - 32px));
+}
+
+.campaign-wizard-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(174, 191, 202, 0.13);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 46%),
+    rgba(10, 13, 15, 0.26);
+}
+
+.wizard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wizard-heading span {
+  color: var(--steel);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.campaign-wizard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
 }
 
 .sheet-subtitle {
@@ -1211,6 +1246,10 @@ textarea::placeholder {
   font-weight: 850;
 }
 
+.sheet-helper-button {
+  justify-self: start;
+}
+
 .setup-section {
   display: grid;
   gap: 10px;
@@ -1245,6 +1284,15 @@ textarea::placeholder {
   font-size: 0.78rem;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.record-dialog label.check-row {
+  display: flex;
+  text-transform: none;
+}
+
+.record-dialog label.check-row input {
+  width: auto;
 }
 
 .record-dialog input,

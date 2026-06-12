@@ -94,6 +94,7 @@ const elements = {
   sheetAbilities: document.querySelector("#sheet-abilities"),
   sheetSpells: document.querySelector("#sheet-spells"),
   sheetNotes: document.querySelector("#sheet-notes"),
+  autoFillCharacterSheet: document.querySelector("#auto-fill-character-sheet"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
   peopleList: document.querySelector("#people-list"),
@@ -153,6 +154,14 @@ const elements = {
   campaignForm: document.querySelector("#campaign-form"),
   newCampaignTitle: document.querySelector("#new-campaign-title"),
   newCampaignPremise: document.querySelector("#new-campaign-premise"),
+  newCampaignStartingLocation: document.querySelector("#new-campaign-starting-location"),
+  newCampaignTone: document.querySelector("#new-campaign-tone"),
+  newCharacterName: document.querySelector("#new-character-name"),
+  newCharacterAncestry: document.querySelector("#new-character-ancestry"),
+  newCharacterClass: document.querySelector("#new-character-class"),
+  newCharacterLevel: document.querySelector("#new-character-level"),
+  newCharacterConcept: document.querySelector("#new-character-concept"),
+  newCharacterAutoSheet: document.querySelector("#new-character-auto-sheet"),
   closeCampaignDialog: document.querySelector("#close-campaign-dialog"),
   confirmDialog: document.querySelector("#confirm-dialog"),
   confirmForm: document.querySelector("#confirm-form"),
@@ -203,6 +212,10 @@ elements.closeCharacterSheet.addEventListener("click", () => {
 elements.characterSheetForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   await saveCharacterSheet();
+});
+
+elements.autoFillCharacterSheet.addEventListener("click", () => {
+  autoFillOpenCharacterSheet();
 });
 
 elements.campaignSelect.addEventListener("change", async () => {
@@ -333,6 +346,16 @@ elements.campaignForm.addEventListener("submit", async (event) => {
   await createNewCampaign({
     title: elements.newCampaignTitle.value,
     premise: elements.newCampaignPremise.value,
+    startingLocation: elements.newCampaignStartingLocation.value,
+    tone: elements.newCampaignTone.value,
+    playerCharacter: {
+      name: elements.newCharacterName.value,
+      ancestry: elements.newCharacterAncestry.value,
+      characterClass: elements.newCharacterClass.value,
+      level: elements.newCharacterLevel.value,
+      concept: elements.newCharacterConcept.value,
+      autoSheet: elements.newCharacterAutoSheet.checked,
+    },
   });
 });
 
@@ -489,9 +512,24 @@ async function selectCampaignByPath(sqlitePath) {
   }
 }
 
-async function createNewCampaign({ title, premise }) {
-  const trimmedTitle = title.trim() || "New Campaign Binder";
-  const trimmedPremise = premise.trim() || "A new D&D 5e-lite campaign ready to grow through play.";
+async function createNewCampaign({ title, premise, startingLocation, tone, playerCharacter }) {
+  const trimmedTitle = String(title ?? "").trim() || "New Campaign Binder";
+  const trimmedPremise = String(premise ?? "").trim() || "Start a new D&D 5e-lite campaign. Ask for missing essentials, then open with a playable scene.";
+  const trimmedStartingLocation = String(startingLocation ?? "").trim();
+  const trimmedTone = String(tone ?? "").trim();
+  const characterSeed = normalizeWizardCharacter(playerCharacter);
+  const openingPrompt = buildCampaignOpeningPrompt({
+    title: trimmedTitle,
+    premise: trimmedPremise,
+    startingLocation: trimmedStartingLocation,
+    tone: trimmedTone,
+    character: characterSeed,
+  });
+  const openingScene = buildOpeningSceneSummary({
+    premise: trimmedPremise,
+    startingLocation: trimmedStartingLocation,
+    character: characterSeed,
+  });
   try {
     elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
     setProviderActivity("Creating campaign SQLite file...", "working");
@@ -503,6 +541,9 @@ async function createNewCampaign({ title, premise }) {
       body: JSON.stringify({
         title: trimmedTitle,
         premise: trimmedPremise,
+        openingScene,
+        startingLocation: trimmedStartingLocation,
+        tone: trimmedTone,
         providerSettings: providerSettingsForNewCampaign(),
       }),
     });
@@ -515,12 +556,20 @@ async function createNewCampaign({ title, premise }) {
     setCampaignFromPayload(payload, "new_campaign_start");
     state.reviewBatch = null;
     elements.responseImport.value = "";
+
+    if (characterSeed.name) {
+      await seedWizardPlayerCharacter(characterSeed);
+    }
+
     seedPlayLog();
     render();
     elements.campaignDialog.close();
     elements.campaignForm.reset();
+    resetCampaignWizardDefaults();
+    elements.playerInput.value = openingPrompt;
+    elements.playerInput.focus();
     elements.bridgeStatus.textContent = "New campaign saved to SQLite";
-    setProviderActivity("New campaign saved", "idle");
+    setProviderActivity("Opening prompt is ready to send", "idle");
   } catch (error) {
     render();
     elements.bridgeStatus.textContent = error instanceof Error ? `New campaign failed: ${error.message}` : "New campaign failed";
@@ -551,11 +600,269 @@ function providerSettingsForNewCampaign() {
 }
 
 function openCampaignDialog() {
-  elements.newCampaignTitle.value = "New Campaign Binder";
-  elements.newCampaignPremise.value = "A new D&D 5e-lite campaign ready to grow through play.";
+  resetCampaignWizardDefaults();
   elements.campaignDialog.showModal();
   elements.newCampaignTitle.focus();
   elements.newCampaignTitle.select();
+}
+
+function resetCampaignWizardDefaults() {
+  elements.newCampaignTitle.value = "New Campaign Binder";
+  elements.newCampaignPremise.value = "";
+  elements.newCampaignStartingLocation.value = "";
+  elements.newCampaignTone.value = "";
+  elements.newCharacterName.value = "";
+  elements.newCharacterAncestry.value = "";
+  elements.newCharacterClass.value = "";
+  elements.newCharacterLevel.value = "1";
+  elements.newCharacterConcept.value = "";
+  elements.newCharacterAutoSheet.checked = true;
+}
+
+function normalizeWizardCharacter(input = {}) {
+  const name = String(input.name ?? "").trim();
+  const ancestry = String(input.ancestry ?? "").trim();
+  const characterClass = String(input.characterClass ?? "").trim();
+  const concept = String(input.concept ?? "").trim();
+  const level = clampLevel(parseOptionalNumber(input.level) ?? 1);
+
+  return {
+    name,
+    ancestry,
+    characterClass,
+    level,
+    concept,
+    autoSheet: input.autoSheet !== false,
+  };
+}
+
+function buildOpeningSceneSummary({ premise, startingLocation, character }) {
+  const details = [
+    premise,
+    character?.name ? `Player character: ${formatCharacterBasics(character)}.` : "",
+    startingLocation ? `Starting place: ${startingLocation}.` : "",
+  ].filter(Boolean);
+
+  return details.join(" ");
+}
+
+function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, character }) {
+  const lines = [
+    `Start campaign: ${title}.`,
+    `Campaign seed: ${premise}`,
+  ];
+
+  if (startingLocation) {
+    lines.push(`Starting place: ${startingLocation}.`);
+  }
+  if (tone) {
+    lines.push(`Tone/style: ${tone}.`);
+  }
+  if (character?.name) {
+    lines.push(`Primary player character: ${formatCharacterBasics(character)}.`);
+  } else if (character?.concept || character?.characterClass || character?.ancestry) {
+    lines.push(`Primary player character draft: ${formatCharacterBasics(character)}. Ask for the missing name when it matters.`);
+  }
+
+  lines.push(
+    "Open with a playable first scene, immediate stakes, and useful choices.",
+    "Guide any missing character details through play instead of stopping for a long setup form.",
+    "Propose LoreKeeper updates for the player character, starting place, active thread, and any named party members or NPCs.",
+    "(meta: Return strict LoreKeeper JSON only. Keep the first turn concise and table-ready.)",
+  );
+
+  return lines.join("\n");
+}
+
+function formatCharacterBasics(character) {
+  const identity = [
+    character.name,
+    character.ancestry,
+    character.characterClass,
+    character.level ? `level ${character.level}` : "",
+  ].filter(Boolean).join(", ");
+  return [identity || "Unnamed player character", character.concept].filter(Boolean).join(" - ");
+}
+
+async function seedWizardPlayerCharacter(character) {
+  const sheet = character.autoSheet
+    ? buildFiveELiteCharacterSeed(character)
+    : {
+        id: `party-${slugify(character.name)}`,
+        name: character.name,
+        type: "player_character",
+        playerRole: "Player character",
+        ancestryClass: [character.ancestry, character.characterClass].filter(Boolean).join(" ") || "adventurer",
+        level: character.level,
+        background: character.concept,
+        notes: ["Created from the new campaign wizard."],
+      };
+
+  const response = await fetch(apiCampaignRecordUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      domain: "party",
+      ...sheet,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const result = await response.json();
+  setCampaignFromPayload(result, "new_campaign_player_character");
+}
+
+function buildFiveELiteCharacterSeed(character) {
+  const level = clampLevel(character.level || 1);
+  const profile = classifyCharacterProfile(`${character.characterClass} ${character.concept}`);
+  const abilityScores = standardScoresForProfile(profile);
+  const conMod = abilityModifier(abilityScores.CON);
+  const dexMod = abilityModifier(abilityScores.DEX);
+  const maxHp = Math.max(1, hitDieForProfile(profile) + conMod + Math.max(0, level - 1) * Math.max(1, Math.ceil(hitDieForProfile(profile) / 2) + conMod));
+  const armorClass = Math.max(10, 10 + dexMod + armorBonusForProfile(profile));
+  const ancestryClass = [character.ancestry, character.characterClass].filter(Boolean).join(" ") || profile.label;
+
+  return {
+    id: `party-${slugify(character.name)}`,
+    name: character.name,
+    type: "player_character",
+    playerRole: "Player character",
+    ancestryClass,
+    level,
+    experience: 0,
+    proficiencyBonus: proficiencyBonusForLevel(level),
+    background: character.concept || `${character.name} is a ${ancestryClass} beginning the campaign.`,
+    stats: {
+      hp: {
+        current: maxHp,
+        max: maxHp,
+      },
+      armorClass,
+      abilityScores,
+      spells: spellsForProfile(profile, character),
+    },
+    skills: skillsForProfile(profile, character),
+    abilities: abilitiesForProfile(profile, character),
+    spells: spellsForProfile(profile, character),
+    notes: ["Created from the new campaign wizard with a 5E-lite standard array."],
+  };
+}
+
+function classifyCharacterProfile(text) {
+  const value = String(text ?? "").toLowerCase();
+  const profiles = [
+    { key: "druid", label: "druid", match: /\b(druid|wild shape|nature|frost|wolf)\b/ },
+    { key: "rogue", label: "rogue", match: /\b(rogue|thief|burglar|assassin|heist|lock|sneak)\b/ },
+    { key: "ranger", label: "ranger", match: /\b(ranger|scout|archer|bow|tracker|hunter)\b/ },
+    { key: "fighter", label: "fighter", match: /\b(fighter|warrior|soldier|guard|knight|sword)\b/ },
+    { key: "wizard", label: "wizard", match: /\b(wizard|mage|arcane|spellbook|sorcerer)\b/ },
+    { key: "cleric", label: "cleric", match: /\b(cleric|priest|paladin|divine|faith|healer)\b/ },
+    { key: "bard", label: "bard", match: /\b(bard|performer|charmer|silver tongue|song)\b/ },
+  ];
+  return profiles.find((profile) => profile.match.test(value)) ?? { key: "balanced", label: "adventurer" };
+}
+
+function standardScoresForProfile(profile) {
+  const maps = {
+    druid: { STR: 8, DEX: 13, CON: 14, INT: 12, WIS: 15, CHA: 10 },
+    rogue: { STR: 8, DEX: 15, CON: 13, INT: 12, WIS: 10, CHA: 14 },
+    ranger: { STR: 10, DEX: 15, CON: 13, INT: 8, WIS: 14, CHA: 12 },
+    fighter: { STR: 15, DEX: 12, CON: 14, INT: 8, WIS: 13, CHA: 10 },
+    wizard: { STR: 8, DEX: 14, CON: 13, INT: 15, WIS: 12, CHA: 10 },
+    cleric: { STR: 12, DEX: 10, CON: 14, INT: 8, WIS: 15, CHA: 13 },
+    bard: { STR: 8, DEX: 14, CON: 13, INT: 10, WIS: 12, CHA: 15 },
+    balanced: { STR: 12, DEX: 14, CON: 13, INT: 10, WIS: 15, CHA: 8 },
+  };
+
+  return maps[profile.key] ?? maps.balanced;
+}
+
+function hitDieForProfile(profile) {
+  if (profile.key === "fighter") {
+    return 10;
+  }
+  if (profile.key === "wizard") {
+    return 6;
+  }
+  return 8;
+}
+
+function armorBonusForProfile(profile) {
+  if (profile.key === "fighter" || profile.key === "cleric") {
+    return 3;
+  }
+  if (profile.key === "ranger" || profile.key === "rogue") {
+    return 2;
+  }
+  return 0;
+}
+
+function skillsForProfile(profile, character) {
+  const skills = {
+    druid: ["Nature", "Survival", "Animal Handling", "Perception"],
+    rogue: ["Stealth", "Sleight of Hand", "Deception", "Thieves' Tools"],
+    ranger: ["Perception", "Survival", "Stealth", "Athletics"],
+    fighter: ["Athletics", "Intimidation", "Perception", "Survival"],
+    wizard: ["Arcana", "Investigation", "History", "Insight"],
+    cleric: ["Medicine", "Insight", "Religion", "Persuasion"],
+    bard: ["Performance", "Persuasion", "Deception", "Insight"],
+    balanced: ["Perception", "Survival", "Insight", "Athletics"],
+  };
+  const extras = /frost/i.test(`${character.characterClass} ${character.concept}`) ? ["Frost magic control"] : [];
+  return [...(skills[profile.key] ?? skills.balanced), ...extras];
+}
+
+function abilitiesForProfile(profile, character) {
+  const abilities = {
+    druid: ["Wild Shape", "Druidcraft", "Primal spellcasting"],
+    rogue: ["Sneak Attack", "Cunning Action", "Thieves' Tools"],
+    ranger: ["Favored terrain instincts", "Archery training", "Tracking"],
+    fighter: ["Second Wind", "Weapon training", "Tactical footing"],
+    wizard: ["Arcane Recovery", "Ritual casting", "Spellbook"],
+    cleric: ["Channel Divinity", "Divine spellcasting", "Healing word"],
+    bard: ["Bardic Inspiration", "Jack of All Trades", "Silver tongue"],
+    balanced: ["Adventurer's instincts", "Fieldcraft", "Quick thinking"],
+  };
+  const extras = /wolf/i.test(`${character.characterClass} ${character.concept}`) ? ["Wolf companion bond"] : [];
+  return [...(abilities[profile.key] ?? abilities.balanced), ...extras];
+}
+
+function spellsForProfile(profile, character) {
+  const value = `${character.characterClass} ${character.concept}`;
+  if (profile.key === "druid") {
+    return /frost/i.test(value)
+      ? ["Frostbite", "Druidcraft", "Entangle", "Goodberry"]
+      : ["Druidcraft", "Entangle", "Goodberry"];
+  }
+  if (profile.key === "wizard") {
+    return ["Mage Hand", "Detect Magic", "Magic Missile"];
+  }
+  if (profile.key === "cleric") {
+    return ["Guidance", "Bless", "Healing Word"];
+  }
+  if (profile.key === "bard") {
+    return ["Vicious Mockery", "Charm Person", "Healing Word"];
+  }
+  return [];
+}
+
+function proficiencyBonusForLevel(level) {
+  return 2 + Math.floor((Math.max(1, level) - 1) / 4);
+}
+
+function abilityModifier(score) {
+  return Math.floor((Number(score) - 10) / 2);
+}
+
+function clampLevel(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 1;
+  }
+  return Math.min(20, Math.max(1, Math.round(number)));
 }
 
 let pendingConfirmResolve = null;
@@ -2707,6 +3014,44 @@ function renderCharacterSheet(member) {
   elements.sheetNotes.value = (member.notes ?? []).join("\n");
 }
 
+function autoFillOpenCharacterSheet() {
+  const name = elements.sheetName.value.trim() || "Adventurer";
+  const ancestryClass = elements.sheetAncestryClass.value.trim();
+  const role = elements.sheetRole.value.trim();
+  const level = parseOptionalNumber(elements.sheetLevel.value) ?? 1;
+  const background = elements.sheetBackground.value.trim();
+  const sheet = buildFiveELiteCharacterSeed({
+    name,
+    ancestry: inferAncestryFromSheetText(ancestryClass),
+    characterClass: [ancestryClass, role].filter(Boolean).join(" "),
+    level,
+    concept: background,
+    autoSheet: true,
+  });
+
+  elements.sheetName.value = sheet.name;
+  elements.sheetAncestryClass.value = ancestryClass || sheet.ancestryClass;
+  elements.sheetRole.value = role || "Player character";
+  elements.sheetLevel.value = sheet.level ?? "";
+  elements.sheetXp.value = elements.sheetXp.value.trim() || String(sheet.experience ?? "");
+  elements.sheetHpCurrent.value = sheet.stats.hp.current ?? "";
+  elements.sheetHpMax.value = sheet.stats.hp.max ?? "";
+  elements.sheetAc.value = sheet.stats.armorClass ?? "";
+  elements.sheetProf.value = sheet.proficiencyBonus ?? "";
+  elements.sheetBackground.value = background || sheet.background;
+  elements.sheetStr.value = sheet.stats.abilityScores.STR ?? "";
+  elements.sheetDex.value = sheet.stats.abilityScores.DEX ?? "";
+  elements.sheetCon.value = sheet.stats.abilityScores.CON ?? "";
+  elements.sheetInt.value = sheet.stats.abilityScores.INT ?? "";
+  elements.sheetWis.value = sheet.stats.abilityScores.WIS ?? "";
+  elements.sheetCha.value = sheet.stats.abilityScores.CHA ?? "";
+  elements.sheetSkills.value = mergeMultiline(elements.sheetSkills.value, sheet.skills);
+  elements.sheetAbilities.value = mergeMultiline(elements.sheetAbilities.value, sheet.abilities);
+  elements.sheetSpells.value = mergeMultiline(elements.sheetSpells.value, sheet.spells);
+  elements.sheetNotes.value = mergeMultiline(elements.sheetNotes.value, ["Auto-filled with a 5E-lite standard array."]);
+  elements.bridgeStatus.textContent = `${sheet.name} sheet auto-filled; review and save when ready`;
+}
+
 async function saveCharacterSheet() {
   const member = findById(state.campaign.party, state.activeCharacterSheet);
   if (!member) {
@@ -2884,6 +3229,10 @@ function splitMultiline(value) {
     .split(/[,;\n]+/)
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function mergeMultiline(existing, additions) {
+  return uniqueTextList([splitMultiline(existing), additions]).join("\n");
 }
 
 function parseOptionalNumber(value) {
@@ -3104,6 +3453,11 @@ function renderReviewBatch() {
       "No pending state changes.",
     ),
   );
+}
+
+function inferAncestryFromSheetText(value) {
+  const match = String(value ?? "").match(/\b(human|elf|dwarf|halfling|gnome|orc|tiefling|dragonborn|half-elf|half-orc)\b/i);
+  return match?.[1] ?? "";
 }
 
 function latestCommittedReviewBatch(campaign) {
