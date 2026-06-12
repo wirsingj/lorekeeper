@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from "electron";
+import { Menu, app, BrowserWindow, shell } from "electron";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ let mainWindow = null;
 
 async function createWindow() {
   await startApiServer();
+  Menu.setApplicationMenu(null);
 
   mainWindow = new BrowserWindow({
     width: 1480,
