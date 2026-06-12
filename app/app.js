@@ -33,6 +33,7 @@ const defaultCompanionOptions = {
   projectHint: "LoreKeeper",
   returnToCaller: true,
 };
+const userSettingsStorageKey = "lorekeeper.lastProviderSettings";
 const state = {
   campaign: null,
   contextPack: null,
@@ -406,6 +407,13 @@ elements.playerForm.addEventListener("submit", async (event) => {
       source: "player_meta",
     });
   }
+  await seedPartyFromPlayerOpening(state.currentTurn.parsedMessage?.inWorldText || playerMessage);
+  state.currentTurn = createPlayerTurn({
+    campaign: state.campaign,
+    playerMessage,
+  });
+  state.contextPack = state.currentTurn.contextPack;
+  state.prompt = state.currentTurn.providerPrompt;
   render();
   const providerMode = currentProviderSettings().preferredProvider;
   const runResult = providerMode === "ollama"
@@ -522,10 +530,23 @@ async function createNewCampaign({ title, premise }) {
 
 function providerSettingsForNewCampaign() {
   const settings = currentProviderSettings();
+  if (settings.preferredProvider !== "ollama") {
+    return settings;
+  }
+
+  const installed = installedOllamaModelIds();
+  if (isOllamaModelInstalled(settings.selectedModel, installed)) {
+    return settings;
+  }
+
+  const selectedControlModel = elements.ollamaModel?.value;
+  const fallbackModel = [selectedControlModel, ...installed]
+    .filter(Boolean)
+    .find((model) => isOllamaModelInstalled(model, installed));
+
   return {
     ...settings,
-    preferredProvider: "ollama",
-    selectedModel: elements.ollamaModel?.value || settings.selectedModel || "llama3.1:8b",
+    selectedModel: fallbackModel || settings.selectedModel,
   };
 }
 
@@ -564,6 +585,176 @@ function resolveConfirmDialog(value) {
   pendingConfirmResolve = null;
   elements.confirmDialog.close();
   resolve(value);
+}
+
+async function seedPartyFromPlayerOpening(playerText) {
+  const inferredMembers = inferPartyMembersFromPlayerText(playerText, state.campaign);
+  if (!inferredMembers.length) {
+    return [];
+  }
+
+  const added = [];
+  for (const member of inferredMembers) {
+    try {
+      const response = await fetch(apiCampaignRecordUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          domain: "party",
+          ...member,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const result = await response.json();
+      state.campaign = normalizeCampaign(result.campaign);
+      state.campaigns = result.campaigns ?? state.campaigns;
+      state.sqlitePath = result.sqlitePath ?? state.sqlitePath;
+      state.contextPack = buildContextPack(state.campaign, {
+        purpose: "player_seeded_party_context",
+      });
+      added.push(member.name);
+    } catch (error) {
+      elements.bridgeStatus.textContent = error instanceof Error
+        ? `Party seed failed: ${error.message}`
+        : "Party seed failed";
+    }
+  }
+
+  if (added.length) {
+    elements.bridgeStatus.textContent = `Added ${added.join(", ")} to the party`;
+    setProviderActivity(`Party updated: ${added.join(", ")}`, "idle");
+  }
+
+  return added;
+}
+
+function inferPartyMembersFromPlayerText(playerText, campaign) {
+  const text = stripParentheticalText(playerText);
+  if (!text || (campaign.party ?? []).length >= 6) {
+    return [];
+  }
+
+  const existingNames = new Set((campaign.party ?? []).map((member) => normalizeNameKey(member.name)));
+  const names = inferOpeningPartyNames(text)
+    .filter((name) => !existingNames.has(normalizeNameKey(name)))
+    .slice(0, 4);
+
+  return names.map((name, index) => ({
+    id: `party-${slugify(name)}`,
+    name,
+    type: index === 0 ? "player_character" : "party_member",
+    playerRole: index === 0 ? "Player character" : "trusted party member",
+    ancestryClass: inferCharacterRoleText(text, name) || "adventurer",
+    background: inferCharacterBackgroundText(text, name, index),
+    notes: [
+      index === 0
+        ? "Inferred from the player's opening campaign message."
+        : "Inferred as a trusted party member from the player's opening campaign message.",
+    ],
+  }));
+}
+
+function stripParentheticalText(value) {
+  return String(value ?? "").replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function inferOpeningPartyNames(text) {
+  const names = [];
+  const pairPatterns = [
+    /\b([A-Z][A-Za-z'’-]{1,30})\s+and\s+(?:(?:his|her|their)\s+)?(?:(?:best|old|close|trusted|new|slower|faster|friend|companion|ally)\s+){0,6}([A-Z][A-Za-z'’-]{1,30})\s+(?:are|were|run|sprint|walk|enter|head|travel|dash)\b/,
+    /\b([A-Z][A-Za-z'’-]{1,30})\s+and\s+([A-Z][A-Za-z'’-]{1,30})\s+(?:are|were|run|sprint|walk|enter|head|travel|dash)\b/,
+  ];
+
+  for (const pattern of pairPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      names.push(match[1], match[2]);
+      break;
+    }
+  }
+
+  if (!names.length) {
+    const firstPerson = text.match(/\b(?:I am|I'm|my character is|playing as)\s+([A-Z][A-Za-z'’-]{1,30})\b/i);
+    if (firstPerson?.[1]) {
+      names.push(firstPerson[1]);
+    }
+  }
+
+  return uniqueNames(names.filter(isLikelyCharacterName));
+}
+
+function inferCharacterRoleText(text, name) {
+  const escaped = escapeRegExp(name);
+  const classMatch = text.match(new RegExp(`\\b${escaped}\\b[^.]{0,140}\\b(ranger|fighter|druid|rogue|thief|wizard|cleric|bard|scout|warrior|mage)\\b`, "i"));
+  if (classMatch?.[1]) {
+    return classMatch[1].toLowerCase();
+  }
+
+  const patterns = [
+    new RegExp(`\\b${escaped}\\s+is\\s+([^,.!?]{4,90})`, "i"),
+    new RegExp(`\\b${escaped}\\s+[^.]{0,60}\\b(?:ranger|fighter|druid|rogue|thief|wizard|cleric|bard|scout|warrior|mage)\\b[^,.!?]{0,50}`, "i"),
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      return compactRoleText(match[1]);
+    }
+    if (match?.[0]) {
+      return compactRoleText(match[0].replace(new RegExp(`^${escaped}\\s+`, "i"), ""));
+    }
+  }
+
+  return "";
+}
+
+function inferCharacterBackgroundText(text, name, index) {
+  const role = inferCharacterRoleText(text, name);
+  if (role) {
+    return `${name} is ${role}.`;
+  }
+  return index === 0
+    ? `${name} is the player character introduced in the opening scene.`
+    : `${name} is introduced as a trusted party member in the opening scene.`;
+}
+
+function compactRoleText(value) {
+  return String(value ?? "")
+    .replace(/\band\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.!,;:]+$/, "");
+}
+
+function uniqueNames(names) {
+  const seen = new Set();
+  return names.filter((name) => {
+    const key = normalizeNameKey(name);
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function isLikelyCharacterName(name) {
+  const key = normalizeNameKey(name);
+  return Boolean(key) && !new Set(["the", "they", "there", "forest", "camp", "test", "trying", "on"]).has(key);
+}
+
+function normalizeNameKey(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function slugify(value) {
+  return normalizeNameKey(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "member";
 }
 
 async function loadImportedCampaign() {
@@ -606,15 +797,37 @@ function setCampaignFromPayload(payload, contextPurpose) {
 
 function currentProviderSettings() {
   const settings = state.campaign?.providerSettings ?? {};
-  const preferredProvider = settings.preferredProvider === "chatgpt" ? "bridge" : settings.preferredProvider || "bridge";
+  const saved = loadLastProviderSettings();
+  const preferredProvider = settings.preferredProvider === "chatgpt"
+    ? "bridge"
+    : settings.preferredProvider || saved.preferredProvider || "ollama";
   return {
     preferredProvider,
-    selectedModel: settings.selectedModel || "llama3.1:8b",
-    generationTimeoutMs: Number(settings.generationTimeoutMs) || 120000,
-    outputLimit: Number(settings.outputLimit) || 900,
-    fastMode: Boolean(settings.fastMode),
-    ollamaBaseUrl: settings.ollamaBaseUrl || "http://127.0.0.1:11434",
+    selectedModel: settings.selectedModel || saved.selectedModel || "llama3.1:8b",
+    generationTimeoutMs: Number(settings.generationTimeoutMs || saved.generationTimeoutMs) || 120000,
+    outputLimit: Number(settings.outputLimit || saved.outputLimit) || 900,
+    fastMode: settings.fastMode ?? saved.fastMode ?? false,
+    ollamaBaseUrl: settings.ollamaBaseUrl || saved.ollamaBaseUrl || "http://127.0.0.1:11434",
   };
+}
+
+function loadLastProviderSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(userSettingsStorageKey) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function rememberProviderSettings(settings) {
+  localStorage.setItem(userSettingsStorageKey, JSON.stringify({
+    preferredProvider: settings.preferredProvider,
+    selectedModel: settings.selectedModel,
+    generationTimeoutMs: settings.generationTimeoutMs,
+    outputLimit: settings.outputLimit,
+    fastMode: settings.fastMode,
+    ollamaBaseUrl: settings.ollamaBaseUrl,
+  }));
 }
 
 async function saveProviderSettingsFromControls() {
@@ -641,6 +854,7 @@ async function saveProviderSettingsFromControls() {
 
     const payload = await response.json();
     setCampaignFromPayload(payload, "provider_settings_update");
+    rememberProviderSettings(currentProviderSettings());
     state.providerStatus = payload.providerStatus ?? state.providerStatus;
     render();
     setProviderActivity("Provider settings saved", "idle");
@@ -702,7 +916,7 @@ function renderProviderControls() {
 
 function renderModelOptions(settings) {
   const ollama = state.providerStatus?.providers?.ollama;
-  const installed = (ollama?.models ?? []).map((model) => model.name || model.model).filter(Boolean);
+  const installed = installedOllamaModelIds();
   const recommended = (ollama?.recommendedModels ?? []).map((model) => model.id);
   const options = dedupeModelOptions([settings.selectedModel, ...installed, ...recommended].filter(Boolean), settings.selectedModel);
 
@@ -715,6 +929,11 @@ function renderModelOptions(settings) {
       return option;
     }),
   );
+}
+
+function installedOllamaModelIds() {
+  const ollama = state.providerStatus?.providers?.ollama;
+  return (ollama?.models ?? []).map((model) => model.name || model.model).filter(Boolean);
 }
 
 function dedupeModelOptions(modelIds, selectedModel) {
@@ -1293,11 +1512,15 @@ async function importProviderResponse(responseText, options = {}) {
   });
 
   state.reviewBatch = reviewBatch.proposedChanges.length > 0 ? reviewBatch : null;
+  const autoCommitResult = options.autoCommit ? await autoCommitReviewBatch(reviewBatch) : null;
 
   elements.responseImport.value = "";
   if (extraction.error) {
     elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
     setProviderActivity("Imported response; no state updates saved", "waiting");
+  } else if (autoCommitResult?.applied?.length) {
+    elements.bridgeStatus.textContent = `${autoCommitResult.applied.length} state change${autoCommitResult.applied.length === 1 ? "" : "s"} saved to SQLite`;
+    setProviderActivity("State updated from local response", "idle");
   } else if (extraction.proposedChanges.length > 0) {
     elements.bridgeStatus.textContent = `${extraction.proposedChanges.length} proposed state change${extraction.proposedChanges.length === 1 ? "" : "s"} awaiting review`;
     setProviderActivity("Imported response; proposed changes awaiting review", "waiting");
@@ -1314,7 +1537,38 @@ async function importProviderResponse(responseText, options = {}) {
     proposedChanges: extraction.proposedChanges.length,
     reviewBatch: state.reviewBatch,
     extraction,
+    autoCommitResult,
   };
+}
+
+async function autoCommitReviewBatch(reviewBatch) {
+  if (!reviewBatch?.proposedChanges?.length) {
+    return null;
+  }
+
+  const safeBatch = {
+    ...reviewBatch,
+    proposedChanges: reviewBatch.proposedChanges.map((change) => ({
+      ...change,
+      status: shouldAutoApproveChange(change) ? "approved" : change.status,
+    })),
+  };
+
+  if (!safeBatch.proposedChanges.some((change) => change.status === "approved")) {
+    return null;
+  }
+
+  return commitExtractedChanges(safeBatch);
+}
+
+function shouldAutoApproveChange(change) {
+  if (change.validation?.valid === false || change.status === "rejected") {
+    return false;
+  }
+  if (change.importance === "major" || change.visibility === "dm_only" || change.visibility === "system_only") {
+    return false;
+  }
+  return true;
 }
 
 function splitProviderTableMessages(text, campaign, proposedChanges = []) {
@@ -1875,6 +2129,7 @@ async function runPromptThroughLocalProvider(turn) {
         await importProviderResponse(responseText, {
           source: "ollama",
           meta: [meta, warning].filter(Boolean).join("; "),
+          autoCommit: !warning,
         });
         setProviderActivity(
           warning
@@ -1891,7 +2146,7 @@ async function runPromptThroughLocalProvider(turn) {
     }
 
     if (responseText.trim()) {
-      await importProviderResponse(responseText, { source: "ollama" });
+      await importProviderResponse(responseText, { source: "ollama", autoCommit: true });
       return { providerReceived, imported: true };
     }
 
@@ -3211,11 +3466,32 @@ function extractChoicePanel(blocks, role) {
     return blocks;
   }
 
-  if (blocks.length < 2) {
+  if (blocks.length < 1) {
     return blocks;
   }
 
   const last = blocks.at(-1);
+  const inlinePanel = extractInlineChoicePanel(last);
+  if (inlinePanel) {
+    const nextBlocks = blocks.slice(0, -1);
+    if (inlinePanel.beforeText) {
+      nextBlocks.push({
+        ...last,
+        text: inlinePanel.beforeText,
+      });
+    }
+    nextBlocks.push({
+      type: "choices",
+      prompt: inlinePanel.prompt,
+      items: inlinePanel.items,
+    });
+    return nextBlocks;
+  }
+
+  if (blocks.length < 2) {
+    return blocks;
+  }
+
   const previous = blocks.at(-2);
   if (last?.type !== "paragraph" || previous?.type !== "paragraph") {
     return blocks;
@@ -3248,8 +3524,39 @@ function extractChoicePanel(blocks, role) {
   return nextBlocks;
 }
 
+function extractInlineChoicePanel(block) {
+  if (block?.type !== "paragraph") {
+    return null;
+  }
+
+  const text = block.text.trim();
+  const optionMarker = text.search(/\b(?:Options?|Choices?)\s*:/i);
+  if (optionMarker === -1) {
+    return null;
+  }
+
+  const beforeMarker = text.slice(0, optionMarker).trim();
+  const optionText = text.slice(optionMarker).replace(/^\s*(?:Options?|Choices?)\s*:\s*/i, "").trim();
+  const prompt = extractChoicePrompt(beforeMarker) || extractChoicePrompt(text) || "What do you do?";
+  const promptStart = beforeMarker.lastIndexOf(prompt);
+  const beforeText = promptStart >= 0 ? beforeMarker.slice(0, promptStart).trim() : beforeMarker;
+  const choices = splitChoiceText(optionText);
+  if (choices.length < 2) {
+    return null;
+  }
+
+  return {
+    beforeText,
+    prompt,
+    items: choices,
+  };
+}
+
 function splitChoiceText(text) {
-  const normalized = text.replace(/\s+/g, " ").trim();
+  const normalized = text
+    .replace(/\s*-\s*(?=(?:\d+[.)]\s+|[A-Z][^.!?]{8,120}(?:\.|$)))/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!normalized) {
     return [];
   }
@@ -3259,11 +3566,11 @@ function splitChoiceText(text) {
     .map((item) => item.replace(/^\d+[.)]\s*/, "").trim())
     .filter(Boolean);
   if (numbered.length >= 2) {
-    return numbered;
+    return numbered.map(cleanChoiceText).filter(Boolean);
   }
 
   const sentenceChoices = normalized
-    .split(/(?<=\.)\s+(?=[A-Z])/)
+    .split(/\s+-\s+|(?<=\.)\s+(?=[A-Z])/)
     .map((item) => item.trim())
     .filter((item) => item.length >= 12 && !/^something else\.?$/i.test(item));
   const hasFallback = /(?:^|\s)Something else\.?$/i.test(normalized);

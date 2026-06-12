@@ -52,7 +52,17 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
       },
       "choices": {
         "prompt": "question for the player",
-        "options": [{ "id": "1", "text": "clear action option" }],
+        "scope": "player|party|character",
+        "forActorId": "optional character id",
+        "forActor": "optional character name",
+        "options": [
+          {
+            "id": "1",
+            "actorId": "optional actor id",
+            "actor": "optional actor name",
+            "text": "clear action option"
+          }
+        ],
         "allowOther": true
       },
       "mechanics": [
@@ -192,9 +202,12 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
   },
   "choices": {
     "prompt": "What does Evelynn do?",
+    "scope": "character",
+    "forActorId": "evelynn",
+    "forActor": "Evelynn",
     "options": [
-      { "id": "1", "text": "Ask the rider who sent him." },
-      { "id": "2", "text": "Signal the crew to prepare an ambush." }
+      { "id": "1", "actorId": "evelynn", "actor": "Evelynn", "text": "Ask the rider who sent him." },
+      { "id": "2", "actorId": "evelynn", "actor": "Evelynn", "text": "Signal the crew to prepare an ambush." }
     ],
     "allowOther": true
   },
@@ -247,6 +260,8 @@ Allowed table roles: `dm`, `player`, `party`, `npc`, `system`.
 Allowed table kinds: `narration`, `dialogue`, `action`, `mechanics`, `status`, `aside`.
 
 Allowed table visibility values: `table`, `dm_only`, `party`.
+
+`choices` are first-class response data. The model should not bury player or party action options only in narration. Use `choices.scope`, `choices.forActor`, and per-option `actor`/`actorId` when the options are for a party member or NPC.
 
 Allowed mechanic types: `suggested_check`, `check`, `save`, `attack`, `damage`, `initiative`, `resource_note`, `status`, `none`.
 

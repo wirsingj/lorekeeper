@@ -39,6 +39,8 @@ The model owns:
 - proposed canon updates
 - tone within provided context
 
+Action options belong in `response.choices`, not loose prose. For options aimed at a specific party member or NPC, the model should include `choices.forActor`/`forActorId` or per-option `actor`/`actorId` so the app can render a clean table choice panel.
+
 The model must not:
 
 - directly mutate SQLite

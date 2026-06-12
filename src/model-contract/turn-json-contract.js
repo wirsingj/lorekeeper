@@ -190,7 +190,10 @@ export function renderTurnResponseForImport(turnResponse) {
   if (response.sceneStatus.awaitingPlayer && response.choices.options.length) {
     lines.push([
       response.choices.prompt || "What do you do?",
-      ...response.choices.options.map((option, index) => `${option.id || index + 1}. ${option.text}`),
+      ...response.choices.options.map((option, index) => {
+        const actor = option.actor || response.choices.forActor || "";
+        return `${option.id || index + 1}. ${actor ? `${actor}: ` : ""}${option.text}`;
+      }),
       response.choices.allowOther ? "Something else." : "",
     ].filter(Boolean).join("\n"));
   }
@@ -318,7 +321,17 @@ function createResponseFormatSchema() {
       },
       choices: {
         prompt: "question for the player",
-        options: [{ id: "1", text: "clear action option" }],
+        scope: "player|party|character",
+        forActorId: "optional character id",
+        forActor: "optional character name",
+        options: [
+          {
+            id: "1",
+            actorId: "optional actor id",
+            actor: "optional actor name",
+            text: "clear action option",
+          },
+        ],
         allowOther: true,
       },
       mechanics: [
@@ -354,6 +367,8 @@ function createResponseFormatSchema() {
       "Use people for NPCs.",
       "Every named add/update should include data.name or data.title.",
       "Choices must be separate objects, not a paragraph.",
+      "Use choices.options for every listed option. Do not put action options only in table text.",
+      "When options are for a specific party member or NPC, include choices.forActor/forActorId or option.actor/actorId.",
       "Do not silently change HP, inventory, relationships, quests, or major canon.",
       "If stats are missing, suggest a pending check instead of inventing exact math.",
     ],
@@ -435,12 +450,17 @@ function normalizeChoices(choices = {}) {
   const options = Array.isArray(choices.options)
     ? choices.options.map((option, index) => ({
       id: String(option?.id ?? index + 1),
+      actorId: option?.actorId ?? null,
+      actor: compactWhitespace(option?.actor || ""),
       text: compactWhitespace(option?.text || option),
     })).filter((option) => option.text)
     : [];
 
   return {
     prompt: compactWhitespace(choices.prompt || "What do you do?"),
+    scope: compactWhitespace(choices.scope || ""),
+    forActorId: choices.forActorId ?? null,
+    forActor: compactWhitespace(choices.forActor || ""),
     options: options.slice(0, 7),
     allowOther: choices.allowOther !== false,
   };

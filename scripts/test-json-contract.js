@@ -117,6 +117,7 @@ assert.equal(structured.error, null);
 const renderedStructured = renderTurnResponseForImport(structured.response);
 assert.match(renderedStructured, /A branch snaps ahead/);
 assert.match(renderedStructured, /Perception: Roll if Jarin pauses/);
+assert.match(renderedStructured, /Jarin: Drop low and listen/);
 assert.match(renderedStructured, /```json lorekeeper_updates/);
 
 const noChanges = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ proposedChanges: [] })));
@@ -250,7 +251,10 @@ function validTurnResponse(overrides = {}) {
     sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
     choices: {
       prompt: "What does Jarin do?",
-      options: [{ id: "1", text: "Drop low and listen." }],
+      scope: "character",
+      forActorId: "jarin",
+      forActor: "Jarin",
+      options: [{ id: "1", actorId: "jarin", actor: "Jarin", text: "Drop low and listen." }],
       allowOther: true,
     },
     mechanics: [
