@@ -94,6 +94,7 @@ const server = createServer(async (request, response) => {
         openingScene: body.openingScene,
         startingLocation: body.startingLocation,
         tone: body.tone,
+        providerSettings: body.providerSettings,
       });
       sendJson(response, 200, payload);
       return;

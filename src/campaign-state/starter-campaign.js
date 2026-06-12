@@ -57,6 +57,7 @@ export function createStarterCampaign(options = {}) {
       },
     ],
     rulesProfile: createDefaultRulesProfile(),
+    providerSettings: options.providerSettings,
     style: {
       tone: options.tone?.trim() || "engaging D&D-style adventure with strong continuity and player agency",
       pacing: "establish the scene, offer meaningful choices, and preserve consequences",

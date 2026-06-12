@@ -1,4 +1,4 @@
-import { Menu, app, BrowserWindow, shell } from "electron";
+import { Menu, app, BrowserWindow, screen, shell } from "electron";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,10 +11,10 @@ let mainWindow = null;
 async function createWindow() {
   await startApiServer();
   Menu.setApplicationMenu(null);
+  const windowBounds = preferredWindowBounds();
 
   mainWindow = new BrowserWindow({
-    width: 1520,
-    height: 1080,
+    ...windowBounds,
     minWidth: 1120,
     minHeight: 720,
     title: "LoreKeeper",
@@ -32,6 +32,19 @@ async function createWindow() {
   });
 
   await mainWindow.loadURL(`http://127.0.0.1:${port}`);
+}
+
+function preferredWindowBounds() {
+  const { workArea } = screen.getPrimaryDisplay();
+  const width = Math.min(workArea.width, Math.max(1520, Math.floor(workArea.width * 0.9)));
+  const height = Math.min(workArea.height, Math.max(1080, Math.floor(workArea.height * 0.9)));
+
+  return {
+    width,
+    height,
+    x: workArea.x + Math.max(0, Math.floor((workArea.width - width) / 2)),
+    y: workArea.y + Math.max(0, Math.floor((workArea.height - height) / 2)),
+  };
 }
 
 async function startApiServer() {

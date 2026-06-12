@@ -69,7 +69,7 @@ function normalizeProviderSettings(providerSettings = {}) {
   return {
     preferredProvider: providerSettings.preferredProvider === "chatgpt"
       ? "bridge"
-      : providerSettings.preferredProvider || "bridge",
+      : providerSettings.preferredProvider || "ollama",
     selectedModel: providerSettings.selectedModel || "llama3.1:8b",
     generationTimeoutMs: providerSettings.generationTimeoutMs || 120000,
     outputLimit: providerSettings.outputLimit || 900,

@@ -129,6 +129,7 @@ const elements = {
   playLog: document.querySelector("#play-log"),
   playerForm: document.querySelector("#player-form"),
   playerInput: document.querySelector("#player-input"),
+  buildTurn: document.querySelector("#build-turn"),
   responseImport: document.querySelector("#response-import"),
   pasteResponse: document.querySelector("#paste-response"),
   importResponse: document.querySelector("#import-response"),
@@ -494,6 +495,7 @@ async function createNewCampaign({ title, premise }) {
       body: JSON.stringify({
         title: trimmedTitle,
         premise: trimmedPremise,
+        providerSettings: providerSettingsForNewCampaign(),
       }),
     });
 
@@ -516,6 +518,15 @@ async function createNewCampaign({ title, premise }) {
     elements.bridgeStatus.textContent = error instanceof Error ? `New campaign failed: ${error.message}` : "New campaign failed";
     setProviderActivity("New campaign failed", "error");
   }
+}
+
+function providerSettingsForNewCampaign() {
+  const settings = currentProviderSettings();
+  return {
+    ...settings,
+    preferredProvider: "ollama",
+    selectedModel: elements.ollamaModel?.value || settings.selectedModel || "llama3.1:8b",
+  };
 }
 
 function openCampaignDialog() {
@@ -1827,17 +1838,9 @@ async function runPromptThroughLocalProvider(turn) {
 
   const controller = new AbortController();
   state.activeGeneration = controller;
-  state.streamingMessage = {
-    id: `stream-${Date.now()}`,
-    role: "dm",
-    title: "DM",
-    body: "",
-    meta: "Streaming from local Ollama",
-    source: "ollama_stream",
-    createdAt: new Date().toISOString(),
-  };
   elements.cancelGeneration.hidden = false;
   elements.cancelGeneration.disabled = false;
+  elements.buildTurn.disabled = true;
   setProviderActivity("Generating locally with Ollama...", "working");
   render();
 
@@ -1864,11 +1867,8 @@ async function runPromptThroughLocalProvider(turn) {
         setProviderActivity(`Ollama generating with ${event.model}...`, "working");
       } else if (event.type === "token") {
         responseText += event.text ?? "";
-        state.streamingMessage.body = cleanProviderResponseForPlay(responseText);
-        renderPlayLog();
       } else if (event.type === "done") {
         responseText = event.result?.text ?? responseText;
-        state.streamingMessage = null;
         const meta = event.result
           ? `Ollama ${event.result.model}; ${Math.round((event.result.durationMs ?? 0) / 1000)}s; context ${event.result.contextSize ?? 0} chars`
           : "";
@@ -1884,7 +1884,6 @@ async function runPromptThroughLocalProvider(turn) {
     }
 
     if (responseText.trim()) {
-      state.streamingMessage = null;
       await importProviderResponse(responseText, { source: "ollama" });
       return { providerReceived, imported: true };
     }
@@ -1894,13 +1893,11 @@ async function runPromptThroughLocalProvider(turn) {
     if (error?.name === "AbortError") {
       setProviderActivity("Local generation canceled", "idle");
       elements.bridgeStatus.textContent = "Local generation canceled";
-      state.streamingMessage = null;
       render();
       return { providerReceived, canceled: true };
     }
     setProviderActivity(error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed", "error");
     elements.bridgeStatus.textContent = error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed";
-    state.streamingMessage = null;
     render();
     return { providerReceived: false, error };
   } finally {
@@ -1909,6 +1906,7 @@ async function runPromptThroughLocalProvider(turn) {
     }
     elements.cancelGeneration.hidden = true;
     elements.cancelGeneration.disabled = true;
+    elements.buildTurn.disabled = false;
   }
 }
 
@@ -2957,13 +2955,22 @@ function recordElement({ title, body, onEdit }) {
 function cleanProviderResponseForPlay(text) {
   const withoutUpdates = stripLorekeeperUpdates(text);
   const withoutRolePrefix = stripProviderRolePrefix(withoutUpdates);
-  return stripTrailingStatusBlock(withoutRolePrefix).trim() || "The DM response was imported for review.";
+  const withoutMarkdownNoise = stripProviderMarkdownNoise(withoutRolePrefix);
+  return stripTrailingStatusBlock(withoutMarkdownNoise).trim() || "The DM response was imported for review.";
 }
 
 function stripProviderRolePrefix(text) {
   return String(text ?? "")
     .replace(/^\s*(?:\*\*)?\s*(?:DM|Dungeon Master|Lorekeeper|Assistant)\s*(?:\*\*)?\s*[:\-]\s*/i, "")
     .replace(/^\s*(?:#|##)\s*(?:DM|Dungeon Master|Lorekeeper|Assistant)\s*$/gim, "")
+    .trim();
+}
+
+function stripProviderMarkdownNoise(text) {
+  return String(text ?? "")
+    .replace(/\*\*(DM|Dungeon Master|Options?|proposedChanges)\s*:\*\*/gi, "$1:")
+    .replace(/\*\*([^*\n]{1,80})\*\*/g, "$1")
+    .replace(/(?:^|\n)\s*proposedChanges\s*:\s*$/i, "")
     .trim();
 }
 

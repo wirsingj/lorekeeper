@@ -166,7 +166,7 @@ export function createDefaultRecapTemplateSettings() {
 
 export function createDefaultProviderSettings() {
   return {
-    preferredProvider: "bridge",
+    preferredProvider: "ollama",
     selectedModel: "llama3.1:8b",
     generationTimeoutMs: 120000,
     outputLimit: 900,

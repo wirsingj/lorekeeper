@@ -153,6 +153,7 @@ export async function createNewActiveCampaign(projectRoot, options = {}) {
     openingScene: options.openingScene,
     startingLocation: options.startingLocation,
     tone: options.tone,
+    providerSettings: options.providerSettings,
   });
   const { campaign } = ensureInferredPlayerCharacter(starterCampaign);
   const sqlitePath = await uniqueCampaignFilePath(projectRoot, campaign.title);
