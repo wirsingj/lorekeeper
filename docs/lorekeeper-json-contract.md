@@ -1,23 +1,20 @@
 # LoreKeeper JSON Contract
 
-LoreKeeper now has two provider contracts:
+LoreKeeper's desktop/local model loop uses explicit application-owned contracts:
 
-- `turn-json-v1`: preferred for local/desktop providers such as Ollama.
-- Legacy sidecar response: kept for browser provider bridge compatibility.
+`App -> LorekeeperTurnRequest -> Model -> LorekeeperTurnResponse -> App`
 
-## Standalone Turn Contract
+The model must return valid JSON only. No markdown, no fenced code block, and no prose outside JSON.
 
-The desktop/local model path is:
+SQLite remains canon. A model response can only propose state changes; LoreKeeper validates those changes and keeps them behind review instead of treating model output as truth.
 
-`APP -> JSON request -> MODEL -> JSON response -> APP`
-
-The app owns formatting, persistence, validation, and canon updates.
-
-### Input Envelope
+## Request: `LorekeeperTurnRequest`
 
 ```json
 {
-  "lorekeeperRequest": "turn-json-v1",
+  "type": "lorekeeper.turn.request",
+  "schemaVersion": 1,
+  "requestId": "turn-lxyz12-abcd12",
   "meta": {
     "intent": "generate_next_tabletop_turn",
     "campaignId": "campaign-id",
@@ -28,59 +25,70 @@ The app owns formatting, persistence, validation, and canon updates.
       "Never contradict canon context.",
       "Do not decide the primary player character's major choices.",
       "Parenthetical player text is meta direction, not in-world speech.",
-      "Write a strong, specific scene beat with useful choices."
+      "Write a strong, specific scene beat with useful choices.",
+      "Return valid JSON only."
     ]
   },
   "responseFormat": {
     "type": "json_only",
     "schema": {
-      "lorekeeperResponse": "turn-json-v1",
+      "type": "lorekeeper.turn.response",
+      "schemaVersion": 1,
+      "requestId": "same-id-from-request",
       "table": [
         {
-          "speaker": "DM or party member name",
-          "role": "dm|party",
+          "speaker": "DM",
+          "speakerId": null,
+          "role": "dm|player|party|npc|system",
+          "kind": "narration|dialogue|action|mechanics|status|aside",
           "text": "player-facing table chat text"
         }
       ],
+      "sceneStatus": {
+        "mode": "social|exploration|combat|downtime|travel",
+        "danger": "none|tense|immediate|combat",
+        "awaitingPlayer": true
+      },
       "choices": {
         "prompt": "question for the player",
-        "options": [
-          {
-            "id": "1",
-            "text": "clear action option"
-          }
-        ],
+        "options": [{ "id": "1", "text": "clear action option" }],
         "allowOther": true
       },
       "mechanics": [
         {
-          "type": "check|attack|save|damage|status|none",
+          "type": "suggested_check|save|attack|damage|initiative|resource_note|status|none",
+          "actorId": "optional actor id",
           "actor": "character or creature name",
+          "ability": "optional ability",
+          "skill": "optional skill",
           "roll": "optional dice formula or result",
           "dc": null,
+          "reason": "why this mechanic is relevant",
           "outcome": "success|failure|mixed|pending|none",
           "label": "short roll/check/combat label",
           "text": "brief player-facing mechanics"
         }
       ],
-      "proposedChanges": [
-        {
-          "operation": "add|update|remove|note",
-          "domain": "party|people|factions|places|items|inventory|lore|timeline|quests|relationships|scene|combat|style",
-          "targetId": null,
-          "summary": "compact canon update",
-          "data": {},
-          "confidence": "low|medium|high",
-          "reason": "why this should become canon"
-        }
-      ]
+      "flags": {
+        "requiresReview": true,
+        "startsCombat": false,
+        "endsScene": false,
+        "containsSecretInfo": false
+      },
+      "proposedChanges": [],
+      "warnings": []
     },
     "rules": [
       "Return valid JSON only.",
+      "Do not use markdown.",
+      "Do not wrap the response in a code fence.",
       "Use proposedChanges: [] when no canon changed.",
-      "Use party for PCs and trusted companions; people for NPCs.",
+      "Use party for PCs and trusted companions.",
+      "Use people for NPCs.",
       "Every named add/update should include data.name or data.title.",
-      "Choices must be separate objects, not a paragraph."
+      "Choices must be separate objects, not a paragraph.",
+      "Do not silently change HP, inventory, relationships, quests, or major canon.",
+      "If stats are missing, suggest a pending check instead of inventing exact math."
     ]
   },
   "user": {
@@ -97,10 +105,20 @@ The app owns formatting, persistence, validation, and canon updates.
       }
     ]
   },
+  "generation": {
+    "mode": "normal|fast|combat|summary",
+    "maxTableEntries": 8,
+    "maxChoices": 6,
+    "allowMechanics": true,
+    "allowProposedChanges": true,
+    "tone": "engaging D&D-style adventure with strong continuity and player agency"
+  },
   "context": {
     "summary": "compact campaign premise",
     "scene": {
       "status": "active",
+      "mode": "social|exploration|combat|downtime|travel",
+      "danger": "none|tense|immediate|combat",
       "currentPlaceId": "place-id",
       "presentPeopleIds": [],
       "presentPartyMemberIds": [],
@@ -112,9 +130,12 @@ The app owns formatting, persistence, validation, and canon updates.
         "name": "Character Name",
         "role": "ancestry/class/table role",
         "hp": null,
+        "maxHp": null,
         "level": null,
         "abilities": [],
         "skills": [],
+        "conditions": [],
+        "resources": [],
         "notes": []
       }
     ],
@@ -123,12 +144,12 @@ The app owns formatting, persistence, validation, and canon updates.
         "id": "character-id",
         "name": "Character Name",
         "voice": "brief personality/voice guidance",
-        "agency": "primary player character or companion agency rule"
+        "agency": "primary_player_character|companion|npc|dm"
       }
     ],
     "sections": [
       {
-        "kind": "current_scene",
+        "kind": "current_scene|recent_history|relevant_lore|active_threads|nearby_entities|combat_state|style_rules",
         "title": "Current Scene",
         "entries": ["compact facts"]
       }
@@ -137,53 +158,70 @@ The app owns formatting, persistence, validation, and canon updates.
 }
 ```
 
-### Output Envelope
+## Response: `LorekeeperTurnResponse`
 
 ```json
 {
-  "lorekeeperResponse": "turn-json-v1",
+  "type": "lorekeeper.turn.response",
+  "schemaVersion": 1,
+  "requestId": "same-id-from-request",
   "table": [
     {
       "speaker": "DM",
+      "speakerId": null,
       "role": "dm",
-      "text": "The player-facing scene beat."
+      "kind": "narration",
+      "text": "The tavern door opens, and the room goes quiet."
     },
     {
       "speaker": "Roderic Vale",
+      "speakerId": "roderic-vale",
       "role": "party",
+      "kind": "dialogue",
       "text": "\"I'll watch the door.\""
     }
   ],
+  "sceneStatus": {
+    "mode": "social",
+    "danger": "tense",
+    "awaitingPlayer": true
+  },
   "choices": {
     "prompt": "What does Evelynn do?",
     "options": [
-      {
-        "id": "1",
-        "text": "Ask the rider who sent him."
-      },
-      {
-        "id": "2",
-        "text": "Signal the crew to prepare an ambush."
-      }
+      { "id": "1", "text": "Ask the rider who sent him." },
+      { "id": "2", "text": "Signal the crew to prepare an ambush." }
     ],
     "allowOther": true
   },
   "mechanics": [
     {
-      "type": "check",
+      "type": "suggested_check",
+      "actorId": "evelynn",
       "actor": "Evelynn",
-      "roll": "d20 + WIS/Insight",
+      "ability": "WIS",
+      "skill": "Insight",
+      "roll": "",
       "dc": 13,
+      "reason": "Determine whether the rider is bluffing.",
       "outcome": "pending",
       "label": "Insight check",
       "text": "Roll if Evelynn studies whether the rider is bluffing."
     }
   ],
+  "flags": {
+    "requiresReview": true,
+    "startsCombat": false,
+    "endsScene": false,
+    "containsSecretInfo": false
+  },
   "proposedChanges": [
     {
       "operation": "add",
       "domain": "people",
       "targetId": null,
+      "importance": "normal",
+      "visibility": "player_visible",
       "summary": "Three armed riders entered The Bent Coin looking for the cloaked contact.",
       "data": {
         "name": "Three Armed Riders",
@@ -193,91 +231,31 @@ The app owns formatting, persistence, validation, and canon updates.
       "confidence": "high",
       "reason": "Directly introduced in the scene."
     }
-  ]
+  ],
+  "warnings": []
 }
 ```
 
-## Legacy Sidecar Contract
+## Validation Rules
 
-Browser/provider bridge output still supports two parts:
+Allowed table roles: `dm`, `player`, `party`, `npc`, `system`.
 
-1. Player-facing narration.
-2. One fenced update block.
+Allowed table kinds: `narration`, `dialogue`, `action`, `mechanics`, `status`, `aside`.
 
-```json lorekeeper_updates
-{
-  "proposedChanges": [
-    {
-      "operation": "add|update|remove|note",
-      "domain": "party|people|factions|places|items|inventory|lore|timeline|quests|relationships|scene|combat|style",
-      "targetId": null,
-      "summary": "",
-      "data": {},
-      "confidence": "low|medium|high",
-      "reason": ""
-    }
-  ]
-}
-```
+Allowed mechanic types: `suggested_check`, `check`, `save`, `attack`, `damage`, `initiative`, `resource_note`, `status`, `none`.
 
-## Rules
+Allowed operations: `add`, `update`, `remove`, `note`.
 
-- Narration comes first.
-- The update block comes last.
-- No prose after the update block.
-- Use `proposedChanges: []` when nothing important changed.
-- Every added or updated named record should include `data.name` or `data.title`.
-- Use `party` for player characters and trusted companions.
-- Use `people` for NPCs.
-- SQLite canon wins over provider chat memory.
+Allowed domains: `party`, `people`, `factions`, `places`, `items`, `inventory`, `lore`, `timeline`, `quests`, `relationships`, `scene`, `combat`, `style`.
 
-## Parser Behavior
+Allowed importance values: `minor`, `normal`, `major`.
 
-The parser:
+Allowed visibility values: `player_visible`, `dm_only`, `system_only`.
 
-- extracts fenced `json lorekeeper_updates` blocks
-- falls back to any fenced JSON containing `proposedChanges`
-- falls back to inline JSON objects containing `proposedChanges`
-- strips update JSON before rendering player-facing narration
-- recovers complete changes from partial JSON when possible
-- never throws parser errors into the UI turn loop
+Major proposed changes require `flags.requiresReview: true`.
 
-## Validation
+When validation fails, LoreKeeper quarantines proposed changes, renders a recoverable status, and reports a contract warning.
 
-Allowed operations:
+## Legacy Bridge Compatibility
 
-- `add`
-- `update`
-- `remove`
-- `note`
-
-Allowed domains:
-
-- `party`
-- `people`
-- `factions`
-- `places`
-- `items`
-- `inventory`
-- `lore`
-- `timeline`
-- `quests`
-- `relationships`
-- `scene`
-- `combat`
-- `style`
-- `rules_profile`
-
-Invalid changes are marked rejected and are not committed.
-
-## Review Workflow Direction
-
-Current prototype behavior auto-approves valid extracted changes for fast iteration. The target desktop workflow is:
-
-1. Import provider response.
-2. Parse and validate proposed changes.
-3. Show a reviewable diff.
-4. Let the user edit, approve, or reject.
-5. Commit approved changes to SQLite.
-
-This keeps model proposals from silently becoming canon.
+The browser bridge can still ingest the older player-facing prose plus fenced `json lorekeeper_updates` block. That path remains compatibility/debug behavior while the desktop/local model path uses the strict JSON contract.

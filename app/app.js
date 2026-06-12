@@ -1292,21 +1292,18 @@ async function importProviderResponse(responseText, options = {}) {
     proposedChanges: extraction.proposedChanges,
   });
 
-  const commitResult = reviewBatch.proposedChanges.length > 0 ? await commitExtractedChanges(reviewBatch) : null;
+  state.reviewBatch = reviewBatch.proposedChanges.length > 0 ? reviewBatch : null;
 
   elements.responseImport.value = "";
   if (extraction.error) {
     elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
     setProviderActivity("Imported response; no state updates saved", "waiting");
-  } else if (extraction.proposedChanges.length > 0 && !commitResult) {
-    elements.bridgeStatus.textContent = "State save failed; response text was still imported";
-    setProviderActivity("Imported response; state save failed", "error");
+  } else if (extraction.proposedChanges.length > 0) {
+    elements.bridgeStatus.textContent = `${extraction.proposedChanges.length} proposed state change${extraction.proposedChanges.length === 1 ? "" : "s"} awaiting review`;
+    setProviderActivity("Imported response; proposed changes awaiting review", "waiting");
   } else {
-    elements.bridgeStatus.textContent =
-      extraction.proposedChanges.length > 0
-        ? `${commitResult?.applied?.length ?? 0} state change${commitResult?.applied?.length === 1 ? "" : "s"} saved`
-        : "DM response imported with no proposed changes";
-    setProviderActivity("Imported provider response and saved campaign state", "idle");
+    elements.bridgeStatus.textContent = "DM response imported with no proposed changes";
+    setProviderActivity("Imported provider response", "idle");
   }
   render();
   if (options.rememberProviderText !== false) {
@@ -1315,7 +1312,7 @@ async function importProviderResponse(responseText, options = {}) {
   return {
     imported: true,
     proposedChanges: extraction.proposedChanges.length,
-    commitResult,
+    reviewBatch: state.reviewBatch,
     extraction,
   };
 }
@@ -1869,14 +1866,24 @@ async function runPromptThroughLocalProvider(turn) {
         responseText += event.text ?? "";
       } else if (event.type === "done") {
         responseText = event.result?.text ?? responseText;
+        const warning = event.result?.parseError || event.result?.validationErrors?.length
+          ? "contract warning"
+          : "";
         const meta = event.result
           ? `Ollama ${event.result.model}; ${Math.round((event.result.durationMs ?? 0) / 1000)}s; context ${event.result.contextSize ?? 0} chars`
           : "";
         await importProviderResponse(responseText, {
           source: "ollama",
-          meta,
+          meta: [meta, warning].filter(Boolean).join("; "),
         });
-        setProviderActivity(meta ? `Local response imported (${meta})` : "Local response imported", "idle");
+        setProviderActivity(
+          warning
+            ? `Local response imported with contract warning: ${event.result.parseError || event.result.validationErrors?.[0]}`
+            : meta
+              ? `Local response imported (${meta})`
+              : "Local response imported",
+          warning ? "waiting" : "idle",
+        );
         return { providerReceived: true, imported: true };
       } else if (event.type === "error") {
         throw new Error(event.error || "Local provider generation failed.");
@@ -2812,6 +2819,22 @@ function renderContextPack(contextPack) {
 }
 
 function renderReviewBatch() {
+  if (state.reviewBatch?.proposedChanges?.length) {
+    const changes = state.reviewBatch.proposedChanges;
+    elements.reviewCount.textContent = String(changes.length);
+    elements.reviewList.replaceChildren(
+      ...changes.slice(0, 6).map((change) =>
+        recordElement({
+          title: `${change.status} / ${change.operation} / ${change.domain}`,
+          body: change.validation?.valid === false
+            ? `${change.summary} (${change.validation.errors.join("; ")})`
+            : change.summary,
+        }),
+      ),
+    );
+    return;
+  }
+
   const lastCommitted = latestCommittedReviewBatch(state.campaign);
   const changes = lastCommitted?.applied ?? [];
   elements.reviewCount.textContent = String(changes.length);
@@ -2823,7 +2846,7 @@ function renderReviewBatch() {
           body: change.summary,
         }),
       ),
-      "Imported state changes save automatically.",
+      "No pending state changes.",
     ),
   );
 }

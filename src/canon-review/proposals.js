@@ -1,22 +1,22 @@
 import { validateProposedChange } from "./validate-updates.js";
 
 export function createReviewBatch({ campaignId, source, rawResponse, proposedChanges }) {
-  const decidedAt = new Date().toISOString();
+  const createdAt = new Date().toISOString();
   return {
     id: `review-${Date.now()}`,
     campaignId,
     source,
-    status: "auto_approved",
-    createdAt: decidedAt,
-    decidedAt,
+    status: "pending_review",
+    createdAt,
+    decidedAt: null,
     rawResponse,
     proposedChanges: proposedChanges.map((change, index) => {
       const validation = validateProposedChange(change);
       return {
         id: `change-${index + 1}`,
         ...change,
-        status: validation.valid ? "approved" : "rejected",
-        decidedAt,
+        status: validation.valid ? "pending" : "rejected",
+        decidedAt: null,
         validation,
       };
     }),

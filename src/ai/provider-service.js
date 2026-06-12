@@ -1,4 +1,5 @@
 import {
+  buildTurnRequestEnvelope,
   buildTurnJsonPrompt,
   parseTurnJsonResponse,
   renderTurnResponseForImport,
@@ -68,12 +69,17 @@ export async function generateTurnWithProvider({
     throw new Error("Server generation currently supports the Ollama provider. Bridge generation stays in the renderer extension adapter.");
   }
 
-  const prompt = buildTurnJsonPrompt({
+  const request = buildTurnRequestEnvelope({
     campaign,
     contextPack,
     playerTurn: playerTurn || "No in-world action supplied this turn.",
     parsedMessage,
+    options: {
+      mode: settings.fastMode ? "fast" : undefined,
+      fastMode: settings.fastMode,
+    },
   });
+  const prompt = buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedMessage, options: { requestId: request.requestId, mode: request.generation.mode } });
 
   const provider = new OllamaProvider({ baseUrl: settings.ollamaBaseUrl });
   const result = await provider.generateTurn({
@@ -89,12 +95,15 @@ export async function generateTurnWithProvider({
     },
   });
 
-  const parsed = parseTurnJsonResponse(result.text);
+  const parsed = parseTurnJsonResponse(result.text, { requestId: request.requestId });
   return {
     ...result,
     text: renderTurnResponseForImport(parsed.response),
     structured: parsed.response,
+    requestId: request.requestId,
     parseError: parsed.error,
+    validationErrors: parsed.validationErrors,
+    recovery: parsed.recovery,
     rawText: result.text,
   };
 }
