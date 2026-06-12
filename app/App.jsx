@@ -1,12 +1,20 @@
 export function LorekeeperShell() {
   return (
     <div id="app" className="handheld-shell">
-      <header className="top-bar">
-        <div>
-          <p className="eyebrow">Campaign</p>
-          <h1 id="campaign-title">Loading campaign...</h1>
-        </div>
-        <div className="top-meta">
+      <aside className="left-panel panel-rail">
+        <section className="rail-section campaign-section">
+          <div className="section-title">
+            <div>
+              <p className="eyebrow">Campaign</p>
+              <h1 id="campaign-title" className="visually-hidden">Loading campaign...</h1>
+            </div>
+            <button id="open-setup" className="icon-action" type="button" title="Setup" aria-label="Setup">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 0 1 0-7Z"></path>
+                <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5l-2-3.5l-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8 8 0 0 0 7 6.5l-2.4-1l-2 3.5l2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5l2 3.5l2.4-1a8 8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8 8 0 0 0 2.6-1.5l2.4 1l2-3.5l-2-1.5Z"></path>
+              </svg>
+            </button>
+          </div>
           <div className="campaign-picker">
             <select id="campaign-select" aria-label="Campaign selector">
               <option>Loading campaigns...</option>
@@ -19,19 +27,13 @@ export function LorekeeperShell() {
               </svg>
             </button>
           </div>
-          <span id="scene-location">Loading...</span>
-          <span id="provider-status">Provider: manual bridge</span>
-          <span id="save-status">SQLite: local file ready</span>
-          <button id="open-setup" className="icon-action" type="button" title="Setup" aria-label="Setup">
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 0 1 0-7Z"></path>
-              <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5l-2-3.5l-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8 8 0 0 0 7 6.5l-2.4-1l-2 3.5l2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5l2 3.5l2.4-1a8 8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8 8 0 0 0 2.6-1.5l2.4 1l2-3.5l-2-1.5Z"></path>
-            </svg>
-          </button>
-        </div>
-      </header>
+          <div className="status-chips">
+            <span id="scene-location">Loading...</span>
+            <span id="save-status">SQLite: local file ready</span>
+          </div>
+          <span id="provider-status" className="visually-hidden">Provider: manual bridge</span>
+        </section>
 
-      <aside className="left-panel panel-rail">
         <section className="rail-section">
           <div className="section-title">
             <h2>Party</h2>
@@ -41,16 +43,6 @@ export function LorekeeperShell() {
             </div>
           </div>
           <div id="party-list" className="record-stack"></div>
-        </section>
-
-        <section className="rail-section">
-          <div className="section-title">
-            <h2>Binder</h2>
-          </div>
-          <div className="button-stack">
-            <button id="new-campaign" type="button">New Campaign</button>
-            <button id="load-imported" type="button">Load Imported</button>
-          </div>
         </section>
       </aside>
 
@@ -126,13 +118,6 @@ export function LorekeeperShell() {
             <button id="build-turn" type="submit">Send Turn</button>
           </div>
         </form>
-        <details className="prompt-drawer">
-          <summary>
-            <span>Provider Prompt</span>
-            <span id="prompt-size">0 chars</span>
-          </summary>
-          <textarea id="prompt-output" spellCheck="false"></textarea>
-        </details>
       </footer>
 
       <RecordDialog />
@@ -224,6 +209,16 @@ function SetupDialog() {
           <div className="section-title">
             <h3>Provider</h3>
           </div>
+          <label>
+            <span>Provider Mode</span>
+            <select id="provider-mode">
+              <option>ChatGPT Tab</option>
+              <option disabled>Claude Tab</option>
+              <option disabled>ChatGPT API</option>
+              <option disabled>Claude API</option>
+              <option disabled>Manual</option>
+            </select>
+          </label>
           <div className="bridge-card">
             <div className="status-line">
               <span className="status-dot"></span>
@@ -235,11 +230,28 @@ function SetupDialog() {
               <button id="new-provider-chat" type="button">New Campaign Chat</button>
             </div>
           </div>
+          <details className="prompt-drawer">
+            <summary>
+              <span>Provider Prompt</span>
+              <span id="prompt-size">0 chars</span>
+            </summary>
+            <textarea id="prompt-output" spellCheck="false"></textarea>
+          </details>
         </section>
 
         <section className="setup-section">
           <div className="section-title">
-            <h3>State Sync</h3>
+            <h3>Campaign Tools</h3>
+          </div>
+          <div className="button-stack two-up">
+            <button id="new-campaign" type="button">New Campaign</button>
+            <button id="load-imported" type="button">Load Imported</button>
+          </div>
+        </section>
+
+        <section className="setup-section">
+          <div className="section-title">
+            <h3>Manual State Sync</h3>
             <span id="review-count" className="count-pill">0</span>
           </div>
           <textarea id="response-import" className="rail-textarea" spellCheck="false"></textarea>
@@ -257,49 +269,105 @@ function SetupDialog() {
 function CharacterSheetDialog() {
   return (
     <dialog id="character-sheet-dialog" className="record-dialog character-sheet-dialog">
-      <form method="dialog">
+      <form id="character-sheet-form" method="dialog">
         <header className="dialog-header">
           <div>
             <p className="eyebrow">Character Sheet</p>
             <h2 id="character-sheet-title">Character</h2>
-            <p id="character-sheet-subtitle" className="sheet-subtitle"></p>
+            <p id="character-sheet-subtitle" className="sheet-subtitle">5E-lite profile</p>
           </div>
           <button id="close-character-sheet" className="icon-action" type="button" title="Close">x</button>
         </header>
 
-        <section className="sheet-grid" aria-label="Character details">
-          <article className="sheet-card compact">
-            <span>Level / XP</span>
-            <strong id="character-sheet-level">Unknown</strong>
+        <section className="sheet-grid editable-sheet" aria-label="Character details">
+          <article className="sheet-card identity-card">
+            <span>Identity</span>
+            <div className="sheet-two">
+              <label>
+                <span>Name</span>
+                <input id="sheet-name" autoComplete="off" />
+              </label>
+              <label>
+                <span>Ancestry / Class</span>
+                <input id="sheet-ancestry-class" autoComplete="off" placeholder="Human rogue" />
+              </label>
+            </div>
+            <label>
+              <span>Role</span>
+              <input id="sheet-role" autoComplete="off" placeholder="Player character, scout, loyalist..." />
+            </label>
           </article>
-          <article className="sheet-card compact">
-            <span>Health</span>
-            <strong id="character-sheet-hp">HP unknown</strong>
+
+          <article className="sheet-card vitals-card">
+            <span>Vitals</span>
+            <div className="sheet-stat-row">
+              <label>
+                <span>Level</span>
+                <input id="sheet-level" inputMode="numeric" />
+              </label>
+              <label>
+                <span>XP</span>
+                <input id="sheet-xp" inputMode="numeric" />
+              </label>
+              <label>
+                <span>HP</span>
+                <input id="sheet-hp-current" inputMode="numeric" placeholder="cur" />
+              </label>
+              <label>
+                <span>Max</span>
+                <input id="sheet-hp-max" inputMode="numeric" />
+              </label>
+              <label>
+                <span>AC</span>
+                <input id="sheet-ac" inputMode="numeric" />
+              </label>
+              <label>
+                <span>Prof</span>
+                <input id="sheet-prof" inputMode="numeric" />
+              </label>
+            </div>
           </article>
+
           <article className="sheet-card">
             <span>Background</span>
-            <p id="character-sheet-background"></p>
+            <textarea id="sheet-background" rows="3"></textarea>
           </article>
+
           <article className="sheet-card">
-            <span>Stats</span>
-            <div id="character-sheet-stats" className="stat-grid"></div>
+            <span>Ability Scores</span>
+            <div className="ability-edit-grid">
+              <label><span>STR</span><input id="sheet-str" inputMode="numeric" /></label>
+              <label><span>DEX</span><input id="sheet-dex" inputMode="numeric" /></label>
+              <label><span>CON</span><input id="sheet-con" inputMode="numeric" /></label>
+              <label><span>INT</span><input id="sheet-int" inputMode="numeric" /></label>
+              <label><span>WIS</span><input id="sheet-wis" inputMode="numeric" /></label>
+              <label><span>CHA</span><input id="sheet-cha" inputMode="numeric" /></label>
+            </div>
           </article>
+
           <article className="sheet-card">
-            <span>Specialties / Checks</span>
-            <ul id="character-sheet-skills" className="sheet-list"></ul>
+            <span>Proficiencies / Checks</span>
+            <textarea id="sheet-skills" rows="4" placeholder="Stealth, insight, thieves' tools..."></textarea>
           </article>
+
           <article className="sheet-card">
-            <span>Abilities / Spells</span>
-            <ul id="character-sheet-abilities" className="sheet-list"></ul>
+            <span>Features / Abilities</span>
+            <textarea id="sheet-abilities" rows="4" placeholder="Sneak attack, frost magic, wild shape..."></textarea>
           </article>
+
+          <article className="sheet-card">
+            <span>Spells</span>
+            <textarea id="sheet-spells" rows="4"></textarea>
+          </article>
+
           <article className="sheet-card">
             <span>Notes</span>
-            <ul id="character-sheet-notes" className="sheet-list"></ul>
+            <textarea id="sheet-notes" rows="4"></textarea>
           </article>
         </section>
 
         <footer className="dialog-actions">
-          <button id="edit-character-sheet" type="button">Edit Character</button>
+          <button id="save-character-sheet" type="submit">Save Character</button>
         </footer>
       </form>
     </dialog>

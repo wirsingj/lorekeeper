@@ -56,17 +56,30 @@ const elements = {
   setupDialog: document.querySelector("#setup-dialog"),
   closeSetup: document.querySelector("#close-setup"),
   characterSheetDialog: document.querySelector("#character-sheet-dialog"),
+  characterSheetForm: document.querySelector("#character-sheet-form"),
   closeCharacterSheet: document.querySelector("#close-character-sheet"),
-  editCharacterSheet: document.querySelector("#edit-character-sheet"),
   characterSheetTitle: document.querySelector("#character-sheet-title"),
   characterSheetSubtitle: document.querySelector("#character-sheet-subtitle"),
-  characterSheetLevel: document.querySelector("#character-sheet-level"),
-  characterSheetHp: document.querySelector("#character-sheet-hp"),
-  characterSheetBackground: document.querySelector("#character-sheet-background"),
-  characterSheetStats: document.querySelector("#character-sheet-stats"),
-  characterSheetSkills: document.querySelector("#character-sheet-skills"),
-  characterSheetAbilities: document.querySelector("#character-sheet-abilities"),
-  characterSheetNotes: document.querySelector("#character-sheet-notes"),
+  sheetName: document.querySelector("#sheet-name"),
+  sheetAncestryClass: document.querySelector("#sheet-ancestry-class"),
+  sheetRole: document.querySelector("#sheet-role"),
+  sheetLevel: document.querySelector("#sheet-level"),
+  sheetXp: document.querySelector("#sheet-xp"),
+  sheetHpCurrent: document.querySelector("#sheet-hp-current"),
+  sheetHpMax: document.querySelector("#sheet-hp-max"),
+  sheetAc: document.querySelector("#sheet-ac"),
+  sheetProf: document.querySelector("#sheet-prof"),
+  sheetBackground: document.querySelector("#sheet-background"),
+  sheetStr: document.querySelector("#sheet-str"),
+  sheetDex: document.querySelector("#sheet-dex"),
+  sheetCon: document.querySelector("#sheet-con"),
+  sheetInt: document.querySelector("#sheet-int"),
+  sheetWis: document.querySelector("#sheet-wis"),
+  sheetCha: document.querySelector("#sheet-cha"),
+  sheetSkills: document.querySelector("#sheet-skills"),
+  sheetAbilities: document.querySelector("#sheet-abilities"),
+  sheetSpells: document.querySelector("#sheet-spells"),
+  sheetNotes: document.querySelector("#sheet-notes"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
   peopleList: document.querySelector("#people-list"),
@@ -156,17 +169,19 @@ elements.closeCharacterSheet.addEventListener("click", () => {
   elements.characterSheetDialog.close();
 });
 
-elements.editCharacterSheet.addEventListener("click", () => {
-  const member = findById(state.campaign.party, state.activeCharacterSheet);
-  if (!member) {
-    return;
-  }
-  elements.characterSheetDialog.close();
-  openRecordDialog("party", member);
+elements.characterSheetForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveCharacterSheet();
 });
 
 elements.campaignSelect.addEventListener("change", async () => {
   const sqlitePath = elements.campaignSelect.value;
+  if (sqlitePath === "__new__") {
+    renderCampaignSelector();
+    openCampaignDialog();
+    return;
+  }
+
   if (!sqlitePath || sqlitePath === state.sqlitePath) {
     return;
   }
@@ -734,6 +749,16 @@ function render() {
 function renderCampaignSelector() {
   const campaigns = state.campaigns ?? [];
   elements.deleteCampaign.disabled = !state.sqlitePath || !state.campaign?.title;
+
+  if (!campaigns.length) {
+    const option = document.createElement("option");
+    option.value = state.sqlitePath ?? "";
+    option.textContent = state.campaign?.title ?? "No campaigns found";
+    option.selected = true;
+    elements.campaignSelect.replaceChildren(option, newCampaignOption());
+    return;
+  }
+
   elements.campaignSelect.replaceChildren(
     ...campaigns.map((campaign) => {
       const option = document.createElement("option");
@@ -742,15 +767,15 @@ function renderCampaignSelector() {
       option.selected = campaign.sqlitePath === state.sqlitePath;
       return option;
     }),
+    newCampaignOption(),
   );
+}
 
-  if (!campaigns.length) {
-    const option = document.createElement("option");
-    option.value = state.sqlitePath ?? "";
-    option.textContent = state.campaign?.title ?? "No campaigns found";
-    option.selected = true;
-    elements.campaignSelect.append(option);
-  }
+function newCampaignOption() {
+  const option = document.createElement("option");
+  option.value = "__new__";
+  option.textContent = "+ New campaign...";
+  return option;
 }
 
 function openDeleteCampaignDialog() {
@@ -1642,69 +1667,138 @@ function renderCharacterSheet(member) {
     member.role,
     member.type,
   ].filter(Boolean).join(" / ") || "Party member";
-  elements.characterSheetLevel.textContent = formatLevelAndXp(member);
-  elements.characterSheetHp.textContent = formatSheetHp(member.stats?.hp ?? member.hp ?? member.hitPoints);
-  elements.characterSheetBackground.textContent = characterBackground(member);
+  const hp = normalizeHpForForm(member.stats?.hp ?? member.hp ?? member.hitPoints);
+  const scores = characterAbilityScores(member);
 
-  const abilityScores = characterAbilityScores(member);
-  elements.characterSheetStats.replaceChildren(
-    ...(
-      abilityScores.length
-        ? abilityScores.map(([label, score]) => statPill(label, score))
-        : [emptyInline("No ability scores recorded yet.")]
-    ),
-  );
-
-  renderSheetList(elements.characterSheetSkills, characterSkills(member), "No specialties or checks recorded yet.");
-  renderSheetList(elements.characterSheetAbilities, characterAbilities(member), "No abilities or spells recorded yet.");
-  renderSheetList(elements.characterSheetNotes, member.notes ?? [], "No extra notes recorded yet.");
+  elements.sheetName.value = member.name || "";
+  elements.sheetAncestryClass.value = member.ancestryClass || member.class || "";
+  elements.sheetRole.value = member.playerRole || member.role || "";
+  elements.sheetLevel.value = member.level ?? member.stats?.level ?? member.characterLevel ?? "";
+  elements.sheetXp.value = member.experience ?? member.xp ?? member.stats?.experience ?? member.stats?.xp ?? "";
+  elements.sheetHpCurrent.value = hp.current ?? "";
+  elements.sheetHpMax.value = hp.max ?? "";
+  elements.sheetAc.value = member.stats?.armorClass ?? member.armorClass ?? member.ac ?? "";
+  elements.sheetProf.value = member.proficiencyBonus ?? member.stats?.proficiencyBonus ?? member.prof ?? "";
+  elements.sheetBackground.value = member.background || member.backstory || member.summary || member.description || "";
+  elements.sheetStr.value = scores.STR ?? "";
+  elements.sheetDex.value = scores.DEX ?? "";
+  elements.sheetCon.value = scores.CON ?? "";
+  elements.sheetInt.value = scores.INT ?? "";
+  elements.sheetWis.value = scores.WIS ?? "";
+  elements.sheetCha.value = scores.CHA ?? "";
+  elements.sheetSkills.value = characterSkills(member).join("\n");
+  elements.sheetAbilities.value = characterAbilities(member).join("\n");
+  elements.sheetSpells.value = uniqueTextList([member.spells, member.stats?.spells]).join("\n");
+  elements.sheetNotes.value = (member.notes ?? []).join("\n");
 }
 
-function formatLevelAndXp(member) {
-  const level = member.level ?? member.stats?.level ?? member.characterLevel;
-  const xp = member.experience ?? member.xp ?? member.stats?.experience ?? member.stats?.xp;
-  if (level && xp) {
-    return `Level ${level} / ${xp} XP`;
+async function saveCharacterSheet() {
+  const member = findById(state.campaign.party, state.activeCharacterSheet);
+  if (!member) {
+    elements.bridgeStatus.textContent = "Character not found";
+    return;
   }
-  if (level) {
-    return `Level ${level}`;
+
+  const payload = {
+    domain: "party",
+    id: member.id,
+    name: elements.sheetName.value.trim(),
+    role: elements.sheetRole.value.trim(),
+    playerRole: elements.sheetRole.value.trim(),
+    ancestryClass: elements.sheetAncestryClass.value.trim(),
+    level: parseOptionalNumber(elements.sheetLevel.value),
+    experience: parseOptionalNumber(elements.sheetXp.value),
+    proficiencyBonus: parseOptionalNumber(elements.sheetProf.value),
+    background: elements.sheetBackground.value.trim(),
+    stats: {
+      hp: buildHpPayload(),
+      armorClass: parseOptionalNumber(elements.sheetAc.value),
+      abilityScores: buildAbilityScorePayload(),
+      spells: splitMultiline(elements.sheetSpells.value),
+    },
+    skills: splitMultiline(elements.sheetSkills.value),
+    abilities: splitMultiline(elements.sheetAbilities.value),
+    spells: splitMultiline(elements.sheetSpells.value),
+    notes: splitMultiline(elements.sheetNotes.value),
+  };
+
+  if (!payload.name) {
+    elements.bridgeStatus.textContent = "Character name is required";
+    return;
   }
-  if (xp) {
-    return `${xp} XP`;
+
+  try {
+    elements.bridgeStatus.textContent = "Saving character sheet...";
+    setProviderActivity(`Saving ${payload.name} to SQLite...`, "working");
+    const response = await fetch(apiCampaignRecordUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const result = await response.json();
+    setCampaignFromPayload(result, "character_sheet_update");
+    seedPlayLog();
+    render();
+    const updated = findById(state.campaign.party, member.id);
+    if (updated) {
+      state.activeCharacterSheet = updated.id;
+      renderCharacterSheet(updated);
+    }
+    elements.bridgeStatus.textContent = `${payload.name} saved to SQLite`;
+    setProviderActivity(`${payload.name} saved`, "idle");
+  } catch (error) {
+    elements.bridgeStatus.textContent = error instanceof Error ? `Character save failed: ${error.message}` : "Character save failed";
+    setProviderActivity("Character save failed", "error");
   }
-  return "Level unknown";
 }
 
-function formatSheetHp(hp) {
+function buildHpPayload() {
+  const current = parseOptionalNumber(elements.sheetHpCurrent.value);
+  const max = parseOptionalNumber(elements.sheetHpMax.value);
+  if (current === null && max === null) {
+    return null;
+  }
+  return {
+    current,
+    max,
+  };
+}
+
+function buildAbilityScorePayload() {
+  return removeNullEntries({
+    STR: parseOptionalNumber(elements.sheetStr.value),
+    DEX: parseOptionalNumber(elements.sheetDex.value),
+    CON: parseOptionalNumber(elements.sheetCon.value),
+    INT: parseOptionalNumber(elements.sheetInt.value),
+    WIS: parseOptionalNumber(elements.sheetWis.value),
+    CHA: parseOptionalNumber(elements.sheetCha.value),
+  });
+}
+
+function normalizeHpForForm(hp) {
   if (!hp) {
-    return "HP unknown";
+    return {};
   }
-
-  if (typeof hp === "string" || typeof hp === "number") {
-    return `HP ${hp}`;
+  if (typeof hp === "number" || typeof hp === "string") {
+    return {
+      current: hp,
+      max: "",
+    };
   }
-
-  if (hp.current !== undefined && hp.max !== undefined) {
-    return `HP ${hp.current}/${hp.max}`;
-  }
-
-  return "HP unknown";
-}
-
-function characterBackground(member) {
-  return [
-    member.background,
-    member.backstory,
-    member.summary,
-    member.description,
-    ...(member.notes ?? []).slice(0, 2),
-  ].filter(Boolean).join(" ") || "No background recorded yet.";
+  return hp;
 }
 
 function characterAbilityScores(member) {
   const source = member.abilityScores ?? member.ability_scores ?? member.stats?.abilityScores ?? member.stats?.ability_scores ?? member.stats?.abilities;
   if (!source || Array.isArray(source) || typeof source !== "object") {
-    return [];
+    return {};
   }
 
   const aliases = {
@@ -1716,25 +1810,14 @@ function characterAbilityScores(member) {
     CHA: ["CHA", "cha", "charisma"],
   };
 
-  return Object.entries(aliases)
-    .map(([label, keys]) => {
-      const score = keys.map((key) => source[key]).find((value) => value !== undefined && value !== null);
-      return score !== undefined ? [label, score] : null;
-    })
-    .filter(Boolean);
-}
-
-function statPill(label, score) {
-  const wrapper = document.createElement("span");
-  wrapper.className = "stat-pill";
-  const numeric = Number(score);
-  const modifier = Number.isFinite(numeric) ? ` (${formatModifier(Math.floor((numeric - 10) / 2))})` : "";
-  wrapper.textContent = `${label} ${score}${modifier}`;
-  return wrapper;
-}
-
-function formatModifier(value) {
-  return value >= 0 ? `+${value}` : String(value);
+  return Object.fromEntries(
+    Object.entries(aliases)
+      .map(([label, keys]) => {
+        const score = keys.map((key) => source[key]).find((value) => value !== undefined && value !== null);
+        return score !== undefined ? [label, score] : null;
+      })
+      .filter(Boolean),
+  );
 }
 
 function characterSkills(member) {
@@ -1753,8 +1836,6 @@ function characterAbilities(member) {
     member.abilities,
     member.features,
     member.traits,
-    member.spells,
-    member.stats?.spells,
   ]);
 }
 
@@ -1783,30 +1864,24 @@ function uniqueTextList(values) {
     });
 }
 
-function renderSheetList(list, values, emptyMessage) {
-  list.replaceChildren(
-    ...(values.length
-      ? values.map((value) => {
-          const item = document.createElement("li");
-          item.textContent = value;
-          return item;
-        })
-      : [emptyListItem(emptyMessage)]),
-  );
+function splitMultiline(value) {
+  return String(value || "")
+    .split(/[,;\n]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
-function emptyListItem(message) {
-  const item = document.createElement("li");
-  item.className = "empty-list-item";
-  item.textContent = message;
-  return item;
+function parseOptionalNumber(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return null;
+  }
+  const number = Number(text);
+  return Number.isFinite(number) ? number : text;
 }
 
-function emptyInline(message) {
-  const node = document.createElement("p");
-  node.className = "empty-inline";
-  node.textContent = message;
-  return node;
+function removeNullEntries(object) {
+  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== null && value !== ""));
 }
 
 function renderPeople(campaign) {

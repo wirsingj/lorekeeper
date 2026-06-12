@@ -25,9 +25,16 @@ export function addCampaignRecord(campaign, input) {
     working[domain].push(record);
   } else {
     record.createdAt = working[domain][existingIndex].createdAt || record.createdAt;
+    const mergedStats = domain === "party"
+      ? {
+          ...(working[domain][existingIndex].stats ?? {}),
+          ...(record.stats ?? {}),
+        }
+      : record.stats;
     working[domain][existingIndex] = {
       ...working[domain][existingIndex],
       ...record,
+      ...(mergedStats ? { stats: mergedStats } : {}),
       id: working[domain][existingIndex].id,
       updatedAt: now,
     };
@@ -49,14 +56,28 @@ function createRecord(domain, input, now) {
     return {
       id: input.id || uniqueId("party", name),
       name,
-      type: "player_character",
-      ancestryClass: input.role || "adventurer",
+      type: input.type || "player_character",
+      playerRole: input.playerRole || input.role || "party member",
+      ancestryClass: input.ancestryClass || input.ancestry_class || input.role || "adventurer",
+      level: input.level ?? null,
+      experience: input.experience ?? input.xp ?? null,
+      proficiencyBonus: input.proficiencyBonus ?? input.proficiency_bonus ?? null,
+      background: input.background || input.backstory || input.summary || "",
       stats: {
-        hp: null,
-        armorClass: null,
-        abilities: {},
+        hp: input.stats?.hp ?? input.hp ?? null,
+        armorClass: input.stats?.armorClass ?? input.stats?.armor_class ?? input.armorClass ?? input.ac ?? null,
+        abilityScores:
+          input.stats?.abilityScores ??
+          input.stats?.ability_scores ??
+          input.stats?.abilities ??
+          input.abilityScores ??
+          input.ability_scores ??
+          {},
+        spells: normalizeList(input.stats?.spells ?? input.spells),
       },
-      abilities: [],
+      skills: normalizeList(input.skills ?? input.proficiencies ?? input.specialties),
+      abilities: normalizeList(input.abilities ?? input.features ?? input.traits),
+      spells: normalizeList(input.spells ?? input.stats?.spells),
       notes,
       createdAt: now,
       updatedAt: now,
@@ -207,9 +228,24 @@ function requireName(input) {
 }
 
 function splitNotes(value) {
+  if (Array.isArray(value)) {
+    return value.map((note) => String(note).trim()).filter(Boolean);
+  }
+
   return String(value || "")
     .split(/\n+/)
     .map((note) => note.trim())
+    .filter(Boolean);
+}
+
+function normalizeList(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+
+  return String(value || "")
+    .split(/[,;\n]+/)
+    .map((entry) => entry.trim())
     .filter(Boolean);
 }
 
