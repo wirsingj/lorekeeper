@@ -13,8 +13,8 @@ async function createWindow() {
   Menu.setApplicationMenu(null);
 
   mainWindow = new BrowserWindow({
-    width: 1480,
-    height: 940,
+    width: 1520,
+    height: 1080,
     minWidth: 1120,
     minHeight: 720,
     title: "LoreKeeper",

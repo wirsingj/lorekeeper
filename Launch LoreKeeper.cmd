@@ -18,5 +18,5 @@ call npm run desktop
 if errorlevel 1 (
   echo.
   echo LoreKeeper exited with an error.
-  pause
+  if /i not "%~1"=="--no-pause" pause
 )
