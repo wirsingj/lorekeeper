@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
 import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startCombat } from "../src/engine/combat-engine.js";
 import { createCampaignStateStore } from "../src/engine/campaign-state-store.js";
@@ -160,6 +161,17 @@ function testCombatEngine() {
   assert.equal(resolved.actionRecord.effects.every((effect) => effect.source === "combat_engine"), true);
 }
 
+function testCombatTrackerView() {
+  const campaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: 10, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const view = buildCombatTrackerView(campaign, { controlledActorId: "karl" });
+  assert.equal(view.inCombat, true);
+  assert.equal(view.rows.some((row) => row.name === "Drunk miner" && row.meta === "DM"), true);
+  assert.equal(view.rows.find((row) => row.id === "karl").controlled, true);
+}
+
 function testProviderBoundary() {
   const campaign = campaignFixture();
   const turn = beginTurn(createTurnEngineState(), { turnId: "turn-provider", mode: gameModes.RP, actorId: "thor" });
@@ -191,6 +203,7 @@ testAgencyController();
 testTurnEngine();
 testStateEffects();
 testCombatEngine();
+testCombatTrackerView();
 testProviderBoundary();
 testCampaignStateStore();
 

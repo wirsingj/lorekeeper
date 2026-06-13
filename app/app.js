@@ -10,6 +10,7 @@ import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
 import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inputs.js";
+import { buildCombatTrackerView } from "./combat-tracker-view.js";
 
 const launchParams = new URLSearchParams(window.location.search);
 const clientMode = launchParams.get("mode") === "client";
@@ -6194,85 +6195,37 @@ function renderCombatTracker(campaign) {
   if (!elements.combatTrackerSection || !elements.combatTurnOrder) {
     return;
   }
-  const combat = campaign.combat ?? {};
-  const turnOrder = normalizedCombatTurnOrder(campaign);
-  const activeId = combat.currentTurnId || turnOrder[0]?.id || null;
-  const inCombat = Boolean(combat.inCombat && turnOrder.length);
-  elements.combatTrackerSection.hidden = !inCombat;
-  if (!inCombat) {
+  const view = buildCombatTrackerView(campaign, { controlledActorId: state.guestSession?.partyMemberId });
+  elements.combatTrackerSection.hidden = !view.inCombat;
+  if (!view.inCombat) {
     elements.combatTurnOrder.replaceChildren();
     elements.combatActiveActor.textContent = "No active turn.";
     return;
   }
 
-  const active = turnOrder.find((entry) => entry.id === activeId) ?? turnOrder[0];
-  elements.combatRound.textContent = `R${combat.round ?? 1}`;
-  elements.combatActiveActor.textContent = `${active?.name ?? "Unknown"}'s turn`;
+  elements.combatRound.textContent = view.roundLabel;
+  elements.combatActiveActor.textContent = view.activeLabel;
   elements.combatTurnOrder.replaceChildren(
-    ...turnOrder.map((entry, index) => {
+    ...view.rows.map((entry) => {
       const item = document.createElement("li");
       item.className = [
         "combat-order-row",
-        entry.id === activeId ? "active" : "",
+        entry.active ? "active" : "",
         entry.type === "enemy" ? "enemy" : "party",
-        entry.id === state.guestSession?.partyMemberId ? "controlled" : "",
+        entry.controlled ? "controlled" : "",
       ].filter(Boolean).join(" ");
       const rank = document.createElement("span");
       rank.className = "combat-order-rank";
-      rank.textContent = String(index + 1);
+      rank.textContent = String(entry.rank);
       const label = document.createElement("strong");
       label.textContent = entry.name;
       const meta = document.createElement("span");
       meta.className = "combat-order-meta";
-      meta.textContent = combatOrderMeta(entry);
+      meta.textContent = entry.meta;
       item.append(rank, label, meta);
       return item;
     }),
   );
-}
-
-function normalizedCombatTurnOrder(campaign) {
-  const combat = campaign.combat ?? {};
-  const explicit = Array.isArray(combat.turnOrder) ? combat.turnOrder : [];
-  if (explicit.length) {
-    return explicit.map((entry) => ({
-      id: entry.id || entry.actorId,
-      name: entry.name || labelById(campaign, entry.id || entry.actorId),
-      type: entry.type || combatActorType(campaign, entry.id || entry.actorId),
-      initiativeRoll: entry.initiativeRoll ?? null,
-      initiativeModifier: entry.initiativeModifier ?? 0,
-      initiativeScore: entry.initiativeScore ?? entry.initiative ?? null,
-    })).filter((entry) => entry.id);
-  }
-  const initiativeIds = combat.initiative?.length
-    ? combat.initiative
-    : [
-      ...(campaign.scene?.presentPartyMemberIds?.length ? campaign.scene.presentPartyMemberIds : (campaign.party ?? []).map((member) => member.id)),
-      ...(combat.enemies ?? []).map((enemy) => enemy.id).filter(Boolean),
-    ];
-  return initiativeIds.map((id) => ({
-    id,
-    name: labelById(campaign, id),
-    type: combatActorType(campaign, id),
-    initiativeRoll: null,
-    initiativeModifier: 0,
-    initiativeScore: null,
-  }));
-}
-
-function combatActorType(campaign, id) {
-  if ((campaign.party ?? []).some((member) => member.id === id)) {
-    return "party";
-  }
-  if ((campaign.combat?.enemies ?? []).some((enemy) => enemy.id === id)) {
-    return "enemy";
-  }
-  return "unknown";
-}
-
-function combatOrderMeta(entry) {
-  const owner = entry.id === state.guestSession?.partyMemberId ? "You" : entry.type === "enemy" ? "DM" : "Party";
-  return owner;
 }
 
 function pendingJoinConnectionForMember(campaign, memberId) {
