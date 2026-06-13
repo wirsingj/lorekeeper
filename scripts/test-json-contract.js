@@ -588,14 +588,23 @@ assert.equal(aliasedChange.response.proposedChanges[0].visibility, "player_visib
 const invalidOperation = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   proposedChanges: [{ ...validChange(), operation: "teleport" }],
 })));
-assert.equal(invalidOperation.ok, false);
+assert.equal(invalidOperation.ok, true);
 assert.equal(invalidOperation.response.proposedChanges.length, 0);
+assert.match(invalidOperation.response.warnings.join(" "), /Dropped invalid proposedChange/);
 
 const invalidDomain = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   proposedChanges: [{ ...validChange(), domain: "planets" }],
 })));
-assert.equal(invalidDomain.ok, false);
+assert.equal(invalidDomain.ok, true);
 assert.equal(invalidDomain.response.proposedChanges.length, 0);
+assert.match(invalidDomain.response.warnings.join(" "), /Dropped invalid proposedChange/);
+
+const malformedOptionalChange = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  proposedChanges: [{ ...validChange(), operation: "set", domain: "memories" }],
+})));
+assert.equal(malformedOptionalChange.ok, true);
+assert.equal(malformedOptionalChange.error, null);
+assert.equal(malformedOptionalChange.response.proposedChanges.length, 0);
 
 const mismatch = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ requestId: "wrong-id" })), {
   requestId: "right-id",

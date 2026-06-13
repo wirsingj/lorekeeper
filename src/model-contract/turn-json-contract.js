@@ -157,16 +157,27 @@ export function parseTurnJsonResponse(rawText, options = {}) {
     expectedRequestId: options.requestId,
     request: options.request,
   });
+  const onlyOptionalChangeErrors = hasOnlyProposedChangeValidationErrors(validation.errors);
+  const acceptedResponse = onlyOptionalChangeErrors
+    ? {
+      ...repaired,
+      proposedChanges: [],
+      warnings: [
+        ...repaired.warnings,
+        ...validation.errors.map((error) => `Dropped invalid proposedChange: ${error}`),
+      ],
+    }
+    : repaired;
 
   return {
-    ok: validation.valid,
-    error: validation.valid ? null : validation.errors.join("; "),
+    ok: validation.valid || onlyOptionalChangeErrors,
+    error: validation.valid || onlyOptionalChangeErrors ? null : validation.errors.join("; "),
     validationErrors: validation.errors,
     recovery: parsed.recovery,
-    response: validation.valid
-      ? repaired
+    response: validation.valid || onlyOptionalChangeErrors
+      ? acceptedResponse
       : {
-        ...repaired,
+        ...acceptedResponse,
         proposedChanges: hasProposedChangeValidationErrors(validation.errors) ? [] : repaired.proposedChanges,
         warnings: [...repaired.warnings, ...validation.errors],
       },
@@ -240,6 +251,10 @@ function repairCombatAdvanceChange(response, request) {
 
 function hasProposedChangeValidationErrors(errors = []) {
   return errors.some((error) => /^proposedChanges\[\d+\]\./.test(error));
+}
+
+function hasOnlyProposedChangeValidationErrors(errors = []) {
+  return errors.length > 0 && errors.every((error) => /^proposedChanges\[\d+\]\./.test(error));
 }
 
 export function renderTurnResponseForImport(turnResponse) {
