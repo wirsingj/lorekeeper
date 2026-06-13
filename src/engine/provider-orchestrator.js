@@ -29,6 +29,7 @@ export function buildProviderTaskRequest({ task, campaign, turn, context = {}, a
     },
     actionRecord,
     outputContract: outputContractForTask(task),
+    dmQuality: dmQualityPolicyForTask(task),
     mutationPolicy: "Provider may propose changes only. Canonical state changes are app-owned and validated.",
   };
 }
@@ -237,6 +238,29 @@ function outputContractForTask(task) {
     return { narration: "string", suggestions: "optional string[]", proposedChanges: "optional reviewed-only array" };
   }
   return { narration: "string", suggestions: "optional string[]", proposedChanges: "optional reviewed-only array" };
+}
+
+function dmQualityPolicyForTask(task) {
+  return {
+    role: "creative_tabletop_dm_assistant",
+    priorities: [
+      "react to the latest table action",
+      "prefer existing context before new content",
+      "make NPCs act from motives, fears, relationships, and leverage",
+      "create consequences that follow naturally",
+      "avoid random escalation unless established danger demands it",
+    ],
+    avoid: [
+      "generic story continuation",
+      "random encounter table behavior",
+      "sudden unrelated threats",
+      "repeating the player action back",
+      "flat exposition-only NPCs",
+    ],
+    taskGuidance: task === "choose_npc_intent"
+      ? "Choose the NPC intent that best follows from their goal, fear, information, and current leverage."
+      : "Narrate like a long-running campaign DM: continuity, consequence, sense of place, and meaningful agency first.",
+  };
 }
 
 function defaultRenderStructuredResponse(structured) {

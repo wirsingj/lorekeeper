@@ -184,6 +184,8 @@ function testProviderBoundary() {
   const request = buildProviderTaskRequest({ task: "narrate_resolved_action", campaign, turn });
   assert.equal(request.turnId, "turn-provider");
   assert.equal(request.mutationPolicy.includes("app-owned"), true);
+  assert.equal(request.dmQuality.role, "creative_tabletop_dm_assistant");
+  assert.ok(request.dmQuality.avoid.includes("random encounter table behavior"));
   assert.equal(request.readonlyContext.recentMessages.length, 1);
   assert.equal(request.readonlyContext.party, undefined, "provider request should not include whole campaign dumps");
 

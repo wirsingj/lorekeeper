@@ -347,6 +347,9 @@ export function createDefaultStyleRules() {
       "Preserve established canon unless the user approves a change.",
       "Keep player agency explicit.",
       "Use vivid sensory details without burying actionable choices.",
+      "Prefer consequences, NPC motivations, relationships, and unresolved threads over random new encounters.",
+      "Let scenes breathe; conversation, travel, investigation, planning, and fallout can be complete turns.",
+      "Introduce new threats only when they follow from current danger, established setup, NPC motive, or a player action.",
     ],
     formattingRules: [
       "End most scenes with solid narration or an immediate prompt; reserve structured options for combat, immediate danger, or explicit option requests.",

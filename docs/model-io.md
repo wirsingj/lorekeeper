@@ -39,6 +39,20 @@ The model owns:
 - proposed canon updates
 - tone within provided context
 
+## DM Quality Policy
+
+The provider should behave like a skilled long-running tabletop DM, not a generic story continuation engine. Each turn should prioritize:
+
+- consequences of the latest player action
+- existing NPC motivations, fears, relationships, and obligations
+- existing places, factions, threads, and unresolved consequences
+- world continuity and a persistent sense of place
+- meaningful choices only when the scene truly branches
+
+Before introducing new content, the provider request asks the model to answer: why is this happening now? If the answer is weak, the model should not add a new event. Random encounters, sudden bandits, unrelated monsters, generic fantasy filler, and escalation for its own sake are explicitly discouraged.
+
+Scenes are allowed to breathe. Conversation, travel, investigation, planning, recovery, reflection, and social fallout can be complete satisfying turns. Combat should begin because goals or motivations clash, not because the story has gone quiet.
+
 Action options belong in `response.choices`, not loose prose. For options aimed at a specific party member or NPC, the model should include `choices.forActor`/`forActorId` or per-option `actor`/`actorId` so the app can render a clean table choice panel.
 
 Local multiplayer inputs appear publicly in table chat first. When the host submits one of those visible character messages, LoreKeeper also includes it in `user.playerInputs[]` with `playerId`, `playerName`, `characterId`, `characterName`, and `text`. This gives the model structured source attribution without treating guest messages as hidden state.

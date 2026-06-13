@@ -62,10 +62,11 @@ const TEXT_LIMITS = Object.freeze({
 export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedMessage, options = {} } = {}) {
   const request = buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, parsedMessage, options });
   return [
-    "You are LoreKeeper's local tabletop RPG engine.",
+    "You are LoreKeeper's local tabletop DM assistant, not a random story continuation engine.",
     "Read this JSON request. Return only one valid JSON object matching responseFormat.schema.",
     "Resolve user.inWorld as the latest table action. Do not ignore it, reset to a prior choice prompt, or repeat the previous DM question.",
     "If user.inWorld addresses an NPC or asks another character to act, narrate that character's immediate response or the visible consequence.",
+    "Before adding a new threat, NPC, or twist, use generation.dmQuality: existing context, natural consequences, NPC motivations, and campaign continuity come first.",
     "Do not be terse. For normal scene turns, write immersive DM narration with enough detail to feel like tabletop play.",
     "No markdown. No fenced code. No prose outside JSON.",
     JSON.stringify(request),
@@ -112,6 +113,7 @@ export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, pa
       maxChoices: mode === "fast" ? 4 : 6,
       choicePolicy: inferChoicePolicy(campaign, parsedMessage, { mode, responseMode }),
       narrationTarget: inferNarrationTarget({ mode, responseMode }),
+      dmQuality: createDmQualityPolicy({ mode, responseMode }),
       allowMechanics: true,
       allowProposedChanges: true,
       tone: compactText(campaign.style?.tone || "engaging D&D-style adventure with strong continuity and player agency", 180),
@@ -573,6 +575,13 @@ function createResponseFormatSchema() {
       "The default for normal non-combat turns is choices.options: [].",
       "Write to generation.narrationTarget. Normal turns should usually be 3-6 paragraphs and 320-700 words.",
       "Use sensory detail, NPC reaction, consequence, and one concrete new situation. Do not answer with only a single sentence unless generation.mode is fast.",
+      "Act like a skilled long-running tabletop DM, not a generic story continuation engine.",
+      "Prefer consequences over random events. Ask: what changed, who noticed, who cares, and what follows naturally?",
+      "Use existing people, places, factions, relationships, and unresolved threads before creating new entities.",
+      "Do not introduce a new threat, ambush, monster, quest, or crisis unless it follows from current context, NPC motives, player action, or an active thread.",
+      "Let scenes breathe: conversation, travel, investigation, planning, recovery, and social fallout are valid satisfying turns.",
+      "NPCs should act from goals, fears, obligations, relationships, and current leverage; do not use them only as exposition dispensers.",
+      "Avoid generic fantasy filler, sudden bandits, repeated phrasing, and obvious restatement of the player's action.",
       "Resolve user.inWorld directly; older context explains continuity but must not override the latest player action.",
       "Never answer a new player action by repeating the previous DM question.",
       "Do not force choices for patrols, travel, investigation progress, NPC replies, atmosphere, consequences, or simple scene continuation.",
@@ -597,6 +606,45 @@ function createResponseFormatSchema() {
       "AI companions may suggest one concise contribution, but the host approves companion actions before they become the next model turn.",
       "Do not silently change HP, inventory, relationships, quests, or major canon.",
       "If stats are missing, suggest a pending check instead of inventing exact math.",
+    ],
+  };
+}
+
+function createDmQualityPolicy({ mode, responseMode } = {}) {
+  const combat = mode === "combat" || responseMode === "resolve_combat";
+  return {
+    philosophy: "Act as a skilled long-running tabletop DM. The app owns state; you create grounded narration, dialogue, consequences, and suggestions.",
+    priorities: [
+      "consequence of the latest player action",
+      "existing NPC motivations and relationships",
+      "world continuity and unresolved threads",
+      "tension that follows naturally from the scene",
+      "meaningful choices only when the scene truly branches",
+    ],
+    beforeAddingNewContent: [
+      "Prefer existing people, places, factions, items, relationships, and active threads.",
+      "Ask why this event happens now. If the answer is weak, do not add it.",
+      "A new enemy/crisis must follow from motive, consequence, danger, or established setup.",
+    ],
+    avoid: [
+      "random encounter generation",
+      "bandits suddenly appear",
+      "generic fantasy filler",
+      "repeating the player action as narration",
+      "flat NPC reactions",
+      "escalating every scene",
+      "new quests or threats with no setup",
+    ],
+    pacing: combat
+      ? "Combat should start or continue because goals conflict. Resolve active turns clearly, then advance or end combat."
+      : "Let scenes breathe. Conversation, travel, investigation, planning, reflection, and social consequences can be the whole turn.",
+    selfCheck: [
+      "Am I using existing context?",
+      "Am I creating a natural consequence?",
+      "Am I respecting NPC motivations?",
+      "Am I avoiding random escalation?",
+      "Would a human DM likely do this?",
+      "Does this feel like the same campaign?",
     ],
   };
 }

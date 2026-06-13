@@ -111,6 +111,9 @@ assert.equal(requestEnvelope.generation.choicePolicy.choicesAllowed, false);
 assert.equal(requestEnvelope.generation.narrationTarget.style, "immersive_tabletop");
 assert.equal(requestEnvelope.generation.narrationTarget.paragraphs, "3-6");
 assert.equal(requestEnvelope.generation.narrationTarget.words, "320-700");
+assert.match(requestEnvelope.generation.dmQuality.philosophy, /skilled long-running tabletop DM/);
+assert.ok(requestEnvelope.generation.dmQuality.avoid.includes("random encounter generation"));
+assert.ok(requestEnvelope.generation.dmQuality.beforeAddingNewContent.some((rule) => /Prefer existing people/.test(rule)));
 assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
 
