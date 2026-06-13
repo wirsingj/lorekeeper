@@ -23,7 +23,7 @@ const apiCampaignUrl = "/api/campaign";
 const apiCampaignsUrl = "/api/campaigns";
 const apiSelectCampaignUrl = "/api/campaign/select";
 const apiNewCampaignUrl = "/api/campaign/new";
-const apiHideCampaignUrl = "/api/campaign/hide";
+const apiDeleteCampaignUrl = "/api/campaign/delete";
 const apiImportedCampaignUrl = "/api/campaign/imported";
 const apiCommitReviewUrl = "/api/review/commit";
 const apiCampaignRecordUrl = "/api/campaign/record";
@@ -288,7 +288,6 @@ const elements = {
   deleteCampaignForm: document.querySelector("#delete-campaign-form"),
   deleteCampaignTitle: document.querySelector("#delete-campaign-title"),
   deleteCampaignMessage: document.querySelector("#delete-campaign-message"),
-  deleteCampaignName: document.querySelector("#delete-campaign-name"),
   closeDeleteCampaignDialog: document.querySelector("#close-delete-campaign-dialog"),
   cancelDeleteCampaign: document.querySelector("#cancel-delete-campaign"),
   confirmDeleteCampaign: document.querySelector("#confirm-delete-campaign"),
@@ -563,13 +562,9 @@ elements.cancelDeleteCampaign.addEventListener("click", () => {
   elements.deleteCampaignDialog.close();
 });
 
-elements.deleteCampaignName.addEventListener("input", () => {
-  elements.confirmDeleteCampaign.disabled = elements.deleteCampaignName.value !== state.campaign.title;
-});
-
 elements.deleteCampaignForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  await hideActiveCampaign();
+  await deleteActiveCampaign();
 });
 
 elements.recordForm.addEventListener("submit", async (event) => {
@@ -3869,28 +3864,22 @@ function newCampaignOption() {
 
 function openDeleteCampaignDialog() {
   if (!state.sqlitePath || !state.campaign?.title) {
-    elements.bridgeStatus.textContent = "No active campaign file to hide";
+    elements.bridgeStatus.textContent = "No active campaign file to delete";
     return;
   }
 
-  elements.deleteCampaignTitle.textContent = `Hide ${state.campaign.title}`;
+  elements.deleteCampaignTitle.textContent = `Delete ${state.campaign.title}`;
   elements.deleteCampaignMessage.textContent =
-    `This will hide "${state.campaign.title}" from the campaign selector. The SQLite file stays on disk for now.`;
-  elements.deleteCampaignName.value = "";
-  elements.confirmDeleteCampaign.disabled = true;
+    `This will permanently delete "${state.campaign.title}" from this device, remove its SQLite file, and clean up the campaign index.`;
+  elements.confirmDeleteCampaign.disabled = false;
   elements.deleteCampaignDialog.showModal();
-  elements.deleteCampaignName.focus();
+  elements.confirmDeleteCampaign.focus();
 }
 
-async function hideActiveCampaign() {
-  if (elements.deleteCampaignName.value !== state.campaign.title) {
-    elements.bridgeStatus.textContent = "Campaign name did not match";
-    return;
-  }
-
+async function deleteActiveCampaign() {
   try {
-    elements.bridgeStatus.textContent = "Hiding campaign...";
-    const response = await fetch(apiHideCampaignUrl, {
+    elements.bridgeStatus.textContent = "Deleting campaign...";
+    const response = await fetch(apiDeleteCampaignUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -3906,13 +3895,13 @@ async function hideActiveCampaign() {
     }
 
     const payload = await response.json();
-    setCampaignFromPayload(payload, "campaign_hidden_context");
+    setCampaignFromPayload(payload, "campaign_deleted_context");
     seedPlayLog();
     render();
     elements.deleteCampaignDialog.close();
-    elements.bridgeStatus.textContent = "Campaign hidden from selector";
+    elements.bridgeStatus.textContent = "Campaign deleted";
   } catch (error) {
-    elements.bridgeStatus.textContent = error instanceof Error ? `Hide failed: ${error.message}` : "Hide failed";
+    elements.bridgeStatus.textContent = error instanceof Error ? `Delete failed: ${error.message}` : "Delete failed";
   }
 }
 

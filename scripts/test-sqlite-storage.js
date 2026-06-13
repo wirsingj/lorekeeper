@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
+import {
+  createNewActiveCampaign,
+  deleteCampaign,
+  listCampaigns,
+} from "../src/storage/campaign-repository.js";
 import {
   readCampaignFromSqliteFile,
   readCampaignSqliteSummary,
@@ -98,6 +104,40 @@ try {
   assert.equal(roundTrip.stateEffectLog.length, 1);
   assert.equal(roundTrip.combatActionLog.length, 1);
   assert.equal(roundTrip.providerEventLog.length, 1);
+
+  const repoRoot = path.join(tempDir, "campaign-repo");
+  const first = await createNewActiveCampaign(repoRoot, {
+    title: "Delete Target",
+    premise: "This campaign should be deleted.",
+  });
+  const second = await createNewActiveCampaign(repoRoot, {
+    title: "Keep Target",
+    premise: "This campaign should survive.",
+  });
+  assert.ok(existsSync(first.sqlitePath));
+  assert.ok(existsSync(second.sqlitePath));
+
+  await assert.rejects(
+    () => deleteCampaign(repoRoot, { sqlitePath: first.sqlitePath, campaignTitle: "Wrong Name" }),
+    /Campaign name did not match/,
+  );
+  assert.ok(existsSync(first.sqlitePath));
+
+  const afterDelete = await deleteCampaign(repoRoot, {
+    sqlitePath: second.sqlitePath,
+    campaignTitle: "Keep Target",
+  });
+  assert.equal(existsSync(second.sqlitePath), false);
+  assert.equal(afterDelete.campaign.title, "Delete Target");
+
+  const campaigns = await listCampaigns(repoRoot);
+  assert.ok(campaigns.campaigns.some((entry) => entry.title === "Delete Target"));
+  assert.equal(campaigns.campaigns.some((entry) => entry.title === "Keep Target"), false);
+
+  const indexPath = path.join(repoRoot, "data", "campaigns", "campaign-index.json");
+  const index = JSON.parse(await readFile(indexPath, "utf8"));
+  assert.equal(index.campaigns.some((entry) => path.resolve(entry.sqlitePath) === path.resolve(second.sqlitePath)), false);
+  assert.equal(index.hiddenCampaignPaths.some((sqlitePath) => path.resolve(sqlitePath) === path.resolve(second.sqlitePath)), false);
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

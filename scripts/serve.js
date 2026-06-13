@@ -5,10 +5,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   createNewActiveCampaign,
+  deleteCampaign,
   listCampaigns,
   loadActiveCampaign,
   loadImportedCampaign,
-  hideCampaign,
   selectCampaign,
   updateActiveCampaign,
 } from "../src/storage/campaign-repository.js";
@@ -170,9 +170,9 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (url.pathname === "/api/campaign/hide" && request.method === "POST") {
+    if ((url.pathname === "/api/campaign/delete" || url.pathname === "/api/campaign/hide") && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await hideCampaign(projectRoot, {
+      const payload = await deleteCampaign(projectRoot, {
         sqlitePath: body.sqlitePath,
         campaignTitle: body.campaignTitle,
       });
@@ -983,6 +983,8 @@ async function validateCampaignPin(request, url) {
 function requiresCampaignPin(pathname) {
   return new Set([
     "/api/campaign/record",
+    "/api/campaign/delete",
+    "/api/campaign/hide",
     "/api/campaign/message",
     "/api/campaign/message/update",
     "/api/provider/conversation",

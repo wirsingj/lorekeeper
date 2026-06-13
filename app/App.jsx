@@ -27,7 +27,7 @@ export function LorekeeperShell() {
             <select id="campaign-select" aria-label="Campaign selector">
               <option>Loading campaigns...</option>
             </select>
-            <button id="delete-campaign" className="icon-action danger-action" type="button" title="Hide campaign" aria-label="Hide campaign">
+            <button id="delete-campaign" className="icon-action danger-action" type="button" title="Delete campaign" aria-label="Delete campaign">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M9 3h6l1 2h4v2H4V5h4l1-2Z"></path>
                 <path d="M6 9h12l-1 11H7L6 9Z"></path>
@@ -601,19 +601,15 @@ function DeleteCampaignDialog() {
       <form id="delete-campaign-form" method="dialog">
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">Hide Campaign</p>
-            <h2 id="delete-campaign-title">Hide Campaign</h2>
+            <p className="eyebrow">Delete Campaign</p>
+            <h2 id="delete-campaign-title">Delete Campaign</h2>
           </div>
           <button id="close-delete-campaign-dialog" className="icon-action" type="button" title="Close">x</button>
         </header>
         <p id="delete-campaign-message" className="dialog-copy"></p>
-        <label>
-          <span>Type campaign name</span>
-          <input id="delete-campaign-name" autoComplete="off" />
-        </label>
         <footer className="dialog-actions">
           <button id="cancel-delete-campaign" type="button" className="secondary-action">Cancel</button>
-          <button id="confirm-delete-campaign" type="submit" className="danger-button" disabled>Hide Campaign</button>
+          <button id="confirm-delete-campaign" type="submit" className="danger-button">Delete Campaign</button>
         </footer>
       </form>
     </dialog>

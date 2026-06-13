@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { normalizeCampaign, touchCampaign } from "../campaign-state/schema.js";
+import { normalizeCampaign } from "../campaign-state/schema.js";
 import { createStarterCampaign } from "../campaign-state/starter-campaign.js";
 import { ensureInferredPlayerCharacter } from "../campaign-state/player-character-inference.js";
 import {
@@ -172,6 +172,10 @@ export async function createNewActiveCampaign(projectRoot, options = {}) {
 }
 
 export async function hideCampaign(projectRoot, { sqlitePath, campaignTitle }) {
+  return deleteCampaign(projectRoot, { sqlitePath, campaignTitle });
+}
+
+export async function deleteCampaign(projectRoot, { sqlitePath, campaignTitle }) {
   const resolvedPath = path.resolve(sqlitePath ?? "");
   if (!isPathInside(resolvedPath, getCampaignsDir(projectRoot))) {
     throw new Error("Campaign must be inside data/campaigns.");
@@ -185,17 +189,27 @@ export async function hideCampaign(projectRoot, { sqlitePath, campaignTitle }) {
   if (campaign.title !== campaignTitle) {
     throw new Error("Campaign name did not match.");
   }
-  const hiddenCampaign = touchCampaign({ ...campaign, hidden: true });
-  await overwriteCampaignSqliteFile(hiddenCampaign, resolvedPath);
 
   const index = await loadCampaignIndex(projectRoot);
+  await deleteSqliteStoreFiles(resolvedPath);
+  const nextCampaigns = index.campaigns.filter((entry) =>
+    path.resolve(entry.sqlitePath) !== resolvedPath &&
+    entry.id !== campaign.id
+  );
+  const nextHiddenPaths = index.hiddenCampaignPaths.filter((hiddenPath) => path.resolve(hiddenPath) !== resolvedPath);
   await saveCampaignIndex(projectRoot, {
     activeCampaignPath: index.activeCampaignPath === resolvedPath ? null : index.activeCampaignPath,
-    campaigns: index.campaigns,
-    hiddenCampaignPaths: [...new Set([...index.hiddenCampaignPaths, resolvedPath])],
+    campaigns: nextCampaigns,
+    hiddenCampaignPaths: nextHiddenPaths,
   });
 
   return loadActiveCampaign(projectRoot);
+}
+
+async function deleteSqliteStoreFiles(sqlitePath) {
+  await rm(sqlitePath, { force: true });
+  await rm(`${sqlitePath}-wal`, { force: true });
+  await rm(`${sqlitePath}-shm`, { force: true });
 }
 
 export async function saveActiveCampaign(projectRoot, campaign) {
