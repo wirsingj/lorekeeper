@@ -26,6 +26,9 @@ export function buildCombatTrackerView(campaign, options = {}) {
       active: entry.id === activeId,
       controlled: entry.id === options.controlledActorId,
       meta: combatOrderMeta(entry, options.controlledActorId),
+      hpLabel: combatHpLabel(entry.hp, {
+        hidden: entry.type === "enemy" && options.hideEnemyHp === true,
+      }),
     })),
   };
 }
@@ -41,6 +44,7 @@ export function normalizedCombatTurnOrder(campaign) {
       initiativeRoll: entry.initiativeRoll ?? null,
       initiativeModifier: entry.initiativeModifier ?? 0,
       initiativeScore: entry.initiativeScore ?? entry.initiative ?? null,
+      hp: combatActorHp(campaign, entry.id || entry.actorId, entry),
     })).filter((entry) => entry.id);
   }
   const initiativeIds = combat.initiative?.length
@@ -56,6 +60,7 @@ export function normalizedCombatTurnOrder(campaign) {
     initiativeRoll: null,
     initiativeModifier: 0,
     initiativeScore: null,
+    hp: combatActorHp(campaign, id),
   }));
 }
 
@@ -85,4 +90,66 @@ function labelById(campaign, id) {
     (campaign.combat?.enemies ?? []).find((item) => item.id === id)?.name ||
     id
   );
+}
+
+function combatActorHp(campaign, id, fallback = {}) {
+  const partyMember = (campaign.party ?? []).find((member) => member.id === id);
+  if (partyMember) {
+    return normalizeHpValue(partyMember.stats?.hp ?? partyMember.hp ?? partyMember.hitPoints ?? fallback.hp);
+  }
+
+  const enemy = (campaign.combat?.enemies ?? []).find((item) => item.id === id);
+  if (enemy) {
+    return normalizeHpValue(enemy.hp ?? enemy.hitPoints ?? fallback.hp);
+  }
+
+  return normalizeHpValue(fallback.hp);
+}
+
+function normalizeHpValue(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const current = numberOrNull(value.current ?? value.value ?? value.hp);
+    const max = numberOrNull(value.max ?? value.maximum ?? value.total);
+    return current === null && max === null
+      ? null
+      : { current, max, temporary: numberOrNull(value.temporary ?? value.temp) ?? 0 };
+  }
+  if (typeof value === "string") {
+    const match = value.match(/(-?\d+)\s*\/\s*(-?\d+)/);
+    if (match) {
+      return { current: Number(match[1]), max: Number(match[2]), temporary: 0 };
+    }
+  }
+  const number = numberOrNull(value);
+  return number === null ? null : { current: number, max: number, temporary: 0 };
+}
+
+function combatHpLabel(hp, options = {}) {
+  if (!hp) {
+    return "";
+  }
+  if (options.hidden) {
+    return hp.current !== null ? "HP ?" : "";
+  }
+  if (hp.current !== null && hp.max !== null) {
+    return `${hp.current}/${hp.max}`;
+  }
+  if (hp.current !== null) {
+    return String(hp.current);
+  }
+  if (hp.max !== null) {
+    return `?/${hp.max}`;
+  }
+  return "";
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }

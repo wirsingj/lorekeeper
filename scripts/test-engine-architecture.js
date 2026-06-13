@@ -173,6 +173,8 @@ function testCombatTrackerView() {
   const view = buildCombatTrackerView(campaign, { controlledActorId: "karl" });
   assert.equal(view.inCombat, true);
   assert.equal(view.rows.some((row) => row.name === "Drunk miner" && row.meta === "DM"), true);
+  assert.equal(view.rows.find((row) => row.id === "miner").hpLabel, "10/10");
+  assert.equal(view.rows.find((row) => row.id === "thor").hpLabel, "12/12");
   assert.equal(view.rows.find((row) => row.id === "karl").controlled, true);
 }
 

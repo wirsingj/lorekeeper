@@ -5183,6 +5183,9 @@ function contractIssueFromProviderResult(result) {
   if (!result) {
     return "missing provider result";
   }
+  if (result.ok === true && !result.error && !result.parseError) {
+    return "";
+  }
   if (result.parseError) {
     return result.parseError;
   }
@@ -6233,7 +6236,10 @@ function renderCombatTracker(campaign) {
       const meta = document.createElement("span");
       meta.className = "combat-order-meta";
       meta.textContent = entry.meta;
-      item.append(rank, label, meta);
+      const hp = document.createElement("span");
+      hp.className = "combat-order-hp";
+      hp.textContent = entry.hpLabel || "";
+      item.append(rank, label, meta, hp);
       return item;
     }),
   );

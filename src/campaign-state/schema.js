@@ -242,7 +242,7 @@ function normalizeEngineState(engineState = {}) {
 
 function normalizeCombatState(combat = {}) {
   const defaults = createEmptyCombatState();
-  return {
+  return reconcileCombatState({
     ...defaults,
     ...(combat ?? {}),
     inCombat: Boolean(combat?.inCombat ?? defaults.inCombat),
@@ -254,7 +254,89 @@ function normalizeCombatState(combat = {}) {
     conditions: Array.isArray(combat?.conditions) ? combat.conditions : defaults.conditions,
     turnEconomy: combat?.turnEconomy && typeof combat.turnEconomy === "object" ? combat.turnEconomy : defaults.turnEconomy,
     preferences: Array.isArray(combat?.preferences) ? combat.preferences : defaults.preferences,
+  });
+}
+
+function reconcileCombatState(combat) {
+  if (!combat.inCombat || !Array.isArray(combat.enemies) || !combat.enemies.length) {
+    return combat;
+  }
+
+  const enemyIds = new Set(combat.enemies.map((enemy) => enemy?.id).filter(Boolean));
+  const livingEnemyIds = new Set(combat.enemies
+    .filter((enemy) => !isDefeatedCombatant(enemy))
+    .map((enemy) => enemy.id)
+    .filter(Boolean));
+
+  if (enemyIds.size > 0 && livingEnemyIds.size === 0) {
+    return {
+      ...combat,
+      inCombat: false,
+      initiative: [],
+      turnOrder: [],
+      currentTurnId: null,
+      turnEconomy: {},
+      turnResolved: false,
+      advanceTurn: false,
+      lastOutcome: combat.lastOutcome || "Combat ended: all known enemies defeated.",
+    };
+  }
+
+  const turnOrder = Array.isArray(combat.turnOrder)
+    ? combat.turnOrder.filter((entry) => {
+      const id = entry?.id || entry?.actorId;
+      return !enemyIds.has(id) || livingEnemyIds.has(id);
+    })
+    : [];
+  const initiative = turnOrder.length
+    ? turnOrder.map((entry) => entry.id || entry.actorId).filter(Boolean)
+    : (Array.isArray(combat.initiative) ? combat.initiative : []).filter((id) => !enemyIds.has(id) || livingEnemyIds.has(id));
+
+  return {
+    ...combat,
+    turnOrder,
+    initiative,
+    currentTurnId: combat.currentTurnId && initiative.includes(combat.currentTurnId)
+      ? combat.currentTurnId
+      : initiative[0] ?? combat.currentTurnId,
   };
+}
+
+function isDefeatedCombatant(combatant = {}) {
+  const conditions = Array.isArray(combatant.conditions) ? combatant.conditions : [];
+  if (conditions.some((condition) => ["dead", "defeated", "destroyed", "unconscious"].includes(String(condition).toLowerCase()))) {
+    return true;
+  }
+  const hp = normalizeHpValue(combatant.hp ?? combatant.hitPoints);
+  return hp.current !== null && hp.current <= 0;
+}
+
+function normalizeHpValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return { current: null, max: null };
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return {
+      current: numberOrNull(value.current ?? value.value ?? value.hp),
+      max: numberOrNull(value.max ?? value.maximum ?? value.total),
+    };
+  }
+  if (typeof value === "string") {
+    const match = value.match(/(-?\d+)\s*\/\s*(-?\d+)/);
+    if (match) {
+      return { current: Number(match[1]), max: Number(match[2]) };
+    }
+  }
+  const number = numberOrNull(value);
+  return { current: number, max: number };
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 export function createDefaultStyleRules() {

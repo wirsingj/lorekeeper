@@ -5,7 +5,7 @@ import { OllamaProvider } from "../src/ai/ollama-provider.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "../app/mechanics-formatting.js";
 import { normalizeProviderRuntimeSettings } from "../src/ai/provider-settings.js";
 import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
-import { createEmptyCampaign } from "../src/campaign-state/schema.js";
+import { createEmptyCampaign, normalizeCampaign } from "../src/campaign-state/schema.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import {
   buildTurnRequestEnvelope,
@@ -346,6 +346,60 @@ const repairedPromptedCombat = applyCanonicalChanges({
 ]);
 assert.equal(repairedPromptedCombat.campaign.combat.currentTurnId, "mira");
 assert.equal(repairedPromptedCombat.campaign.combat.promptedActorId, undefined);
+
+const defeatedLastEnemyCombat = applyCanonicalChanges({
+  ...rulesCampaignData,
+  combat: {
+    inCombat: true,
+    round: 3,
+    currentTurnId: "mira",
+    turnOrder: [
+      { id: "mira", name: "Mira", type: "party", initiativeScore: 14 },
+      { id: "enemy-wolf", name: "Wolf", type: "enemy", initiativeScore: 9 },
+    ],
+    initiative: ["mira", "enemy-wolf"],
+    enemies: [{ id: "enemy-wolf", name: "Wolf", hp: { current: 5, max: 5 } }],
+  },
+}, [
+  {
+    id: "combat-last-enemy-defeated",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Mira drops the last wolf.",
+    data: {
+      inCombat: true,
+      turnResolved: true,
+      advanceTurn: true,
+      resolvedActorId: "mira",
+      enemyUpdates: [{ id: "enemy-wolf", hp: { current: 0, max: 5 } }],
+    },
+    confidence: "high",
+    reason: "The final enemy was defeated.",
+  },
+]);
+assert.equal(defeatedLastEnemyCombat.campaign.combat.inCombat, false);
+assert.deepEqual(defeatedLastEnemyCombat.campaign.combat.turnOrder, []);
+assert.deepEqual(defeatedLastEnemyCombat.campaign.combat.initiative, []);
+
+const normalizedDefeatedCombat = normalizeCampaign({
+  ...rulesCampaignData,
+  combat: {
+    inCombat: true,
+    round: 5,
+    currentTurnId: "enemy-hostile-miner",
+    turnOrder: [
+      { id: "enemy-hostile-miner", name: "Hostile miner", type: "enemy", initiativeScore: 12 },
+      { id: "mira", name: "Mira", type: "party", initiativeScore: 10 },
+    ],
+    initiative: ["enemy-hostile-miner", "mira"],
+    enemies: [{ id: "enemy-hostile-miner", name: "Hostile miner", hp: { current: 0, max: 0 } }],
+  },
+});
+assert.equal(normalizedDefeatedCombat.combat.inCombat, false);
+assert.deepEqual(normalizedDefeatedCombat.combat.turnOrder, []);
 
 assert.equal(
   normalizeProviderRuntimeSettings({ ollamaBaseUrl: "https://example.com/ollama" }).ollamaBaseUrl,

@@ -299,6 +299,7 @@ function mergeCombatChange(campaign, change, operation) {
   campaign.combat = normalizeCombatPatch(campaign.combat ?? {}, data);
   applyCombatActorUpdates(campaign, normalizeList(data.actorUpdates ?? data.partyUpdates));
   applyCombatEnemyUpdates(campaign.combat, normalizeList(data.enemyUpdates));
+  reconcileDefeatedCombatants(campaign, change.summary);
   if (campaign.combat?.inCombat) {
     let orderedCampaign;
     if (data.promptedActorId) {
@@ -316,6 +317,7 @@ function mergeCombatChange(campaign, change, operation) {
       orderedCampaign = ensureCombatTurnOrder(campaign, { reroll: data.rerollInitiative === true });
     }
     campaign.combat = orderedCampaign.combat;
+    reconcileDefeatedCombatants(campaign, change.summary);
   }
   addHumanNote(campaign.combat, change);
   return { applied: true };
@@ -439,6 +441,55 @@ function applyCombatEnemyUpdates(combat, updates) {
     }
   }
   combat.enemies = enemies;
+}
+
+function reconcileDefeatedCombatants(campaign, summary = "") {
+  const combat = campaign.combat;
+  if (!combat?.inCombat) {
+    return;
+  }
+
+  const enemies = normalizeCombatants(combat.enemies);
+  const knownEnemyIds = new Set(enemies.map((enemy) => enemy.id).filter(Boolean));
+  const livingEnemyIds = new Set(enemies.filter((enemy) => !isDefeatedCombatant(enemy)).map((enemy) => enemy.id));
+  const allKnownEnemiesDefeated = enemies.length > 0 && livingEnemyIds.size === 0;
+
+  if (allKnownEnemiesDefeated) {
+    campaign.combat = {
+      ...combat,
+      inCombat: false,
+      currentTurnId: null,
+      initiative: [],
+      turnOrder: [],
+      turnEconomy: {},
+      turnResolved: false,
+      advanceTurn: false,
+      lastOutcome: summary || combat.lastOutcome || "Combat ended: all known enemies defeated.",
+    };
+    return;
+  }
+
+  if (!knownEnemyIds.size || !Array.isArray(combat.turnOrder)) {
+    return;
+  }
+
+  combat.turnOrder = combat.turnOrder.filter((entry) => {
+    const id = entry.id || entry.actorId;
+    return !knownEnemyIds.has(id) || livingEnemyIds.has(id);
+  });
+  combat.initiative = combat.turnOrder.map((entry) => entry.id || entry.actorId).filter(Boolean);
+  if (combat.currentTurnId && !combat.initiative.includes(combat.currentTurnId)) {
+    combat.currentTurnId = combat.initiative[0] ?? null;
+  }
+}
+
+function isDefeatedCombatant(combatant = {}) {
+  const conditions = normalizeList(combatant.conditions).map((condition) => String(condition).toLowerCase());
+  if (conditions.some((condition) => ["dead", "defeated", "destroyed", "unconscious"].includes(condition))) {
+    return true;
+  }
+  const hp = normalizeHpValue(combatant.hp ?? combatant.hitPoints);
+  return hp.current !== null && hp.current <= 0;
 }
 
 function addHumanNote(record, change) {
@@ -830,6 +881,9 @@ function recordId(value) {
 }
 
 function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }

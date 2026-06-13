@@ -427,7 +427,7 @@ h3 {
 
 .combat-order-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   gap: 3px 7px;
   align-items: center;
   padding: 7px;
@@ -480,6 +480,23 @@ h3 {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.combat-order-hp {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  align-self: center;
+  min-width: 42px;
+  padding: 2px 6px;
+  border: 1px solid rgba(206, 221, 228, 0.12);
+  border-radius: 999px;
+  background: rgba(10, 16, 20, 0.36);
+  color: #dfe8ec;
+  font-size: 0.66rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .bridge-card {
