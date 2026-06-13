@@ -65,3 +65,41 @@ The app is ready for broad testing again when:
 ## Remaining Risk
 
 This first architecture slice does not rewrite all of `app/app.js`. That should be done progressively, because a single large renderer rewrite would likely break the app while bugs are already hot. The important shift is that new logic now has a stable engine layer to move into.
+
+## Send Flow Audit Findings
+
+The old send/nudge/cancel/retry path had several overlapping state owners:
+
+- `state.activeGeneration` owned abort/cancel state.
+- `state.turnRepair` owned invalid-output recovery.
+- DOM button disabled flags were mutated directly in multiple functions.
+- Provider stream completion could still drive UI cleanup after unrelated state changed.
+- Retry called back into local generation without a single lifecycle projection.
+
+The current cut removes `state.activeGeneration` and `state.turnRepair` from `app.js`. `TurnFlowRuntime` now owns those concepts and projects them to UI. `ProviderOrchestrator` owns local generation execution.
+
+## Remaining App.js Monolith Areas
+
+Still to migrate:
+
+- `submitPlayerTurnFromInput` still builds player turn prompts and performs echo/import side effects.
+- Sidecar/bridge provider flow still has older manual import behavior.
+- Post-turn recovery helpers still live in `app.js`, though they now use runtime gates.
+- Multiplayer pending input resolution still calls the high-level submit function.
+- Repair import still uses existing review/import plumbing.
+
+These should be extracted in small cuts rather than one giant renderer rewrite.
+
+## Schema 2.0 Update
+
+Because LoreKeeper is still in dev-experimental mode, old save files can be wiped and recreated. The
+schema now favors the new architecture by adding first-class engine state and logs to the campaign
+snapshot and SQLite:
+
+- turn lifecycle records
+- provider event records
+- dice roll records
+- validated state effect records
+- combat action records
+
+This gives future debugging a source better than provider prose or screenshots.

@@ -89,12 +89,18 @@ export async function readCampaignSqliteSummary(sqlitePath) {
       row.count,
     ]),
   );
+  const engineCounts = Object.fromEntries(
+    ["turn_records", "provider_events", "dice_rolls", "state_effects", "combat_actions"]
+      .filter((tableName) => tableExists(db, tableName))
+      .map((tableName) => [tableName, firstRow(db, `SELECT COUNT(*) AS count FROM ${tableName}`)?.count ?? 0]),
+  );
   db.close();
 
   return {
     campaign,
     metadata,
     counts,
+    engineCounts,
   };
 }
 
@@ -143,6 +149,7 @@ function insertCampaign(db, campaign) {
   insertRecordGroup(db, campaign, "quests", campaign.quests, (record) => record.title);
   insertRecordGroup(db, campaign, "scene", [campaign.scene], () => "Current scene", "scene-current");
   insertRecordGroup(db, campaign, "combat", [campaign.combat], () => "Combat state", "combat-current");
+  insertRecordGroup(db, campaign, "engine_state", [campaign.engineState], () => "Engine state", "engine-state-current");
   insertRecordGroup(db, campaign, "rules_profile", [campaign.rulesProfile], () => "Rules profile", "rules-profile-current");
   insertRecordGroup(db, campaign, "style", [campaign.style], () => "Campaign style", "style-current");
   insertRecordGroup(
@@ -162,6 +169,7 @@ function insertCampaign(db, campaign) {
 
   insertSessionLog(db, campaign);
   insertReviewLog(db, campaign);
+  insertEngineLogs(db, campaign);
 
   for (const relationship of campaign.relationships) {
     runInsert(db, "relationships", {
@@ -203,6 +211,83 @@ function insertCampaign(db, campaign) {
       source_order: sourceDocument.sourceOrder ?? 0,
       data_json: JSON.stringify(sourceDocument),
       created_at: now,
+    });
+  }
+}
+
+function insertEngineLogs(db, campaign) {
+  const now = new Date().toISOString();
+
+  for (const [index, turn] of (campaign.turnLog ?? []).entries()) {
+    runInsert(db, "turn_records", {
+      campaign_id: campaign.id,
+      id: turn.id || turn.turnId || `turn-${index + 1}`,
+      mode: turn.mode || "rp",
+      state: turn.state || "complete",
+      actor_id: turn.actorId || null,
+      input_kind: turn.inputKind || "player",
+      provider_request_id: turn.providerRequestId || turn.requestId || null,
+      started_at: turn.startedAt || turn.createdAt || now,
+      completed_at: turn.completedAt || null,
+      summary: turn.summary || "",
+      data_json: JSON.stringify(turn),
+    });
+  }
+
+  for (const [index, event] of (campaign.providerEventLog ?? []).entries()) {
+    runInsert(db, "provider_events", {
+      campaign_id: campaign.id,
+      id: event.id || `provider-event-${index + 1}`,
+      turn_id: event.turnId || null,
+      request_id: event.requestId || null,
+      event_type: event.type || event.eventType || "unknown",
+      created_at: event.createdAt || event.at || now,
+      data_json: JSON.stringify(event),
+    });
+  }
+
+  for (const [index, roll] of (campaign.diceLog ?? []).entries()) {
+    runInsert(db, "dice_rolls", {
+      campaign_id: campaign.id,
+      id: roll.id || `roll-${index + 1}`,
+      turn_id: roll.turnId || null,
+      actor_id: roll.actorId || null,
+      target_id: roll.targetId || null,
+      label: roll.label || null,
+      formula: roll.formula || "",
+      total: Number(roll.total) || 0,
+      created_at: roll.createdAt || now,
+      data_json: JSON.stringify(roll),
+    });
+  }
+
+  for (const [index, effect] of (campaign.stateEffectLog ?? []).entries()) {
+    runInsert(db, "state_effects", {
+      campaign_id: campaign.id,
+      id: effect.id || `effect-${index + 1}`,
+      turn_id: effect.turnId || null,
+      effect_type: effect.type || "unknown",
+      target_id: effect.targetId || null,
+      amount: Number.isFinite(Number(effect.amount)) ? Number(effect.amount) : null,
+      status: effect.status || "applied",
+      reason: effect.reason || "",
+      created_at: effect.createdAt || now,
+      data_json: JSON.stringify(effect),
+    });
+  }
+
+  for (const [index, action] of (campaign.combatActionLog ?? []).entries()) {
+    runInsert(db, "combat_actions", {
+      campaign_id: campaign.id,
+      id: action.id || `combat-action-${index + 1}`,
+      turn_id: action.turnId || action.id || `combat-turn-${index + 1}`,
+      actor_id: action.actorId || "",
+      action_type: action.actionType || "improvise",
+      target_ids_json: JSON.stringify(action.targetIds ?? []),
+      declared_text: action.declaredText || "",
+      narration: action.narration || "",
+      created_at: action.createdAt || now,
+      data_json: JSON.stringify(action),
     });
   }
 }

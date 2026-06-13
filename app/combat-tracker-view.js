@@ -59,7 +59,7 @@ export function normalizedCombatTurnOrder(campaign) {
   }));
 }
 
-function combatActorType(campaign, id) {
+export function combatActorType(campaign, id) {
   if ((campaign.party ?? []).some((member) => member.id === id)) {
     return "party";
   }

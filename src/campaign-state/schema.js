@@ -52,6 +52,12 @@ export function createEmptyCampaign(overrides = {}) {
     scene: normalizeSceneState(overrides.scene),
     sessionLog: normalizeSessionLog(overrides.sessionLog),
     combat: normalizeCombatState(overrides.combat),
+    engineState: normalizeEngineState(overrides.engineState),
+    turnLog: arrayOrEmpty(overrides.turnLog),
+    diceLog: arrayOrEmpty(overrides.diceLog),
+    stateEffectLog: arrayOrEmpty(overrides.stateEffectLog),
+    combatActionLog: arrayOrEmpty(overrides.combatActionLog),
+    providerEventLog: arrayOrEmpty(overrides.providerEventLog),
     rulesProfile: overrides.rulesProfile ?? createDefaultRulesProfile(),
     style: overrides.style ?? createDefaultStyleRules(),
     promptTemplates: overrides.promptTemplates ?? createDefaultPromptTemplateSettings(),
@@ -199,6 +205,38 @@ export function createEmptyCombatState() {
       "Options are suggestions, not restrictions; the player can combine options, add flavor, or attempt a reasonable different action.",
       "When a player attempts something uncertain, resolve it with an appropriate roll or clearly stated automatic outcome.",
     ],
+  };
+}
+
+export function createEmptyEngineState() {
+  return {
+    mode: "rp",
+    turn: {
+      state: "idle",
+      activeTurnId: null,
+      activeActorId: null,
+      activeProviderRequestId: null,
+      lastCompletedTurnId: null,
+      lastError: null,
+    },
+    pendingInputs: [],
+    proposedEffects: [],
+  };
+}
+
+function normalizeEngineState(engineState = {}) {
+  const defaults = createEmptyEngineState();
+  const source = engineState && typeof engineState === "object" ? engineState : {};
+  const turn = source.turn && typeof source.turn === "object" ? source.turn : {};
+  return {
+    ...defaults,
+    ...source,
+    turn: {
+      ...defaults.turn,
+      ...turn,
+    },
+    pendingInputs: arrayOrEmpty(source.pendingInputs),
+    proposedEffects: arrayOrEmpty(source.proposedEffects),
   };
 }
 
@@ -379,6 +417,11 @@ export function validateCampaign(campaign) {
   requireArray(campaign, "timeline", errors);
   requireArray(campaign, "quests", errors);
   requireArray(campaign, "relationships", errors);
+  requireArray(campaign, "turnLog", errors);
+  requireArray(campaign, "diceLog", errors);
+  requireArray(campaign, "stateEffectLog", errors);
+  requireArray(campaign, "combatActionLog", errors);
+  requireArray(campaign, "providerEventLog", errors);
   requireArray(campaign, "sourceDocuments", errors);
   requireArray(campaign, "assets", errors);
 
@@ -392,6 +435,10 @@ export function validateCampaign(campaign) {
 
   if (!campaign.combat || typeof campaign.combat !== "object") {
     errors.push("combat must be an object.");
+  }
+
+  if (!campaign.engineState || typeof campaign.engineState !== "object") {
+    errors.push("engineState must be an object.");
   }
 
   if (!campaign.rulesProfile || typeof campaign.rulesProfile !== "object") {

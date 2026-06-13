@@ -129,6 +129,89 @@ CREATE TABLE provider_runs (
 CREATE INDEX idx_provider_runs_campaign_created
 ON provider_runs (campaign_id, created_at);
 
+CREATE TABLE turn_records (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+  mode TEXT NOT NULL DEFAULT 'rp',
+  state TEXT NOT NULL DEFAULT 'complete',
+  actor_id TEXT,
+  input_kind TEXT NOT NULL DEFAULT 'player',
+  provider_request_id TEXT,
+  started_at TEXT NOT NULL,
+  completed_at TEXT,
+  summary TEXT NOT NULL DEFAULT '',
+  data_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (campaign_id, id)
+);
+
+CREATE INDEX idx_turn_records_campaign_started
+ON turn_records (campaign_id, started_at);
+
+CREATE TABLE provider_events (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+  turn_id TEXT,
+  request_id TEXT,
+  event_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (campaign_id, id)
+);
+
+CREATE INDEX idx_provider_events_turn
+ON provider_events (campaign_id, turn_id, request_id, created_at);
+
+CREATE TABLE dice_rolls (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+  turn_id TEXT,
+  actor_id TEXT,
+  target_id TEXT,
+  label TEXT,
+  formula TEXT NOT NULL,
+  total INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (campaign_id, id)
+);
+
+CREATE INDEX idx_dice_rolls_turn
+ON dice_rolls (campaign_id, turn_id, created_at);
+
+CREATE TABLE state_effects (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+  turn_id TEXT,
+  effect_type TEXT NOT NULL,
+  target_id TEXT,
+  amount INTEGER,
+  status TEXT NOT NULL DEFAULT 'applied',
+  reason TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (campaign_id, id)
+);
+
+CREATE INDEX idx_state_effects_turn
+ON state_effects (campaign_id, turn_id, created_at);
+
+CREATE TABLE combat_actions (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+  turn_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  target_ids_json TEXT NOT NULL DEFAULT '[]',
+  declared_text TEXT NOT NULL DEFAULT '',
+  narration TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (campaign_id, id)
+);
+
+CREATE INDEX idx_combat_actions_turn
+ON combat_actions (campaign_id, turn_id, created_at);
+
 CREATE TABLE review_batches (
   campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   id TEXT NOT NULL CHECK (length(trim(id)) > 0),

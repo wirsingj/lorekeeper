@@ -68,19 +68,23 @@ export function resolveCombatAction(campaign, action, options = {}) {
     : resolveNonAttack(normalized, actor, base, action);
 
   const effectsResult = applyStateEffects(normalized, resolved.effects, { source: "combat_engine", turnId: base.turnId });
-  const advanced = advanceExistingCombatTurn(effectsResult.campaign, {
+  let advanced = advanceExistingCombatTurn(effectsResult.campaign, {
     fromActorId: actor.id,
     summary: resolved.summary ?? `${actor.name} resolved ${actionType}.`,
   });
+  const actionRecord = {
+    ...base,
+    id: action.id ?? `combat-action-${base.turnId}`,
+    rolls: resolved.rolls,
+    effects: effectsResult.appliedEffects,
+    narration: resolved.narration,
+    createdAt: action.createdAt ?? new Date().toISOString(),
+  };
+  advanced = appendCombatLogs(advanced, actionRecord);
 
   return {
     campaign: advanced,
-    actionRecord: {
-      ...base,
-      rolls: resolved.rolls,
-      effects: effectsResult.appliedEffects,
-      narration: resolved.narration,
-    },
+    actionRecord,
     rolls: resolved.rolls,
     effects: effectsResult.appliedEffects,
     proposedChanges: effectsResult.proposedChanges,
@@ -88,11 +92,7 @@ export function resolveCombatAction(campaign, action, options = {}) {
     nextActorId: advanced.combat?.currentTurnId ?? null,
     narrationTask: {
       task: "narrate_resolved_action",
-      actionRecord: {
-        ...base,
-        rolls: resolved.rolls,
-        effects: effectsResult.appliedEffects,
-      },
+      actionRecord,
     },
   };
 }
@@ -188,4 +188,26 @@ function currentHp(record) {
 function normalizeActionType(value) {
   const normalized = String(value || "").trim().toLowerCase();
   return Object.values(combatActionTypes).includes(normalized) ? normalized : combatActionTypes.IMPROVISE;
+}
+
+function appendCombatLogs(campaign, actionRecord) {
+  const next = structuredClone(campaign);
+  next.combatActionLog = appendUniqueById(next.combatActionLog, [actionRecord]).slice(-500);
+  if (actionRecord.rolls?.length) {
+    next.diceLog = appendUniqueById(next.diceLog, actionRecord.rolls).slice(-1000);
+  }
+  return next;
+}
+
+function appendUniqueById(existing = [], additions = []) {
+  const seen = new Set(existing.map((item) => item.id).filter(Boolean));
+  const next = existing.slice();
+  for (const item of additions) {
+    if (item.id && seen.has(item.id)) {
+      continue;
+    }
+    next.push(item);
+    if (item.id) seen.add(item.id);
+  }
+  return next;
 }

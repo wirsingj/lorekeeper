@@ -44,11 +44,19 @@ export function applyStateEffects(campaign, effects = [], options = {}) {
       continue;
     }
     applyEffect(next, effect);
-    appliedEffects.push({
+    const loggedEffect = {
+      id: effect.id ?? `effect-${Date.now()}-${appliedEffects.length + 1}`,
       ...effect,
       source: options.source ?? effect.source ?? "app_engine",
       turnId: options.turnId ?? effect.turnId ?? null,
-    });
+      createdAt: effect.createdAt ?? options.now ?? new Date().toISOString(),
+      status: "applied",
+    };
+    appliedEffects.push(loggedEffect);
+  }
+
+  if (appliedEffects.length) {
+    next.stateEffectLog = appendUniqueById(next.stateEffectLog, appliedEffects);
   }
 
   return { campaign: next, appliedEffects, proposedChanges, errors };
@@ -130,4 +138,17 @@ function effectToProposedChange(effect, options) {
 
 function unique(values) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function appendUniqueById(existing = [], additions = []) {
+  const seen = new Set(existing.map((item) => item.id).filter(Boolean));
+  const next = existing.slice();
+  for (const item of additions) {
+    if (item.id && seen.has(item.id)) {
+      continue;
+    }
+    next.push(item);
+    if (item.id) seen.add(item.id);
+  }
+  return next.slice(-1000);
 }

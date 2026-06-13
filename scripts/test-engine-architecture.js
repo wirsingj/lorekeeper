@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
+import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
 import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startCombat } from "../src/engine/combat-engine.js";
 import { createCampaignStateStore } from "../src/engine/campaign-state-store.js";
 import { rollD20, rollFormula } from "../src/engine/dice-engine.js";
-import { buildProviderTaskRequest, acceptProviderResponseForTurn } from "../src/engine/provider-orchestrator.js";
+import { buildProviderTaskRequest, acceptProviderResponseForTurn, createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { applyStateEffects } from "../src/engine/state-effects.js";
 import {
   addPendingInput,
@@ -159,6 +160,9 @@ function testCombatEngine() {
   assert.equal(resolved.actionRecord.rolls[0].label, "Attack roll");
   assert.equal(resolved.campaign.combat.currentTurnId, "sy", "combat should advance after app-side resolution");
   assert.equal(resolved.actionRecord.effects.every((effect) => effect.source === "combat_engine"), true);
+  assert.equal(resolved.campaign.combatActionLog.length, 1, "combat action should be logged to campaign state");
+  assert.equal(resolved.campaign.diceLog.length >= 1, true, "combat rolls should be logged to campaign state");
+  assert.equal(resolved.campaign.stateEffectLog.length, resolved.actionRecord.effects.length, "applied effects should be logged to campaign state");
 }
 
 function testCombatTrackerView() {
@@ -182,7 +186,132 @@ function testProviderBoundary() {
   assert.equal(request.readonlyContext.party, undefined, "provider request should not include whole campaign dumps");
 
   assert.equal(acceptProviderResponseForTurn(turn, { turnId: "wrong", narration: "late" }).accepted, false);
-  assert.equal(acceptProviderResponseForTurn(turn, { turnId: "turn-provider", narration: "ok" }).accepted, true);
+  const accepted = acceptProviderResponseForTurn(turn, {
+    turnId: "turn-provider",
+    narration: "ok",
+    proposedChanges: [{ operation: "add", domain: "lore", summary: "review me" }],
+  });
+  assert.equal(accepted.accepted, true);
+  assert.equal(accepted.proposedChanges.length, 1, "provider changes should remain proposed/reviewed data");
+
+  const combatCampaign = {
+    ...campaign,
+    combat: {
+      inCombat: true,
+      currentTurnId: "thor",
+      round: 1,
+      turnOrder: [{ id: "thor", name: "Thor", type: "party" }],
+      enemies: [],
+    },
+  };
+  const combatRequest = buildProviderTaskRequest({ task: "generate_scene_beat", campaign: combatCampaign, turn: { turnId: "nudge-combat", mode: "combat" } });
+  assert.equal(combatRequest.mode, "combat");
+  assert.equal(combatRequest.readonlyContext.combat.currentTurnId, "thor", "combat context must preserve active human actor");
+}
+
+async function testProviderExecutionLifecycle() {
+  const events = [];
+  const orchestrator = createProviderOrchestrator({
+    endpoint: "/generate",
+    fetchFn: async () => ({
+      ok: true,
+      body: ndjsonStream([
+        { type: "start", model: "test-model" },
+        { type: "token", text: "hello" },
+        { type: "done", result: { model: "test-model", text: "{\"table\":[]}", structured: { table: [] } } },
+      ]),
+    }),
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => {},
+  });
+  const turnFlow = createTurnFlowRuntime();
+  assert.equal(turnFlow.getProjection().canSubmit, true, "idle UI projection should allow a new turn");
+  const turn = { playerMessage: "I look around.", playerInputs: [] };
+  turnFlow.beginLogicalTurn({ campaign: campaignFixture(), turn });
+  const run = orchestrator.startLocalGeneration({
+    turn,
+    onEvent: (event) => {
+      events.push(event);
+      turnFlow.applyProviderEvent(event);
+    },
+  });
+  turnFlow.startGeneration(run);
+  assert.throws(() => turnFlow.startGeneration(run), /already active/i, "double generation should be rejected");
+  assert.equal(turnFlow.getProjection().canSubmit, false, "send projection must disable during generation");
+  const result = await run.promise;
+  assert.equal(result.providerReceived, true);
+  assert.equal(turnFlow.getProjection().state, turnStates.COMPLETE);
+  assert.equal(events.some((event) => event.type === "generation_delta"), true);
+}
+
+async function testInvalidProviderOutputIsRecoverable() {
+  const orchestrator = createProviderOrchestrator({
+    endpoint: "/generate",
+    fetchFn: async () => ({
+      ok: true,
+      body: ndjsonStream([
+        { type: "start", model: "test-model" },
+        { type: "done", result: { model: "test-model", text: "not-json", parseError: "bad json" } },
+      ]),
+    }),
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => {},
+  });
+  const turnFlow = createTurnFlowRuntime();
+  const turn = { playerMessage: "I search.", playerInputs: [] };
+  turnFlow.beginLogicalTurn({ campaign: campaignFixture(), turn });
+  const run = orchestrator.startLocalGeneration({
+    turn,
+    validateProviderResult: (result) => result.parseError || "",
+    onEvent: (event) => turnFlow.applyProviderEvent(event),
+  });
+  turnFlow.startGeneration(run);
+  const result = await run.promise;
+  assert.equal(result.validationIssue, "bad json");
+  assert.equal(turnFlow.getProjection().state, turnStates.ERROR);
+  assert.equal(turnFlow.getProjection().canRetry, true);
+}
+
+async function testCancelAndStaleCompletion() {
+  const orchestrator = createProviderOrchestrator({
+    endpoint: "/generate",
+    fetchFn: async (_url, init) => {
+      init.signal.addEventListener("abort", () => {});
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      });
+    },
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => {},
+  });
+  const turnFlow = createTurnFlowRuntime();
+  const turn = { playerMessage: "I wait.", playerInputs: [] };
+  turnFlow.beginLogicalTurn({ campaign: campaignFixture(), turn });
+  const run = orchestrator.startLocalGeneration({ turn, onEvent: (event) => turnFlow.applyProviderEvent(event) });
+  turnFlow.startGeneration(run);
+  assert.throws(() => turnFlow.retryLastTurn(), /active/i, "retry during active generation should be rejected");
+  turnFlow.cancelGeneration("test_cancel");
+  await run.promise;
+  assert.equal(turnFlow.getProjection().state, turnStates.AWAITING_INPUT);
+  const before = turnFlow.getProjection().state;
+  turnFlow.applyProviderEvent({ type: "generation_completed", turnId: "stale", requestId: "stale", response: {} });
+  assert.equal(turnFlow.getProjection().state, before, "stale completion must not change state");
+}
+
+function ndjsonStream(events) {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      for (const event of events) {
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      }
+      controller.close();
+    },
+  });
 }
 
 function testCampaignStateStore() {
@@ -206,5 +335,9 @@ testCombatEngine();
 testCombatTrackerView();
 testProviderBoundary();
 testCampaignStateStore();
+
+await testProviderExecutionLifecycle();
+await testInvalidProviderOutputIsRecoverable();
+await testCancelAndStaleCompletion();
 
 console.log("engine architecture tests passed");

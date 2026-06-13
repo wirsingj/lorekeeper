@@ -129,6 +129,24 @@ Approved review changes are committed through `POST /api/review/commit`. The com
 The full snapshot is intentional while the schema is still greenfield. It keeps round-trip behavior
 safe while the normalized tables evolve.
 
+## Schema 2.0 Engine Tables
+
+During the experimental rearchitecture phase, old campaign save files may be wiped or recreated. The
+schema is being shaped around app-owned game state rather than provider-owned implicit state.
+
+SQLite schema 2.0 stores the full normalized campaign snapshot and also exposes engine-oriented
+tables:
+
+- `turn_records`: durable turn lifecycle history.
+- `provider_events`: provider execution events tied to turn/request ids.
+- `dice_rolls`: app-owned roll records and visible breakdown data.
+- `state_effects`: validated app-side HP/resource/condition/effect changes.
+- `combat_actions`: app-owned combat action records.
+
+The snapshot remains the authoritative round-trip source while these tables become query and audit
+surfaces. Future cuts can move from snapshot rewriting to transaction/event replay once the engine
+contracts settle.
+
 ## Browser Storage Role
 
 Browser storage may keep cached state, selected tab metadata, UI preferences, and temporary working

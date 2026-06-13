@@ -45,6 +45,155 @@ export function acceptProviderResponseForTurn(turnState, response) {
   };
 }
 
+export function createProviderOrchestrator(options = {}) {
+  const fetchFn = options.fetchFn ?? globalThis.fetch?.bind(globalThis);
+  const endpoint = options.endpoint;
+  const setTimeoutFn = options.setTimeoutFn ?? globalThis.setTimeout?.bind(globalThis);
+  const clearTimeoutFn = options.clearTimeoutFn ?? globalThis.clearTimeout?.bind(globalThis);
+  if (!fetchFn) {
+    throw new Error("ProviderOrchestrator requires a fetch function");
+  }
+
+  return {
+    startLocalGeneration({ turn, providerSettings = {}, onEvent = () => {}, validateProviderResult = () => "", renderStructuredResponse = defaultRenderStructuredResponse }) {
+      if (!endpoint) {
+        throw new Error("ProviderOrchestrator requires an endpoint for local generation");
+      }
+      if (!turn?.playerMessage?.trim()) {
+        throw new Error("Cannot start provider generation without a player message");
+      }
+      const turnId = turn.turnId ?? turn.id ?? `turn-${Date.now()}`;
+      const requestId = `provider-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const controller = new AbortController();
+      let responseText = "";
+      let providerReceived = false;
+      let timedOut = false;
+      const timeoutMs = Math.max(15000, Number(providerSettings.generationTimeoutMs) || 120000) + 5000;
+      const emit = (event) => onEvent({ turnId, requestId, ...event });
+      queueMicrotask(() => emit({ type: "generation_started" }));
+      const timeoutId = setTimeoutFn?.(() => {
+        timedOut = true;
+        controller.abort();
+      }, timeoutMs);
+
+      const promise = (async () => {
+        try {
+          const response = await fetchFn(endpoint, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              playerMessage: turn.playerMessage,
+              playerInputs: turn.playerInputs ?? [],
+            }),
+            signal: controller.signal,
+          });
+
+          if (!response.ok || !response.body) {
+            throw new Error(await response.text());
+          }
+
+          for await (const event of readNdjsonResponse(response.body)) {
+            if (event.type === "start") {
+              providerReceived = true;
+              emit({ type: "generation_started", model: event.model });
+            } else if (event.type === "token") {
+              responseText += event.text ?? "";
+              emit({ type: "generation_delta", textDelta: event.text ?? "" });
+            } else if (event.type === "done") {
+              responseText = event.result?.structured
+                ? renderStructuredResponse(event.result.structured)
+                : event.result?.text ?? responseText;
+              const validationIssue = validateProviderResult(event.result);
+              const completion = {
+                providerReceived: true,
+                responseText,
+                rawText: event.result?.text ?? responseText,
+                providerResult: event.result,
+                validationIssue,
+              };
+              emit({ type: validationIssue ? "generation_failed" : "generation_completed", response: completion, error: validationIssue, recoverable: Boolean(validationIssue) });
+              return completion;
+            } else if (event.type === "error") {
+              throw new Error(event.error || "Local provider generation failed.");
+            }
+          }
+
+          if (responseText.trim()) {
+            const completion = {
+              providerReceived,
+              responseText,
+              rawText: responseText,
+              providerResult: {
+                text: responseText,
+                warning: "Stream ended without a done event.",
+              },
+              validationIssue: "",
+            };
+            emit({ type: "generation_completed", response: completion });
+            return completion;
+          }
+
+          throw new Error("Ollama returned no response text.");
+        } catch (error) {
+          if (error?.name === "AbortError") {
+            const cancelled = {
+              providerReceived,
+              responseText,
+              timedOut,
+              canceled: !timedOut,
+            };
+            emit({ type: "generation_cancelled", reason: timedOut ? "timeout" : "cancelled", response: cancelled });
+            return cancelled;
+          }
+          const failed = {
+            providerReceived,
+            responseText,
+            error,
+          };
+          emit({
+            type: "generation_failed",
+            error: error instanceof Error ? error.message : String(error ?? "Provider generation failed"),
+            recoverable: true,
+            response: failed,
+          });
+          return failed;
+        } finally {
+          clearTimeoutFn?.(timeoutId);
+        }
+      })();
+
+      return {
+        turnId,
+        requestId,
+        cancel: () => controller.abort(),
+        promise,
+      };
+    },
+  };
+}
+
+export async function* readNdjsonResponse(body) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line) yield JSON.parse(line);
+      newlineIndex = buffer.indexOf("\n");
+    }
+  }
+
+  const final = buffer.trim();
+  if (final) yield JSON.parse(final);
+}
+
 function deriveMode(campaign) {
   return campaign?.combat?.inCombat ? "combat" : campaign?.scene?.status === "downtime" ? "downtime" : "rp";
 }
@@ -88,4 +237,8 @@ function outputContractForTask(task) {
     return { narration: "string", suggestions: "optional string[]", proposedChanges: "optional reviewed-only array" };
   }
   return { narration: "string", suggestions: "optional string[]", proposedChanges: "optional reviewed-only array" };
+}
+
+function defaultRenderStructuredResponse(structured) {
+  return JSON.stringify(structured, null, 2);
 }

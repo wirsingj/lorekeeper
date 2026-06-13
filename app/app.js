@@ -10,7 +10,9 @@ import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
 import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inputs.js";
-import { buildCombatTrackerView } from "./combat-tracker-view.js";
+import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
+import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
+import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 
 const launchParams = new URLSearchParams(window.location.search);
 const clientMode = launchParams.get("mode") === "client";
@@ -75,13 +77,11 @@ const state = {
     lastImportedProviderText: "",
   },
   providerStatus: null,
-  activeGeneration: null,
   streamingMessage: null,
   editingRecord: null,
   activeCharacterSheet: null,
   activeCharacterSheetAutofill: null,
   diagnosticsEvents: [],
-  turnRepair: null,
   pendingChoiceSelection: null,
   forceScrollToBottom: false,
   multiplayerSnapshot: null,
@@ -99,6 +99,14 @@ const state = {
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
+
+state.turnFlow = createTurnFlowRuntime();
+const providerOrchestrator = createProviderOrchestrator({
+  fetchFn: (...args) => window.fetch(...args),
+  endpoint: apiProviderGenerateTurnUrl,
+  setTimeoutFn: (...args) => window.setTimeout(...args),
+  clearTimeoutFn: (...args) => window.clearTimeout(...args),
+});
 
 function withLorekeeperApiAuth(input, init = {}) {
   if (!apiToken || !shouldAttachLorekeeperApiToken(input)) {
@@ -583,7 +591,7 @@ async function nudgeDm() {
     setProviderActivity("Only the host can nudge the DM", "waiting");
     return { providerReceived: false, reason: "guest_mode" };
   }
-  if (state.activeGeneration) {
+  if (hasActiveGeneration()) {
     setProviderActivity("DM is already generating", "waiting");
     return { providerReceived: false, reason: "busy" };
   }
@@ -822,12 +830,12 @@ function chooseVisibleOption(block, index) {
 }
 
 async function submitPlayerTurnFromInput(originalInput, options = {}) {
-  if (state.activeGeneration) {
+  if (hasActiveGeneration()) {
     elements.bridgeStatus.textContent = "The DM is already resolving a turn.";
     setProviderActivity("Wait for the current DM response before sending again", "waiting");
     return { providerReceived: false, reason: "busy" };
   }
-  if (state.turnRepair && !options.allowDuringRepair) {
+  if (activeTurnRepair() && !options.allowDuringRepair) {
     elements.bridgeStatus.textContent = "Resolve the model repair before sending another turn.";
     setProviderActivity("Repair needed before the next turn. Inspect, Retry, or Import.", "error");
     return { providerReceived: false, reason: "repair_required" };
@@ -1135,7 +1143,7 @@ async function bootClientMode() {
 
 function startMultiplayerPolling() {
   window.setInterval(async () => {
-    if (state.activeGeneration) {
+    if (hasActiveGeneration()) {
       return;
     }
     try {
@@ -1169,8 +1177,8 @@ function startMultiplayerPolling() {
 async function maybeAutoResolveEnemyCombatTurn() {
   if (
     clientMode ||
-    state.activeGeneration ||
-    state.turnRepair ||
+    hasActiveGeneration() ||
+    activeTurnRepair() ||
     state.autoResolvingEnemyTurn ||
     !state.campaign?.combat?.inCombat
   ) {
@@ -1247,7 +1255,7 @@ function schedulePostTurnRecovery(reason = "unknown") {
 }
 
 async function runPostTurnRecovery(reason = "unknown") {
-  if (state.activeGeneration || state.turnRepair) {
+  if (hasActiveGeneration() || activeTurnRepair()) {
     return;
   }
   clearResolvedRecoveredInputDraft(`post_turn_${reason}`);
@@ -1258,8 +1266,8 @@ async function runPostTurnRecovery(reason = "unknown") {
 
 async function repairStalePromptedCombatTurn(reason = "unknown") {
   if (
-    state.activeGeneration ||
-    state.turnRepair ||
+    hasActiveGeneration() ||
+    activeTurnRepair() ||
     state.autoResolvingEnemyTurn ||
     state.repairingCombatPromptTurn ||
     !state.campaign?.combat?.inCombat
@@ -1306,7 +1314,7 @@ async function repairStalePromptedCombatTurn(reason = "unknown") {
 }
 
 async function resumePendingPlayerTurn(reason = "unknown") {
-  if (state.activeGeneration || state.turnRepair || state.autoResumingPendingTurn || elements.playerInput.value.trim()) {
+  if (hasActiveGeneration() || activeTurnRepair() || state.autoResumingPendingTurn || elements.playerInput.value.trim()) {
     return;
   }
 
@@ -1385,8 +1393,8 @@ function pendingPlayerTurnText(message) {
 async function maybeAutoResolveCombatRemoteInputs() {
   if (
     clientMode ||
-    state.activeGeneration ||
-    state.turnRepair ||
+    hasActiveGeneration() ||
+    activeTurnRepair() ||
     state.autoResolvingCombatInput ||
     !state.campaign?.combat?.inCombat ||
     elements.playerInput.value.trim()
@@ -2970,7 +2978,7 @@ async function loadImportedCampaign() {
   });
   state.prompt = "";
   state.reviewBatch = null;
-  state.turnRepair = null;
+  state.turnFlow.clearRepair();
 }
 
 function setCampaignFromPayload(payload, contextPurpose) {
@@ -2985,7 +2993,7 @@ function setCampaignFromPayload(payload, contextPurpose) {
   state.prompt = "";
   state.reviewBatch = null;
   if (previousCampaignId && previousCampaignId !== state.campaign.id) {
-    state.turnRepair = null;
+    state.turnFlow.clearRepair();
   }
 }
 
@@ -3003,6 +3011,23 @@ function currentProviderSettings() {
     fastMode: settings.fastMode ?? saved.fastMode ?? false,
     ollamaBaseUrl: settings.ollamaBaseUrl || saved.ollamaBaseUrl || "http://127.0.0.1:11434",
   };
+}
+
+function turnProjection() {
+  return state.turnFlow.getProjection();
+}
+
+function hasActiveGeneration() {
+  return state.turnFlow.hasActiveGeneration();
+}
+
+function activeTurnRepair() {
+  return state.turnFlow.getRepair();
+}
+
+function turnFlowBlocksNewTurn() {
+  const projection = turnProjection();
+  return projection.hasActiveGeneration || projection.hasRepair || projection.isResolving;
 }
 
 function currentAppMode() {
@@ -3180,7 +3205,7 @@ function applyThinModeChrome() {
   elements.joinCampaign.hidden = false;
   if (elements.joinCampaignMain) {
     elements.joinCampaignMain.hidden = false;
-    elements.joinCampaignMain.disabled = Boolean(state.activeGeneration);
+    elements.joinCampaignMain.disabled = hasActiveGeneration();
   }
   if (elements.syncGuestTable) {
     elements.syncGuestTable.hidden = false;
@@ -3229,7 +3254,7 @@ function applyFullModeChrome() {
   const combatGate = hostCombatInputGate();
   elements.playerInput.disabled = combatGate.inputDisabled;
   elements.playerInput.placeholder = combatGate.placeholder || "I check the alley for watchers. (Keep this tense and heist-focused.)";
-  elements.buildTurn.disabled = Boolean(state.activeGeneration) || Boolean(state.turnRepair) || combatGate.sendDisabled;
+  elements.buildTurn.disabled = !turnProjection().canSubmit || combatGate.sendDisabled;
   elements.buildTurn.textContent = "Send Turn";
 }
 
@@ -4990,29 +5015,18 @@ async function runPromptThroughLocalProvider(turn) {
     return { providerReceived: false };
   }
 
-  const controller = new AbortController();
-  state.activeGeneration = controller;
+  state.turnFlow.beginLogicalTurn({
+    campaign: state.campaign,
+    turn,
+    inputKind: /^\(DM nudge:/i.test(turn.playerMessage) ? "nudge" : "player",
+    actorId: state.campaign?.combat?.currentTurnId ?? null,
+  });
   elements.cancelGeneration.hidden = false;
   elements.cancelGeneration.disabled = false;
   elements.buildTurn.disabled = true;
   setProviderActivity("Generating locally with Ollama...", "working");
-  let responseText = "";
-  let providerReceived = false;
-  let timedOut = false;
-  const timeoutMs = Math.max(15000, Number(currentProviderSettings().generationTimeoutMs) || 120000) + 5000;
-  const timeoutId = window.setTimeout(() => {
-    if (state.activeGeneration !== controller) {
-      return;
-    }
-    timedOut = true;
-    pushDiagnosticsEvent("ollama_generation_renderer_timeout", {
-      timeoutMs,
-      providerReceived,
-      responseChars: responseText.length,
-    });
-    controller.abort();
-  }, timeoutMs);
   pushDiagnosticsEvent("ollama_generation_started", {
+    turnId: turn.turnId,
     playerMessage: turn.playerMessage,
     playerInputs: turn.playerInputs ?? [],
     promptChars: turn.providerPrompt?.length ?? 0,
@@ -5021,132 +5035,108 @@ async function runPromptThroughLocalProvider(turn) {
   render();
 
   try {
-    const response = await fetchOrExplain(apiProviderGenerateTurnUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        playerMessage: turn.playerMessage,
-        playerInputs: turn.playerInputs ?? [],
-      }),
-      signal: controller.signal,
+    const run = providerOrchestrator.startLocalGeneration({
+      turn,
+      providerSettings: currentProviderSettings(),
+      validateProviderResult: contractIssueFromProviderResult,
+      renderStructuredResponse: renderTurnResponseForImport,
+      onEvent: handleProviderGenerationEvent,
     });
-
-    if (!response.ok || !response.body) {
-      throw new Error(await response.text());
+    state.turnFlow.startGeneration(run);
+    const result = await run.promise;
+    if (result?.timedOut || result?.canceled) {
+      setProviderActivity(
+        result.timedOut ? "Local generation timed out; Send Turn can retry" : "Local generation canceled",
+        result.timedOut ? "error" : "idle",
+      );
+      elements.bridgeStatus.textContent = result.timedOut ? "Local generation timed out" : "Local generation canceled";
+      return { providerReceived: Boolean(result.providerReceived), canceled: Boolean(result.canceled), timedOut: Boolean(result.timedOut) };
     }
-
-    for await (const event of readNdjsonResponse(response.body)) {
-      if (event.type === "start") {
-        providerReceived = true;
-        setProviderActivity(`Ollama generating with ${event.model}...`, "working");
-        pushDiagnosticsEvent("ollama_stream_started", event);
-      } else if (event.type === "token") {
-        responseText += event.text ?? "";
-      } else if (event.type === "done") {
-        pushDiagnosticsEvent("ollama_generation_done", {
-          result: event.result,
-          streamedTextChars: responseText.length,
-        });
-        responseText = event.result?.structured
-          ? renderTurnResponseForImport(event.result.structured)
-          : event.result?.text ?? responseText;
-        const contractIssue = contractIssueFromProviderResult(event.result);
-        const meta = event.result
-          ? `Ollama ${event.result.model}; ${Math.round((event.result.durationMs ?? 0) / 1000)}s; context ${event.result.contextSize ?? 0} chars`
-          : "";
-        if (contractIssue) {
-          setTurnRepair({
-            reason: contractIssue,
-            source: "ollama",
-            turn,
-            responseText,
-            rawText: event.result?.text ?? responseText,
-            parseError: event.result?.parseError || "",
-            validationErrors: event.result?.validationErrors ?? [],
-            providerResult: event.result,
-            meta,
-          });
-          return { providerReceived: true, imported: false, needsRepair: true };
-        }
-        await importProviderResponse(responseText, {
-          source: "ollama",
-          meta,
-          autoCommit: true,
-          data: {
-            providerResult: event.result,
-            turnResponse: event.result?.structured ?? null,
-            choices: structuredChoicesForMessage(event.result?.structured),
-            turn,
-          },
-        });
-        setProviderActivity(
-          meta
-            ? `Local response imported (${meta})`
-            : "Local response imported",
-          "idle",
-        );
-        return { providerReceived: true, imported: true };
-      } else if (event.type === "error") {
-        pushDiagnosticsEvent("ollama_stream_error", event);
-        throw new Error(event.error || "Local provider generation failed.");
-      }
-    }
-
-    if (responseText.trim()) {
-      pushDiagnosticsEvent("ollama_generation_finished_without_done", {
-        providerReceived,
-        responseChars: responseText.length,
-      });
-      await importProviderResponse(responseText, {
+    if (result?.validationIssue) {
+      const meta = providerResultMeta(result.providerResult);
+      setTurnRepair({
+        reason: result.validationIssue,
         source: "ollama",
+        turn,
+        responseText: result.responseText,
+        rawText: result.rawText,
+        parseError: result.providerResult?.parseError || "",
+        validationErrors: result.providerResult?.validationErrors ?? [],
+        providerResult: result.providerResult,
+        meta,
+      });
+      return { providerReceived: true, imported: false, needsRepair: true };
+    }
+    if (result?.responseText?.trim()) {
+      const meta = providerResultMeta(result.providerResult);
+      await importProviderResponse(result.responseText, {
+        source: "ollama",
+        meta,
         autoCommit: true,
         data: {
+          providerResult: result.providerResult,
+          turnResponse: result.providerResult?.structured ?? null,
+          choices: structuredChoicesForMessage(result.providerResult?.structured),
           turn,
-          providerResult: {
-            text: responseText,
-            warning: "Stream ended without a done event.",
-          },
         },
       });
-      return { providerReceived, imported: true };
+      setProviderActivity(meta ? `Local response imported (${meta})` : "Local response imported", "idle");
+      return { providerReceived: Boolean(result.providerReceived), imported: true };
     }
-
-    throw new Error("Ollama returned no response text.");
+    throw result?.error || new Error("Ollama returned no response text.");
   } catch (error) {
-    if (error?.name === "AbortError") {
-      pushDiagnosticsEvent("ollama_generation_canceled", {
-        timedOut,
-        providerReceived,
-        responseChars: responseText.length,
-      });
-      setProviderActivity(
-        timedOut ? "Local generation timed out; Send Turn can retry" : "Local generation canceled",
-        timedOut ? "error" : "idle",
-      );
-      elements.bridgeStatus.textContent = timedOut ? "Local generation timed out" : "Local generation canceled";
-      return { providerReceived, canceled: !timedOut, timedOut };
-    }
     pushDiagnosticsEvent("ollama_generation_failed", {
-      providerReceived,
-      responseChars: responseText.length,
+      turnId: turn.turnId,
       message: error instanceof Error ? error.message : String(error ?? "Ollama failed"),
       stack: error instanceof Error ? error.stack : "",
     });
+    state.turnFlow.failGeneration(error);
     setProviderActivity(error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed", "error");
     elements.bridgeStatus.textContent = error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed";
     render();
     return { providerReceived: false, error };
   } finally {
-    window.clearTimeout(timeoutId);
-    if (state.activeGeneration === controller) {
-      state.activeGeneration = null;
-    }
     elements.cancelGeneration.hidden = true;
     elements.cancelGeneration.disabled = true;
-    elements.buildTurn.disabled = Boolean(state.turnRepair);
     updateNudgeAvailability();
     render();
   }
+}
+
+function handleProviderGenerationEvent(event) {
+  state.turnFlow.applyProviderEvent(event);
+  if (event.type === "generation_started" && event.model) {
+    setProviderActivity(`Ollama generating with ${event.model}...`, "working");
+    pushDiagnosticsEvent("ollama_stream_started", event);
+  } else if (event.type === "generation_completed") {
+    pushDiagnosticsEvent("ollama_generation_done", {
+      turnId: event.turnId,
+      requestId: event.requestId,
+      result: event.response?.providerResult,
+      streamedTextChars: event.response?.responseText?.length ?? 0,
+    });
+  } else if (event.type === "generation_failed") {
+    pushDiagnosticsEvent("ollama_stream_failed", {
+      turnId: event.turnId,
+      requestId: event.requestId,
+      error: event.error,
+      recoverable: event.recoverable,
+    });
+  } else if (event.type === "generation_cancelled") {
+    pushDiagnosticsEvent("ollama_generation_canceled", {
+      turnId: event.turnId,
+      requestId: event.requestId,
+      reason: event.reason,
+      providerReceived: event.response?.providerReceived,
+      responseChars: event.response?.responseText?.length ?? 0,
+    });
+  }
+}
+
+function providerResultMeta(result) {
+  return result
+    ? `Ollama ${result.model}; ${Math.round((result.durationMs ?? 0) / 1000)}s; context ${result.contextSize ?? 0} chars`
+    : "";
 }
 
 function isChoiceLikeLine(line) {
@@ -5178,18 +5168,13 @@ function contractIssueFromProviderResult(result) {
 }
 
 function cancelActiveGeneration() {
-  if (state.activeGeneration) {
-    state.activeGeneration.abort();
-  }
+  state.turnFlow.cancelGeneration("user_cancelled");
 }
 
 function setTurnRepair(repair) {
-  state.turnRepair = {
-    ...repair,
-    createdAt: repair.createdAt || new Date().toISOString(),
-  };
-  pushDiagnosticsEvent("turn_repair_required", summarizeTurnRepair(state.turnRepair));
-  const reason = compactUiText(state.turnRepair.reason || "model response failed the JSON contract", 180);
+  const savedRepair = state.turnFlow.setRepair(repair);
+  pushDiagnosticsEvent("turn_repair_required", summarizeTurnRepair(savedRepair));
+  const reason = compactUiText(savedRepair.reason || "model response failed the JSON contract", 180);
   elements.bridgeStatus.textContent = `Model response needs repair: ${reason}`;
   setProviderActivity(`Needs repair - ${reason}. Inspect or retry.`, "error");
   updateNudgeAvailability();
@@ -5197,10 +5182,7 @@ function setTurnRepair(repair) {
 }
 
 function clearTurnRepair() {
-  state.turnRepair = null;
-  if (elements.buildTurn && !state.activeGeneration && !clientMode) {
-    elements.buildTurn.disabled = false;
-  }
+  state.turnFlow.clearRepair();
   updateTurnRepairControls();
   updateNudgeAvailability();
 }
@@ -5219,18 +5201,20 @@ function cleanMessageMeta(value) {
 }
 
 async function retryTurnRepair() {
-  const repair = state.turnRepair;
+  const repair = activeTurnRepair();
   if (!repair?.turn) {
     setProviderActivity("No repairable turn is available", "error");
     return;
   }
-  clearTurnRepair();
   setProviderActivity("Retrying with strict JSON contract...", "working");
+  state.turnFlow.retryLastTurn();
+  updateTurnRepairControls();
+  updateNudgeAvailability();
   await runPromptThroughLocalProvider(repair.turn);
 }
 
 async function inspectTurnRepair() {
-  if (!state.turnRepair) {
+  if (!activeTurnRepair()) {
     return;
   }
   if (elements.setupDialog && !elements.setupDialog.open) {
@@ -5241,7 +5225,7 @@ async function inspectTurnRepair() {
 }
 
 async function importTurnRepairAnyway() {
-  const repair = state.turnRepair;
+  const repair = activeTurnRepair();
   if (!repair?.responseText) {
     setProviderActivity("No rejected response text is available", "error");
     return;
@@ -5450,13 +5434,13 @@ function buildRendererDiagnostics() {
       state: elements.providerActivity?.dataset.state || "",
     },
     bridgeStatus: elements.bridgeStatus?.textContent || "",
-    activeGeneration: Boolean(state.activeGeneration),
+    turnEngine: state.turnFlow.getProjection(),
     currentTurn: summarizeCurrentTurn(state.currentTurn),
     promptChars: state.prompt?.length ?? 0,
     promptTail: state.prompt ? state.prompt.slice(-6000) : "",
     reviewBatch: state.reviewBatch,
     bridge: state.bridge,
-    turnRepair: summarizeTurnRepair(state.turnRepair),
+    turnRepair: summarizeTurnRepair(activeTurnRepair()),
     recentPlayMessages: state.playMessages.slice(-30),
     diagnosticsEvents: state.diagnosticsEvents.slice(-80),
     campaignCounts: state.campaign ? {
@@ -5556,26 +5540,28 @@ function updateNudgeAvailability() {
   if (!elements.nudgeDm) {
     return;
   }
-  elements.nudgeDm.disabled = clientMode || Boolean(state.activeGeneration) || Boolean(state.turnRepair) || !state.campaign;
-  elements.nudgeDm.title = state.turnRepair
+  const projection = turnProjection();
+  elements.nudgeDm.disabled = clientMode || !projection.canNudge || !state.campaign;
+  elements.nudgeDm.title = projection.hasRepair
     ? "Resolve the model repair first"
-    : state.activeGeneration
+    : projection.hasActiveGeneration
       ? "DM is already generating"
       : "Nudge DM";
 }
 
 function updateTurnRepairControls() {
-  const active = Boolean(state.turnRepair);
+  const projection = turnProjection();
+  const active = projection.hasRepair;
   if (elements.repairRetry) {
     elements.repairRetry.hidden = !active;
-    elements.repairRetry.disabled = Boolean(state.activeGeneration);
+    elements.repairRetry.disabled = projection.hasActiveGeneration;
   }
   if (elements.repairInspect) {
     elements.repairInspect.hidden = !active;
   }
   if (elements.repairImportAnyway) {
     elements.repairImportAnyway.hidden = !active;
-    elements.repairImportAnyway.disabled = Boolean(state.activeGeneration);
+    elements.repairImportAnyway.disabled = projection.hasActiveGeneration;
   }
   if (elements.recheckProvider) {
     elements.recheckProvider.hidden = active || clientMode;

@@ -41,3 +41,29 @@ Provider chat history is not canon. Provider responses are never trusted as stat
 - proposed reviewed changes
 
 It may not directly advance turns, spend resources, apply HP damage, assign controllers, or mutate SQLite.
+
+## Current Send Flow
+
+Send/nudge/cancel/retry ownership is now split cleanly:
+
+- `app/app.js` collects input and renders UI.
+- `TurnFlowRuntime` coordinates turn lifecycle projection for the renderer.
+- `TurnEngine` owns lifecycle transitions and stale event rejection.
+- `ProviderOrchestrator` owns provider execution and cancellation.
+- `importProviderResponse` remains the app-side import/review handoff.
+
+Provider completion can create review items or import accepted narration, but it does not directly mutate canon outside the existing import/review path.
+
+## Schema 2.0 Logs
+
+Campaign state now includes engine-aligned logs:
+
+- `turnLog`
+- `diceLog`
+- `stateEffectLog`
+- `combatActionLog`
+- `providerEventLog`
+
+SQLite also stores these in normalized schema 2.0 tables for audit and future context retrieval. The
+current writer still persists the whole campaign snapshot atomically; normalized tables are the
+queryable/auditable mirror.
