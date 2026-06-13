@@ -124,21 +124,23 @@ export function LorekeeperShell() {
         </section>
         <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
           <span id="provider-activity-label">Provider idle</span>
-          <button id="repair-retry" className="mini-action" type="button" title="Retry the last turn with the strict JSON contract" hidden>
-            Retry
-          </button>
-          <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics for the failed model response" hidden>
-            Inspect
-          </button>
-          <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Import this response even though it failed validation" hidden>
-            Import
-          </button>
-          <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel generation" hidden>
-            Cancel
-          </button>
-          <button id="recheck-provider" className="mini-action" type="button" title="Read latest provider response">
-            Read Latest
-          </button>
+          <div className="provider-activity-actions">
+            <button id="repair-retry" className="mini-action" type="button" title="Retry the last turn with the strict JSON contract" hidden>
+              Retry
+            </button>
+            <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics for the failed model response" hidden>
+              Inspect
+            </button>
+            <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Import this response even though it failed validation" hidden>
+              Import
+            </button>
+            <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel generation" hidden>
+              Cancel
+            </button>
+            <button id="recheck-provider" className="mini-action" type="button" title="Read latest provider response" hidden>
+              Read Latest
+            </button>
+          </div>
         </div>
       </aside>
 

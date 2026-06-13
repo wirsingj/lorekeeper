@@ -1172,14 +1172,14 @@ button:disabled {
   right: 10px;
   bottom: 10px;
   left: 10px;
-  padding: 9px 10px;
+  padding: 10px;
   border: 1px solid rgba(174, 191, 202, 0.12);
   border-radius: 10px;
   background: rgba(10, 13, 15, 0.34);
   display: grid;
-  grid-template-columns: 9px minmax(0, 1fr) repeat(5, auto);
-  align-items: center;
-  gap: 8px;
+  grid-template-columns: 9px minmax(0, 1fr);
+  align-items: start;
+  gap: 7px 8px;
   min-height: 20px;
   color: #b9c6cc;
   font-size: 0.78rem;
@@ -1197,41 +1197,25 @@ button:disabled {
 
 #provider-activity-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.provider-activity[data-state="error"] #provider-activity-label,
-.provider-activity[data-state="waiting"] #provider-activity-label {
   white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  line-height: 1.25;
+  overflow-wrap: anywhere;
+  line-height: 1.28;
 }
 
-.provider-activity[data-state="error"],
-.provider-activity[data-state="waiting"] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-
-.provider-activity[data-state="error"]::before,
-.provider-activity[data-state="waiting"]::before {
-  flex: 0 0 9px;
+.provider-activity::before {
   margin-top: 4px;
 }
 
-.provider-activity[data-state="error"] #provider-activity-label,
-.provider-activity[data-state="waiting"] #provider-activity-label {
-  flex: 1 1 calc(100% - 22px);
+.provider-activity-actions {
+  grid-column: 2;
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
   min-width: 0;
 }
 
-.provider-activity[data-state="error"] .mini-action,
-.provider-activity[data-state="waiting"] .mini-action {
-  flex: 0 0 auto;
+.provider-activity-actions:has(> button:not([hidden])) {
+  display: flex;
 }
 
 #recheck-provider,

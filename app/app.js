@@ -5557,8 +5557,10 @@ function setProviderActivity(message, status = "idle") {
 
   if (elements.providerActivityLabel) {
     elements.providerActivityLabel.textContent = message;
+    elements.providerActivityLabel.title = message;
   } else {
     elements.providerActivity.textContent = message;
+    elements.providerActivity.title = message;
   }
   elements.providerActivity.dataset.state = status;
   updateTurnRepairControls();
@@ -5592,7 +5594,7 @@ function updateTurnRepairControls() {
     elements.repairImportAnyway.disabled = projection.hasActiveGeneration;
   }
   if (elements.recheckProvider) {
-    elements.recheckProvider.hidden = active || clientMode;
+    elements.recheckProvider.hidden = active || clientMode || currentProviderSettings().preferredProvider !== "bridge";
   }
 }
 
