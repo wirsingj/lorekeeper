@@ -12,6 +12,7 @@ import { renderTurnResponseForImport } from "../src/model-contract/turn-json-con
 import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inputs.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
+import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 
 const launchParams = new URLSearchParams(window.location.search);
@@ -7104,6 +7105,29 @@ function messageBodyElements(text, role = "dm", data = {}) {
       return panel;
     }
 
+    if (block.type === "mechanics") {
+      const panel = document.createElement("div");
+      panel.className = "roll-panel";
+      const title = document.createElement("strong");
+      title.className = "roll-panel-title";
+      title.textContent = "Mechanics";
+      panel.append(title);
+
+      block.rows.forEach((row) => {
+        const item = document.createElement("div");
+        item.className = `roll-row ${row.category || ""}`.trim();
+        const label = document.createElement("span");
+        label.className = "roll-label";
+        label.textContent = row.label;
+        const detail = document.createElement("span");
+        detail.className = "roll-detail";
+        detail.textContent = row.detail;
+        item.append(label, detail);
+        panel.append(item);
+      });
+      return panel;
+    }
+
     const paragraph = document.createElement("p");
     paragraph.textContent = block.text;
     return paragraph;
@@ -7146,31 +7170,39 @@ function normalizeMessageBlocks(text, role) {
 function normalizeDmProseBlocks(rawBlocks) {
   const normalized = [];
   let proseGroup = [];
+  const seenMechanics = new Set();
 
   rawBlocks.forEach((block, index) => {
-    const renderable = textBlockToRenderableBlock(block);
-    if (renderable.type === "list" || renderable.type === "choices" || renderable.type === "combat") {
-      flushProseGroup();
-      if (renderable.type === "choices" && renderable.beforeText) {
-        normalized.push({
-          type: "paragraph",
-          text: renderable.beforeText,
-        });
+    for (const part of splitMechanicsFromBlock(block)) {
+      const renderable = part.type === "mechanics"
+        ? { type: "mechanics", rows: dedupeMechanicsRows(part.rows, seenMechanics) }
+        : textBlockToRenderableBlock(part.text);
+      if (renderable.type === "mechanics" && !renderable.rows.length) {
+        continue;
       }
-      normalized.push(renderable);
-      return;
-    }
+      if (renderable.type === "list" || renderable.type === "choices" || renderable.type === "combat" || renderable.type === "mechanics") {
+        flushProseGroup();
+        if (renderable.type === "choices" && renderable.beforeText) {
+          normalized.push({
+            type: "paragraph",
+            text: renderable.beforeText,
+          });
+        }
+        normalized.push(renderable);
+        continue;
+      }
 
-    if (shouldKeepDmBlockSeparate(renderable.text, index, rawBlocks.length)) {
-      flushProseGroup();
-      normalized.push(renderable);
-      return;
-    }
+      if (shouldKeepDmBlockSeparate(renderable.text, index, rawBlocks.length)) {
+        flushProseGroup();
+        normalized.push(renderable);
+        continue;
+      }
 
-    proseGroup.push(renderable.text);
-    const joinedLength = proseGroup.join(" ").length;
-    if (proseGroup.length >= 4 || joinedLength >= 480) {
-      flushProseGroup();
+      proseGroup.push(renderable.text);
+      const joinedLength = proseGroup.join(" ").length;
+      if (proseGroup.length >= 4 || joinedLength >= 480) {
+        flushProseGroup();
+      }
     }
   });
 

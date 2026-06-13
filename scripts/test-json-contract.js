@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createReviewBatch, getCommittableChanges } from "../src/canon-review/proposals.js";
 import { OllamaProvider } from "../src/ai/ollama-provider.js";
+import { dedupeMechanicsRows, splitMechanicsFromBlock } from "../app/mechanics-formatting.js";
 import { normalizeProviderRuntimeSettings } from "../src/ai/provider-settings.js";
 import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { createEmptyCampaign } from "../src/campaign-state/schema.js";
@@ -688,6 +689,31 @@ const dmOnlyTable = renderTurnResponseForImport(validTurnResponse({
 }));
 assert.doesNotMatch(dmOnlyTable, /Secret/);
 assert.match(dmOnlyTable, /Visible/);
+
+const splitMechanics = splitMechanicsFromBlock(
+  "Garren's blade slices through the air. Damage: Garren's attack hits! Damage: 1d8 + 4 = 12. The miner takes 12 damage (Hostile Miner HP: 0 -> -12).",
+);
+assert.equal(splitMechanics[0].type, "text");
+assert.match(splitMechanics[0].text, /Garren's blade slices/);
+assert.equal(splitMechanics[1].type, "mechanics");
+assert.equal(splitMechanics[1].rows.length, 1);
+assert.equal(splitMechanics[1].rows[0].label, "Damage");
+assert.match(splitMechanics[1].rows[0].detail, /1d8 \+ 4 = 12/);
+assert.match(splitMechanics[1].rows[0].detail, /HP: 0 -> -12/);
+
+const duplicatedMechanics = dedupeMechanicsRows([
+  ...splitMechanics[1].rows,
+  ...splitMechanicsFromBlock("Damage: 1d8 + 4 = 12. The miner takes 12 damage (Hostile Miner HP: 0 -> -12).")[0].rows,
+]);
+assert.equal(duplicatedMechanics.length, 1);
+
+const attackMechanics = splitMechanicsFromBlock(
+  "The hostile miner lunges. Hostile Miner's Attack: d20 + 5 = 18 vs AC 14; Hit. Damage: 2d6 + 3 = 15.",
+);
+assert.equal(attackMechanics[1].rows.length, 2);
+assert.equal(attackMechanics[1].rows[0].label, "Hostile Miner's Attack");
+assert.match(attackMechanics[1].rows[0].detail, /18 vs AC 14/);
+assert.equal(attackMechanics[1].rows[1].label, "Damage");
 
 assert.equal(validateTurnResponse(validTurnResponse()).valid, true);
 

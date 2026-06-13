@@ -949,6 +949,57 @@ button:disabled {
   margin: 0;
 }
 
+.roll-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(222, 188, 120, 0.28);
+  border-radius: 8px;
+  background: rgba(49, 39, 23, 0.44);
+}
+
+.roll-panel-title {
+  color: #ffe2a8;
+  font-size: 0.7rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.roll-row {
+  display: grid;
+  grid-template-columns: minmax(86px, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 6px 7px;
+  border: 1px solid rgba(222, 188, 120, 0.13);
+  border-radius: 7px;
+  background: rgba(10, 13, 15, 0.28);
+}
+
+.roll-label {
+  color: #f5d18d;
+  font-size: 0.72rem;
+  font-weight: 950;
+  line-height: 1.35;
+}
+
+.roll-detail {
+  min-width: 0;
+  color: #eef3f5;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.roll-row.attack .roll-label {
+  color: #ffd090;
+}
+
+.roll-row.damage .roll-label {
+  color: #ffb0a0;
+}
+
 .message-meta {
   display: block;
   margin-top: 9px;
