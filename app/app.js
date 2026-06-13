@@ -686,10 +686,45 @@ function extractChoiceTokenText(text) {
 
 function choiceSelectionInWorldText(selection, visibleText = "") {
   const text = String(visibleText ?? "").trim();
-  if (text && !/^(?:i\s+)?(?:choose|chose|pick|picked|select|selected|option|choice)\s+/i.test(text)) {
+  if (!text) {
+    return selection.inWorldText;
+  }
+
+  const tokenText = extractChoiceTokenText(text);
+  if (!tokenText) {
     return text;
   }
-  return selection.inWorldText;
+
+  if (isBareChoiceSelectionText(text) || isExactChoiceDraft(selection, text)) {
+    return selection.inWorldText;
+  }
+
+  // The player edited the clicked choice draft with extra intent. Preserve that
+  // text as the actual action while retaining structured selection metadata.
+  return text;
+}
+
+function isBareChoiceSelectionText(text) {
+  const trimmed = String(text ?? "").trim();
+  return /^(?:[A-Ha-h]|\d+)(?:\s*(?:,|\+|and|&)\s*(?:[A-Ha-h]|\d+))*$/.test(trimmed) ||
+    /^(?:i\s+)?(?:choose|chose|pick|picked|select|selected|option|choice)\s+(?:[A-Ha-h]|\d+)(?:\s*(?:,|\+|and|&)\s*(?:[A-Ha-h]|\d+))*\s*$/i.test(trimmed);
+}
+
+function isExactChoiceDraft(selection, text) {
+  const normalizedText = compactCompareText(text);
+  if (!normalizedText) {
+    return false;
+  }
+  if (normalizedText === compactCompareText(selection.inWorldText)) {
+    return true;
+  }
+  return (selection.selectedOptionIds ?? []).some((id, index) => {
+    const choice = selection.choices?.[index] ?? "";
+    return normalizedText === compactCompareText(`I choose ${id}: ${choice}`) ||
+      normalizedText === compactCompareText(`I choose ${id}. ${choice}`) ||
+      normalizedText === compactCompareText(`I choose ${id} ${choice}`) ||
+      normalizedText === compactCompareText(`${id}. ${choice}`);
+  });
 }
 
 function pendingSelectionMatchesText(selection, text = "") {
@@ -5039,7 +5074,7 @@ async function runPromptThroughLocalProvider(turn) {
       turn,
       providerSettings: currentProviderSettings(),
       validateProviderResult: contractIssueFromProviderResult,
-      renderStructuredResponse: renderTurnResponseForImport,
+      renderStructuredResponse: (structured) => renderTurnResponseForImport(structured, { includeChoices: false }),
       onEvent: handleProviderGenerationEvent,
     });
     state.turnFlow.startGeneration(run);

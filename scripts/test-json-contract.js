@@ -367,6 +367,38 @@ assert.match(renderedStructured, /Jarin: Drop low and listen/);
 assert.match(renderedStructured, /B\. Something else\./);
 assert.match(renderedStructured, /```json lorekeeper_updates/);
 
+const echoedChoiceResponse = validTurnResponse({
+  table: [{
+    speaker: "DM",
+    speakerId: null,
+    role: "dm",
+    kind: "narration",
+    visibility: "table",
+    text: "The miner lifts his pickaxe and squares up. What do you do, Garren? A. Throw sand in his eyes. B. Ready your stance.",
+  }],
+  choices: {
+    prompt: "What do you do, Garren?",
+    scope: "character",
+    forActorId: "garren",
+    forActor: "Garren",
+    options: [
+      { id: "A", actorId: "garren", actor: "Garren", legalOptionId: null, text: "Throw sand in his eyes." },
+      { id: "B", actorId: "garren", actor: "Garren", legalOptionId: null, text: "Ready your stance." },
+    ],
+    allowOther: true,
+  },
+});
+const renderedWithoutChoiceEcho = renderTurnResponseForImport(echoedChoiceResponse, { includeChoices: false });
+assert.match(renderedWithoutChoiceEcho, /The miner lifts his pickaxe and squares up\./);
+assert.doesNotMatch(renderedWithoutChoiceEcho, /What do you do, Garren/);
+assert.doesNotMatch(renderedWithoutChoiceEcho, /A\. Throw sand/);
+assert.doesNotMatch(renderedWithoutChoiceEcho, /Ready your stance/);
+
+const renderedWithSingleChoiceBlock = renderTurnResponseForImport(echoedChoiceResponse);
+assert.match(renderedWithSingleChoiceBlock, /The miner lifts his pickaxe and squares up\./);
+assert.equal((renderedWithSingleChoiceBlock.match(/A\. Garren: Throw sand in his eyes\./g) ?? []).length, 1);
+assert.equal((renderedWithSingleChoiceBlock.match(/B\. Garren: Ready your stance\./g) ?? []).length, 1);
+
 const noChanges = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ proposedChanges: [] })));
 assert.equal(noChanges.response.proposedChanges.length, 0);
 

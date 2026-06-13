@@ -257,8 +257,9 @@ function hasOnlyProposedChangeValidationErrors(errors = []) {
   return errors.length > 0 && errors.every((error) => /^proposedChanges\[\d+\]\./.test(error));
 }
 
-export function renderTurnResponseForImport(turnResponse) {
+export function renderTurnResponseForImport(turnResponse, options = {}) {
   const response = normalizeTurnResponse(turnResponse);
+  const includeChoices = options.includeChoices !== false;
   const lines = [];
 
   for (const entry of response.table) {
@@ -267,7 +268,8 @@ export function renderTurnResponseForImport(turnResponse) {
     }
 
     const speaker = String(entry.speaker || "DM").trim();
-    const text = String(entry.text || "").trim();
+    const rawText = String(entry.text || "").trim();
+    const text = stripChoiceEchoFromTableText(rawText, response.choices, { includeChoices });
     if (!text) {
       continue;
     }
@@ -283,7 +285,7 @@ export function renderTurnResponseForImport(turnResponse) {
     lines.push(response.mechanics.map((item) => `${item.label}: ${item.text}`).join("\n"));
   }
 
-  if (response.sceneStatus.awaitingPlayer && response.choices.options.length) {
+  if (includeChoices && response.sceneStatus.awaitingPlayer && response.choices.options.length) {
     const renderedOptions = response.choices.options.map((option, index) => {
       const actor = option.actor || response.choices.forActor || "";
       return `${option.id || letterForIndex(index)}. ${actor ? `${actor}: ` : ""}${option.text}`;
@@ -305,6 +307,42 @@ export function renderTurnResponseForImport(turnResponse) {
   ].join("\n"));
 
   return lines.filter(Boolean).join("\n\n").trim();
+}
+
+function stripChoiceEchoFromTableText(text, choices = {}, options = {}) {
+  const hasStructuredChoices = Boolean(choices?.options?.length);
+  if (!hasStructuredChoices) {
+    return String(text ?? "").trim();
+  }
+
+  let cleaned = String(text ?? "").trim();
+  const optionHeadingIndex = cleaned.search(/\b(?:Options?|Choices?)\s*:/i);
+  if (optionHeadingIndex >= 0 && countChoiceMarkers(cleaned.slice(optionHeadingIndex)) >= 2) {
+    cleaned = cleaned.slice(0, optionHeadingIndex).trim();
+  }
+
+  const letteredIndex = firstChoiceEchoIndex(cleaned);
+  if (letteredIndex >= 0 && countChoiceMarkers(cleaned.slice(letteredIndex)) >= 2) {
+    cleaned = cleaned.slice(0, letteredIndex).trim();
+  }
+
+  if (!options.includeChoices) {
+    cleaned = cleaned
+      .replace(/\s*["'`]*\s*What (?:do|does|would|will|should|can) [^?]{0,120}\?\s*["'`]*\s*$/i, "")
+      .replace(/\s*["'`]*\s*(?:What now|Your move|Choose)\.?\s*["'`]*\s*$/i, "")
+      .trim();
+  }
+
+  return cleaned;
+}
+
+function firstChoiceEchoIndex(text) {
+  const match = String(text ?? "").match(/(?:^|[\s"'`])(?:[A-H]|\d{1,2})[.)]\s+/i);
+  return match ? match.index + match[0].search(/(?:[A-H]|\d{1,2})[.)]\s+/i) : -1;
+}
+
+function countChoiceMarkers(text) {
+  return (String(text ?? "").match(/(?:^|[\s"'`])(?:[A-H]|\d{1,2})[.)]\s+/gi) ?? []).length;
 }
 
 export function validateTurnRequest(request) {
