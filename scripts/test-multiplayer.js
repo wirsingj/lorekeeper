@@ -5,6 +5,7 @@ import {
   clearPendingTurnInputs,
   controllerKinds,
   createGuestSnapshot,
+  createHostSnapshot,
   createInviteForPartyMember,
   disconnectGuest,
   parseInviteLink,
@@ -36,6 +37,7 @@ const joinResult = requestJoin(campaign, {
 });
 campaign = joinResult.campaign;
 assert.equal(joinResult.approved, false);
+assert.ok(joinResult.connectionSecret);
 assert.equal(campaign.multiplayer.connections[0].status, "pending");
 const duplicateJoinResult = requestJoin(campaign, {
   inviteLink: inviteResult.inviteLink,
@@ -44,10 +46,12 @@ const duplicateJoinResult = requestJoin(campaign, {
 });
 campaign = duplicateJoinResult.campaign;
 assert.equal(duplicateJoinResult.connection.id, joinResult.connection.id);
+assert.equal(duplicateJoinResult.connectionSecret, joinResult.connectionSecret);
 assert.equal(campaign.multiplayer.connections.length, 1);
 
 campaign = approveJoinRequest(campaign, joinResult.connection.id);
 const connected = campaign.multiplayer.connections[0];
+const connectionSecret = joinResult.connectionSecret;
 const kevric = campaign.party.find((member) => member.id === "kevric");
 assert.equal(connected.status, "connected");
 assert.equal(kevric.controllerKind, controllerKinds.REMOTE_PLAYER);
@@ -64,6 +68,7 @@ driftedCampaign.party = driftedCampaign.party.map((member) => member.id === "kev
 const healedControllerCampaign = submitGuestAction(driftedCampaign, {
   connectionId: connected.id,
   clientId: "guest-client",
+  connectionSecret,
   characterId: "kevric",
   text: "Kevric tests that an approved guest seat repairs controller drift.",
 });
@@ -82,10 +87,14 @@ const legacyConnection = {
   playerId: legacyPlayer.id,
   status: "pending",
   approvedAt: null,
+  secret: connectionSecret,
 };
 staleCampaign.multiplayer.players.push(legacyPlayer);
 staleCampaign.multiplayer.connections.push(legacyConnection);
-const healedSnapshot = createGuestSnapshot(staleCampaign, legacyConnection.id);
+const healedSnapshot = createGuestSnapshot(staleCampaign, legacyConnection.id, {
+  clientId: "guest-client",
+  connectionSecret,
+});
 assert.equal(healedSnapshot.connection.status, "connected");
 assert.equal(healedSnapshot.connection.id, connected.id);
 
@@ -93,6 +102,7 @@ assert.throws(
   () => submitGuestAction(campaign, {
     connectionId: connected.id,
     clientId: "other-client",
+    connectionSecret,
     characterId: "kevric",
     text: "Kevric acts from the wrong thin client.",
   }),
@@ -102,6 +112,19 @@ assert.throws(
 assert.throws(
   () => submitGuestAction(campaign, {
     connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret: "wrong-secret",
+    characterId: "kevric",
+    text: "Kevric acts with the wrong connection secret.",
+  }),
+  /secret does not match/,
+);
+
+assert.throws(
+  () => submitGuestAction(campaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
     characterId: "jarin",
     text: "Jarin acts from the guest client.",
   }),
@@ -111,6 +134,7 @@ assert.throws(
 campaign = submitGuestAction(campaign, {
   connectionId: connected.id,
   clientId: "guest-client",
+  connectionSecret,
   characterId: "kevric",
   text: "Kevric ducks behind the nearest tree and watches Jarin's blind side.",
 });
@@ -124,8 +148,11 @@ assert.equal(publicMessage.data.status, "pending_model_submit");
 assert.equal(publicMessage.data.hostStaged, true);
 assert.match(publicMessage.meta, /staged for next Send Turn/i);
 
-const guestSnapshot = createGuestSnapshot(campaign, connected.id);
+const hostSnapshot = createHostSnapshot(campaign);
+assert.equal(hostSnapshot.connections.some((connection) => "secret" in connection), false);
+const guestSnapshot = createGuestSnapshot(campaign, connected.id, { clientId: "guest-client", connectionSecret });
 assert.equal(guestSnapshot.assignedCharacter.name, "Kevric");
+assert.ok(guestSnapshot.revision);
 assert.equal(guestSnapshot.messages.some((message) => message.title === "Kevric"), true);
 assert.equal(guestSnapshot.tableState.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.equal(guestSnapshot.tableState.places.find((place) => place.id === "forest").name, "Forest");
@@ -156,7 +183,7 @@ campaign.sessionLog.messages.push({
   createdAt: new Date().toISOString(),
   data: {},
 });
-const resolvedGuestSnapshot = createGuestSnapshot(campaign, connected.id);
+const resolvedGuestSnapshot = createGuestSnapshot(campaign, connected.id, { clientId: "guest-client", connectionSecret });
 assert.equal(resolvedGuestSnapshot.messages.some((message) => message.id === "dm-after-guest-action"), true);
 assert.equal(
   resolvedGuestSnapshot.messages.find((message) => message.title === "Kevric").data.status,
@@ -169,12 +196,12 @@ assert.equal(releasedKevric.controllerKind, controllerKinds.AI_COMPANION);
 
 let tableStopCampaign = approveJoinRequest(joinResult.campaign, joinResult.connection.id);
 tableStopCampaign = stopLocalTable(tableStopCampaign);
-const stoppedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client" });
+const stoppedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client", connectionSecret });
 assert.equal(stoppedSnapshot.tableStopped, true);
 assert.equal(stoppedSnapshot.awaitingApproval, false);
 assert.match(stoppedSnapshot.scene.immediateSituation, /host local table is off/i);
 tableStopCampaign = startLocalTable(tableStopCampaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
-const revivedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client" });
+const revivedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client", connectionSecret });
 assert.equal(revivedSnapshot.connection.status, "connected");
 assert.equal(revivedSnapshot.assignedCharacter.name, "Kevric");
 assert.equal(tableStopCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { touchCampaign } from "../campaign-state/schema.js";
+import { buildAggregatedPlayerTurn as buildAggregatedPlayerTurnPure } from "./turn-inputs.js";
 
 export const multiplayerProtocolVersion = 1;
 
@@ -185,6 +186,9 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
   }
   const existing = findExistingConnectionForClient(next, invite.id, clientId);
   if (existing) {
+    if (!existing.secret) {
+      existing.secret = randomToken(24);
+    }
     const existingPlayer = next.multiplayer.players.find((player) => player.id === existing.playerId);
     if (existingPlayer) {
       existingPlayer.displayName = compactLine(playerName || existingPlayer.displayName || "Guest Player", 80);
@@ -208,6 +212,7 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
         lastSeenAt: nowIso(),
       },
       approved: existing.status === "connected",
+      connectionSecret: existing.secret,
     };
   }
 
@@ -228,6 +233,7 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
     inviteId: invite.id,
     partyMemberId: member.id,
     status: invite.approvalRequired ? "pending" : "connected",
+    secret: randomToken(24),
     requestedAt: nowIso(),
     approvedAt: invite.approvalRequired ? null : nowIso(),
     deniedAt: null,
@@ -252,6 +258,7 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
     connection,
     player,
     approved: connection.status === "connected",
+    connectionSecret: connection.secret,
   };
 }
 
@@ -299,13 +306,14 @@ export function denyJoinRequest(campaign, connectionId) {
   return touchCampaign(next);
 }
 
-export function submitGuestAction(campaign, { connectionId, clientId, characterId, text, ready = true } = {}) {
+export function submitGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId, text, ready = true } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
   if (!connection || connection.status !== "connected") {
     throw new Error("Connection is not approved.");
   }
   assertClientMatchesConnection(next, connection, clientId);
+  assertConnectionSecret(connection, connectionSecret);
   if (connection.partyMemberId !== characterId) {
     throw new Error("Guest can only submit for their assigned party member.");
   }
@@ -343,13 +351,14 @@ export function submitGuestAction(campaign, { connectionId, clientId, characterI
   return touchCampaign(next);
 }
 
-export function passGuestAction(campaign, { connectionId, clientId, characterId } = {}) {
+export function passGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
   if (!connection || connection.status !== "connected") {
     throw new Error("Connection is not approved.");
   }
   assertClientMatchesConnection(next, connection, clientId);
+  assertConnectionSecret(connection, connectionSecret);
   if (connection.partyMemberId !== characterId) {
     throw new Error("Guest can only pass for their assigned party member.");
   }
@@ -462,47 +471,7 @@ export function setHostController(campaign, partyMemberId) {
 }
 
 export function buildAggregatedPlayerTurn(campaign, { hostText = "" } = {}) {
-  const next = normalizeMultiplayerCampaign(campaign);
-  const readyInputs = next.multiplayer.pendingTurnInputs
-    .filter((input) => input.ready && !input.passed && input.text)
-    .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-  const lines = [];
-  if (hostText.trim()) {
-    lines.push(`Host/player: ${hostText.trim()}`);
-  }
-  for (const input of readyInputs) {
-    lines.push(`${input.characterName}: ${input.text}`);
-  }
-  if (!lines.length) {
-    throw new Error("No ready player inputs to resolve.");
-  }
-
-  return {
-    raw: "Combined structured party turn",
-    text: [
-      "Combined structured party turn:",
-      ...lines.map((line) => `- ${line}`),
-      "(meta: Resolve these party inputs together. Preserve each character's agency and voice.)",
-    ].join("\n"),
-    playerInputs: [
-      ...(hostText.trim() ? [{
-        playerId: "host",
-        playerName: "Host",
-        characterId: null,
-        characterName: "Host",
-        text: hostText.trim(),
-        ready: true,
-      }] : []),
-      ...readyInputs.map((input) => ({
-        playerId: input.playerId,
-        playerName: input.playerName,
-        characterId: input.characterId,
-        characterName: input.characterName,
-        text: input.text,
-        ready: input.ready,
-      })),
-    ],
-  };
+  return buildAggregatedPlayerTurnPure(normalizeMultiplayerCampaign(campaign), { hostText });
 }
 
 export function clearPendingTurnInputs(campaign, inputIds = null) {
@@ -519,8 +488,10 @@ export function clearPendingTurnInputs(campaign, inputIds = null) {
 
 export function createHostSnapshot(campaign) {
   const normalized = normalizeMultiplayerCampaign(campaign);
+  const revision = tableRevision(normalized);
   return {
     protocolVersion: multiplayerProtocolVersion,
+    revision,
     campaignId: normalized.id,
     campaignTitle: normalized.title,
     localTable: normalized.multiplayer.localTable,
@@ -539,7 +510,7 @@ export function createHostSnapshot(campaign) {
       createdAt: invite.createdAt,
       revokedAt: invite.revokedAt,
     })),
-    connections: normalized.multiplayer.connections,
+    connections: normalized.multiplayer.connections.map(publicConnection),
     pendingTurnInputs: normalized.multiplayer.pendingTurnInputs,
     events: normalized.multiplayer.events.slice(-20),
   };
@@ -547,6 +518,7 @@ export function createHostSnapshot(campaign) {
 
 export function createGuestSnapshot(campaign, connectionId, options = {}) {
   const normalized = normalizeMultiplayerCampaign(campaign);
+  const revision = tableRevision(normalized);
   const requestedConnection = normalized.multiplayer.connections.find((item) => item.id === connectionId);
   const connection =
     findApprovedSiblingConnection(normalized, requestedConnection) ??
@@ -555,6 +527,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
   if (!connection) {
     throw new Error("Connection not found.");
   }
+  assertConnectionSecret(connection, options.connectionSecret);
   const assigned = normalized.party.find((member) => member.id === connection.partyMemberId);
   if (connection.status !== "connected") {
     const tableStopped = !normalized.multiplayer.localTable?.running;
@@ -565,6 +538,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
         : `Guest connection is ${connection.status}.`;
     return {
       protocolVersion: multiplayerProtocolVersion,
+      revision,
       campaignId: normalized.id,
       campaignTitle: normalized.title,
       connection: publicConnection(connection),
@@ -586,6 +560,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
       tableStopped,
       tableState: {
         updatedAt: normalized.updatedAt ?? nowIso(),
+        revision,
         generatedAt: nowIso(),
         scene: {
           status: connection.status,
@@ -612,6 +587,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
 
   return {
     protocolVersion: multiplayerProtocolVersion,
+    revision,
     campaignId: normalized.id,
     campaignTitle: normalized.title,
     connection: publicConnection(connection),
@@ -882,6 +858,15 @@ function assertClientMatchesConnection(campaign, connection, clientId) {
   }
 }
 
+function assertConnectionSecret(connection, connectionSecret) {
+  if (!connection.secret) {
+    return;
+  }
+  if (connection.secret !== String(connectionSecret ?? "")) {
+    throw new Error("Guest connection secret does not match.");
+  }
+}
+
 function normalizeControllerKind(value, fallback) {
   return allowedControllerKinds.has(value) ? value : fallback;
 }
@@ -902,6 +887,15 @@ function appendEvent(events = [], event) {
       ...event,
     },
   ].slice(-100);
+}
+
+function tableRevision(campaign) {
+  const updatedAt = campaign.updatedAt ?? "";
+  const eventCount = campaign.multiplayer?.events?.length ?? 0;
+  const messageCount = campaign.sessionLog?.messages?.length ?? 0;
+  const pendingCount = campaign.multiplayer?.pendingTurnInputs?.length ?? 0;
+  const combatTurn = campaign.combat?.currentTurnId ?? "";
+  return `${updatedAt}:${eventCount}:${messageCount}:${pendingCount}:${combatTurn}`;
 }
 
 function upsertById(records, record) {
@@ -977,6 +971,7 @@ function publicPartyMember(member) {
 function createVisibleTableState(campaign, connection) {
   return {
     updatedAt: campaign.updatedAt ?? nowIso(),
+    revision: tableRevision(campaign),
     generatedAt: nowIso(),
     scene: publicData(campaign.scene),
     party: campaign.party.slice(-tableStateLimits.party).map(publicPartyMember),

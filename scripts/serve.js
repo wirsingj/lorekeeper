@@ -315,10 +315,12 @@ const server = createServer(async (request, response) => {
       });
       sendJson(response, 200, {
         connection: joinResult.connection,
+        connectionSecret: joinResult.connectionSecret,
         player: joinResult.player,
         approved: joinResult.approved,
         snapshot: joinResult.approved ? createGuestSnapshot(payload.campaign, joinResult.connection.id, {
           clientId: body.clientId,
+          connectionSecret: joinResult.connectionSecret,
         }) : null,
       });
       return;
@@ -352,6 +354,7 @@ const server = createServer(async (request, response) => {
       const { campaign } = await loadActiveCampaign(projectRoot);
       sendJson(response, 200, createGuestSnapshot(campaign, url.searchParams.get("connectionId"), {
         clientId: url.searchParams.get("clientId"),
+        connectionSecret: url.searchParams.get("connectionSecret"),
       }));
       return;
     }
@@ -364,6 +367,7 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, {
         snapshot: createGuestSnapshot(payload.campaign, body.connectionId, {
           clientId: body.clientId,
+          connectionSecret: body.connectionSecret,
         }),
       });
       return;
@@ -377,6 +381,7 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, {
         snapshot: createGuestSnapshot(payload.campaign, body.connectionId, {
           clientId: body.clientId,
+          connectionSecret: body.connectionSecret,
         }),
       });
       return;

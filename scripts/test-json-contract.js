@@ -312,6 +312,40 @@ const advancedCombat = applyCanonicalChanges(startedCombat.campaign, [
 ]);
 assert.notEqual(advancedCombat.campaign.combat.currentTurnId, resolvedActorId);
 
+const repairedPromptedCombat = applyCanonicalChanges({
+  ...rulesCampaignData,
+  combat: {
+    inCombat: true,
+    round: 1,
+    currentTurnId: "enemy-drunk-miner",
+    turnOrder: [
+      { id: "enemy-drunk-miner", name: "Drunk miner", type: "enemy", initiativeScore: 12 },
+      { id: "mira", name: "Mira", type: "party", initiativeScore: 10 },
+    ],
+    initiative: ["enemy-drunk-miner", "mira"],
+    enemies: [{ id: "enemy-drunk-miner", name: "Drunk miner", hp: 8 }],
+  },
+}, [
+  {
+    id: "combat-prompted-actor-repair",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "The DM prompt is clearly asking Mira to act.",
+    data: {
+      inCombat: true,
+      promptedActorId: "mira",
+      onlyFromNonParty: true,
+    },
+    confidence: "high",
+    reason: "Repair stale combat turn owner.",
+  },
+]);
+assert.equal(repairedPromptedCombat.campaign.combat.currentTurnId, "mira");
+assert.equal(repairedPromptedCombat.campaign.combat.promptedActorId, undefined);
+
 assert.equal(
   normalizeProviderRuntimeSettings({ ollamaBaseUrl: "https://example.com/ollama" }).ollamaBaseUrl,
   "http://127.0.0.1:11434",

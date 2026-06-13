@@ -9,6 +9,7 @@ import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-r
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
+import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inputs.js";
 
 const launchParams = new URLSearchParams(window.location.search);
 const clientMode = launchParams.get("mode") === "client";
@@ -974,6 +975,40 @@ function buildStagedRemoteTurnPrompt(inputs) {
   ].join("\n");
 }
 
+function clearResolvedRecoveredInputDraft(reason = "unknown") {
+  const draft = elements.playerInput.value.trim();
+  if (!draft || !state.playMessages.length) {
+    return false;
+  }
+  const draftKey = compactCompareText(draft);
+  let matchingPlayerIndex = -1;
+  for (let index = state.playMessages.length - 1; index >= 0; index -= 1) {
+    const message = state.playMessages[index];
+    if (message.role !== "player") {
+      continue;
+    }
+    if (compactCompareText(message.body) === draftKey) {
+      matchingPlayerIndex = index;
+      break;
+    }
+  }
+  if (matchingPlayerIndex === -1) {
+    return false;
+  }
+  const hasLaterTableResponse = state.playMessages
+    .slice(matchingPlayerIndex + 1)
+    .some((message) => ["dm", "party", "npc", "provider"].includes(message.role));
+  if (!hasLaterTableResponse) {
+    return false;
+  }
+  elements.playerInput.value = "";
+  pushDiagnosticsEvent("stale_input_draft_cleared", {
+    reason,
+    matchedMessageId: state.playMessages[matchingPlayerIndex]?.id,
+  });
+  return true;
+}
+
 function collectApprovedPartyInputs() {
   return state.playMessages
     .filter((message) => message.role === "party" && message.data?.status === "approved_party_input")
@@ -1065,6 +1100,7 @@ async function boot() {
   await refreshMultiplayerSnapshot({ quiet: true });
   seedPlayLog();
   render();
+  clearResolvedRecoveredInputDraft("boot");
   schedulePendingPlayerTurnResume("boot");
   scheduleCombatPromptTurnRepair("boot");
 }
@@ -1210,7 +1246,8 @@ async function repairStalePromptedCombatTurn(reason = "unknown") {
     return null;
   }
   const latestPrompt = latestDmNarration(state.playMessages);
-  const repairKey = `${state.campaign.id || "campaign"}:${state.campaign.combat?.currentTurnId || ""}->${repair.data.currentTurnId}:${latestPrompt.slice(0, 120)}`;
+  const repairedActorId = repair.data.promptedActorId || repair.data.currentTurnId;
+  const repairKey = `${state.campaign.id || "campaign"}:${state.campaign.combat?.currentTurnId || ""}->${repairedActorId}:${latestPrompt.slice(0, 120)}`;
   if (repairKey === state.lastCombatPromptRepairKey) {
     return null;
   }
@@ -1221,7 +1258,7 @@ async function repairStalePromptedCombatTurn(reason = "unknown") {
     pushDiagnosticsEvent("combat_prompt_turn_repair_started", {
       reason,
       fromActorId: state.campaign.combat?.currentTurnId || "",
-      toActorId: repair.data.currentTurnId,
+      toActorId: repair.data.promptedActorId || repair.data.currentTurnId,
       latestPrompt: latestPrompt.slice(0, 500),
     });
     const reviewBatch = createReviewBatch({
@@ -1234,7 +1271,7 @@ async function repairStalePromptedCombatTurn(reason = "unknown") {
     if (result?.applied?.length) {
       seedPlayLog();
       render();
-      setProviderActivity(`Combat turn repaired for ${labelById(state.campaign, repair.data.currentTurnId)}`, "idle");
+      setProviderActivity(`Combat turn repaired for ${labelById(state.campaign, repair.data.promptedActorId || repair.data.currentTurnId)}`, "idle");
     }
     return result;
   } finally {
@@ -1397,6 +1434,7 @@ async function selectCampaignByPath(sqlitePath) {
     await reconcilePartyDirectivesFromHistory();
     seedPlayLog();
     render();
+    clearResolvedRecoveredInputDraft("campaign_open");
     schedulePendingPlayerTurnResume("campaign_open");
     scheduleCombatPromptTurnRepair("campaign_open");
     elements.bridgeStatus.textContent = "Campaign opened";
@@ -1649,11 +1687,13 @@ async function requestJoinFromUi() {
       inviteLink,
       clientId,
       connectionId: result.connection.id,
+      connectionSecret: result.connectionSecret || "",
       playerId: result.player.id,
       playerName: result.player.displayName,
       partyMemberId: result.connection.partyMemberId,
       campaignId: parsed.campaign,
       status: result.connection.status,
+      lastRevision: result.snapshot?.revision ?? result.snapshot?.tableState?.revision ?? "",
     };
     saveGuestSession(state.guestSession);
     elements.joinStatus.textContent = result.approved
@@ -1711,15 +1751,20 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
     const url = new URL(`${state.guestSession.hostBaseUrl}${apiMultiplayerGuestSnapshotUrl}`);
     url.searchParams.set("connectionId", state.guestSession.connectionId);
     url.searchParams.set("clientId", state.guestSession.clientId || guestClientId());
+    if (state.guestSession.connectionSecret) {
+      url.searchParams.set("connectionSecret", state.guestSession.connectionSecret);
+    }
     url.searchParams.set("t", String(Date.now()));
     const snapshot = await fetchJson(url.toString());
     state.guestSession = {
       ...state.guestSession,
       connectionId: snapshot.connection?.id ?? state.guestSession.connectionId,
+      connectionSecret: state.guestSession.connectionSecret || "",
       status: snapshot.connection?.status ?? state.guestSession.status,
       partyMemberId: snapshot.connection?.partyMemberId ?? state.guestSession.partyMemberId,
       playerId: snapshot.connection?.playerId ?? state.guestSession.playerId,
       playerName: snapshot.connection?.displayName ?? state.guestSession.playerName,
+      lastRevision: snapshot.revision ?? snapshot.tableState?.revision ?? state.guestSession.lastRevision ?? "",
     };
     saveGuestSession(state.guestSession);
     renderGuestSnapshot(snapshot);
@@ -1735,8 +1780,15 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
     }
     return snapshot;
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Guest resync failed";
+    if (/connection secret/i.test(message) || (/connection/i.test(message) && /not found/i.test(message))) {
+      clearGuestSession();
+      setProviderActivity("Guest session expired. Rejoin from a fresh invite.", "error");
+      render();
+      return null;
+    }
     if (explicit) {
-      setProviderActivity(error instanceof Error ? `Guest resync failed: ${error.message}` : "Guest resync failed", "error");
+      setProviderActivity(`Guest resync failed: ${message}`, "error");
     }
     throw error;
   } finally {
@@ -1754,6 +1806,7 @@ async function submitGuestActionFromUi({ pass = false } = {}) {
     const result = await postJson(`${state.guestSession.hostBaseUrl}${endpoint}`, {
       connectionId: state.guestSession.connectionId,
       clientId: state.guestSession.clientId || guestClientId(),
+      connectionSecret: state.guestSession.connectionSecret || "",
       characterId: state.guestSession.partyMemberId,
       text: elements.playerInput.value.trim(),
       ready: true,
@@ -1777,8 +1830,8 @@ async function resolveCollectedPartyInputs() {
     return;
   }
 
-  const aggregateText = buildAggregatedPartyTurnText({ hostText, inputs: readyInputs });
-  await resolvePendingInputsWithText(readyInputs, aggregateText);
+  const aggregate = buildAggregatedPlayerTurnFromInputs({ hostText, inputs: readyInputs });
+  await resolvePendingInputsWithText(readyInputs, aggregate.text);
 }
 
 async function resolvePendingInput(inputId) {
@@ -1811,21 +1864,6 @@ async function resolvePendingInputsWithText(inputs, aggregateText) {
     state.multiplayerSnapshot = result.multiplayer;
     render();
   }
-}
-
-function buildAggregatedPartyTurnText({ hostText, inputs }) {
-  const lines = [];
-  if (hostText) {
-    lines.push(`Host/player: ${hostText}`);
-  }
-  for (const input of inputs) {
-    lines.push(`${input.characterName}: ${input.text}`);
-  }
-  return [
-    "Combined structured party turn:",
-    ...lines.map((line) => `- ${line}`),
-    "(meta: Resolve these party inputs together. Preserve each character's agency and voice. Return strict LoreKeeper JSON.)",
-  ].join("\n");
 }
 
 function renderGuestSnapshot(snapshot) {
@@ -2111,6 +2149,12 @@ function loadGuestSession() {
 
 function saveGuestSession(session) {
   localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
+}
+
+function clearGuestSession() {
+  state.guestSession = null;
+  state.guestSnapshot = null;
+  localStorage.removeItem(guestSessionStorageKey);
 }
 
 function normalizeWizardCharacter(input = {}) {
@@ -4150,8 +4194,8 @@ function createImplicitCombatActorPromptChange(tableMessages = [], proposedChang
     summary: `${actorName} is the active combat actor.`,
     data: {
       inCombat: true,
-      currentTurnId: promptedActorId,
-      activeActorId: promptedActorId,
+      promptedActorId,
+      onlyFromNonParty: true,
       lastAction: `Combat prompt handed initiative to ${actorName}.`,
     },
     confidence: turnResponse?.sceneStatus?.mode === "combat" || turnResponse?.choices?.forActorId ? "high" : "medium",

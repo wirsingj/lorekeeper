@@ -1,5 +1,5 @@
 import { touchCampaign } from "./schema.js";
-import { advanceCombatTurn, ensureCombatTurnOrder } from "../rules/combat-turns.js";
+import { advanceCombatTurn, ensureCombatTurnOrder, repairCombatTurnOwner } from "../rules/combat-turns.js";
 
 const arrayDomains = new Set([
   "people",
@@ -300,12 +300,21 @@ function mergeCombatChange(campaign, change, operation) {
   applyCombatActorUpdates(campaign, normalizeList(data.actorUpdates ?? data.partyUpdates));
   applyCombatEnemyUpdates(campaign.combat, normalizeList(data.enemyUpdates));
   if (campaign.combat?.inCombat) {
-    const orderedCampaign = data.advanceTurn || data.turnResolved
-      ? advanceCombatTurn(campaign, {
+    let orderedCampaign;
+    if (data.promptedActorId) {
+      orderedCampaign = repairCombatTurnOwner(campaign, {
+        promptedActorId: data.promptedActorId,
+        onlyFromNonParty: data.onlyFromNonParty !== false,
+        summary: change.summary,
+      });
+    } else if (data.advanceTurn || data.turnResolved) {
+      orderedCampaign = advanceCombatTurn(campaign, {
         fromActorId: data.resolvedActorId ?? data.actorId ?? data.characterId ?? data.currentTurnId ?? campaign.combat.currentTurnId,
         summary: change.summary,
-      })
-      : ensureCombatTurnOrder(campaign, { reroll: data.rerollInitiative === true });
+      });
+    } else {
+      orderedCampaign = ensureCombatTurnOrder(campaign, { reroll: data.rerollInitiative === true });
+    }
     campaign.combat = orderedCampaign.combat;
   }
   addHumanNote(campaign.combat, change);
@@ -313,7 +322,7 @@ function mergeCombatChange(campaign, change, operation) {
 }
 
 function normalizeCombatPatch(existing = {}, data = {}) {
-  const excluded = new Set(["actorUpdates", "partyUpdates", "enemyUpdates"]);
+  const excluded = new Set(["actorUpdates", "partyUpdates", "enemyUpdates", "promptedActorId", "onlyFromNonParty"]);
   const patch = Object.fromEntries(Object.entries(data).filter(([key]) => !excluded.has(key)));
   const merged = mergeNestedObjects(existing, patch);
 

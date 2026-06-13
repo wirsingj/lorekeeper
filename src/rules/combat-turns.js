@@ -11,7 +11,9 @@ export function ensureCombatTurnOrder(campaign, options = {}) {
   if (existingOrder.length && options.reroll !== true && !missingCombatants) {
     next.combat.turnOrder = existingOrder;
     next.combat.initiative = existingOrder.map((entry) => entry.id);
-    next.combat.currentTurnId = next.combat.currentTurnId || existingOrder[0]?.id || null;
+    next.combat.currentTurnId = existingOrder.some((entry) => entry.id === next.combat.currentTurnId)
+      ? next.combat.currentTurnId
+      : existingOrder[0]?.id || null;
     next.combat.turnEconomy = {
       ...(next.combat.turnEconomy ?? {}),
       ...turnEconomyForActor(next, next.combat.currentTurnId, { preserveExisting: true }),
@@ -80,6 +82,33 @@ export function currentCombatActor(campaign) {
 export function isActorCurrentCombatTurn(campaign, actorId) {
   const current = currentCombatActor(campaign);
   return Boolean(current && actorId && current.id === actorId);
+}
+
+export function repairCombatTurnOwner(campaign, { promptedActorId, onlyFromNonParty = true, summary = "" } = {}) {
+  if (!campaign?.combat?.inCombat || !promptedActorId) {
+    return campaign;
+  }
+  const next = ensureCombatTurnOrder(campaign);
+  const order = next.combat.turnOrder ?? [];
+  const prompted = order.find((entry) => entry.id === promptedActorId);
+  if (!prompted || prompted.id === next.combat.currentTurnId) {
+    return next;
+  }
+  const current = order.find((entry) => entry.id === next.combat.currentTurnId);
+  if (onlyFromNonParty && current?.type === "party") {
+    return next;
+  }
+  next.combat.currentTurnId = prompted.id;
+  next.combat.turnEconomy = {
+    ...(next.combat.turnEconomy ?? {}),
+    ...turnEconomyForActor(next, prompted.id, { preserveExisting: true }),
+  };
+  next.combat.lastAction = summary || `Combat prompt handed initiative to ${prompted.name || prompted.id}.`;
+  return next;
+}
+
+export function combatActorType(campaign, id) {
+  return actorType(campaign, id);
 }
 
 function normalizeExistingOrder(campaign) {
