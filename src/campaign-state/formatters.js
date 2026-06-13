@@ -15,6 +15,7 @@ export function labelEntity(campaign, id) {
     campaign.items,
     campaign.quests,
     campaign.lore,
+    campaign.combat?.enemies,
   ];
 
   for (const group of groups) {
@@ -42,4 +43,3 @@ export function joinNotes(notes = []) {
 
   return notes.join(" ");
 }
-

@@ -11,7 +11,7 @@
   "scripts": {
     "check": "node ./src/index.js",
     "demo": "node ./src/index.js",
-    "test": "node ./scripts/test-json-contract.js",
+    "test": "node ./scripts/test-json-contract.js && node ./scripts/test-multiplayer.js && node ./scripts/test-sqlite-storage.js",
     "new:campaign": "node ./scripts/new-campaign.js",
     "import:folder": "node ./scripts/import-campaign-folder.js",
     "api": "node ./scripts/serve.js 4174",
@@ -19,6 +19,8 @@
     "vite": "vite --host 127.0.0.1",
     "build": "vite build",
     "desktop": "npm run build && electron .",
+    "client": "node ./scripts/launch-desktop.js --client",
+    "cleanup": "node ./scripts/cleanup-processes.js",
     "shortcut": "cscript //nologo \"Create LoreKeeper Desktop Shortcut.vbs\""
   },
   "keywords": [

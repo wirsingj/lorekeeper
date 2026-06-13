@@ -72,7 +72,7 @@ function normalizeProviderSettings(providerSettings = {}) {
       : providerSettings.preferredProvider || "ollama",
     selectedModel: providerSettings.selectedModel || "llama3.1:8b",
     generationTimeoutMs: providerSettings.generationTimeoutMs || 120000,
-    outputLimit: providerSettings.outputLimit || 900,
+    outputLimit: providerSettings.outputLimit || 1800,
     fastMode: providerSettings.fastMode ?? false,
     ollamaBaseUrl: providerSettings.ollamaBaseUrl || "http://127.0.0.1:11434",
     bridgeMode: providerSettings.bridgeMode || "manual_until_adapter_ready",

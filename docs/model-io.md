@@ -41,6 +41,8 @@ The model owns:
 
 Action options belong in `response.choices`, not loose prose. For options aimed at a specific party member or NPC, the model should include `choices.forActor`/`forActorId` or per-option `actor`/`actorId` so the app can render a clean table choice panel.
 
+Local multiplayer inputs appear publicly in table chat first. When the host submits one of those visible character messages, LoreKeeper also includes it in `user.playerInputs[]` with `playerId`, `playerName`, `characterId`, `characterName`, and `text`. This gives the model structured source attribution without treating guest messages as hidden state.
+
 The model must not:
 
 - directly mutate SQLite

@@ -1,4 +1,5 @@
 import { touchCampaign } from "./schema.js";
+import { advanceCombatTurn, ensureCombatTurnOrder } from "../rules/combat-turns.js";
 
 const arrayDomains = new Set([
   "people",
@@ -62,7 +63,7 @@ function applyOneChange(campaign, change) {
   }
 
   if (domain === "combat") {
-    return mergeObjectChange(campaign.combat, change, operation);
+    return mergeCombatChange(campaign, change, operation);
   }
 
   if (domain === "style") {
@@ -154,6 +155,14 @@ function mergeRecordPatch(record, patch) {
     ...record,
     ...patch,
   };
+
+  if (patch.stats !== undefined && isPlainObject(record.stats) && isPlainObject(patch.stats)) {
+    merged.stats = mergeNestedObjects(record.stats, patch.stats);
+  }
+
+  if (patch.resources !== undefined && isPlainObject(record.resources) && isPlainObject(patch.resources)) {
+    merged.resources = mergeNestedObjects(record.resources, patch.resources);
+  }
 
   if (patch.notes !== undefined) {
     merged.notes = [
@@ -278,6 +287,151 @@ function mergeObjectChange(target, change, operation) {
   return { applied: true };
 }
 
+function mergeCombatChange(campaign, change, operation) {
+  if (operation === "remove") {
+    return {
+      applied: false,
+      reason: "Cannot remove singleton campaign combat state.",
+    };
+  }
+
+  const data = change.data ?? {};
+  campaign.combat = normalizeCombatPatch(campaign.combat ?? {}, data);
+  applyCombatActorUpdates(campaign, normalizeList(data.actorUpdates ?? data.partyUpdates));
+  applyCombatEnemyUpdates(campaign.combat, normalizeList(data.enemyUpdates));
+  if (campaign.combat?.inCombat) {
+    const orderedCampaign = data.advanceTurn || data.turnResolved
+      ? advanceCombatTurn(campaign, {
+        fromActorId: data.resolvedActorId ?? data.actorId ?? data.characterId ?? data.currentTurnId ?? campaign.combat.currentTurnId,
+        summary: change.summary,
+      })
+      : ensureCombatTurnOrder(campaign, { reroll: data.rerollInitiative === true });
+    campaign.combat = orderedCampaign.combat;
+  }
+  addHumanNote(campaign.combat, change);
+  return { applied: true };
+}
+
+function normalizeCombatPatch(existing = {}, data = {}) {
+  const excluded = new Set(["actorUpdates", "partyUpdates", "enemyUpdates"]);
+  const patch = Object.fromEntries(Object.entries(data).filter(([key]) => !excluded.has(key)));
+  const merged = mergeNestedObjects(existing, patch);
+
+  return {
+    ...merged,
+    inCombat: data.inCombat !== undefined ? Boolean(data.inCombat) : Boolean(existing.inCombat),
+    round: data.round !== undefined ? numberOrNull(data.round) : existing.round ?? null,
+    initiative: data.initiative !== undefined ? normalizeList(data.initiative).map(recordId).filter(Boolean) : normalizeList(existing.initiative),
+    turnOrder: data.turnOrder !== undefined ? normalizeList(data.turnOrder) : normalizeList(existing.turnOrder),
+    currentTurnId: data.currentTurnId ?? data.activeActorId ?? existing.currentTurnId ?? null,
+    enemies: data.enemies !== undefined ? normalizeCombatants(data.enemies) : normalizeCombatants(existing.enemies),
+    conditions: data.conditions !== undefined ? normalizeList(data.conditions) : normalizeList(existing.conditions),
+    turnEconomy: normalizeTurnEconomyMap(merged.turnEconomy ?? {}),
+    stakes: data.stakes ?? existing.stakes ?? "",
+    lastAction: data.lastAction ?? data.chosenAction ?? existing.lastAction ?? null,
+    lastOutcome: data.lastOutcome ?? data.outcome ?? existing.lastOutcome ?? null,
+    notes: normalizeNotes(merged.notes),
+  };
+}
+
+function applyCombatActorUpdates(campaign, updates) {
+  if (!updates.length) {
+    return;
+  }
+
+  for (const update of updates) {
+    if (!update || typeof update !== "object") {
+      continue;
+    }
+    const actorId = update.actorId ?? update.partyMemberId ?? update.characterId ?? update.id;
+    if (!actorId) {
+      continue;
+    }
+    const index = campaign.party.findIndex((member) => member.id === actorId);
+    if (index === -1) {
+      continue;
+    }
+    const member = campaign.party[index];
+    const patch = {};
+    if (update.hp !== undefined || update.hpDelta !== undefined || update.damage !== undefined || update.healing !== undefined) {
+      patch.stats = {
+        ...(member.stats ?? {}),
+        hp: normalizeHpUpdate(member.stats?.hp ?? member.hp ?? member.hitPoints, update),
+      };
+    }
+    if (update.resources !== undefined || update.spellSlots !== undefined || update.uses !== undefined || update.resourceDeltas !== undefined) {
+      patch.resources = normalizeResourceUpdate(member.resources ?? member.stats?.resources ?? {}, update);
+      patch.stats = {
+        ...(patch.stats ?? member.stats ?? {}),
+        resources: patch.resources,
+        spellSlots: patch.resources.spellSlots ?? member.stats?.spellSlots ?? null,
+      };
+    }
+    if (update.conditions !== undefined) {
+      patch.conditions = normalizeList(update.conditions);
+      patch.stats = {
+        ...(patch.stats ?? member.stats ?? {}),
+        conditions: patch.conditions,
+      };
+    }
+    if (update.addConditions !== undefined || update.removeConditions !== undefined) {
+      patch.conditions = mergeConditions(member.conditions ?? member.stats?.conditions, update);
+      patch.stats = {
+        ...(patch.stats ?? member.stats ?? {}),
+        conditions: patch.conditions,
+      };
+    }
+    if (Object.keys(patch).length) {
+      campaign.party[index] = normalizeRecordForDomain("party", {
+        ...mergeRecordPatch(member, patch),
+        id: member.id,
+      });
+    }
+
+    if (update.turnEconomy !== undefined) {
+      campaign.combat.turnEconomy = {
+        ...(campaign.combat.turnEconomy ?? {}),
+        [actorId]: normalizeTurnEconomyEntry({
+          ...(campaign.combat.turnEconomy?.[actorId] ?? {}),
+          ...(update.turnEconomy ?? {}),
+        }),
+      };
+    }
+  }
+}
+
+function applyCombatEnemyUpdates(combat, updates) {
+  if (!updates.length) {
+    return;
+  }
+  const enemies = normalizeCombatants(combat.enemies);
+  for (const update of updates) {
+    if (!update || typeof update !== "object") {
+      continue;
+    }
+    const enemyId = update.enemyId ?? update.id ?? uniqueId("enemy", update.name ?? "enemy");
+    const index = enemies.findIndex((enemy) => enemy.id === enemyId || normalizeName(enemy.name) === normalizeName(update.name));
+    const existing = index === -1 ? { id: enemyId, name: update.name || enemyId } : enemies[index];
+    const next = {
+      ...existing,
+      ...update,
+      id: existing.id ?? enemyId,
+      hp: update.hp !== undefined || update.hpDelta !== undefined || update.damage !== undefined || update.healing !== undefined
+        ? normalizeHpUpdate(existing.hp, update)
+        : existing.hp,
+      conditions: update.conditions !== undefined || update.addConditions !== undefined || update.removeConditions !== undefined
+        ? mergeConditions(update.conditions !== undefined ? update.conditions : existing.conditions, update)
+        : normalizeList(existing.conditions),
+    };
+    if (index === -1) {
+      enemies.push(next);
+    } else {
+      enemies[index] = next;
+    }
+  }
+  combat.enemies = enemies;
+}
+
 function addHumanNote(record, change) {
   if (!change.summary) {
     return;
@@ -321,6 +475,8 @@ function normalizeRecordForDomain(domain, record) {
 
   if (domain === "party") {
     const name = record.name || record.title || "Unnamed party member";
+    const level = record.level ?? record.stats?.level ?? record.characterLevel ?? null;
+    const proficiencyBonus = record.proficiencyBonus ?? record.proficiency_bonus ?? record.stats?.proficiencyBonus ?? null;
     return {
       id: record.id || uniqueId("party", name),
       name,
@@ -332,8 +488,19 @@ function normalizeRecordForDomain(domain, record) {
         [record.ancestry, record.class].filter(Boolean).join(" ") ||
         record.role ||
         "thief",
+      level,
+      experience: record.experience ?? record.xp ?? null,
+      proficiencyBonus,
+      background: record.background || record.backstory || "",
       stats: normalizeStats(record.stats ?? record),
-      abilities: normalizeList(record.abilities || record.features || record.skills),
+      speedFt: record.speedFt ?? record.speed ?? record.stats?.speedFt ?? record.stats?.speed ?? null,
+      resources: normalizeResources(record.resources ?? record.stats?.resources ?? record),
+      attacks: normalizeList(record.attacks ?? record.weapons ?? record.equipment?.weapons),
+      conditions: normalizeList(record.conditions ?? record.stats?.conditions),
+      skills: normalizeList(record.skills ?? record.proficiencies ?? record.specialties ?? record.stats?.skills),
+      abilities: normalizeList(record.abilities ?? record.features ?? record.traits),
+      spells: normalizeList(record.spells ?? record.stats?.spells),
+      inventory: normalizeList(record.inventory ?? record.equipment ?? record.items),
       notes: normalizeNotes(record.notes || record.summary || record.description),
       createdAt: record.createdAt || now,
       updatedAt: now,
@@ -438,14 +605,175 @@ function normalizeStats(record) {
   return {
     hp: record.hp ?? record.hitPoints ?? record.hit_points ?? null,
     armorClass: record.armorClass ?? record.armor_class ?? record.ac ?? null,
-    abilities: record.abilityScores ?? record.ability_scores ?? record.abilitiesScores ?? {},
+    abilityScores: record.abilityScores ?? record.ability_scores ?? record.abilitiesScores ?? record.abilities ?? {},
+    spellSlots: record.spellSlots ?? record.spell_slots ?? record.resources?.spellSlots ?? null,
+    resources: record.resources ?? null,
+    speedFt: record.speedFt ?? record.speed ?? null,
+    conditions: normalizeList(record.conditions),
     spells: normalizeList(record.spells),
   };
+}
+
+function normalizeCombatants(value) {
+  return normalizeList(value).map((combatant) => {
+    if (combatant && typeof combatant === "object") {
+      return {
+        ...combatant,
+        id: combatant.id ?? uniqueId("enemy", combatant.name || combatant.title || "combatant"),
+        name: combatant.name || combatant.title || combatant.id || "Combatant",
+        hp: combatant.hp ?? null,
+        conditions: normalizeList(combatant.conditions),
+      };
+    }
+    return {
+      id: uniqueId("enemy", combatant),
+      name: String(combatant),
+      hp: null,
+      conditions: [],
+    };
+  });
+}
+
+function normalizeTurnEconomyMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([actorId, entry]) => [actorId, normalizeTurnEconomyEntry(entry)])
+      .filter(([actorId]) => actorId),
+  );
+}
+
+function normalizeTurnEconomyEntry(entry = {}) {
+  const source = entry && typeof entry === "object" ? entry : {};
+  return {
+    action: normalizeAvailability(source.action, "available"),
+    bonusAction: normalizeAvailability(source.bonusAction ?? source.bonus_action, "available"),
+    reaction: normalizeAvailability(source.reaction, "available"),
+    movementRemainingFt: numberOrNull(source.movementRemainingFt ?? source.movement) ?? 0,
+    freeObjectInteraction: normalizeAvailability(source.freeObjectInteraction ?? source.objectInteraction, "available"),
+  };
+}
+
+function normalizeAvailability(value, fallback) {
+  const text = String(value ?? fallback).toLowerCase();
+  if (["spent", "used", "unavailable", "none", "0", "false"].includes(text)) {
+    return "spent";
+  }
+  if (["available", "ready", "unused", "1", "true"].includes(text)) {
+    return "available";
+  }
+  return fallback;
+}
+
+function normalizeHpUpdate(existingHp, update = {}) {
+  if (update.hp !== undefined) {
+    return normalizeHpValue(update.hp);
+  }
+  const hp = normalizeHpValue(existingHp);
+  const current = hp.current ?? hp.max ?? 0;
+  const max = hp.max ?? current;
+  const damage = Number(update.damage ?? 0) || 0;
+  const healing = Number(update.healing ?? 0) || 0;
+  const hpDelta = Number(update.hpDelta ?? 0) || 0;
+  return {
+    current: Math.max(0, Math.min(max, current + hpDelta - damage + healing)),
+    max,
+    temporary: hp.temporary ?? 0,
+  };
+}
+
+function normalizeHpValue(value) {
+  if (value && typeof value === "object") {
+    return {
+      current: numberOrNull(value.current ?? value.value),
+      max: numberOrNull(value.max ?? value.maximum),
+      temporary: Number(value.temporary ?? value.temp ?? 0) || 0,
+    };
+  }
+  if (typeof value === "string") {
+    const match = value.match(/(\d+)\s*\/\s*(\d+)/);
+    if (match) {
+      return { current: Number(match[1]), max: Number(match[2]), temporary: 0 };
+    }
+  }
+  const number = numberOrNull(value);
+  return { current: number, max: number, temporary: 0 };
+}
+
+function normalizeResourceUpdate(existingResources, update = {}) {
+  const resources = mergeNestedObjects(
+    existingResources && typeof existingResources === "object" ? existingResources : {},
+    update.resources && typeof update.resources === "object" ? update.resources : {},
+  );
+  if (update.spellSlots && typeof update.spellSlots === "object") {
+    resources.spellSlots = mergeNestedObjects(resources.spellSlots ?? {}, update.spellSlots);
+  }
+  if (update.uses && typeof update.uses === "object") {
+    resources.uses = mergeNestedObjects(resources.uses ?? {}, update.uses);
+  }
+  if (update.resourceDeltas && typeof update.resourceDeltas === "object") {
+    applyResourceDeltas(resources, update.resourceDeltas);
+  }
+  return resources;
+}
+
+function applyResourceDeltas(resources, deltas) {
+  for (const [path, delta] of Object.entries(deltas)) {
+    const parts = String(path).split(".").filter(Boolean);
+    if (!parts.length) {
+      continue;
+    }
+    let target = resources;
+    for (const part of parts.slice(0, -1)) {
+      target[part] = target[part] && typeof target[part] === "object" ? target[part] : {};
+      target = target[part];
+    }
+    const key = parts.at(-1);
+    target[key] = (Number(target[key]) || 0) + (Number(delta) || 0);
+  }
+}
+
+function mergeConditions(existing, update = {}) {
+  let conditions = update.conditions !== undefined ? normalizeList(update.conditions) : normalizeList(existing);
+  for (const condition of normalizeList(update.addConditions)) {
+    if (!conditions.includes(condition)) {
+      conditions.push(condition);
+    }
+  }
+  const remove = new Set(normalizeList(update.removeConditions).map((condition) => String(condition).toLowerCase()));
+  if (remove.size) {
+    conditions = conditions.filter((condition) => !remove.has(String(condition).toLowerCase()));
+  }
+  return conditions;
+}
+
+function normalizeResources(record) {
+  if (!record || typeof record !== "object") {
+    return {};
+  }
+  const resources = record.resources && typeof record.resources === "object" ? structuredClone(record.resources) : {};
+  const spellSlots = record.spellSlots ?? record.spell_slots ?? record.stats?.spellSlots;
+  if (spellSlots && typeof spellSlots === "object" && !resources.spellSlots) {
+    resources.spellSlots = spellSlots;
+  }
+  const uses = record.uses ?? record.stats?.uses;
+  if (uses && typeof uses === "object" && !resources.uses) {
+    resources.uses = uses;
+  }
+  return resources;
 }
 
 function normalizeList(value) {
   if (Array.isArray(value)) {
     return value.filter((item) => item !== null && item !== undefined && String(item).trim() !== "");
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, entry]) => (entry && typeof entry === "object" ? { name: key, ...entry } : `${key}: ${entry}`))
+      .filter(Boolean);
   }
 
   if (typeof value === "string") {
@@ -458,6 +786,22 @@ function normalizeList(value) {
   return [];
 }
 
+function mergeNestedObjects(base, patch) {
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (isPlainObject(value) && isPlainObject(base?.[key])) {
+      merged[key] = mergeNestedObjects(base[key], value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function normalizeNotes(value) {
   return normalizeList(value);
 }
@@ -467,6 +811,18 @@ function normalizeName(value) {
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
+}
+
+function recordId(value) {
+  if (value && typeof value === "object") {
+    return value.id ?? value.actorId ?? value.partyMemberId ?? value.name ?? "";
+  }
+  return String(value ?? "");
+}
+
+function numberOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function uniqueId(prefix, value) {

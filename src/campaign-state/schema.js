@@ -1,4 +1,4 @@
-export const CAMPAIGN_SCHEMA_VERSION = "0.1.0";
+export const CAMPAIGN_SCHEMA_VERSION = "2.0.0";
 
 export const entityTypes = Object.freeze({
   PERSON: "person",
@@ -38,20 +38,20 @@ export function createEmptyCampaign(overrides = {}) {
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
     summary: overrides.summary ?? "",
-    people: overrides.people ?? [],
-    party: overrides.party ?? [],
-    factions: overrides.factions ?? [],
-    places: overrides.places ?? [],
-    maps: overrides.maps ?? [],
-    items: overrides.items ?? [],
-    inventory: overrides.inventory ?? [],
-    lore: overrides.lore ?? [],
-    timeline: overrides.timeline ?? [],
-    quests: overrides.quests ?? [],
-    relationships: overrides.relationships ?? [],
-    scene: overrides.scene ?? createEmptyScene(),
-    sessionLog: overrides.sessionLog ?? createEmptySessionLog(),
-    combat: overrides.combat ?? createEmptyCombatState(),
+    people: arrayOrEmpty(overrides.people),
+    party: arrayOrEmpty(overrides.party),
+    factions: arrayOrEmpty(overrides.factions),
+    places: arrayOrEmpty(overrides.places),
+    maps: arrayOrEmpty(overrides.maps),
+    items: arrayOrEmpty(overrides.items),
+    inventory: arrayOrEmpty(overrides.inventory),
+    lore: arrayOrEmpty(overrides.lore),
+    timeline: arrayOrEmpty(overrides.timeline),
+    quests: arrayOrEmpty(overrides.quests),
+    relationships: arrayOrEmpty(overrides.relationships),
+    scene: normalizeSceneState(overrides.scene),
+    sessionLog: normalizeSessionLog(overrides.sessionLog),
+    combat: normalizeCombatState(overrides.combat),
     rulesProfile: overrides.rulesProfile ?? createDefaultRulesProfile(),
     style: overrides.style ?? createDefaultStyleRules(),
     promptTemplates: overrides.promptTemplates ?? createDefaultPromptTemplateSettings(),
@@ -64,10 +64,50 @@ export function createEmptyCampaign(overrides = {}) {
           ? "bridge"
           : overrides.providerSettings?.preferredProvider ?? createDefaultProviderSettings().preferredProvider,
     },
-    sourceDocuments: overrides.sourceDocuments ?? [],
-    assets: overrides.assets ?? [],
-    reviewLog: overrides.reviewLog ?? [],
-    rawImports: overrides.rawImports ?? [],
+    multiplayer: normalizeMultiplayerState(overrides.multiplayer),
+    sourceDocuments: arrayOrEmpty(overrides.sourceDocuments),
+    assets: arrayOrEmpty(overrides.assets),
+    reviewLog: arrayOrEmpty(overrides.reviewLog),
+    rawImports: arrayOrEmpty(overrides.rawImports),
+  };
+}
+
+export function createDefaultMultiplayerState() {
+  return {
+    protocolVersion: 1,
+    localTable: {
+      running: false,
+      host: "",
+      port: null,
+      lanAddress: "",
+      startedAt: null,
+      stoppedAt: null,
+    },
+    hostTurnState: "waiting_for_player",
+    players: [],
+    seats: [],
+    invites: [],
+    connections: [],
+    pendingTurnInputs: [],
+    events: [],
+  };
+}
+
+function normalizeMultiplayerState(multiplayer = {}) {
+  const defaults = createDefaultMultiplayerState();
+  return {
+    protocolVersion: Number(multiplayer.protocolVersion) || defaults.protocolVersion,
+    localTable: {
+      ...defaults.localTable,
+      ...(multiplayer.localTable ?? {}),
+    },
+    hostTurnState: multiplayer.hostTurnState || defaults.hostTurnState,
+    players: Array.isArray(multiplayer.players) ? multiplayer.players : [],
+    seats: Array.isArray(multiplayer.seats) ? multiplayer.seats : [],
+    invites: Array.isArray(multiplayer.invites) ? multiplayer.invites : [],
+    connections: Array.isArray(multiplayer.connections) ? multiplayer.connections : [],
+    pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs : [],
+    events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
   };
 }
 
@@ -81,6 +121,23 @@ export function createEmptyScene() {
     activeQuestIds: [],
     localNotes: [],
     immediateSituation: "",
+  };
+}
+
+function normalizeSceneState(scene = {}) {
+  const defaults = createEmptyScene();
+  const source = scene && typeof scene === "object" ? scene : {};
+  return {
+    ...defaults,
+    ...source,
+    nearbyPlaceIds: arrayOrEmpty(source.nearbyPlaceIds),
+    presentPeopleIds: arrayOrEmpty(source.presentPeopleIds),
+    presentPartyMemberIds: arrayOrEmpty(source.presentPartyMemberIds),
+    activeQuestIds: arrayOrEmpty(source.activeQuestIds),
+    localNotes: arrayOrEmpty(source.localNotes),
+    status: source.status ?? defaults.status,
+    currentPlaceId: source.currentPlaceId ?? defaults.currentPlaceId,
+    immediateSituation: source.immediateSituation ?? source.situation ?? defaults.immediateSituation,
   };
 }
 
@@ -100,25 +157,65 @@ export function createEmptySessionLog() {
   };
 }
 
+function normalizeSessionLog(sessionLog = {}) {
+  const defaults = createEmptySessionLog();
+  const source = sessionLog && typeof sessionLog === "object" ? sessionLog : {};
+  const sessions = arrayOrEmpty(source.sessions);
+  const messages = arrayOrEmpty(source.messages);
+  return {
+    ...defaults,
+    ...source,
+    activeSessionId: source.activeSessionId || sessions[0]?.id || defaults.activeSessionId,
+    sessions: sessions.length ? sessions : defaults.sessions,
+    messages,
+  };
+}
+
+function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 export function createEmptyCombatState() {
   return {
     inCombat: false,
     round: null,
     initiative: [],
+    turnOrder: [],
+    currentTurnId: null,
     enemies: [],
     conditions: [],
+    turnEconomy: {},
     stakes: "",
+    lastAction: null,
+    lastOutcome: null,
     turnFormat:
-      "Combat turn format: Character name and HP, Options list, Chosen action, roll/math breakdown, HP/resource updates, short narration.",
+      "Combat result format: character/creature and HP when known, chosen action, visible roll/math breakdown, HP/resource updates, vivid narration; options only when asking for an active actor's decision.",
     preferences: [
       "Keep combat tactical but cinematic.",
       "Track HP, conditions, initiative, and enemy intent when available.",
       "Ask for missing player choices instead of assuming major tactics.",
-      "Use numbered or clearly separated options before resolving a non-player combatant's chosen action.",
+      "Use lettered A/B/C/D options before resolving a non-player combatant's chosen action.",
       "Show damage math and HP deltas explicitly when combat resolves.",
       "Options are suggestions, not restrictions; the player can combine options, add flavor, or attempt a reasonable different action.",
       "When a player attempts something uncertain, resolve it with an appropriate roll or clearly stated automatic outcome.",
     ],
+  };
+}
+
+function normalizeCombatState(combat = {}) {
+  const defaults = createEmptyCombatState();
+  return {
+    ...defaults,
+    ...(combat ?? {}),
+    inCombat: Boolean(combat?.inCombat ?? defaults.inCombat),
+    round: combat?.round ?? defaults.round,
+    initiative: Array.isArray(combat?.initiative) ? combat.initiative : defaults.initiative,
+    turnOrder: Array.isArray(combat?.turnOrder) ? combat.turnOrder : defaults.turnOrder,
+    currentTurnId: combat?.currentTurnId ?? defaults.currentTurnId,
+    enemies: Array.isArray(combat?.enemies) ? combat.enemies : defaults.enemies,
+    conditions: Array.isArray(combat?.conditions) ? combat.conditions : defaults.conditions,
+    turnEconomy: combat?.turnEconomy && typeof combat.turnEconomy === "object" ? combat.turnEconomy : defaults.turnEconomy,
+    preferences: Array.isArray(combat?.preferences) ? combat.preferences : defaults.preferences,
   };
 }
 
@@ -132,7 +229,7 @@ export function createDefaultStyleRules() {
       "Use vivid sensory details without burying actionable choices.",
     ],
     formattingRules: [
-      "End scenes with clear options or an immediate prompt for the player.",
+      "End most scenes with solid narration or an immediate prompt; reserve structured options for combat, immediate danger, or explicit option requests.",
       "Separate mechanical updates from prose when stakes or inventory change.",
     ],
   };
@@ -169,7 +266,7 @@ export function createDefaultProviderSettings() {
     preferredProvider: "ollama",
     selectedModel: "llama3.1:8b",
     generationTimeoutMs: 120000,
-    outputLimit: 900,
+    outputLimit: 1800,
     fastMode: false,
     ollamaBaseUrl: "http://127.0.0.1:11434",
     bridgeMode: "manual_until_adapter_ready",
@@ -227,11 +324,11 @@ export function createDefaultRulesProfile() {
     combatTurnExample: [
       "Character Name (HP current/max)",
       "Options:",
-      "1. Direct attack or spell.",
-      "2. Utility/help/defense action.",
-      "3. Analysis, movement, setup, or support action.",
+      "A. Direct attack or spell.",
+      "B. Utility/help/defense action.",
+      "C. Analysis, movement, setup, or support action.",
       "Player may choose A+B, add flavor, or do something else reasonable; call for rolls when uncertain.",
-      "Chosen: (1) - concise action name.",
+      "Chosen: (A) - concise action name.",
       "Rolls/Damage: show dice, modifiers, total, and HP math.",
       "Narration: short cinematic result with clear battlefield consequence.",
     ],

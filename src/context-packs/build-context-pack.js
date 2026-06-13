@@ -1,5 +1,6 @@
 import { contextPackKinds } from "../campaign-state/schema.js";
 import { findById, labelEntity } from "../campaign-state/formatters.js";
+import { buildRulesLedger } from "../rules/dnd5e-lite-ledger.js";
 
 const DEFAULT_PACK_KINDS = [
   contextPackKinds.SCENE,
@@ -29,6 +30,9 @@ export function buildContextPack(campaign, options = {}) {
     campaignTitle: campaign.title,
     generatedAt: new Date().toISOString(),
     purpose: options.purpose ?? "next_campaign_turn",
+    rulesLedger: buildRulesLedger(campaign, {
+      mode: options.includeCombatDetail || campaign.combat?.inCombat ? "combat" : "scene",
+    }),
     sections: kinds
       .map((kind) => buildSection(kind, campaign, options))
       .filter((section) => section && section.entries.length > 0),
@@ -135,8 +139,10 @@ function buildPartySection(campaign) {
       const abilities = formatCompactList(member.abilities ?? member.features ?? member.traits, 5);
       const spells = formatCompactList(member.spells ?? member.stats?.spells, 5);
       const notes = formatCompactList(member.notes, 2);
+      const controller = formatControllerDetail(member);
       const details = [
         member.ancestryClass || member.role || member.class || "party member",
+        controller,
         level ? `level ${level}` : null,
         hp,
         stats ? `stats: ${stats}` : null,
@@ -148,6 +154,20 @@ function buildPartySection(campaign) {
       return compactText(`${member.name}: ${details.join("; ")}`, MEDIUM_ENTRY_LIMIT);
     }),
   };
+}
+
+function formatControllerDetail(member) {
+  const kind = member.controllerKind || (member.type === "player_character" ? "host" : "ai_companion");
+  if (kind === "host") {
+    return "controller: host/player; do not speak or choose actions for this character unless delegated";
+  }
+  if (kind === "remote_player") {
+    return "controller: remote player; wait for that player's input";
+  }
+  if (kind === "unassigned") {
+    return "controller: unassigned; ask before using as an active player voice";
+  }
+  return "controller: AI companion; may advise or act in character";
 }
 
 function buildNearbySection(campaign) {
@@ -202,19 +222,34 @@ function buildThreadsSection(campaign) {
 
 function buildCombatSection(campaign) {
   const combat = campaign.combat;
+  const ledger = buildRulesLedger(campaign, { mode: combat.inCombat ? "combat" : "scene" });
   const entries = [
     `In combat: ${combat.inCombat ? "yes" : "no"}`,
     `Turn format: ${compactText(combat.turnFormat, SHORT_ENTRY_LIMIT)}`,
+    ...ledger.actors.slice(0, 6).map((actor) => {
+      const hp = actor.sheet.hp.current !== null && actor.sheet.hp.max !== null
+        ? `HP ${actor.sheet.hp.current}/${actor.sheet.hp.max}`
+        : "HP unknown";
+      const options = actor.legalOptions.slice(0, 5).map((option) => `${option.letter}) ${option.label}`).join("; ");
+      return compactText(
+        `${actor.name}: ${hp}; action ${actor.turnEconomy.action}; bonus ${actor.turnEconomy.bonusAction}; move ${actor.turnEconomy.movementRemainingFt} ft; legal options: ${options}`,
+        MEDIUM_ENTRY_LIMIT,
+      );
+    }),
   ];
 
   if (combat.inCombat) {
     entries.push(...combat.preferences.slice(0, 4).map((preference) => `Preference: ${compactText(preference, SHORT_ENTRY_LIMIT)}`));
     entries.push(`Round: ${combat.round ?? "unknown"}`);
+    entries.push(`Current turn: ${labelEntity(campaign, combat.currentTurnId) || "unknown"}`);
     entries.push(`Initiative: ${combat.initiative.map((id) => labelEntity(campaign, id)).join(", ") || "unknown"}`);
+    if (Array.isArray(combat.turnOrder) && combat.turnOrder.length) {
+      entries.push(`Turn order: ${combat.turnOrder.map((entry) => `${entry.name || labelEntity(campaign, entry.id)} (${entry.initiativeScore ?? "?"})`).join(" > ")}`);
+    }
     entries.push(`Enemies: ${combat.enemies.map((enemy) => `${enemy.name} (${enemy.hp ?? "HP unknown"})`).join(", ")}`);
     entries.push(`Conditions: ${combat.conditions.join(", ") || "none recorded"}`);
   } else {
-    entries.push("When danger starts, present options, allow mixes/other actions, and roll uncertain outcomes.");
+    entries.push("Outside combat or immediate danger, narrate consequences and keep the scene moving; do not present routine option panels.");
   }
 
   return {
@@ -231,7 +266,7 @@ function buildRulesProfileSection(campaign, options = {}) {
   }
   const includeCombatDetail = campaign.combat?.inCombat || options.includeCombatDetail;
   const compactCombatFormat =
-    "Combat format: actor + HP, Options, Chosen action, rolls/math, HP/resource updates, short narration.";
+    "Combat result format: actor + HP when known; chosen action; visible roll/check/save math; damage/healing math; HP/resource update; vivid narration. Options only when asking the active actor what they do.";
 
   return {
     kind: contextPackKinds.RULES,
@@ -241,7 +276,7 @@ function buildRulesProfileSection(campaign, options = {}) {
       `Core stats: ${profile.coreStats.join(", ")}`,
       `Default check: ${profile.diceConventions.defaultCheck}`,
       compactCombatFormat,
-      "Options are suggestions, not restrictions; the player can combine options or attempt something reasonable.",
+      "Structured options are suggestions, not restrictions, and should appear only for combat, immediate danger, or explicit option requests.",
       ...(includeCombatDetail ? profile.combatLoop.slice(0, 4).map((step) => `Combat loop: ${compactText(step, SHORT_ENTRY_LIMIT)}`) : []),
       ...profile.providerGuardRails.slice(0, 3).map((rule) => `Guard rail: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
     ],

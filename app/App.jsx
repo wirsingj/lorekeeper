@@ -8,12 +8,20 @@ export function LorekeeperShell() {
               <p className="eyebrow">Campaign</p>
               <h1 id="campaign-title" className="visually-hidden">Loading campaign...</h1>
             </div>
-            <button id="open-setup" className="icon-action" type="button" title="Setup" aria-label="Setup">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 0 1 0-7Z"></path>
-                <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5l-2-3.5l-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8 8 0 0 0 7 6.5l-2.4-1l-2 3.5l2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5l2 3.5l2.4-1a8 8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8 8 0 0 0 2.6-1.5l2.4 1l2-3.5l-2-1.5Z"></path>
-              </svg>
-            </button>
+            <div className="title-actions">
+              <button id="nudge-dm" className="icon-action labeled-action nudge-action" type="button" title="Nudge DM" aria-label="Nudge DM">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7L8 5Z"></path>
+                </svg>
+                <span>Nudge</span>
+              </button>
+              <button id="open-setup" className="icon-action" type="button" title="Setup" aria-label="Setup">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 0 1 0-7Z"></path>
+                  <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5l-2-3.5l-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8 8 0 0 0 7 6.5l-2.4-1l-2 3.5l2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5l2 3.5l2.4-1a8 8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8 8 0 0 0 2.6-1.5l2.4 1l2-3.5l-2-1.5Z"></path>
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="campaign-picker">
             <select id="campaign-select" aria-label="Campaign selector">
@@ -38,11 +46,28 @@ export function LorekeeperShell() {
           <div className="section-title">
             <h2>Party</h2>
             <div className="title-actions">
+              <button id="join-campaign-main" className="icon-action labeled-action table-action" type="button" title="Join a hosted table" aria-label="Join a hosted table" hidden>
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                  <path d="M10 17l5-5l-5-5"></path>
+                  <path d="M15 12H3"></path>
+                </svg>
+                <span>Join</span>
+              </button>
               <button className="icon-action" data-add-domain="party" type="button" title="Add party member">+</button>
               <span id="party-count" className="count-pill">0</span>
             </div>
           </div>
           <div id="party-list" className="record-stack"></div>
+        </section>
+
+        <section id="combat-tracker-section" className="rail-section combat-tracker-section" hidden>
+          <div className="section-title">
+            <h2>Combat</h2>
+            <span id="combat-round" className="count-pill">R1</span>
+          </div>
+          <p id="combat-active-actor" className="combat-active-actor">No active turn.</p>
+          <ol id="combat-turn-order" className="combat-turn-order"></ol>
         </section>
       </aside>
 
@@ -99,6 +124,15 @@ export function LorekeeperShell() {
         </section>
         <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
           <span id="provider-activity-label">Provider idle</span>
+          <button id="repair-retry" className="mini-action" type="button" title="Retry the last turn with the strict JSON contract" hidden>
+            Retry
+          </button>
+          <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics for the failed model response" hidden>
+            Inspect
+          </button>
+          <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Import this response even though it failed validation" hidden>
+            Import
+          </button>
           <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel generation" hidden>
             Cancel
           </button>
@@ -137,6 +171,7 @@ export function LorekeeperShell() {
       <CharacterSheetDialog />
       <ConfirmDialog />
       <DeleteCampaignDialog />
+      <JoinCampaignDialog />
     </div>
   );
 }
@@ -271,11 +306,25 @@ function SetupDialog() {
       <form method="dialog">
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">Setup</p>
-            <h2>Provider And Sync</h2>
+            <p className="eyebrow">Settings</p>
+            <h2>LoreKeeper Mode And Sync</h2>
           </div>
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
+
+        <section className="setup-section app-mode-section">
+          <div className="section-title">
+            <h3>App Mode</h3>
+          </div>
+          <label>
+            <span>Mode</span>
+            <select id="app-mode-select">
+              <option value="full">LoreKeeper Full Host</option>
+              <option value="thin">ThinLoreKeeper Companion</option>
+            </select>
+          </label>
+          <p id="app-mode-note" className="setup-note">Full mode hosts campaigns. Thin mode joins a host as a party member.</p>
+        </section>
 
         <section className="setup-section">
           <div className="section-title">
@@ -360,6 +409,41 @@ function SetupDialog() {
             <button id="new-campaign" type="button">New Campaign</button>
             <button id="load-imported" type="button">Load Imported</button>
           </div>
+        </section>
+
+        <section className="setup-section diagnostics-section">
+          <div className="section-title">
+            <h3>Diagnostics</h3>
+            <span id="diagnostics-status" className="count-pill">Idle</span>
+          </div>
+          <div className="button-stack two-up">
+            <button id="refresh-diagnostics" type="button">Refresh Diagnostics</button>
+            <button id="copy-diagnostics" type="button">Copy JSON</button>
+          </div>
+          <textarea
+            id="diagnostics-output"
+            className="rail-textarea diagnostics-output"
+            spellCheck="false"
+            readOnly
+            placeholder="Open diagnostics after a weird turn to inspect logs, recent messages, raw provider JSON, contract warnings, scene/combat state, and runtime details."
+          ></textarea>
+        </section>
+
+        <section className="setup-section local-table-section">
+          <div className="section-title">
+            <h3>Local Table</h3>
+            <span id="local-table-state" className="count-pill">Off</span>
+          </div>
+          <p id="local-table-address" className="setup-note">Start a LAN table only when another local app is joining.</p>
+          <div className="button-stack two-up">
+            <button id="start-local-table" type="button">Start Local Table</button>
+            <button id="stop-local-table" type="button">Stop</button>
+            <button id="join-campaign" type="button">Join Campaign</button>
+            <button id="sync-guest-table" type="button">Resync</button>
+            <button id="resolve-party-inputs" type="button">Resolve Inputs</button>
+          </div>
+          <div id="connected-guests" className="local-table-list"></div>
+          <div id="pending-inputs" className="local-table-list"></div>
         </section>
 
         <section className="setup-section">
@@ -530,6 +614,40 @@ function DeleteCampaignDialog() {
         <footer className="dialog-actions">
           <button id="cancel-delete-campaign" type="button" className="secondary-action">Cancel</button>
           <button id="confirm-delete-campaign" type="submit" className="danger-button" disabled>Hide Campaign</button>
+        </footer>
+      </form>
+    </dialog>
+  );
+}
+
+function JoinCampaignDialog() {
+  return (
+    <dialog id="join-campaign-dialog" className="record-dialog confirm-dialog">
+      <form id="join-campaign-form" method="dialog">
+        <header className="dialog-header">
+          <div>
+            <p className="eyebrow">Local Table</p>
+            <h2>Join Campaign</h2>
+          </div>
+          <button id="close-join-campaign-dialog" className="icon-action" type="button" title="Close">x</button>
+        </header>
+        <label>
+          <span>Invite link</span>
+          <textarea
+            id="join-invite-link"
+            rows="3"
+            spellCheck="false"
+            placeholder="lorekeeper://join?host=192.168.1.24&port=7347&campaign=..."
+          ></textarea>
+        </label>
+        <label>
+          <span>Player name</span>
+          <input id="join-player-name" autoComplete="off" placeholder="Your table name" />
+        </label>
+        <p id="join-status" className="setup-note">Paste an invite link from the host.</p>
+        <footer className="dialog-actions">
+          <button id="cancel-join-campaign" type="button" className="secondary-action">Cancel</button>
+          <button type="submit">Request Join</button>
         </footer>
       </form>
     </dialog>

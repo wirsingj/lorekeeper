@@ -3,17 +3,17 @@ setlocal
 
 cd /d "%~dp0"
 
-where npm >nul 2>nul
+where node >nul 2>nul
 if errorlevel 1 (
-  echo Node/npm was not found on PATH.
-  echo Install Node 22 or open this from a shell where npm is available.
+  echo Node was not found on PATH.
+  echo Install Node 22 or open this from a shell where node is available.
   pause
   exit /b 1
 )
 
 echo Starting LoreKeeper desktop app...
 echo.
-call npm run desktop
+node ".\scripts\launch-desktop.js"
 
 if errorlevel 1 (
   echo.

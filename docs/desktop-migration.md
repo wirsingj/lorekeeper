@@ -58,3 +58,14 @@ The preferred first Electron shape is:
 ## Runtime Baseline
 
 This branch moves the project baseline to Node `>=22.12.0` so the desktop app can track current Electron releases instead of pinning to an older runtime. Existing web/dev scripts may still run on older Node versions for now, but Electron development should use Node 22 or newer.
+
+## Port And Process Hygiene
+
+- Electron starts the local API as a direct child process, not through a Windows shell.
+- Electron sends `SIGTERM` to the API on app quit and falls back to `taskkill /t /f` on Windows if the child remains alive.
+- `scripts/serve.js` closes the HTTP server on `SIGINT`/`SIGTERM`.
+- The desktop shortcut uses `scripts/launch-desktop.js`, which builds the renderer, launches Electron detached, and exits so the shortcut command window does not remain open.
+- `Create LoreKeeper Desktop Shortcut.vbs` regenerates `LoreKeeper.lnk` and `ThinLoreKeeper.lnk` on the desktop and in the repo root. The `.lnk` files target `wscript.exe` explicitly, so they do not depend on `.vbs` file association quirks.
+- `ThinLoreKeeper.lnk` launches the lightweight companion terminal in guest/client mode without starting the local API server.
+- `npm run cleanup` removes repo-owned Electron/API/dev-server process footprints after test launches.
+- Direct developer commands such as `npm run desktop` still keep the launching terminal attached by design.

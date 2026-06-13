@@ -104,7 +104,7 @@ export class OllamaProvider {
         format: options.format,
         keep_alive: options.keepAlive ?? "10m",
         options: {
-          num_predict: options.outputLimit ?? 900,
+          num_predict: options.outputLimit ?? 1800,
           temperature: options.temperature ?? 0.75,
           top_p: options.topP ?? 0.9,
         },
@@ -220,5 +220,31 @@ function statusState({ installed, running, selectedModel, selectedModelAvailable
 }
 
 function normalizeBaseUrl(value) {
-  return String(value || defaultBaseUrl).replace(/\/+$/, "");
+  try {
+    const url = new URL(String(value || defaultBaseUrl));
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || !isLocalOrPrivateHost(url.hostname)) {
+      return defaultBaseUrl;
+    }
+    url.pathname = url.pathname.replace(/\/+$/, "");
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return defaultBaseUrl;
+  }
+}
+
+function isLocalOrPrivateHost(hostname) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (normalized === "localhost" || normalized === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized)) {
+    return true;
+  }
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized)) {
+    return true;
+  }
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(normalized)) {
+    return true;
+  }
+  const match172 = normalized.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  return Boolean(match172 && Number(match172[1]) >= 16 && Number(match172[1]) <= 31);
 }

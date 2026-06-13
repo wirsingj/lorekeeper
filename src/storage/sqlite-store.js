@@ -1,10 +1,13 @@
 import initSqlJs from "sql.js";
-import { readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createEmptyCampaign, normalizeCampaign, validateCampaign } from "../campaign-state/schema.js";
+import { normalizeCampaign, validateCampaign } from "../campaign-state/schema.js";
 
 const schemaPath = fileURLToPath(new URL("./sqlite-schema.sql", import.meta.url));
+export const SQLITE_SCHEMA_VERSION = "2.0.0";
+export const SQLITE_USER_VERSION = 2000000;
 
 export async function createSqliteDatabaseForCampaign(campaign) {
   const errors = validateCampaign(campaign);
@@ -24,7 +27,7 @@ export async function writeCampaignSqliteFile(campaign, outputPath) {
   const db = await createSqliteDatabaseForCampaign(campaign);
   const bytes = db.export();
   db.close();
-  await writeFile(outputPath, bytes);
+  await writeFileAtomically(outputPath, bytes);
 
   return {
     path: outputPath,
@@ -36,28 +39,40 @@ export async function readCampaignFromSqliteFile(sqlitePath) {
   const SQL = await initSqlJs();
   const bytes = await readFile(sqlitePath);
   const db = new SQL.Database(bytes);
-  const snapshot = tableExists(db, "campaign_snapshots")
-    ? firstRow(db, "SELECT campaign_json FROM campaign_snapshots LIMIT 1")
-    : null;
-
-  if (snapshot?.campaign_json) {
-    const campaign = normalizeCampaign(JSON.parse(snapshot.campaign_json));
+  try {
+    assertSqliteSchema2(db);
+    const snapshot = firstRow(
+      db,
+      "SELECT campaign_json, campaign_json_sha256 FROM campaign_snapshots LIMIT 1",
+    );
+    if (!snapshot?.campaign_json) {
+      throw new Error("SQLite campaign file does not contain a schema 2.0 campaign snapshot.");
+    }
+    const hash = sha256(snapshot.campaign_json);
+    if (snapshot.campaign_json_sha256 && snapshot.campaign_json_sha256 !== hash) {
+      throw new Error("SQLite campaign snapshot hash mismatch.");
+    }
+    return normalizeCampaign(JSON.parse(snapshot.campaign_json));
+  } finally {
     db.close();
-    return campaign;
   }
-
-  const campaign = readLegacyCampaignFromDatabase(db);
-  db.close();
-
-  if (!campaign) {
-    throw new Error("SQLite campaign file does not contain a campaign snapshot or legacy campaign rows.");
-  }
-
-  return campaign;
 }
 
 export async function overwriteCampaignSqliteFile(campaign, outputPath) {
   return writeCampaignSqliteFile(campaign, outputPath);
+}
+
+async function writeFileAtomically(outputPath, bytes) {
+  const directory = path.dirname(outputPath);
+  const tempPath = path.join(directory, `.${path.basename(outputPath)}.${process.pid}.${Date.now()}.tmp`);
+  await mkdir(directory, { recursive: true });
+  try {
+    await writeFile(tempPath, bytes);
+    await rename(tempPath, outputPath);
+  } catch (error) {
+    await rm(tempPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 export async function readCampaignSqliteSummary(sqlitePath) {
@@ -65,6 +80,9 @@ export async function readCampaignSqliteSummary(sqlitePath) {
   const bytes = await readFile(sqlitePath);
   const db = new SQL.Database(bytes);
   const campaign = firstRow(db, "SELECT id, title, summary, schema_version FROM campaigns LIMIT 1");
+  const metadata = tableExists(db, "metadata")
+    ? Object.fromEntries(queryRows(db, "SELECT key, value FROM metadata").map((row) => [row.key, row.value]))
+    : {};
   const counts = Object.fromEntries(
     queryRows(db, "SELECT domain, COUNT(*) AS count FROM records GROUP BY domain").map((row) => [
       row.domain,
@@ -75,31 +93,41 @@ export async function readCampaignSqliteSummary(sqlitePath) {
 
   return {
     campaign,
+    metadata,
     counts,
   };
 }
 
 function insertCampaign(db, campaign) {
   const now = new Date().toISOString();
+  const campaignJson = JSON.stringify(campaign);
 
-  db.run(
-    `INSERT INTO metadata (key, value) VALUES
-      ('lorekeeper.storage', 'sqlite'),
-      ('lorekeeper.sqlite_schema', '0.1.1')`,
-  );
+  insertMetadata(db, "lorekeeper.storage", "sqlite", now);
+  insertMetadata(db, "lorekeeper.sqlite_schema", SQLITE_SCHEMA_VERSION, now);
+  insertMetadata(db, "lorekeeper.sqlite_user_version", String(SQLITE_USER_VERSION), now);
+  insertMetadata(db, "lorekeeper.snapshot_hash", sha256(campaignJson), now);
 
   runInsert(db, "campaigns", {
     id: campaign.id,
     title: campaign.title,
     summary: campaign.summary,
     schema_version: campaign.schemaVersion,
+    hidden: campaign.hidden ? 1 : 0,
     created_at: campaign.createdAt,
     updated_at: campaign.updatedAt,
+    data_json: JSON.stringify({
+      providerSettings: campaign.providerSettings ?? {},
+      promptTemplates: campaign.promptTemplates ?? {},
+      recapTemplates: campaign.recapTemplates ?? {},
+      multiplayer: campaign.multiplayer ?? {},
+    }),
   });
 
   runInsert(db, "campaign_snapshots", {
     campaign_id: campaign.id,
-    campaign_json: JSON.stringify(campaign),
+    snapshot_version: 1,
+    campaign_json: campaignJson,
+    campaign_json_sha256: sha256(campaignJson),
     updated_at: campaign.updatedAt,
   });
 
@@ -179,142 +207,15 @@ function insertCampaign(db, campaign) {
   }
 }
 
-function readLegacyCampaignFromDatabase(db) {
-  if (!tableExists(db, "campaigns")) {
-    return null;
-  }
-
-  const campaignRow = firstRow(db, "SELECT id, title, summary, schema_version, created_at, updated_at FROM campaigns LIMIT 1");
-  if (!campaignRow?.id || !campaignRow?.title) {
-    return null;
-  }
-
-  const records = tableExists(db, "records")
-    ? queryRows(db, "SELECT id, domain, data_json FROM records ORDER BY created_at, id")
-    : [];
-  const recordsByDomain = new Map();
-  for (const record of records) {
-    const parsed = parseJsonObject(record.data_json);
-    if (!parsed) {
-      continue;
-    }
-    const domainRecords = recordsByDomain.get(record.domain) ?? [];
-    domainRecords.push(parsed);
-    recordsByDomain.set(record.domain, domainRecords);
-  }
-
-  const base = createEmptyCampaign({
-    id: campaignRow.id,
-    title: campaignRow.title,
-    summary: campaignRow.summary ?? "",
-    schemaVersion: campaignRow.schema_version ?? undefined,
-    createdAt: campaignRow.created_at ?? undefined,
-    updatedAt: campaignRow.updated_at ?? undefined,
-  });
-
-  const firstRecord = (domain, fallback) => recordsByDomain.get(domain)?.[0] ?? fallback;
-  const sessionLog = readLegacySessionLog(db, campaignRow.id, base);
-
-  return normalizeCampaign({
-    ...base,
-    people: recordsByDomain.get("people") ?? base.people,
-    party: recordsByDomain.get("party") ?? base.party,
-    factions: recordsByDomain.get("factions") ?? base.factions,
-    places: recordsByDomain.get("places") ?? base.places,
-    maps: recordsByDomain.get("maps") ?? base.maps,
-    items: recordsByDomain.get("items") ?? base.items,
-    inventory: recordsByDomain.get("inventory") ?? base.inventory,
-    lore: recordsByDomain.get("lore") ?? base.lore,
-    timeline: recordsByDomain.get("timeline") ?? base.timeline,
-    quests: recordsByDomain.get("quests") ?? base.quests,
-    scene: firstRecord("scene", base.scene),
-    combat: firstRecord("combat", base.combat),
-    rulesProfile: firstRecord("rules_profile", base.rulesProfile),
-    style: firstRecord("style", base.style),
-    promptTemplates: {
-      ...base.promptTemplates,
-      templates: recordsByDomain.get("prompt_templates") ?? base.promptTemplates.templates,
-    },
-    recapTemplates: {
-      ...base.recapTemplates,
-      templates: recordsByDomain.get("recap_templates") ?? base.recapTemplates.templates,
-    },
-    relationships: readLegacyRows(db, "relationships"),
-    assets: readLegacyRows(db, "assets"),
-    sourceDocuments: readLegacyRows(db, "source_documents"),
-    sessionLog,
-  });
-}
-
-function readLegacySessionLog(db, campaignId, campaign) {
-  if (!tableExists(db, "sessions")) {
-    return campaign.sessionLog;
-  }
-
-  const sessions = queryRows(db, "SELECT id, title, started_at, ended_at, recap, data_json FROM sessions ORDER BY started_at, id")
-    .map((row) => parseJsonObject(row.data_json) ?? ({
-      id: row.id,
-      title: row.title,
-      startedAt: row.started_at,
-      endedAt: row.ended_at,
-      recap: row.recap ?? "",
-    }));
-
-  const messages = tableExists(db, "session_messages")
-    ? queryRows(
-        db,
-        "SELECT id, session_id, role, title, body, meta, source, provider_run_id, created_at, data_json FROM session_messages ORDER BY created_at, id",
-      ).map((row) => parseJsonObject(row.data_json) ?? ({
-        id: row.id,
-        sessionId: row.session_id,
-        role: row.role,
-        title: row.title,
-        body: row.body,
-        meta: row.meta ?? "",
-        source: row.source ?? "legacy_sqlite",
-        providerRunId: row.provider_run_id,
-        createdAt: row.created_at,
-      }))
-    : [];
-
-  return {
-    activeSessionId: sessions[0]?.id ?? campaign.sessionLog.activeSessionId,
-    sessions: sessions.length ? sessions : campaign.sessionLog.sessions,
-    messages: messages.filter((message) => !campaignId || message),
-  };
-}
-
-function readLegacyRows(db, table) {
-  if (!tableExists(db, table)) {
-    return [];
-  }
-
-  return queryRows(db, `SELECT data_json FROM ${table} ORDER BY created_at, id`)
-    .map((row) => parseJsonObject(row.data_json))
-    .filter(Boolean);
-}
-
-function parseJsonObject(value) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 function insertReviewLog(db, campaign) {
   const now = new Date().toISOString();
 
   for (const batch of campaign.reviewLog ?? []) {
     runInsert(db, "review_batches", {
-      id: batch.id,
       campaign_id: campaign.id,
+      id: batch.id,
       provider_run_id: batch.providerRunId || null,
+      source: batch.source || "unknown",
       status: batch.status || "committed",
       raw_response: batch.rawResponse || "",
       created_at: batch.createdAt || now,
@@ -324,11 +225,14 @@ function insertReviewLog(db, campaign) {
 
     for (const change of batch.proposedChanges ?? []) {
       runInsert(db, "proposed_changes", {
-        id: `${batch.id}-${change.id}`,
+        campaign_id: campaign.id,
         batch_id: batch.id,
+        id: change.id || `${batch.id}-change`,
         operation: change.operation || "note",
         domain: change.domain || "lore",
         target_id: change.targetId || null,
+        importance: change.importance || "normal",
+        visibility: change.visibility || "player_visible",
         summary: change.summary || "Unlabeled proposed update.",
         data_json: JSON.stringify(change.data ?? {}),
         confidence: change.confidence || "unknown",
@@ -368,11 +272,12 @@ function insertSessionLog(db, campaign) {
     });
   }
 
-  for (const message of sessionLog.messages ?? []) {
+  for (const [index, message] of (sessionLog.messages ?? []).entries()) {
     runInsert(db, "session_messages", {
-      id: message.id,
       campaign_id: campaign.id,
+      id: message.id,
       session_id: message.sessionId || sessionLog.activeSessionId || sessions[0].id,
+      sequence: index + 1,
       role: message.role,
       title: message.title,
       body: message.body,
@@ -394,10 +299,10 @@ function insertRecordGroup(db, campaign, domain, records, titleFor, forcedId = n
     const body = recordToBody(record);
 
     runInsert(db, "records", {
-      id,
       campaign_id: campaign.id,
+      id,
       domain,
-      record_type: record.type ?? record.status ?? "",
+      record_type: record.type ?? record.status ?? record.role ?? "",
       title,
       body,
       data_json: JSON.stringify(record),
@@ -407,13 +312,39 @@ function insertRecordGroup(db, campaign, domain, records, titleFor, forcedId = n
     });
 
     runInsert(db, "record_search", {
-      record_id: id,
       campaign_id: campaign.id,
+      record_id: id,
       domain,
       title,
       body,
+      search_text: [title, body, domain, record.type ?? record.role ?? ""].filter(Boolean).join("\n"),
     });
   }
+}
+
+function insertMetadata(db, key, value, now) {
+  runInsert(db, "metadata", {
+    key,
+    value,
+    updated_at: now,
+  });
+}
+
+function assertSqliteSchema2(db) {
+  const metadata = tableExists(db, "metadata")
+    ? Object.fromEntries(queryRows(db, "SELECT key, value FROM metadata").map((row) => [row.key, row.value]))
+    : {};
+  if (metadata["lorekeeper.sqlite_schema"] !== SQLITE_SCHEMA_VERSION) {
+    throw new Error(`Unsupported SQLite schema: ${metadata["lorekeeper.sqlite_schema"] || "missing"}. Expected ${SQLITE_SCHEMA_VERSION}.`);
+  }
+  const userVersion = firstRow(db, "PRAGMA user_version")?.user_version;
+  if (Number(userVersion) !== SQLITE_USER_VERSION) {
+    throw new Error(`Unsupported SQLite user_version: ${userVersion ?? "missing"}. Expected ${SQLITE_USER_VERSION}.`);
+  }
+}
+
+function sha256(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
 }
 
 function recordToBody(record) {

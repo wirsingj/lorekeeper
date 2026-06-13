@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createReviewBatch, getCommittableChanges } from "../src/canon-review/proposals.js";
+import { OllamaProvider } from "../src/ai/ollama-provider.js";
+import { normalizeProviderRuntimeSettings } from "../src/ai/provider-settings.js";
+import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
+import { createEmptyCampaign } from "../src/campaign-state/schema.js";
+import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import {
   buildTurnRequestEnvelope,
   parseTurnJsonResponse,
@@ -8,6 +13,7 @@ import {
   validateTurnRequest,
   validateTurnResponse,
 } from "../src/model-contract/turn-json-contract.js";
+import { buildRulesLedger } from "../src/rules/dnd5e-lite-ledger.js";
 
 const validResponse = [
   "The room goes quiet.",
@@ -79,12 +85,31 @@ const requestEnvelope = buildTurnRequestEnvelope({
     inWorldText: "I roll d20+3 perception to spot the other trainee.",
     metaInstructions: ["Keep it tense."],
   },
+  options: {
+    playerInputs: [
+      {
+        playerId: "guest-kevric",
+        playerName: "Jess",
+        characterId: "kevric",
+        characterName: "Kevric",
+        text: "Kevric keeps running but watches Jarin's flank.",
+        ready: true,
+      },
+    ],
+  },
 });
 assert.equal(requestEnvelope.type, "lorekeeper.turn.request");
 assert.equal(requestEnvelope.schemaVersion, 1);
 assert.equal(requestEnvelope.user.actionIntent, "skill_or_scene_check");
 assert.equal(requestEnvelope.generation.responseMode, "resolve_check");
 assert.equal(requestEnvelope.user.requestedRolls.length, 2);
+assert.equal(requestEnvelope.user.playerInputs[0].characterName, "Kevric");
+assert.equal(requestEnvelope.user.playerInputs[0].text, "Kevric keeps running but watches Jarin's flank.");
+assert.equal(requestEnvelope.generation.choicePolicy.default, "narration_first");
+assert.equal(requestEnvelope.generation.choicePolicy.choicesAllowed, false);
+assert.equal(requestEnvelope.generation.narrationTarget.style, "immersive_tabletop");
+assert.equal(requestEnvelope.generation.narrationTarget.paragraphs, "3-6");
+assert.equal(requestEnvelope.generation.narrationTarget.words, "320-700");
 assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
 
@@ -110,6 +135,193 @@ assert.equal(combatEnvelope.generation.responseMode, "resolve_combat");
 assert.equal(combatEnvelope.context.scene.mode, "combat");
 assert.equal(combatEnvelope.context.party[0].hp, null);
 
+const inferredCombatEnvelope = buildTurnRequestEnvelope({
+  campaign: testCampaign(),
+  contextPack: testContextPack("combat_state"),
+  playerTurn: "Garin steadies the crossbow and fires at the wolf.",
+  parsedMessage: {
+    raw: "Garin steadies the crossbow and fires at the wolf.",
+    inWorldText: "Garin steadies the crossbow and fires at the wolf.",
+    metaInstructions: [],
+  },
+});
+assert.equal(inferredCombatEnvelope.user.actionIntent, "combat_action");
+assert.equal(inferredCombatEnvelope.generation.mode, "combat");
+assert.equal(inferredCombatEnvelope.generation.responseMode, "resolve_combat");
+assert.equal(inferredCombatEnvelope.generation.narrationTarget.words, "220-480");
+
+const rulesCampaignData = rulesCampaign();
+const rulesLedger = buildRulesLedger(rulesCampaignData, { mode: "combat" });
+assert.equal(rulesLedger.actors[0].name, "Mira");
+assert.equal(rulesLedger.actors[0].legalOptions[0].letter, "A");
+assert.ok(rulesLedger.actors[0].legalOptions.some((option) => option.id === "spell-entangle"));
+assert.ok(rulesLedger.actors[0].legalOptions.some((option) => option.id === "feature-wild-shape"));
+assert.ok(rulesLedger.actors[0].legalOptions.some((option) => option.id === "move"));
+
+const objectAttackCampaign = rulesCampaign();
+objectAttackCampaign.party[0].attacks = [
+  { name: { name: "Warhammer" }, attackBonus: 5, damage: { dice: "1d8+3" } },
+];
+const objectAttackLedger = buildRulesLedger(objectAttackCampaign, { mode: "combat" });
+const objectAttackOption = objectAttackLedger.actors[0].legalOptions.find((option) => option.id === "attack-warhammer");
+assert.equal(objectAttackOption.label, "Attack with Warhammer");
+assert.doesNotMatch(objectAttackOption.label, /\[object Object\]/);
+
+const ledgerContextPack = buildContextPack(rulesCampaignData, { includeCombatDetail: true });
+const ledgerEnvelope = buildTurnRequestEnvelope({
+  campaign: rulesCampaignData,
+  contextPack: ledgerContextPack,
+  playerTurn: "Mira sizes up the fight.",
+  parsedMessage: { raw: "Mira sizes up the fight.", inWorldText: "Mira sizes up the fight.", metaInstructions: [] },
+});
+assert.equal(ledgerEnvelope.context.rulesLedger.actors[0].legalOptions[0].letter, "A");
+assert.ok(ledgerEnvelope.context.rulesLedger.actors[0].legalOptions.some((option) => option.id === "spell-entangle"));
+
+const emptyCombatDefaults = createEmptyCampaign({ title: "Combat Defaults" }).combat;
+assert.deepEqual(emptyCombatDefaults.turnEconomy, {});
+assert.equal(emptyCombatDefaults.currentTurnId, null);
+
+const partialThinCampaign = createEmptyCampaign({
+  title: "Partial Thin Snapshot",
+  scene: {},
+  sessionLog: { messages: [] },
+  people: null,
+  party: undefined,
+});
+assert.deepEqual(partialThinCampaign.scene.presentPeopleIds, []);
+assert.deepEqual(partialThinCampaign.scene.presentPartyMemberIds, []);
+assert.deepEqual(partialThinCampaign.scene.localNotes, []);
+assert.deepEqual(partialThinCampaign.people, []);
+assert.deepEqual(partialThinCampaign.party, []);
+assert.doesNotThrow(() => buildContextPack(partialThinCampaign, { purpose: "partial_thin_snapshot" }));
+
+const combatApplied = applyCanonicalChanges(rulesCampaignData, [
+  {
+    id: "combat-update-1",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Mira spends power and is wounded.",
+    data: {
+      inCombat: true,
+      round: 2,
+      currentTurnId: "mira",
+      initiative: ["mira", "wolf-1"],
+      turnEconomy: {
+        mira: { action: "spent", bonusAction: "available", movementRemainingFt: 10 },
+      },
+      enemyUpdates: [
+        { id: "wolf-1", name: "Ash Wolf", hp: { current: 7, max: 13 }, addConditions: ["marked"] },
+      ],
+      actorUpdates: [
+        {
+          actorId: "mira",
+          damage: 6,
+          addConditions: ["bloodied"],
+          resourceDeltas: {
+            "spellSlots.1.used": 1,
+            "uses.wildShape.used": 1,
+          },
+          turnEconomy: { action: "spent", movementRemainingFt: 10 },
+        },
+      ],
+      lastAction: "Mira casts Entangle and takes a hit.",
+      lastOutcome: "The wolf is marked; Mira is bloodied.",
+    },
+    confidence: "high",
+    reason: "Combat resolution.",
+  },
+]);
+const updatedMira = combatApplied.campaign.party.find((member) => member.id === "mira");
+assert.equal(updatedMira.stats.hp.current, 12);
+assert.equal(updatedMira.resources.spellSlots[1].used, 2);
+assert.equal(updatedMira.resources.uses.wildShape.used, 1);
+assert.ok(updatedMira.conditions.includes("bloodied"));
+assert.equal(combatApplied.campaign.combat.round, 2);
+assert.equal(combatApplied.campaign.combat.turnEconomy.mira.action, "spent");
+assert.equal(combatApplied.campaign.combat.enemies[0].name, "Ash Wolf");
+assert.ok(combatApplied.campaign.combat.enemies[0].conditions.includes("marked"));
+
+const inferredEnemyCombat = applyCanonicalChanges(rulesCampaignData, [
+  {
+    id: "combat-inferred-drunk-miner",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "A drunk miner is added to the brawl.",
+    data: {
+      inCombat: true,
+      enemyUpdates: [{ id: "enemy-drunk-miner", name: "Drunk miner", hp: null, type: "humanoid" }],
+    },
+    confidence: "medium",
+    reason: "Hostile NPC inferred from DM narration.",
+  },
+]);
+assert.ok(inferredEnemyCombat.campaign.combat.enemies.some((enemy) => enemy.name === "Drunk miner"));
+assert.ok(inferredEnemyCombat.campaign.combat.turnOrder.some((entry) => entry.id === "enemy-drunk-miner"));
+
+const startedCombat = applyCanonicalChanges(rulesCampaignData, [
+  {
+    id: "combat-start-rolls-initiative",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Combat starts and initiative is rolled.",
+    data: {
+      inCombat: true,
+      round: 1,
+      enemies: [{ id: "wolf-1", name: "Ash Wolf", hp: 18, dexMod: 2 }],
+    },
+    confidence: "high",
+    reason: "Combat start.",
+  },
+]);
+assert.equal(startedCombat.campaign.combat.inCombat, true);
+assert.ok(startedCombat.campaign.combat.turnOrder.length >= 2);
+assert.ok(startedCombat.campaign.combat.currentTurnId);
+assert.deepEqual(
+  startedCombat.campaign.combat.initiative,
+  startedCombat.campaign.combat.turnOrder.map((entry) => entry.id),
+);
+
+const resolvedActorId = startedCombat.campaign.combat.currentTurnId;
+const advancedCombat = applyCanonicalChanges(startedCombat.campaign, [
+  {
+    id: "combat-turn-advance",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "The active actor completes a combat turn.",
+    data: {
+      inCombat: true,
+      turnResolved: true,
+      advanceTurn: true,
+      resolvedActorId,
+    },
+    confidence: "high",
+    reason: "Turn resolved.",
+  },
+]);
+assert.notEqual(advancedCombat.campaign.combat.currentTurnId, resolvedActorId);
+
+assert.equal(
+  normalizeProviderRuntimeSettings({ ollamaBaseUrl: "https://example.com/ollama" }).ollamaBaseUrl,
+  "http://127.0.0.1:11434",
+);
+assert.equal(
+  normalizeProviderRuntimeSettings({ ollamaBaseUrl: "http://192.168.1.50:11434/" }).ollamaBaseUrl,
+  "http://192.168.1.50:11434",
+);
+assert.equal(new OllamaProvider({ baseUrl: "https://example.com/ollama" }).baseUrl, "http://127.0.0.1:11434");
+
 const structured = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ requestId: requestEnvelope.requestId })), {
   requestId: requestEnvelope.requestId,
 });
@@ -118,10 +330,60 @@ const renderedStructured = renderTurnResponseForImport(structured.response);
 assert.match(renderedStructured, /A branch snaps ahead/);
 assert.match(renderedStructured, /Perception: Roll if Jarin pauses/);
 assert.match(renderedStructured, /Jarin: Drop low and listen/);
+assert.match(renderedStructured, /B\. Something else\./);
 assert.match(renderedStructured, /```json lorekeeper_updates/);
 
 const noChanges = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ proposedChanges: [] })));
 assert.equal(noChanges.response.proposedChanges.length, 0);
+
+const missingFlags = validTurnResponse({ proposedChanges: [] });
+delete missingFlags.flags;
+const normalizedMissingFlags = parseTurnJsonResponse(JSON.stringify(missingFlags));
+assert.equal(normalizedMissingFlags.ok, true);
+assert.deepEqual(normalizedMissingFlags.response.flags, {
+  requiresReview: false,
+  startsCombat: false,
+  endsScene: false,
+  containsSecretInfo: false,
+});
+
+const schemaPlaceholderRole = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm|player|party|npc|system", kind: "narration|dialogue|action|mechanics|status|aside", visibility: "table|dm_only|party", text: "The watchtower bell rings once." }],
+})));
+assert.equal(schemaPlaceholderRole.ok, true);
+assert.equal(schemaPlaceholderRole.response.table[0].role, "dm");
+assert.equal(schemaPlaceholderRole.response.table[0].kind, "narration");
+assert.equal(schemaPlaceholderRole.response.table[0].visibility, "table");
+
+const schemaPlaceholderSceneStatus = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  sceneStatus: {
+    mode: "social|exploration|combat|downtime|travel",
+    danger: "none|tense|immediate|combat",
+    awaitingPlayer: "true|false",
+  },
+})));
+assert.equal(schemaPlaceholderSceneStatus.ok, true);
+assert.equal(schemaPlaceholderSceneStatus.response.sceneStatus.mode, "exploration");
+assert.equal(schemaPlaceholderSceneStatus.response.sceneStatus.danger, "none");
+assert.equal(schemaPlaceholderSceneStatus.response.sceneStatus.awaitingPlayer, true);
+
+const paragraphNarration = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "The bell keeps ringing over the gate.\n\nBelow, boots scrape stone as guards scramble awake." }],
+})));
+assert.equal(paragraphNarration.ok, true);
+assert.match(paragraphNarration.response.table[0].text, /gate\.\n\nBelow/);
+
+const narrationFirstChoiceSpam = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Garin continues his patrol. The night air hangs cool and quiet over the wall." }],
+  mechanics: [],
+  flags: { requiresReview: false, startsCombat: false, endsScene: false, containsSecretInfo: false },
+  proposedChanges: [],
+})), {
+  choicePolicy: { choicesAllowed: false, default: "narration_first" },
+});
+assert.equal(narrationFirstChoiceSpam.ok, true);
+assert.equal(narrationFirstChoiceSpam.response.choices.options.length, 0);
+assert.match(narrationFirstChoiceSpam.response.warnings.join(" "), /Structured choices suppressed/);
 
 const markdownWrapped = parseTurnJsonResponse(`\`\`\`json\n${JSON.stringify(validTurnResponse())}\n\`\`\``);
 assert.equal(markdownWrapped.ok, true);
@@ -135,23 +397,159 @@ const partialStructured = parseTurnJsonResponse('{"type":"lorekeeper.turn.respon
 assert.equal(partialStructured.ok, false);
 assert.equal(partialStructured.response.proposedChanges.length, 0);
 
-const invalidRole = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
-  table: [{ speaker: "DM", speakerId: null, role: "wizard", kind: "narration", visibility: "table", text: "Bad role." }],
+const aliasedRole = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "narrator", kind: "narration", visibility: "table", text: "Good role alias." }],
 })));
-assert.equal(invalidRole.ok, false);
-assert.match(invalidRole.error, /table\[0\]\.role/);
+assert.equal(aliasedRole.ok, true);
+assert.equal(aliasedRole.response.table[0].role, "dm");
 
-const invalidKind = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
-  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "cutscene", visibility: "table", text: "Bad kind." }],
+const aliasedKind = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "scene", visibility: "table", text: "Good kind alias." }],
 })));
-assert.equal(invalidKind.ok, false);
-assert.match(invalidKind.error, /table\[0\]\.kind/);
+assert.equal(aliasedKind.ok, true);
+assert.equal(aliasedKind.response.table[0].kind, "narration");
 
-const invalidTableVisibility = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
-  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "secret_player", text: "Bad visibility." }],
+const aliasedTableVisibility = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "public", text: "Good visibility alias." }],
 })));
-assert.equal(invalidTableVisibility.ok, false);
-assert.match(invalidTableVisibility.error, /table\[0\]\.visibility/);
+assert.equal(aliasedTableVisibility.ok, true);
+assert.equal(aliasedTableVisibility.response.table[0].visibility, "table");
+
+const aliasedSceneStatus = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  sceneStatus: { mode: "danger", danger: "urgent", awaitingPlayer: "true" },
+})));
+assert.equal(aliasedSceneStatus.ok, true);
+assert.equal(aliasedSceneStatus.response.sceneStatus.mode, "exploration");
+assert.equal(aliasedSceneStatus.response.sceneStatus.danger, "immediate");
+
+const aliasedMechanics = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  mechanics: [{ type: "skill_check", actor: "Jarin", outcome: "needs_roll", reason: "Listen for movement." }],
+})));
+assert.equal(aliasedMechanics.ok, true);
+assert.equal(aliasedMechanics.response.mechanics[0].type, "check");
+assert.equal(aliasedMechanics.response.mechanics[0].outcome, "pending");
+
+const nestedMechanicRender = renderTurnResponseForImport(validTurnResponse({
+  mechanics: [{
+    type: "attack",
+    actor: "Mira",
+    target: "Wolf",
+    roll: { formula: "d20+4", natural: 15, bonus: 4, total: 19 },
+    damage: "1d8+2 = 7 piercing",
+    outcome: "success",
+  }],
+}));
+assert.doesNotMatch(nestedMechanicRender, /\[object Object\]/);
+assert.match(nestedMechanicRender, /Roll d20\+4, natural 15, bonus \+4, total 19/);
+
+const combatValidationRequest = {
+  ...combatEnvelope,
+  requestId: "combat-validation",
+  generation: { ...combatEnvelope.generation, responseMode: "resolve_combat" },
+  context: {
+    ...combatEnvelope.context,
+    combat: { ...combatEnvelope.context.combat, inCombat: true, currentTurnId: "mira" },
+  },
+  user: { ...combatEnvelope.user, inWorld: "Mira attacks the wolf." },
+};
+const combatMissingMechanics = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  mechanics: [],
+  proposedChanges: [],
+})), {
+  requestId: "combat-validation",
+  request: combatValidationRequest,
+});
+assert.equal(combatMissingMechanics.ok, false);
+assert.match(combatMissingMechanics.error, /resolved combat must include visible mechanics/);
+
+const combatVagueMechanics = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  mechanics: [{ type: "attack", actor: "Mira", outcome: "success", text: "Mira hits the wolf and hurts it." }],
+  proposedChanges: [{
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Mira's combat turn resolves.",
+    data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "mira" },
+    confidence: "high",
+    reason: "Combat action resolved.",
+  }],
+})), {
+  requestId: "combat-validation",
+  request: combatValidationRequest,
+});
+assert.equal(combatVagueMechanics.ok, false);
+assert.match(combatVagueMechanics.error, /resolved combat must include visible mechanics/);
+
+const combatNudgeWithoutMechanics = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: true },
+  mechanics: [],
+  proposedChanges: [],
+})), {
+  requestId: "combat-validation",
+  request: {
+    ...combatValidationRequest,
+    user: {
+      ...combatValidationRequest.user,
+      inWorld: "(DM nudge: Continue from the current SQLite campaign state without inventing a player action.)",
+    },
+  },
+});
+assert.equal(combatNudgeWithoutMechanics.ok, true);
+
+const combatMissingAdvanceRepaired = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  mechanics: [{ type: "attack", actor: "Mira", roll: "d20+1 = 16", outcome: "success", text: "Attack roll 16 hits AC 14." }],
+  proposedChanges: [],
+})), {
+  requestId: "combat-validation",
+  request: combatValidationRequest,
+});
+assert.equal(combatMissingAdvanceRepaired.ok, true);
+assert.ok(combatMissingAdvanceRepaired.response.proposedChanges.some((change) =>
+  change.domain === "combat" &&
+  change.data.turnResolved === true &&
+  change.data.advanceTurn === true &&
+  change.data.resolvedActorId === "mira"
+));
+assert.match(combatMissingAdvanceRepaired.response.warnings.join(" "), /inferred turnResolved/);
+
+const combatWithAdvance = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  mechanics: [{ type: "attack", actor: "Mira", roll: "d20+1 = 16", outcome: "success", text: "Attack roll 16 hits AC 14." }],
+  proposedChanges: [{
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Mira's combat turn resolves.",
+    data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "mira" },
+    confidence: "high",
+    reason: "Combat action resolved.",
+  }],
+})), {
+  requestId: "combat-validation",
+  request: combatValidationRequest,
+});
+assert.equal(combatWithAdvance.ok, true);
+
+const aliasedChange = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  proposedChanges: [{ ...validChange(), operation: "create", domain: "npc", importance: "low", visibility: "public" }],
+})));
+assert.equal(aliasedChange.ok, true);
+assert.equal(aliasedChange.response.proposedChanges[0].operation, "add");
+assert.equal(aliasedChange.response.proposedChanges[0].domain, "people");
+assert.equal(aliasedChange.response.proposedChanges[0].importance, "minor");
+assert.equal(aliasedChange.response.proposedChanges[0].visibility, "player_visible");
 
 const invalidOperation = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   proposedChanges: [{ ...validChange(), operation: "teleport" }],
@@ -171,11 +569,34 @@ const mismatch = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ reques
 assert.equal(mismatch.ok, false);
 assert.match(mismatch.error, /requestId mismatch/);
 
-const missingChoices = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+const repairedMismatch = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ requestId: "wrong-id" })), {
+  requestId: "right-id",
+  repairRequestIdMismatch: true,
+});
+assert.equal(repairedMismatch.ok, true);
+assert.equal(repairedMismatch.response.requestId, "right-id");
+assert.match(repairedMismatch.response.warnings.join(" "), /Repaired model requestId mismatch/);
+
+const objectChoice = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  choices: {
+    prompt: "What does Thor do?",
+    options: [{ id: "A", actor: "Thor", text: { name: "Counterpunch" } }],
+    allowOther: true,
+  },
+})));
+assert.equal(objectChoice.ok, true);
+assert.equal(objectChoice.response.choices.options[0].text, "Counterpunch");
+assert.doesNotMatch(renderTurnResponseForImport(objectChoice.response), /\[object Object\]/);
+
+const awaitingWithoutChoices = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Garin patrols the wall as the city settles into a tense quiet." }],
   choices: { prompt: "What now?", options: [], allowOther: true },
 })));
-assert.equal(missingChoices.ok, false);
-assert.match(missingChoices.error, /choices\.options/);
+assert.equal(awaitingWithoutChoices.ok, true);
+
+const narrationOnlyRender = renderTurnResponseForImport(awaitingWithoutChoices.response);
+assert.match(narrationOnlyRender, /Garin patrols the wall/);
+assert.doesNotMatch(narrationOnlyRender, /What now\?/);
 
 const majorWithoutReview = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   flags: { requiresReview: false, startsCombat: false, endsScene: false, containsSecretInfo: false },
@@ -242,6 +663,96 @@ function testContextPack(kind = "current_scene") {
   };
 }
 
+function rulesCampaign() {
+  return {
+    id: "rules-campaign",
+    title: "Rules Campaign",
+    summary: "A rules ledger test campaign.",
+    style: {
+      tone: "tactical fantasy",
+      pacing: "clean turns",
+      narrationRules: ["Keep agency explicit."],
+      formattingRules: ["End with lettered choices."],
+    },
+    scene: {
+      status: "active",
+      currentPlaceId: "ruins",
+      presentPeopleIds: [],
+      presentPartyMemberIds: ["mira"],
+      activeQuestIds: [],
+      immediateSituation: "Mira is facing a threat in old ruins.",
+      localNotes: [],
+      nearbyPlaceIds: [],
+    },
+    combat: {
+      inCombat: true,
+      round: 1,
+      initiative: ["mira"],
+      enemies: [],
+      conditions: [],
+      turnEconomy: {
+        mira: {
+          action: "available",
+          bonusAction: "available",
+          reaction: "available",
+          movementRemainingFt: 25,
+        },
+      },
+      turnFormat: "Actor, options, chosen, rolls, updates, narration.",
+      preferences: [],
+    },
+    rulesProfile: {
+      name: "D&D 5e Lite",
+      purpose: "Test rules.",
+      coreStats: ["STR", "DEX", "CON", "INT", "WIS", "CHA"],
+      diceConventions: { defaultCheck: "d20 + modifier" },
+      combatLoop: [],
+      providerGuardRails: [],
+    },
+    places: [{ id: "ruins", name: "Old Ruins", summary: "Broken stone and thorny cover." }],
+    people: [],
+    quests: [],
+    inventory: [],
+    items: [],
+    relationships: [],
+    lore: [],
+    party: [
+      {
+        id: "mira",
+        name: "Mira",
+        type: "player_character",
+        playerRole: "Player character",
+        ancestryClass: "Wood elf druid",
+        level: 3,
+        proficiencyBonus: 2,
+        speedFt: 30,
+        stats: {
+          hp: { current: 18, max: 24 },
+          armorClass: 14,
+          abilityScores: { STR: 8, DEX: 14, CON: 13, INT: 12, WIS: 16, CHA: 10 },
+        },
+        skills: [{ name: "Perception" }, "Survival"],
+        abilities: [{ name: "Wild Shape" }, "Primal spellcasting"],
+        spells: ["Druidcraft", "Entangle", "Goodberry"],
+        resources: {
+          spellSlots: {
+            1: { max: 4, used: 1 },
+            2: { max: 2, used: 0 },
+          },
+          uses: {
+            wildShape: { max: 2, used: 0 },
+          },
+        },
+        attacks: [
+          { name: "Quarterstaff", attackBonus: 1, damage: "1d6-1", range: "5 ft" },
+        ],
+        conditions: [],
+        notes: ["Rules ledger fixture."],
+      },
+    ],
+  };
+}
+
 function validTurnResponse(overrides = {}) {
   return {
     type: "lorekeeper.turn.response",
@@ -254,7 +765,7 @@ function validTurnResponse(overrides = {}) {
       scope: "character",
       forActorId: "jarin",
       forActor: "Jarin",
-      options: [{ id: "1", actorId: "jarin", actor: "Jarin", text: "Drop low and listen." }],
+      options: [{ id: "A", actorId: "jarin", actor: "Jarin", legalOptionId: "move", text: "Drop low and listen." }],
       allowOther: true,
     },
     mechanics: [

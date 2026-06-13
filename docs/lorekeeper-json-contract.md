@@ -114,6 +114,16 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
         "skill": "perception",
         "reason": "why LoreKeeper inferred this roll request"
       }
+    ],
+    "playerInputs": [
+      {
+        "playerId": "host-or-guest-id",
+        "playerName": "display name",
+        "characterId": "party-member-id",
+        "characterName": "party member name",
+        "text": "visible table message being submitted to the model",
+        "ready": true
+      }
     ]
   },
   "generation": {

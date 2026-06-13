@@ -2,7 +2,7 @@ import { buildContextPack } from "../context-packs/build-context-pack.js";
 import { buildSidecarPrompt } from "../prompt-builder/build-prompt.js";
 import { parsePlayerMessage } from "./player-message.js";
 
-export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgpt" }) {
+export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgpt", playerInputs = [] }) {
   const trimmedMessage = playerMessage.trim();
   if (!trimmedMessage) {
     throw new Error("Player message is required.");
@@ -28,6 +28,7 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
     createdAt: new Date().toISOString(),
     playerMessage: trimmedMessage,
     parsedMessage,
+    playerInputs,
     contextPack,
     providerPrompt,
     importedResponse: null,
@@ -41,7 +42,7 @@ function isCombatRelevant(parsedMessage) {
     ...(parsedMessage.metaInstructions ?? []),
   ].join(" ").toLowerCase();
 
-  return /\b(combat|fight|attack|spell|damage|hp|initiative|roll|enemy|weapon|cast|shoot|stab|strike)\b/.test(haystack);
+  return /\b(combat|fight|attack|attacks|attacking|spell|damage|hp|initiative|roll|enemy|monster|creature|beast|wolf|weapon|crossbow|bow|arrow|cast|shoot|shot|fire|fires|firing|stab|strike|wounded|under attack)\b/.test(haystack);
 }
 
 export function attachProviderResponse(turn, responseText) {

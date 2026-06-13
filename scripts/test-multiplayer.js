@@ -1,0 +1,238 @@
+import assert from "node:assert/strict";
+import {
+  approveJoinRequest,
+  buildAggregatedPlayerTurn,
+  clearPendingTurnInputs,
+  controllerKinds,
+  createGuestSnapshot,
+  createInviteForPartyMember,
+  disconnectGuest,
+  parseInviteLink,
+  requestJoin,
+  stopLocalTable,
+  startLocalTable,
+  submitGuestAction,
+} from "../src/multiplayer/local-table.js";
+
+let campaign = testCampaign();
+campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+assert.equal(campaign.multiplayer.localTable.running, true);
+
+const inviteResult = createInviteForPartyMember(campaign, {
+  partyMemberId: "kevric",
+  host: "192.168.1.24",
+  port: 7347,
+});
+campaign = inviteResult.campaign;
+const parsedInvite = parseInviteLink(inviteResult.inviteLink);
+assert.equal(parsedInvite.valid, true);
+assert.equal(parsedInvite.seat, "kevric");
+assert.equal(parsedInvite.port, 7347);
+
+const joinResult = requestJoin(campaign, {
+  inviteLink: inviteResult.inviteLink,
+  playerName: "Jess",
+  clientId: "guest-client",
+});
+campaign = joinResult.campaign;
+assert.equal(joinResult.approved, false);
+assert.equal(campaign.multiplayer.connections[0].status, "pending");
+const duplicateJoinResult = requestJoin(campaign, {
+  inviteLink: inviteResult.inviteLink,
+  playerName: "Jess",
+  clientId: "guest-client",
+});
+campaign = duplicateJoinResult.campaign;
+assert.equal(duplicateJoinResult.connection.id, joinResult.connection.id);
+assert.equal(campaign.multiplayer.connections.length, 1);
+
+campaign = approveJoinRequest(campaign, joinResult.connection.id);
+const connected = campaign.multiplayer.connections[0];
+const kevric = campaign.party.find((member) => member.id === "kevric");
+assert.equal(connected.status, "connected");
+assert.equal(kevric.controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(kevric.controllerId, connected.playerId);
+
+const driftedCampaign = JSON.parse(JSON.stringify(campaign));
+driftedCampaign.party = driftedCampaign.party.map((member) => member.id === "kevric"
+  ? {
+    ...member,
+    controllerKind: controllerKinds.AI_COMPANION,
+    controllerId: null,
+  }
+  : member);
+const healedControllerCampaign = submitGuestAction(driftedCampaign, {
+  connectionId: connected.id,
+  clientId: "guest-client",
+  characterId: "kevric",
+  text: "Kevric tests that an approved guest seat repairs controller drift.",
+});
+assert.equal(healedControllerCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(healedControllerCampaign.party.find((member) => member.id === "kevric").controllerId, connected.playerId);
+
+const staleCampaign = JSON.parse(JSON.stringify(campaign));
+const connectedPlayer = staleCampaign.multiplayer.players.find((player) => player.id === connected.playerId);
+const legacyPlayer = {
+  ...connectedPlayer,
+  id: "player-legacy-duplicate",
+};
+const legacyConnection = {
+  ...connected,
+  id: "conn-legacy-duplicate",
+  playerId: legacyPlayer.id,
+  status: "pending",
+  approvedAt: null,
+};
+staleCampaign.multiplayer.players.push(legacyPlayer);
+staleCampaign.multiplayer.connections.push(legacyConnection);
+const healedSnapshot = createGuestSnapshot(staleCampaign, legacyConnection.id);
+assert.equal(healedSnapshot.connection.status, "connected");
+assert.equal(healedSnapshot.connection.id, connected.id);
+
+assert.throws(
+  () => submitGuestAction(campaign, {
+    connectionId: connected.id,
+    clientId: "other-client",
+    characterId: "kevric",
+    text: "Kevric acts from the wrong thin client.",
+  }),
+  /client does not match/,
+);
+
+assert.throws(
+  () => submitGuestAction(campaign, {
+    connectionId: connected.id,
+    characterId: "jarin",
+    text: "Jarin acts from the guest client.",
+  }),
+  /assigned party member/,
+);
+
+campaign = submitGuestAction(campaign, {
+  connectionId: connected.id,
+  clientId: "guest-client",
+  characterId: "kevric",
+  text: "Kevric ducks behind the nearest tree and watches Jarin's blind side.",
+});
+assert.equal(campaign.multiplayer.pendingTurnInputs.length, 1);
+
+const publicMessage = campaign.sessionLog.messages.find((message) => message.data?.pendingInputId === campaign.multiplayer.pendingTurnInputs[0].id);
+assert.equal(publicMessage.role, "party");
+assert.equal(publicMessage.title, "Kevric");
+assert.equal(publicMessage.body, "Kevric ducks behind the nearest tree and watches Jarin's blind side.");
+assert.equal(publicMessage.data.status, "pending_model_submit");
+assert.equal(publicMessage.data.hostStaged, true);
+assert.match(publicMessage.meta, /staged for next Send Turn/i);
+
+const guestSnapshot = createGuestSnapshot(campaign, connected.id);
+assert.equal(guestSnapshot.assignedCharacter.name, "Kevric");
+assert.equal(guestSnapshot.messages.some((message) => message.title === "Kevric"), true);
+assert.equal(guestSnapshot.tableState.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(guestSnapshot.tableState.places.find((place) => place.id === "forest").name, "Forest");
+assert.equal(guestSnapshot.tableState.items.find((item) => item.id === "flag").name, "Training Flag");
+assert.equal(guestSnapshot.tableState.updatedAt, campaign.updatedAt);
+assert.equal(guestSnapshot.tableState.people.some((person) => person.name === "Hidden Handler"), false);
+assert.equal(guestSnapshot.tableState.party.find((member) => member.id === "kevric").notes.some((note) => /secret/i.test(note)), false);
+
+const aggregated = buildAggregatedPlayerTurn(campaign, {
+  hostText: "Jarin slows down and signals silently.",
+});
+assert.match(aggregated.text, /Jarin slows down/);
+assert.equal(aggregated.playerInputs.find((input) => input.characterId === "kevric").characterName, "Kevric");
+
+campaign = clearPendingTurnInputs(campaign, [campaign.multiplayer.pendingTurnInputs[0].id]);
+assert.equal(campaign.multiplayer.pendingTurnInputs.length, 0);
+const submittedMessage = campaign.sessionLog.messages.find((message) => message.title === "Kevric");
+assert.equal(submittedMessage.data.status, "submitted_to_model");
+
+campaign.sessionLog.messages.push({
+  id: "dm-after-guest-action",
+  sessionId: "session-main",
+  role: "dm",
+  title: "DM",
+  body: "Kevric slips behind the tree while Jarin keeps the sentry's eyes forward.",
+  meta: "Test DM result after host resolution.",
+  source: "test",
+  createdAt: new Date().toISOString(),
+  data: {},
+});
+const resolvedGuestSnapshot = createGuestSnapshot(campaign, connected.id);
+assert.equal(resolvedGuestSnapshot.messages.some((message) => message.id === "dm-after-guest-action"), true);
+assert.equal(
+  resolvedGuestSnapshot.messages.find((message) => message.title === "Kevric").data.status,
+  "submitted_to_model",
+);
+
+campaign = disconnectGuest(campaign, connected.id);
+const releasedKevric = campaign.party.find((member) => member.id === "kevric");
+assert.equal(releasedKevric.controllerKind, controllerKinds.AI_COMPANION);
+
+let tableStopCampaign = approveJoinRequest(joinResult.campaign, joinResult.connection.id);
+tableStopCampaign = stopLocalTable(tableStopCampaign);
+const stoppedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client" });
+assert.equal(stoppedSnapshot.tableStopped, true);
+assert.equal(stoppedSnapshot.awaitingApproval, false);
+assert.match(stoppedSnapshot.scene.immediateSituation, /host local table is off/i);
+tableStopCampaign = startLocalTable(tableStopCampaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+const revivedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client" });
+assert.equal(revivedSnapshot.connection.status, "connected");
+assert.equal(revivedSnapshot.assignedCharacter.name, "Kevric");
+assert.equal(tableStopCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
+
+console.log("Lorekeeper multiplayer tests passed.");
+
+function testCampaign() {
+  return {
+    id: "campaign-test",
+    title: "Campaign Test",
+    summary: "A test campaign.",
+    scene: {
+      currentPlaceId: "forest",
+      immediateSituation: "Two trainees are racing toward a hidden camp.",
+      presentPartyMemberIds: ["jarin", "kevric"],
+    },
+    party: [
+      {
+        id: "jarin",
+        name: "Jarin",
+        type: "player_character",
+        playerRole: "player character",
+      },
+      {
+        id: "kevric",
+        name: "Kevric",
+        type: "companion",
+        playerRole: "trusted party member",
+        notes: [
+          "Loyal training partner.",
+          { visibility: "dm_only", text: "Secret handler reports on Kevric." },
+        ],
+      },
+    ],
+    people: [
+      {
+        id: "hidden-handler",
+        name: "Hidden Handler",
+        type: "npc",
+        visibility: "dm_only",
+      },
+    ],
+    places: [{ id: "forest", name: "Forest", type: "location" }],
+    items: [{ id: "flag", name: "Training Flag", type: "quest item" }],
+    quests: [],
+    sessionLog: {
+      activeSessionId: "session-main",
+      sessions: [
+        {
+          id: "session-main",
+          title: "Campaign Play",
+          startedAt: new Date().toISOString(),
+          endedAt: null,
+          recap: "",
+        },
+      ],
+      messages: [],
+    },
+    multiplayer: {},
+  };
+}

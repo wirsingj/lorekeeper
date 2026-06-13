@@ -22,6 +22,16 @@ const PARTY_NAMES = new Map([
   ["el", "Elendra Myris"],
   ["joren", "Joren Valehart"],
   ["joren valehart", "Joren Valehart"],
+  ["dave", "Dave"],
+  ["torrin", "Torrin"],
+  ["kestrin", "Kestrin"],
+  ["branek", "Branek Stonewatch"],
+  ["branek stonewatch", "Branek Stonewatch"],
+  ["rathar", "Rathar Stonekin"],
+  ["rathar stonekin", "Rathar Stonekin"],
+  ["kaelrin", "Kaelrin"],
+  ["silva", "Silva"],
+  ["hank", "Hank"],
 ]);
 
 const FACTION_HINTS = [
@@ -44,6 +54,10 @@ const LOCATION_HINTS = [
   "Vaskorath",
   "Thyraven Reach",
   "Lethora'kael",
+  "Caelvarin Inner Passes",
+  "Lethryn Vale",
+  "Thyraven Reach",
+  "Stonehome",
   "Stonehome Peaks",
   "Willowhollow",
   "Thornhollow",
@@ -121,23 +135,7 @@ export async function importCampaignFolder(folderPath, options = {}) {
 }
 
 async function readCampaignFolder(folderPath) {
-  const dirents = await readdir(folderPath, { withFileTypes: true });
-  const files = await Promise.all(
-    dirents
-      .filter((dirent) => dirent.isFile())
-      .map(async (dirent) => {
-        const filePath = path.join(folderPath, dirent.name);
-        const fileStat = await stat(filePath);
-        const extension = path.extname(dirent.name).toLowerCase();
-        return {
-          name: dirent.name,
-          path: filePath,
-          extension,
-          size: fileStat.size,
-          modifiedAt: fileStat.mtime.toISOString(),
-        };
-      }),
-  );
+  const files = await readCampaignFiles(folderPath);
 
   files.sort((a, b) => {
     const rank = inferSourceRank(a.name) - inferSourceRank(b.name);
@@ -158,6 +156,34 @@ async function readCampaignFolder(folderPath) {
         VIDEO_EXTENSIONS.has(file.extension),
     ),
   };
+}
+
+async function readCampaignFiles(folderPath, basePath = folderPath) {
+  const dirents = await readdir(folderPath, { withFileTypes: true });
+  const files = [];
+
+  for (const dirent of dirents) {
+    const filePath = path.join(folderPath, dirent.name);
+    if (dirent.isDirectory()) {
+      files.push(...await readCampaignFiles(filePath, basePath));
+      continue;
+    }
+    if (!dirent.isFile()) {
+      continue;
+    }
+
+    const fileStat = await stat(filePath);
+    const extension = path.extname(dirent.name).toLowerCase();
+    files.push({
+      name: path.relative(basePath, filePath),
+      path: filePath,
+      extension,
+      size: fileStat.size,
+      modifiedAt: fileStat.mtime.toISOString(),
+    });
+  }
+
+  return files;
 }
 
 async function readSourceDocuments(textFiles) {
@@ -199,28 +225,58 @@ function createAssetRecord(file) {
 
 function extractStructuredCampaign(sourceDocuments) {
   const combined = sourceDocuments.map((doc) => `\n\n# Source: ${doc.name}\n${doc.content}`).join("\n");
-  const sceneSource = selectSceneSource(sourceDocuments)?.content ?? sourceDocuments.at(-1)?.content ?? combined;
+  const canonText = prioritizedCanonText(sourceDocuments);
+  const sceneSource = selectSceneSource(sourceDocuments)?.content ?? sourceDocuments.at(-1)?.content ?? canonText;
+  const scene = extractScene(sceneSource, canonText);
 
   return {
-    summary: extractSummary(combined),
-    party: extractParty(combined),
-    people: extractPeople(combined),
-    factions: extractHintRecords(combined, FACTION_HINTS, "faction"),
-    places: extractPlaces(combined),
+    summary: extractSummary(canonText),
+    party: extractParty(canonText),
+    people: extractPeople(canonText),
+    factions: extractHintRecords(canonText, FACTION_HINTS, "faction"),
+    places: ensureScenePlace(extractPlaces(canonText), scene),
     maps: [],
-    items: extractItems(combined),
-    inventory: extractInventory(combined),
+    items: extractItems(canonText),
+    inventory: extractInventory(canonText),
     lore: extractLore(combined),
     timeline: extractTimeline(combined),
-    quests: extractQuests(combined),
-    relationships: extractRelationships(combined),
-    scene: extractScene(sceneSource, combined),
-    combat: extractCombat(combined),
-    style: extractStyle(combined),
+    quests: extractQuests(canonText),
+    relationships: extractRelationships(canonText),
+    scene,
+    combat: extractCombat(canonText),
+    style: extractStyle(canonText),
   };
 }
 
+function prioritizedCanonText(sourceDocuments) {
+  return [...sourceDocuments]
+    .sort((a, b) => canonPriority(a.name) - canonPriority(b.name))
+    .map((doc) => `\n\n# Source: ${doc.name}\n${doc.content}`)
+    .join("\n");
+}
+
+function canonPriority(name) {
+  const normalized = name.toLowerCase().replace(/\\/g, "/");
+  if (normalized.endsWith("markdown/17_next_session_state.md")) return 0;
+  if (normalized.endsWith("markdown/01_current_state.md")) return 1;
+  if (normalized.endsWith("markdown/16_canon_corrections_and_deprecated_names.md")) return 2;
+  if (normalized.endsWith("markdown/18_lorekeeper_condensed_import.md")) return 3;
+  if (normalized.endsWith("markdown/10_current_arc_caelvarin.md")) return 4;
+  if (normalized.endsWith("markdown/11_current_arc_westbound_thyraven.md")) return 5;
+  if (normalized.includes("vott_lorekeeper_full_import.md")) return 6;
+  if (normalized.includes("/markdown/")) return 20;
+  if (normalized.includes("source_refs/")) return 80;
+  return 100;
+}
+
 function extractSummary(text) {
+  const currentScene = findSectionLines(text, ["Current party and location", "Current exact scene"])
+    .slice(0, 3)
+    .join(" ");
+  if (currentScene) {
+    return currentScene;
+  }
+
   const status = findSectionLines(text, ["CURRENT STATUS", "CURRENT TIMELINE", "CURRENT STATUS MOVING INTO NEXT CHAT WINDOW"])
     .slice(0, 8)
     .join(" ");
@@ -240,10 +296,15 @@ function extractParty(text) {
     }
 
     const description = findDescriptionForName(text, canonicalName) ?? findDescriptionForName(text, key) ?? "";
+    const isPrimaryPlayerCharacter = canonicalName.startsWith("Oskar");
     records.push({
       id: `pc-${slugify(canonicalName)}`,
       name: canonicalName,
-      playerRole: canonicalName.startsWith("Oskar") ? "primary player character" : "party member",
+      type: isPrimaryPlayerCharacter ? "player_character" : "party_member",
+      playerRole: isPrimaryPlayerCharacter ? "primary player character" : "party member",
+      controllerKind: isPrimaryPlayerCharacter ? "host" : "ai_companion",
+      controllerId: isPrimaryPlayerCharacter ? "host" : null,
+      fallbackControllerKind: isPrimaryPlayerCharacter ? "host" : "ai_companion",
       ancestryClass: inferAncestryClass(description),
       status: "active",
       locationId: null,
@@ -302,13 +363,31 @@ function extractPeople(text) {
 }
 
 function extractPlaces(text) {
-  return extractHintRecords(text, LOCATION_HINTS, "place").map((place) => ({
+  const places = extractHintRecords(text, LOCATION_HINTS, "place").map((place) => ({
     ...place,
     type: inferPlaceType(place.notes.join(" ")),
     region: "",
     summary: place.notes[0] ?? "Imported campaign location.",
     connectedPlaceIds: [],
   }));
+
+  if (/Caelvarin['’]s inner passes|living forest roads|inner passes/i.test(text)) {
+    places.unshift({
+      id: "place-caelvarin-inner-passes",
+      name: "Caelvarin Inner Passes",
+      type: "region",
+      region: "Caelvarin",
+      summary: "Living forest roads and inner passes where the Company recently cleansed a corrupted Resonance Warden.",
+      connectedPlaceIds: ["place-caelvarin", "place-lethryn-vale"],
+      notes: [
+        "Living forest roads and inner passes where the Company recently cleansed a corrupted Resonance Warden.",
+        ...findNearbySentences(text, "inner passes", 2),
+      ],
+      source: "imported-current-canon",
+    });
+  }
+
+  return uniqueById(places);
 }
 
 function extractItems(text) {
@@ -400,11 +479,11 @@ function extractTimeline(text) {
 
 function extractQuests(text) {
   const questLines = [
-    ...findSectionLines(text, ["ACTIVE QUEST THREADS", "CURRENT GOALS", "Next Steps"]),
+    ...findSectionLines(text, ["ACTIVE QUEST THREADS", "CURRENT GOALS", "Next Steps", "Current open options", "Major future threads"]),
     ...text
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .filter((line) => /Mission|Buried Force|Mirror Heart|Ridgepeak|Highmark|Construct Development|City Expansion/i.test(line)),
+      .filter((line) => /Mission|Buried Force|Mirror Heart|Ridgepeak|Highmark|Construct Development|City Expansion|Caelvarin|Thyraven|Florryn|Lethora|watcher|Warden|Circle/i.test(line)),
   ];
 
   return uniqueStrings(questLines)
@@ -461,15 +540,24 @@ function extractRelationships(text) {
 }
 
 function extractScene(latest, combined) {
-  const latestSceneLines = findSectionLines(latest, ["CURRENT STATUS MOVING INTO NEXT CHAT WINDOW", "Most Recent Scene", "NEXT STARTING SCENE"]);
+  const latestSceneLines = findSectionLines(latest, [
+    "Next Session State",
+    "Immediate Resume",
+    "Current party and location",
+    "Current exact scene",
+    "CURRENT STATUS MOVING INTO NEXT CHAT WINDOW",
+    "Most Recent Scene",
+    "NEXT STARTING SCENE",
+  ]);
   const immediateSituation = latestSceneLines.join(" ") || "Imported campaign is ready for the next scene.";
+  const currentPlaceId = inferCurrentPlaceId(latest, combined);
 
   return {
     status: "active_scene",
-    currentPlaceId: /Highmark/i.test(latest) ? "place-highmark-vale" : "place-city-of-resonance",
-    nearbyPlaceIds: /Highmark Vault/i.test(latest) ? ["place-highmark-vault", "place-vault-antichamber"] : [],
+    currentPlaceId,
+    nearbyPlaceIds: inferNearbyPlaceIds(latest, currentPlaceId),
     presentPeopleIds: ["npc-sister-nira", "npc-rathar-stonekin", "npc-silva", "npc-kaelrin"].filter((id) =>
-      combined.includes(idToLikelyName(id)),
+      latest.includes(idToLikelyName(id)),
     ),
     presentPartyMemberIds: [
       "pc-oskar-bluez",
@@ -477,7 +565,11 @@ function extractScene(latest, combined) {
       "pc-thoran-holt",
       "pc-elendra-myris",
       "pc-joren-valehart",
-    ],
+      "pc-dave",
+      "pc-torrin",
+      "pc-kestrin",
+      "pc-branek-stonewatch",
+    ].filter((id) => combined.includes(idToLikelyName(id)) || id === "pc-oskar-bluez"),
     activeQuestIds: [],
     localNotes: latestSceneLines.slice(0, 6),
     immediateSituation,
@@ -485,11 +577,70 @@ function extractScene(latest, combined) {
 }
 
 function selectSceneSource(sourceDocuments) {
-  const sceneMarkers = ["CURRENT STATUS MOVING INTO NEXT CHAT WINDOW", "Most Recent Scene", "NEXT STARTING SCENE"];
+  const sceneMarkers = [
+    "Next Session State",
+    "Immediate Resume",
+    "Current party and location",
+    "Current exact scene",
+    "CURRENT STATUS MOVING INTO NEXT CHAT WINDOW",
+    "Most Recent Scene",
+    "NEXT STARTING SCENE",
+  ];
 
   return [...sourceDocuments]
-    .reverse()
+    .sort((a, b) => canonPriority(a.name) - canonPriority(b.name))
     .find((doc) => sceneMarkers.some((marker) => doc.content.toLowerCase().includes(marker.toLowerCase())));
+}
+
+function inferCurrentPlaceId(latest, combined) {
+  const text = `${latest}\n${combined}`;
+  if (/Caelvarin['’]s inner passes|living forest roads|inner passes/i.test(text)) {
+    return "place-caelvarin-inner-passes";
+  }
+  if (/Caelvarin/i.test(text)) {
+    return "place-caelvarin";
+  }
+  if (/Thyraven/i.test(text)) {
+    return "place-thyraven-reach";
+  }
+  if (/Highmark/i.test(latest)) {
+    return "place-highmark-vale";
+  }
+  return "place-city-of-resonance";
+}
+
+function inferNearbyPlaceIds(latest, currentPlaceId) {
+  if (currentPlaceId === "place-caelvarin-inner-passes") {
+    return ["place-caelvarin", "place-lethryn-vale"];
+  }
+  if (/Highmark Vault/i.test(latest)) {
+    return ["place-highmark-vault", "place-vault-antichamber"];
+  }
+  return [];
+}
+
+function ensureScenePlace(places, scene) {
+  if (!scene?.currentPlaceId || places.some((place) => place.id === scene.currentPlaceId)) {
+    return places;
+  }
+  const name = scene.currentPlaceId
+    .replace(/^place-/, "")
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  return [
+    ...places,
+    {
+      id: scene.currentPlaceId,
+      name,
+      type: "place",
+      region: "",
+      summary: scene.immediateSituation || "Imported current scene location.",
+      connectedPlaceIds: [],
+      notes: scene.localNotes ?? [],
+      source: "imported-current-scene",
+    },
+  ];
 }
 
 function extractCombat(text) {
@@ -565,6 +716,16 @@ function inferCampaignTitle(sourceDocuments) {
 }
 
 function findDescriptionForName(text, name) {
+  const headingDescription = findMarkdownDescriptionForName(text, name);
+  if (headingDescription) {
+    return headingDescription;
+  }
+
+  const directLine = findCleanLineForName(text, name);
+  if (directLine) {
+    return directLine;
+  }
+
   const escaped = escapeRegExp(name);
   const patterns = [
     new RegExp(`^\\s*${escaped}\\s+[|—-]\\s+(.+)$`, "im"),
@@ -582,6 +743,109 @@ function findDescriptionForName(text, name) {
   return nearby[0] ?? "";
 }
 
+function findMarkdownDescriptionForName(text, name) {
+  const lines = text.split(/\r?\n/);
+  const targetTokens = tokenizeName(name);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const heading = parseMarkdownHeading(lines[index]);
+    if (!heading || !headingMatchesName(heading, targetTokens)) {
+      continue;
+    }
+
+    const paragraph = firstParagraphAfterHeading(lines, index + 1);
+    if (paragraph) {
+      return paragraph;
+    }
+  }
+
+  return null;
+}
+
+function parseMarkdownHeading(line) {
+  const match = String(line).match(/^\s*#{1,6}\s+(.+?)\s*#*\s*$/);
+  return match?.[1] ? cleanLine(match[1]) : null;
+}
+
+function headingMatchesName(heading, targetTokens) {
+  if (targetTokens.length === 0) {
+    return false;
+  }
+  const headingTokens = new Set(tokenizeName(heading));
+  return targetTokens.every((token) => headingTokens.has(token));
+}
+
+function firstParagraphAfterHeading(lines, startIndex) {
+  const paragraph = [];
+
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const rawLine = lines[index];
+    const line = cleanLine(rawLine);
+
+    if (!line) {
+      if (paragraph.length > 0) {
+        break;
+      }
+      continue;
+    }
+
+    if (parseMarkdownHeading(rawLine) || looksLikeHeading(line)) {
+      break;
+    }
+
+    paragraph.push(line);
+  }
+
+  return cleanLine(paragraph.join(" ")) || null;
+}
+
+function findCleanLineForName(text, name) {
+  const lowerName = name.toLowerCase();
+  const nameParts = lowerName.split(/\s+/).filter(Boolean);
+  const lines = text
+    .split(/\r?\n/)
+    .map((rawLine) => ({
+      rawLine,
+      line: cleanLine(rawLine),
+    }))
+    .filter(({ rawLine, line }) => line && line.length < 360 && !parseMarkdownHeading(rawLine));
+
+  for (const { line } of lines) {
+    const lowerLine = line.toLowerCase();
+    if (!lowerLine.includes(lowerName) && !nameParts.every((part) => lowerLine.includes(part))) {
+      continue;
+    }
+    const nameIndex = lowerLine.indexOf(lowerName);
+    const partIndexes = nameParts
+      .map((part) => lowerLine.indexOf(part))
+      .filter((partIndex) => partIndex >= 0);
+    const firstNameIndex = nameIndex >= 0 ? nameIndex : Math.min(...partIndexes);
+
+    if (firstNameIndex > 80) {
+      continue;
+    }
+    const afterName = nameIndex >= 0
+      ? line.slice(nameIndex + name.length)
+      : line.slice(Math.max(...nameParts.map((part) => lowerLine.indexOf(part) + part.length)));
+    const cleanedAfterName = cleanLine(afterName.replace(/^[\s:|—–-]+/, ""));
+    if (cleanedAfterName) {
+      return cleanedAfterName;
+    }
+  }
+
+  return null;
+}
+
+function tokenizeName(value) {
+  return String(value)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/["'`]/g, " ")
+    .replace(/[^\w\s-]/g, " ")
+    .split(/[\s-]+/)
+    .filter(Boolean);
+}
+
 function findNearbySentences(text, term, count) {
   const index = text.toLowerCase().indexOf(term.toLowerCase());
   if (index === -1) {
@@ -596,7 +860,8 @@ function findNearbySentences(text, term, count) {
     .map(cleanLine)
     .filter((line) => line.length > 0 && !/^[#=*_ -]+$/.test(line));
 
-  return uniqueStrings(lines).slice(0, count);
+  const termLines = lines.filter((line) => line.toLowerCase().includes(term.toLowerCase()));
+  return uniqueStrings(termLines.length ? termLines : lines).slice(0, count);
 }
 
 function findNotesForHint(text, hint, count) {
@@ -653,6 +918,7 @@ function findDirectLine(text, hint) {
 
 function looksLikeHeading(line) {
   return (
+    /^#{1,6}\s/.test(line) ||
     /^[IVX]+\.\s/.test(line) ||
     /^SECTION\s+[IVX]+/i.test(line) ||
     /^\d+\.\s[A-Z]/.test(line) ||
@@ -669,7 +935,7 @@ function findSectionLines(text, sectionNames) {
   for (const line of lines) {
     const cleaned = cleanLine(line);
     const isRequestedHeading = sectionNames.some((section) => cleaned.toLowerCase().includes(section.toLowerCase()));
-    const looksLikeNextMajorHeading = /^[IVX]+\.\s|^SECTION\s+[IVX]+|^\d+\.\s[A-Z]/.test(cleaned);
+    const looksLikeNextMajorHeading = /^#{1,6}\s|^[IVX]+\.\s|^SECTION\s+[IVX]+|^\d+\.\s[A-Z]/.test(cleaned);
 
     if (isRequestedHeading) {
       collecting = true;
@@ -704,6 +970,15 @@ function inferAncestryClass(description) {
   const lower = description.toLowerCase();
   if (lower.includes("dwarf") && lower.includes("cleric")) return "dwarf life cleric";
   if (lower.includes("elven") && lower.includes("weaver")) return "elven weaver-scholar";
+  if (lower.includes("half-elf") && lower.includes("ranger")) return "half-elf ranger/scout";
+  if (lower.includes("halfling")) return "halfling porter/cook";
+  if (lower.includes("rune construct")) return "rune construct";
+  if (lower.includes("dwarven mason") || (lower.includes("dwarven") && lower.includes("mercenary"))) {
+    return "dwarven mason/mercenary";
+  }
+  if (lower.includes("elven cartographer")) return "elven cartographer/alchemist";
+  if (lower.includes("young lantern guard")) return "young Lantern Guard scout";
+  if (lower.includes("older lantern guard")) return "Lantern Guard veteran";
   if (lower.includes("fighter")) return "human fighter";
   if (lower.includes("ranger")) return "human ranger";
   if (lower.includes("scholar")) return "scholar / weaver";

@@ -1,40 +1,114 @@
-import { Menu, app, BrowserWindow, screen, shell } from "electron";
+import { Menu, app, BrowserWindow, ipcMain, screen, shell } from "electron";
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
+import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const port = Number(process.env.LOREKEEPER_PORT || 4173);
-const appIconPath = path.join(rootDir, "assets", "brand", "lorekeeper-icon.ico");
+const preferredPort = Number(process.env.LOREKEEPER_PORT || 4173);
+let apiPort = preferredPort;
+const clientMode = process.argv.includes("--client") || process.env.LOREKEEPER_CLIENT_MODE === "1";
+const appName = clientMode ? "ThinLoreKeeper" : "LoreKeeper";
+const appDisplayName = clientMode ? "ThinLoreKeeper" : "LoreKeeper";
+const appIconPath = path.join(rootDir, "assets", "brand", clientMode ? "lorekeeper-client-icon.ico" : "lorekeeper-icon.ico");
 let apiProcess = null;
 let mainWindow = null;
+let quitting = false;
+let cleanupStarted = false;
+const apiToken = crypto.randomBytes(24).toString("hex");
+
+app.setName(appName);
+app.setPath("userData", path.join(app.getPath("appData"), appName));
+
+const singleInstanceLock = app.requestSingleInstanceLock({ mode: clientMode ? "client" : "host" });
+if (!singleInstanceLock) {
+  app.quit();
+}
 
 async function createWindow() {
-  await startApiServer();
+  if (!clientMode) {
+    await startApiServer();
+  }
   Menu.setApplicationMenu(null);
-  app.setAppUserModelId("LoreKeeper");
+  app.setAppUserModelId(appName);
   const windowBounds = preferredWindowBounds();
 
   mainWindow = new BrowserWindow({
     ...windowBounds,
     minWidth: 1120,
     minHeight: 720,
-    title: "LoreKeeper",
+    show: false,
+    title: appDisplayName,
     icon: appIconPath,
     backgroundColor: "#171a1d",
     webPreferences: {
-      preload: path.join(rootDir, "electron", "preload.js"),
+      preload: path.join(rootDir, "electron", "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
+  mainWindow.once("ready-to-show", focusMainWindow);
+  mainWindow.on("page-title-updated", (event) => {
+    if (!clientMode) {
+      return;
+    }
+    event.preventDefault();
+    mainWindow.setTitle(appDisplayName);
+  });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(url);
+    }
     return { action: "deny" };
   });
+  setupRendererContextMenu(mainWindow);
 
-  await mainWindow.loadURL(`http://127.0.0.1:${port}`);
+  if (clientMode) {
+    await mainWindow.loadFile(path.join(rootDir, "dist", "app", "index.html"), {
+      query: { mode: "client" },
+    });
+    mainWindow.setTitle(appDisplayName);
+  } else {
+    await mainWindow.loadURL(`http://127.0.0.1:${apiPort}?lkToken=${encodeURIComponent(apiToken)}`);
+  }
+  focusMainWindow();
+}
+
+function isSafeExternalUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    return ["https:", "http:", "mailto:"].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function setupRendererContextMenu(window) {
+  window.webContents.on("context-menu", (_event, params) => {
+    const template = [];
+    if (params.isEditable) {
+      template.push(
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut", enabled: params.editFlags.canCut },
+        { role: "copy", enabled: params.editFlags.canCopy || Boolean(params.selectionText) },
+        { role: "paste", enabled: params.editFlags.canPaste },
+        { role: "delete", enabled: params.editFlags.canDelete },
+        { type: "separator" },
+        { role: "selectAll", enabled: params.editFlags.canSelectAll },
+      );
+    } else {
+      template.push(
+        { role: "copy", enabled: Boolean(params.selectionText?.trim()) },
+        { role: "selectAll" },
+      );
+    }
+
+    Menu.buildFromTemplate(template).popup({ window });
+  });
 }
 
 function preferredWindowBounds() {
@@ -55,17 +129,34 @@ async function startApiServer() {
     return;
   }
 
-  apiProcess = spawn(process.env.LOREKEEPER_NODE || "node", ["./scripts/serve.js", String(port)], {
+  apiPort = await findAvailablePort(preferredPort);
+  apiProcess = spawn(process.env.LOREKEEPER_NODE || "node", ["./scripts/serve.js", String(apiPort)], {
     cwd: rootDir,
-    stdio: "inherit",
-    shell: process.platform === "win32",
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+    shell: false,
     windowsHide: true,
+    env: {
+      ...process.env,
+      LOREKEEPER_PARENT_PID: String(process.pid),
+      LOREKEEPER_API_TOKEN: apiToken,
+      LOREKEEPER_BIND_HOST: "0.0.0.0",
+    },
   });
 
+  apiProcess.stdout?.on("data", (chunk) => {
+    console.log(`[api] ${String(chunk).trimEnd()}`);
+  });
+  apiProcess.stderr?.on("data", (chunk) => {
+    console.error(`[api] ${String(chunk).trimEnd()}`);
+  });
   apiProcess.on("exit", (code) => {
-    if (code && code !== 0) {
+    if (!quitting && code && code !== 0) {
       console.error(`LoreKeeper API exited with code ${code}`);
     }
+    apiProcess = null;
+  });
+  apiProcess.on("error", (error) => {
+    console.error(`LoreKeeper API failed to start: ${error instanceof Error ? error.message : error}`);
     apiProcess = null;
   });
 
@@ -76,11 +167,18 @@ async function waitForApi() {
   const deadline = Date.now() + 10000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/api/campaign`);
+      const response = await fetch(`http://127.0.0.1:${apiPort}/api/runtime`);
       if (response.ok) {
-        return;
+        const runtime = await response.json();
+        if (isOwnedApiRuntime(runtime)) {
+          return;
+        }
+        throw new Error(`Port ${apiPort} is already used by another LoreKeeper API process.`);
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && /already used/.test(error.message)) {
+        throw error;
+      }
       // Server is still starting.
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -89,7 +187,74 @@ async function waitForApi() {
   throw new Error("LoreKeeper API did not start in time.");
 }
 
-app.whenReady().then(createWindow);
+async function findAvailablePort(startPort) {
+  for (let candidate = startPort; candidate < startPort + 20; candidate += 1) {
+    if (await canBindLoopback(candidate)) {
+      if (candidate !== startPort) {
+        console.log(`Preferred API port ${startPort} is busy; using ${candidate}.`);
+      }
+      return candidate;
+    }
+  }
+  throw new Error(`No available LoreKeeper API port found near ${startPort}.`);
+}
+
+function canBindLoopback(candidatePort) {
+  return new Promise((resolve) => {
+    const tester = net.createServer();
+    tester.once("error", () => resolve(false));
+    tester.once("listening", () => {
+      tester.close(() => resolve(true));
+    });
+    tester.listen(candidatePort, "127.0.0.1");
+  });
+}
+
+function isOwnedApiRuntime(runtime) {
+  if (!apiProcess) {
+    return false;
+  }
+  const runtimeRoot = path.resolve(runtime.projectRoot || "");
+  return runtimeRoot === rootDir
+    && (Number(runtime.pid) === apiProcess.pid || Number(runtime.parentPid) === apiProcess.pid);
+}
+
+if (singleInstanceLock) {
+  app.whenReady().then(createWindow).catch(async (error) => {
+    console.error(error);
+    await stopApiServer().catch((cleanupError) => {
+      console.error(cleanupError);
+    });
+    app.quit();
+  });
+}
+
+ipcMain.handle("lorekeeper:runtime-mode", () => ({
+  mode: clientMode ? "thin" : "full",
+  appName,
+}));
+
+ipcMain.handle("lorekeeper:relaunch-mode", (_event, requestedMode) => {
+  const nextMode = requestedMode === "thin" ? "thin" : "full";
+  if ((nextMode === "thin") === clientMode) {
+    return { ok: true, mode: nextMode, relaunched: false };
+  }
+
+  const args = process.argv
+    .slice(1)
+    .filter((arg) => arg !== "--client");
+  if (nextMode === "thin") {
+    args.push("--client");
+  }
+
+  app.relaunch({ args });
+  app.quit();
+  return { ok: true, mode: nextMode, relaunched: true };
+});
+
+app.on("second-instance", () => {
+  focusMainWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
@@ -103,8 +268,58 @@ app.on("activate", () => {
   }
 });
 
-app.on("before-quit", () => {
-  if (apiProcess && !apiProcess.killed) {
-    apiProcess.kill();
+app.on("before-quit", (event) => {
+  quitting = true;
+  if (apiProcess && !cleanupStarted) {
+    event.preventDefault();
+    cleanupStarted = true;
+    stopApiServer().finally(() => app.exit(0));
   }
 });
+
+function stopApiServer() {
+  if (!apiProcess || apiProcess.killed) {
+    return Promise.resolve();
+  }
+  const child = apiProcess;
+  const pid = child.pid;
+  return new Promise((resolve) => {
+    const finish = () => resolve();
+    child.once("exit", finish);
+    child.kill("SIGTERM");
+    if (process.platform === "win32" && pid) {
+      setTimeout(() => {
+        if (apiProcess && apiProcess.pid === pid) {
+          spawn("taskkill", ["/pid", String(pid), "/t", "/f"], {
+            stdio: "ignore",
+            windowsHide: true,
+          }).on("exit", finish);
+        }
+      }, 1500);
+    }
+    setTimeout(finish, 3000);
+  });
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.moveTop();
+  mainWindow.focus();
+
+  if (process.platform === "win32") {
+    mainWindow.setAlwaysOnTop(true, "screen-saver");
+    setTimeout(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return;
+      }
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.focus();
+    }, 750);
+  }
+}

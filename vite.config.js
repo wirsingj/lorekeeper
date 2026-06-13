@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 const apiTarget = "http://127.0.0.1:4174";
 
 export default defineConfig({
+  base: "./",
   plugins: [react()],
   server: {
     host: "127.0.0.1",

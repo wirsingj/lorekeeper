@@ -38,7 +38,7 @@ export function createDefaultProviderRuntimeSettings(overrides = {}) {
     preferredProvider: normalizeProviderMode(overrides.preferredProvider ?? overrides.providerMode ?? "bridge"),
     selectedModel: overrides.selectedModel ?? "llama3.1:8b",
     generationTimeoutMs: normalizePositiveInteger(overrides.generationTimeoutMs, 120000),
-    outputLimit: normalizePositiveInteger(overrides.outputLimit, 900),
+    outputLimit: normalizePositiveInteger(overrides.outputLimit, 1800),
     fastMode: Boolean(overrides.fastMode ?? false),
     ollamaBaseUrl: normalizeBaseUrl(overrides.ollamaBaseUrl ?? "http://127.0.0.1:11434"),
   };
@@ -77,5 +77,32 @@ function normalizePositiveInteger(value, fallback) {
 }
 
 function normalizeBaseUrl(value) {
-  return String(value || "http://127.0.0.1:11434").replace(/\/+$/, "");
+  const fallback = "http://127.0.0.1:11434";
+  try {
+    const url = new URL(String(value || fallback));
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || !isLocalOrPrivateHost(url.hostname)) {
+      return fallback;
+    }
+    url.pathname = url.pathname.replace(/\/+$/, "");
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return fallback;
+  }
+}
+
+function isLocalOrPrivateHost(hostname) {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (normalized === "localhost" || normalized === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized)) {
+    return true;
+  }
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized)) {
+    return true;
+  }
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(normalized)) {
+    return true;
+  }
+  const match172 = normalized.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  return Boolean(match172 && Number(match172[1]) >= 16 && Number(match172[1]) <= 31);
 }

@@ -10,8 +10,9 @@ import {
   writeCampaignSqliteFile,
 } from "./sqlite-store.js";
 
-export const activeCampaignFileName = "active-campaign.lorekeeper.sqlite";
 export const campaignIndexFileName = "campaign-index.json";
+export const campaignIndexVersion = "2.0.0";
+const writeQueues = new Map();
 
 export async function loadActiveCampaign(projectRoot) {
   const index = await loadCampaignIndex(projectRoot);
@@ -21,12 +22,9 @@ export async function loadActiveCampaign(projectRoot) {
     && existsSync(selectedPath)
     && !hiddenPaths.has(path.resolve(selectedPath))
     && !(await isCampaignHidden(selectedPath));
-  const migratedPath = selectedPathAvailable
-    ? null
-    : await migrateRuntimeCampaignIfNeeded(projectRoot);
   const sqlitePath = selectedPathAvailable
     ? selectedPath
-    : (migratedPath ?? await findFirstVisibleCampaignPath(projectRoot, hiddenPaths));
+    : await findFirstVisibleCampaignPath(projectRoot, hiddenPaths);
 
   if (sqlitePath && existsSync(sqlitePath)) {
     const campaign = await readCampaignFromSqliteFile(sqlitePath);
@@ -116,7 +114,7 @@ export async function listCampaigns(projectRoot) {
 
 export async function selectCampaign(projectRoot, sqlitePath) {
   const resolvedPath = path.resolve(sqlitePath);
-  if (!resolvedPath.startsWith(getCampaignsDir(projectRoot))) {
+  if (!isPathInside(resolvedPath, getCampaignsDir(projectRoot))) {
     throw new Error("Campaign must be inside data/campaigns.");
   }
 
@@ -175,7 +173,7 @@ export async function createNewActiveCampaign(projectRoot, options = {}) {
 
 export async function hideCampaign(projectRoot, { sqlitePath, campaignTitle }) {
   const resolvedPath = path.resolve(sqlitePath ?? "");
-  if (!resolvedPath.startsWith(getCampaignsDir(projectRoot))) {
+  if (!isPathInside(resolvedPath, getCampaignsDir(projectRoot))) {
     throw new Error("Campaign must be inside data/campaigns.");
   }
 
@@ -201,6 +199,10 @@ export async function hideCampaign(projectRoot, { sqlitePath, campaignTitle }) {
 }
 
 export async function saveActiveCampaign(projectRoot, campaign) {
+  return enqueueCampaignWrite(projectRoot, () => saveActiveCampaignNow(projectRoot, campaign));
+}
+
+async function saveActiveCampaignNow(projectRoot, campaign) {
   const index = await loadCampaignIndex(projectRoot);
   const sqlitePath = index.activeCampaignPath && existsSync(index.activeCampaignPath)
     ? index.activeCampaignPath
@@ -220,22 +222,38 @@ export async function saveActiveCampaign(projectRoot, campaign) {
 }
 
 export async function updateActiveCampaign(projectRoot, updater) {
-  const { campaign } = await loadActiveCampaign(projectRoot);
-  const result = await updater(campaign);
-  const nextCampaign = normalizeCampaign(result.campaign ?? result);
-  const saveResult = await saveActiveCampaign(projectRoot, nextCampaign);
+  return enqueueCampaignWrite(projectRoot, async () => {
+    const { campaign } = await loadActiveCampaign(projectRoot);
+    const result = await updater(campaign);
+    const nextCampaign = normalizeCampaign(result.campaign ?? result);
+    const saveResult = await saveActiveCampaignNow(projectRoot, nextCampaign);
 
-  return {
-    ...result,
-    campaign: nextCampaign,
-    sqlitePath: saveResult.sqlitePath,
-    bytes: saveResult.bytes,
-    campaigns: (await listCampaigns(projectRoot)).campaigns,
-  };
+    return {
+      ...result,
+      campaign: nextCampaign,
+      sqlitePath: saveResult.sqlitePath,
+      bytes: saveResult.bytes,
+      campaigns: (await listCampaigns(projectRoot)).campaigns,
+    };
+  });
 }
 
 export async function resetActiveCampaign(projectRoot, campaign) {
   return saveActiveCampaign(projectRoot, normalizeCampaign(campaign));
+}
+
+function enqueueCampaignWrite(projectRoot, operation) {
+  const key = path.resolve(projectRoot);
+  const previous = writeQueues.get(key) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(operation);
+  const cleanup = next.finally(() => {
+    if (writeQueues.get(key) === cleanup) {
+      writeQueues.delete(key);
+    }
+  });
+  cleanup.catch(() => {});
+  writeQueues.set(key, cleanup);
+  return next;
 }
 
 export async function loadImportedCampaign(projectRoot) {
@@ -277,6 +295,7 @@ async function loadCampaignIndex(projectRoot) {
   const indexPath = getCampaignIndexPath(projectRoot);
   if (!existsSync(indexPath)) {
     return {
+      indexVersion: campaignIndexVersion,
       activeCampaignPath: null,
       campaigns: [],
       hiddenCampaignPaths: [],
@@ -285,6 +304,7 @@ async function loadCampaignIndex(projectRoot) {
 
   const index = JSON.parse(await readFile(indexPath, "utf8"));
   return {
+    indexVersion: index.indexVersion ?? null,
     activeCampaignPath: index.activeCampaignPath ?? null,
     campaigns: Array.isArray(index.campaigns) ? index.campaigns : [],
     hiddenCampaignPaths: Array.isArray(index.hiddenCampaignPaths)
@@ -296,7 +316,12 @@ async function loadCampaignIndex(projectRoot) {
 async function saveCampaignIndex(projectRoot, index) {
   const indexPath = getCampaignIndexPath(projectRoot);
   await mkdir(path.dirname(indexPath), { recursive: true });
-  await writeFile(indexPath, JSON.stringify(index, null, 2));
+  await writeFile(indexPath, JSON.stringify({
+    indexVersion: campaignIndexVersion,
+    activeCampaignPath: index.activeCampaignPath ?? null,
+    campaigns: Array.isArray(index.campaigns) ? index.campaigns : [],
+    hiddenCampaignPaths: Array.isArray(index.hiddenCampaignPaths) ? index.hiddenCampaignPaths : [],
+  }, null, 2));
 }
 
 async function upsertCampaignIndexEntry(projectRoot, { campaign, sqlitePath, makeActive = false }) {
@@ -431,34 +456,6 @@ function getCampaignsDir(projectRoot) {
   return path.join(projectRoot, "data", "campaigns");
 }
 
-async function migrateRuntimeCampaignIfNeeded(projectRoot) {
-  const runtimePath = path.join(projectRoot, "data", "runtime", activeCampaignFileName);
-  if (!existsSync(runtimePath)) {
-    return null;
-  }
-
-  try {
-    const campaign = await readCampaignFromSqliteFile(runtimePath);
-    if (campaign.title === "Veil of the Towers") {
-      return null;
-    }
-
-    const sqlitePath = existsSync(campaignFilePath(projectRoot, campaign.title))
-      ? await uniqueCampaignFilePath(projectRoot, campaign.title)
-      : campaignFilePath(projectRoot, campaign.title);
-    await mkdir(path.dirname(sqlitePath), { recursive: true });
-    await writeCampaignSqliteFile(campaign, sqlitePath);
-    await upsertCampaignIndexEntry(projectRoot, {
-      campaign,
-      sqlitePath,
-      makeActive: true,
-    });
-    return sqlitePath;
-  } catch {
-    return null;
-  }
-}
-
 function getCampaignIndexPath(projectRoot) {
   return path.join(getCampaignsDir(projectRoot), campaignIndexFileName);
 }
@@ -472,4 +469,9 @@ function slugify(value) {
     .replace(/[_\s]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function isPathInside(childPath, parentPath) {
+  const relative = path.relative(path.resolve(parentPath), path.resolve(childPath));
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }

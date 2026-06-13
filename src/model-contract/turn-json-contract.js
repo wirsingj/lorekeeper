@@ -64,6 +64,9 @@ export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedM
   return [
     "You are LoreKeeper's local tabletop RPG engine.",
     "Read this JSON request. Return only one valid JSON object matching responseFormat.schema.",
+    "Resolve user.inWorld as the latest table action. Do not ignore it, reset to a prior choice prompt, or repeat the previous DM question.",
+    "If user.inWorld addresses an NPC or asks another character to act, narrate that character's immediate response or the visible consequence.",
+    "Do not be terse. For normal scene turns, write immersive DM narration with enough detail to feel like tabletop play.",
     "No markdown. No fenced code. No prose outside JSON.",
     JSON.stringify(request),
   ].join("\n");
@@ -85,8 +88,11 @@ export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, pa
       instructionPriority: [
         "Never contradict canon context.",
         "Do not decide the primary player character's major choices.",
+        "Do not write autonomous table posts for host/player-controlled characters.",
         "Parenthetical player text is meta direction, not in-world speech.",
-        "Write a strong, specific scene beat with useful choices.",
+        "Resolve the latest user.inWorld action before consulting older scene text.",
+        "Do not repeat a prior choice prompt after the user has answered or moved past it.",
+        "Default to full DM narration. Offer structured choices only when choicePolicy allows them.",
         "Return valid JSON only.",
       ],
     },
@@ -97,12 +103,15 @@ export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, pa
       meta: (parsedMessage?.metaInstructions ?? []).map((item) => compactText(item, 260)),
       actionIntent: inferActionIntent(parsedMessage?.inWorldText || playerTurn || ""),
       requestedRolls: inferRequestedRolls(parsedMessage?.raw || playerTurn || ""),
+      playerInputs: normalizePlayerInputs(options.playerInputs ?? parsedMessage?.playerInputs ?? []),
     },
     generation: {
       mode,
       responseMode,
       maxTableEntries: mode === "fast" ? 4 : 8,
       maxChoices: mode === "fast" ? 4 : 6,
+      choicePolicy: inferChoicePolicy(campaign, parsedMessage, { mode, responseMode }),
+      narrationTarget: inferNarrationTarget({ mode, responseMode }),
       allowMechanics: true,
       allowProposedChanges: true,
       tone: compactText(campaign.style?.tone || "engaging D&D-style adventure with strong continuity and player agency", 180),
@@ -138,11 +147,15 @@ export function parseTurnJsonResponse(rawText, options = {}) {
     };
   }
 
-  const normalized = normalizeTurnResponse(parsed.value, {
+  const responseValue = repairResponseRequestId(parsed.value, options);
+  const normalized = normalizeTurnResponse(responseValue, {
     expectedRequestId: options.requestId,
+    choicePolicy: options.choicePolicy,
   });
-  const validation = validateTurnResponse(normalized, {
+  const repaired = repairCombatAdvanceChange(normalized, options.request);
+  const validation = validateTurnResponse(repaired, {
     expectedRequestId: options.requestId,
+    request: options.request,
   });
 
   return {
@@ -151,14 +164,82 @@ export function parseTurnJsonResponse(rawText, options = {}) {
     validationErrors: validation.errors,
     recovery: parsed.recovery,
     response: validation.valid
-      ? normalized
+      ? repaired
       : {
-        ...normalized,
-        proposedChanges: [],
-        warnings: [...normalized.warnings, ...validation.errors],
+        ...repaired,
+        proposedChanges: hasProposedChangeValidationErrors(validation.errors) ? [] : repaired.proposedChanges,
+        warnings: [...repaired.warnings, ...validation.errors],
       },
     rawText,
   };
+}
+
+function repairResponseRequestId(response, options = {}) {
+  if (
+    !options.repairRequestIdMismatch ||
+    !options.requestId ||
+    !response ||
+    typeof response !== "object" ||
+    !response.requestId ||
+    response.requestId === options.requestId
+  ) {
+    return response;
+  }
+
+  return {
+    ...response,
+    requestId: options.requestId,
+    warnings: [
+      ...(Array.isArray(response.warnings) ? response.warnings : []),
+      `Repaired model requestId mismatch: got ${response.requestId}.`,
+    ],
+  };
+}
+
+function repairCombatAdvanceChange(response, request) {
+  if (
+    !expectsResolvedCombat(request) ||
+    isCombatNudgeRequest(request) ||
+    !hasSubmittedCombatInput(request) ||
+    !hasVisibleCombatMechanics(response) ||
+    hasCombatAdvanceChange(response)
+  ) {
+    return response;
+  }
+
+  const actorId = request?.context?.combat?.currentTurnId || request?.context?.rulesLedger?.activeActorIds?.[0] || null;
+  const actorName = combatActorName(request, actorId);
+  return {
+    ...response,
+    proposedChanges: [
+      ...(response.proposedChanges ?? []),
+      {
+        operation: "update",
+        domain: "combat",
+        targetId: null,
+        importance: "normal",
+        visibility: "player_visible",
+        summary: `${actorName}'s combat turn resolves.`,
+        data: {
+          inCombat: true,
+          turnResolved: true,
+          advanceTurn: true,
+          resolvedActorId: actorId,
+          lastAction: `${actorName}'s combat turn resolved.`,
+        },
+        confidence: "medium",
+        reason: "LoreKeeper inferred turn advancement because the response resolved visible combat mechanics for the active initiative actor.",
+      },
+    ],
+    warnings: [
+      ...(response.warnings ?? []),
+      "Repaired combat response by adding inferred turnResolved/advanceTurn update.",
+    ],
+  };
+}
+
+function hasProposedChangeValidationErrors(errors = []) {
+  return errors.some((error) => /^proposedChanges\[\d+\]\./.test(error));
 }
 
 export function renderTurnResponseForImport(turnResponse) {
@@ -188,14 +269,18 @@ export function renderTurnResponseForImport(turnResponse) {
   }
 
   if (response.sceneStatus.awaitingPlayer && response.choices.options.length) {
+    const renderedOptions = response.choices.options.map((option, index) => {
+      const actor = option.actor || response.choices.forActor || "";
+      return `${option.id || letterForIndex(index)}. ${actor ? `${actor}: ` : ""}${option.text}`;
+    });
+    if (response.choices.allowOther) {
+      renderedOptions.push(`${letterForIndex(renderedOptions.length)}. Something else.`);
+    }
+
     lines.push([
       response.choices.prompt || "What do you do?",
-      ...response.choices.options.map((option, index) => {
-        const actor = option.actor || response.choices.forActor || "";
-        return `${option.id || index + 1}. ${actor ? `${actor}: ` : ""}${option.text}`;
-      }),
-      response.choices.allowOther ? "Something else." : "",
-    ].filter(Boolean).join("\n"));
+      ...renderedOptions,
+    ].join("\n"));
   }
 
   lines.push([
@@ -220,6 +305,7 @@ export function validateTurnRequest(request) {
   requireValue(request.responseFormat, "type", "json_only", errors);
   requireObject(request.user, "user", errors);
   requireEnum(request.user?.actionIntent, "user.actionIntent", allowedActionIntents, errors);
+  validateArray(request.user?.playerInputs, "user.playerInputs", errors);
   requireObject(request.generation, "generation", errors);
   requireEnum(request.generation?.mode, "generation.mode", allowedGenerationModes, errors);
   requireEnum(request.generation?.responseMode, "generation.responseMode", allowedResponseModes, errors);
@@ -265,9 +351,7 @@ export function validateTurnResponse(response, options = {}) {
   }
 
   requireObject(response.choices, "choices", errors);
-  if (response.sceneStatus?.awaitingPlayer && !response.choices?.options?.length) {
-    errors.push("choices.options are required when sceneStatus.awaitingPlayer is true");
-  }
+  validateArray(response.choices?.options, "choices.options", errors);
 
   validateArray(response.mechanics, "mechanics", errors);
   for (const [index, mechanic] of (response.mechanics ?? []).entries()) {
@@ -293,8 +377,82 @@ export function validateTurnResponse(response, options = {}) {
     }
   }
 
+  validateCombatResolution(response, options, errors);
   validateArray(response.warnings, "warnings", errors);
   return { valid: errors.length === 0, errors };
+}
+
+function validateCombatResolution(response, options = {}, errors = []) {
+  const request = options.request;
+  if (!expectsResolvedCombat(request)) {
+    return;
+  }
+
+  if (isCombatNudgeRequest(request)) {
+    return;
+  }
+  if (!hasSubmittedCombatInput(request)) {
+    return;
+  }
+
+  if (!hasVisibleCombatMechanics(response)) {
+    errors.push("resolved combat must include visible mechanics with rolls, checks, damage, resources, or status");
+  }
+
+  if (!hasCombatAdvanceChange(response)) {
+    errors.push("resolved combat must include a combat proposedChange with data.turnResolved true or data.advanceTurn true");
+  }
+}
+
+function expectsResolvedCombat(request) {
+  return Boolean(
+    request?.generation?.responseMode === "resolve_combat" &&
+    request?.context?.combat?.inCombat === true
+  );
+}
+
+function isCombatNudgeRequest(request) {
+  const userText = String(request?.user?.inWorld || request?.user?.raw || "").trim();
+  return /^\(DM nudge:/i.test(userText);
+}
+
+function hasSubmittedCombatInput(request) {
+  const userText = String(request?.user?.inWorld || request?.user?.raw || "").trim();
+  return Boolean(userText) || (request?.user?.playerInputs ?? []).length > 0;
+}
+
+function hasVisibleCombatMechanics(response) {
+  const meaningful = (response.mechanics ?? []).filter((mechanic) => mechanic && mechanic.type !== "none");
+  if (!meaningful.length) {
+    return false;
+  }
+
+  const combined = meaningful
+    .map((mechanic) => [mechanic.roll, mechanic.text, mechanic.reason, mechanic.damage, mechanic.dc, mechanic.outcome].filter(Boolean).join(" "))
+    .join(" ");
+  const hasRollMath = /\b(?:d20|d\d+|roll(?:ed|s)?|natural|total|vs\.?|against|dc|ac|hits?|miss(?:es)?|success|failure|damage|healing|hp)\b/i.test(combined);
+  const hasNumericResult = /\d/.test(combined);
+  return hasRollMath && hasNumericResult;
+}
+
+function hasCombatAdvanceChange(response) {
+  return (response.proposedChanges ?? []).some((change) =>
+    change?.domain === "combat" &&
+    change?.operation !== "remove" &&
+    change?.data &&
+    (change.data.advanceTurn === true || change.data.turnResolved === true)
+  );
+}
+
+function combatActorName(request, actorId) {
+  if (!actorId) {
+    return "Active actor";
+  }
+  return (
+    request?.context?.combat?.turnOrder?.find((entry) => entry.id === actorId)?.name ||
+    request?.context?.rulesLedger?.actors?.find((actor) => actor.id === actorId)?.name ||
+    actorId
+  );
 }
 
 function createResponseFormatSchema() {
@@ -311,27 +469,20 @@ function createResponseFormatSchema() {
           role: "dm|player|party|npc|system",
           kind: "narration|dialogue|action|mechanics|status|aside",
           visibility: "table|dm_only|party",
-          text: "player-facing table chat text",
+          text: "rich player-facing table chat text; normal scene turns should usually be 3-6 paragraphs",
         },
       ],
       sceneStatus: {
-        mode: "social|exploration|combat|downtime|travel",
-        danger: "none|tense|immediate|combat",
+        mode: "exploration",
+        danger: "tense",
         awaitingPlayer: true,
       },
       choices: {
-        prompt: "question for the player",
-        scope: "player|party|character",
-        forActorId: "optional character id",
-        forActor: "optional character name",
-        options: [
-          {
-            id: "1",
-            actorId: "optional actor id",
-            actor: "optional actor name",
-            text: "clear action option",
-          },
-        ],
+        prompt: "",
+        scope: "",
+        forActorId: null,
+        forActor: "",
+        options: [],
         allowOther: true,
       },
       mechanics: [
@@ -346,7 +497,7 @@ function createResponseFormatSchema() {
           reason: "why this mechanic is relevant",
           outcome: "success|failure|mixed|pending|none",
           label: "short roll/check/combat label",
-          text: "brief player-facing mechanics",
+          text: "player-facing roll/math/result, e.g. Attack d20+5 = 17 vs AC 14; Damage 1d8+3 = 8; Wolf HP 12 -> 4",
         },
       ],
       flags: {
@@ -366,9 +517,31 @@ function createResponseFormatSchema() {
       "Use party for PCs and trusted companions.",
       "Use people for NPCs.",
       "Every named add/update should include data.name or data.title.",
-      "Choices must be separate objects, not a paragraph.",
+      "The default for normal non-combat turns is choices.options: [].",
+      "Write to generation.narrationTarget. Normal turns should usually be 3-6 paragraphs and 320-700 words.",
+      "Use sensory detail, NPC reaction, consequence, and one concrete new situation. Do not answer with only a single sentence unless generation.mode is fast.",
+      "Resolve user.inWorld directly; older context explains continuity but must not override the latest player action.",
+      "Never answer a new player action by repeating the previous DM question.",
+      "Do not force choices for patrols, travel, investigation progress, NPC replies, atmosphere, consequences, or simple scene continuation.",
+      "Offer structured choices only when generation.choicePolicy.choicesAllowed is true or this response establishes immediate danger/combat.",
+      "When offering choices, make them separate objects, not a paragraph. Shape: { id: 'A', actorId: null, actor: '', text: 'clear action option', legalOptionId: null }.",
+      "Use lettered choices: A, B, C, D. The option id should be the letter.",
       "Use choices.options for every listed option. Do not put action options only in table text.",
+      "When context.rulesLedger.actors[].legalOptions exists and a tactical decision is needed, build choices from those options and include legalOptionId.",
+      "Narration/dialogue/feelings may be freeform table text. Stats, rolls, choices, lore, history, relationships, inventory, and character facts must be structured data.",
+      "Put checks, rolls, DCs, HP/resource notes, and outcomes in mechanics, not only in narration.",
+      "Put canon changes in proposedChanges, not only in narration.",
+      "In combat, respect context.combat.currentTurnId/current turn. Offer choices only for the active actor unless resolving an enemy turn.",
+      "If context.combat.currentTurnId is an enemy, resolve that enemy/DM turn using mechanics and then advanceTurn.",
+      "Resolved combat should feel like a tabletop combat beat: actor + current HP when known, chosen action, attack/check/save roll, damage/healing roll, HP/resource update, then vivid narration.",
+      "For dodge/counter/reaction-style options, show each relevant step separately: defensive check/save/AC contest, attack roll if counterattacking, damage roll if it hits, and the final HP/resource result.",
+      "Do not hide combat rolls in prose. Put the exact visible dice/math in mechanics.text or mechanics.roll/damage so the app can render it.",
+      "When a combat actor's submitted action is resolved, include a combat proposedChange with data.turnResolved true, data.advanceTurn true, and data.resolvedActorId.",
+      "For resolved combat, propose concrete state updates: party HP/resources/conditions and combat initiative/round/turnEconomy/enemies.",
+      "Combat proposedChanges may use domain combat data.actorUpdates for party HP/resource/condition changes and data.enemyUpdates for enemy changes.",
       "When options are for a specific party member or NPC, include choices.forActor/forActorId or option.actor/actorId.",
+      "Never put host/player-controlled character speech or action in table entries unless it came from user.playerInputs or user.inWorld.",
+      "AI companions may suggest one concise contribution, but the host approves companion actions before they become the next model turn.",
       "Do not silently change HP, inventory, relationships, quests, or major canon.",
       "If stats are missing, suggest a pending check instead of inventing exact math.",
     ],
@@ -379,7 +552,6 @@ function normalizeTurnResponse(response, options = {}) {
   const rawTable = Array.isArray(response.table) ? response.table : [];
   const table = rawTable.map(normalizeTableEntry).filter((entry) => entry.text);
   const sceneStatus = normalizeSceneStatus(response.sceneStatus);
-  const choices = normalizeChoices(response.choices);
   const mechanics = Array.isArray(response.mechanics)
     ? response.mechanics.map(normalizeMechanic).filter((item) => item.text || item.reason)
     : [];
@@ -388,6 +560,15 @@ function normalizeTurnResponse(response, options = {}) {
     : Array.isArray(response.updates?.proposedChanges)
       ? response.updates.proposedChanges.map(normalizeProposedChange).filter(Boolean)
       : [];
+  const flags = normalizeFlags(response.flags, proposedChanges);
+  const warnings = Array.isArray(response.warnings) ? response.warnings.map(compactWhitespace).filter(Boolean) : [];
+  const choices = applyChoicePolicy(normalizeChoices(response.choices), {
+    choicePolicy: options.choicePolicy,
+    sceneStatus,
+    mechanics,
+    flags,
+    warnings,
+  });
 
   return {
     type: response.type || RESPONSE_TYPE,
@@ -397,9 +578,9 @@ function normalizeTurnResponse(response, options = {}) {
     sceneStatus,
     choices,
     mechanics,
-    flags: normalizeFlags(response.flags, proposedChanges),
+    flags,
     proposedChanges,
-    warnings: Array.isArray(response.warnings) ? response.warnings.map(compactWhitespace).filter(Boolean) : [],
+    warnings,
   };
 }
 
@@ -420,39 +601,223 @@ function createFallbackResponse({ requestId = "", text, warning }) {
 
 function normalizeTableEntry(entry) {
   if (typeof entry === "string") {
-    return { speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: compactWhitespace(entry) };
+    return { speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: normalizeTableText(entry) };
   }
 
+  const speaker = compactWhitespace(entry?.speaker || "DM");
+  const text = normalizeTableText(entry?.text || entry?.body || "");
   return {
-    speaker: compactWhitespace(entry?.speaker || "DM"),
+    speaker,
     speakerId: entry?.speakerId ?? null,
-    role: compactWhitespace(entry?.role || ""),
-    kind: compactWhitespace(entry?.kind || ""),
+    role: normalizeTableRole(entry?.role, speaker),
+    kind: normalizeTableKind(entry?.kind, text),
     visibility: normalizeTableVisibility(entry?.visibility),
-    text: compactWhitespace(entry?.text || entry?.body || ""),
+    text,
   };
 }
 
+function normalizeTableText(value) {
+  return String(value ?? "")
+    .replace(/\r\n?/g, "\n")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/[ \t]*\n[ \t]*/g, " ").replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function normalizeTableRole(value, speaker = "") {
+  const rawRole = compactWhitespace(value || "");
+  if (allowedTableRoles.has(rawRole)) {
+    return rawRole;
+  }
+  if (!rawRole || isSchemaPlaceholder(rawRole, allowedTableRoles)) {
+    return inferTableRoleFromSpeaker(speaker);
+  }
+  const role = normalizeToken(rawRole);
+  const aliases = {
+    assistant: "dm",
+    narrator: "dm",
+    dungeon_master: "dm",
+    dungeonmaster: "dm",
+    gm: "dm",
+    game_master: "dm",
+    character: "party",
+    companion: "party",
+    pc: "player",
+    player_character: "player",
+    non_player_character: "npc",
+  };
+  if (aliases[role]) {
+    return aliases[role];
+  }
+  return inferTableRoleFromSpeaker(speaker);
+}
+
+function inferTableRoleFromSpeaker(speaker = "") {
+  const normalized = compactWhitespace(speaker).toLowerCase();
+  if (!normalized || normalized === "dm" || normalized === "dungeon master" || normalized === "narrator") {
+    return "dm";
+  }
+  if (normalized === "system" || normalized === "lorekeeper") {
+    return "system";
+  }
+  return "party";
+}
+
+function normalizeTableKind(value, text = "") {
+  const rawKind = compactWhitespace(value || "");
+  if (allowedTableKinds.has(rawKind)) {
+    return rawKind;
+  }
+  if (!rawKind || isSchemaPlaceholder(rawKind, allowedTableKinds)) {
+    return inferTableKindFromText(text);
+  }
+  const kind = normalizeToken(rawKind);
+  const aliases = {
+    scene: "narration",
+    description: "narration",
+    prose: "narration",
+    speech: "dialogue",
+    talk: "dialogue",
+    move: "action",
+    roll: "mechanics",
+    check: "mechanics",
+    update: "status",
+  };
+  if (aliases[kind]) {
+    return aliases[kind];
+  }
+  return inferTableKindFromText(text);
+}
+
+function inferTableKindFromText(text = "") {
+  if (/\b(roll|check|dc|damage|hp|initiative|save)\b/i.test(text)) {
+    return "mechanics";
+  }
+  return "narration";
+}
+
+function isSchemaPlaceholder(value, allowedSet) {
+  const text = compactWhitespace(value);
+  if (!text.includes("|")) {
+    return false;
+  }
+  const parts = text.split("|").map((part) => compactWhitespace(part)).filter(Boolean);
+  return parts.length > 1 && parts.every((part) => allowedSet.has(part));
+}
+
 function normalizeTableVisibility(value) {
-  const text = compactWhitespace(value || "");
-  return text || "table";
+  const rawText = compactWhitespace(value || "");
+  if (allowedTableVisibility.has(rawText)) {
+    return rawText;
+  }
+  if (!rawText || isSchemaPlaceholder(rawText, allowedTableVisibility)) {
+    return "table";
+  }
+  const text = normalizeToken(rawText);
+  if (/secret|hidden|private|gm|dm/.test(text)) {
+    return "dm_only";
+  }
+  if (text === "player_visible" || text === "public" || text === "visible" || text === "everyone") {
+    return "table";
+  }
+  return "table";
 }
 
 function normalizeSceneStatus(sceneStatus = {}) {
   return {
-    mode: compactWhitespace(sceneStatus.mode || ""),
-    danger: compactWhitespace(sceneStatus.danger || ""),
-    awaitingPlayer: sceneStatus.awaitingPlayer,
+    mode: normalizeSceneMode(sceneStatus.mode),
+    danger: normalizeDangerLevel(sceneStatus.danger),
+    awaitingPlayer: normalizeAwaitingPlayer(sceneStatus.awaitingPlayer),
   };
 }
 
+function normalizeSceneMode(value) {
+  const rawMode = compactWhitespace(value || "");
+  if (allowedSceneModes.has(rawMode)) {
+    return rawMode;
+  }
+  if (!rawMode || isSchemaPlaceholder(rawMode, allowedSceneModes)) {
+    return "exploration";
+  }
+  const mode = normalizeToken(rawMode);
+  const aliases = {
+    investigation: "exploration",
+    investigate: "exploration",
+    stealth: "exploration",
+    danger: "exploration",
+    tense: "exploration",
+    chase: "exploration",
+    scene: "exploration",
+    wilderness: "exploration",
+    dialogue: "social",
+    conversation: "social",
+    roleplay: "social",
+    rest: "downtime",
+    camp: "downtime",
+    journey: "travel",
+  };
+  if (aliases[mode]) {
+    return aliases[mode];
+  }
+  return "exploration";
+}
+
+function normalizeDangerLevel(value) {
+  const rawDanger = compactWhitespace(value || "");
+  if (allowedDangerLevels.has(rawDanger)) {
+    return rawDanger;
+  }
+  if (!rawDanger || isSchemaPlaceholder(rawDanger, allowedDangerLevels)) {
+    return "none";
+  }
+  const danger = normalizeToken(rawDanger);
+  const aliases = {
+    safe: "none",
+    calm: "none",
+    low: "none",
+    moderate: "tense",
+    threat: "tense",
+    dangerous: "immediate",
+    danger: "immediate",
+    urgent: "immediate",
+    monster: "immediate",
+    creature: "immediate",
+    hostile: "immediate",
+    active_combat: "combat",
+    fighting: "combat",
+  };
+  if (aliases[danger]) {
+    return aliases[danger];
+  }
+  return "tense";
+}
+
+function normalizeAwaitingPlayer(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const text = compactWhitespace(value || "").toLowerCase();
+  if (text === "true") {
+    return true;
+  }
+  if (text === "false") {
+    return false;
+  }
+  return true;
+}
+
 function normalizeChoices(choices = {}) {
+  if (!choices || typeof choices !== "object") {
+    choices = {};
+  }
   const options = Array.isArray(choices.options)
     ? choices.options.map((option, index) => ({
-      id: String(option?.id ?? index + 1),
+      id: String(option?.id ?? letterForIndex(index)),
       actorId: option?.actorId ?? null,
       actor: compactWhitespace(option?.actor || ""),
-      text: compactWhitespace(option?.text || option),
+      legalOptionId: option?.legalOptionId ?? null,
+      text: compactChoiceText(option?.text ?? option?.label ?? option),
     })).filter((option) => option.text)
     : [];
 
@@ -466,28 +831,193 @@ function normalizeChoices(choices = {}) {
   };
 }
 
-function normalizeMechanic(item) {
+function applyChoicePolicy(choices, { choicePolicy, sceneStatus, mechanics, flags, warnings } = {}) {
+  if (!choices?.options?.length) {
+    return choices;
+  }
+
+  const policy = choicePolicy && typeof choicePolicy === "object" ? choicePolicy : null;
+  if (!policy) {
+    return choices;
+  }
+
+  const dangerAllowsChoices = sceneStatus?.danger === "immediate" || sceneStatus?.danger === "combat";
+  const combatAllowsChoices = sceneStatus?.mode === "combat" || flags?.startsCombat === true;
+  const mechanicsNeedChoice = (mechanics ?? []).some((item) => item.outcome === "pending" && item.type !== "none");
+  const policyAllowsChoices = policy?.choicesAllowed === true;
+
+  if (dangerAllowsChoices || combatAllowsChoices || mechanicsNeedChoice || policyAllowsChoices) {
+    return choices;
+  }
+
+  warnings?.push("Structured choices suppressed by choicePolicy; this turn should continue with DM narration.");
   return {
-    type: compactWhitespace(item?.type || ""),
+    ...choices,
+    prompt: "",
+    scope: "",
+    forActorId: null,
+    forActor: "",
+    options: [],
+  };
+}
+
+function normalizeMechanic(item) {
+  const rawType = normalizeToken(item?.type || "");
+  const rawOutcome = normalizeToken(item?.outcome || "");
+  const rollText = formatMechanicRoll(item?.roll);
+  const fallbackText = formatMechanicText(item, rollText);
+  return {
+    type: normalizeMechanicType(rawType),
     actorId: item?.actorId ?? null,
     actor: compactWhitespace(item?.actor || ""),
     ability: item?.ability ?? null,
     skill: item?.skill ?? null,
-    roll: compactWhitespace(item?.roll || ""),
+    roll: rollText,
     dc: item?.dc ?? null,
     reason: compactWhitespace(item?.reason || ""),
-    outcome: compactWhitespace(item?.outcome || ""),
+    outcome: normalizeMechanicOutcome(rawOutcome),
     label: compactWhitespace(item?.label || item?.type || "Mechanic"),
-    text: compactWhitespace(item?.text || item?.reason || item),
+    text: compactWhitespace(item?.text || item?.reason || fallbackText),
   };
 }
 
+function compactChoiceText(value) {
+  if (!value) {
+    return "";
+  }
+  if (typeof value === "object") {
+    const primary = value.text || value.label || value.name || value.title || value.action || value.description || value.id;
+    if (primary) {
+      return compactWhitespace(primary);
+    }
+    return compactWhitespace(Object.entries(value)
+      .map(([key, entry]) => `${key}: ${typeof entry === "object" ? compactChoiceText(entry) : String(entry ?? "")}`)
+      .filter(Boolean)
+      .join(", "));
+  }
+  return compactWhitespace(value);
+}
+
+function formatMechanicText(item, rollText = "") {
+  if (!item || typeof item !== "object") {
+    return compactWhitespace(item || "");
+  }
+
+  const pieces = [];
+  const actor = compactWhitespace(item.actor || item.actorName || "");
+  const target = compactWhitespace(item.target || item.targetName || "");
+  if (actor || target) {
+    pieces.push([actor, target ? `vs ${target}` : ""].filter(Boolean).join(" "));
+  }
+  if (rollText) {
+    pieces.push(`Roll ${rollText}`);
+  }
+  const dc = item.dc ?? item.armorClass ?? item.ac ?? null;
+  if (dc !== null && dc !== undefined && dc !== "") {
+    pieces.push(`DC/AC ${dc}`);
+  }
+  const damage = compactWhitespace(item.damage || item.damageRoll || item.damageText || "");
+  if (damage) {
+    pieces.push(`Damage ${damage}`);
+  }
+  const hpDelta = item.hpDelta ?? item.damageDealt ?? item.healing ?? null;
+  if (hpDelta !== null && hpDelta !== undefined && hpDelta !== "") {
+    pieces.push(`HP delta ${hpDelta}`);
+  }
+  const outcome = compactWhitespace(item.outcome || item.result || "");
+  if (outcome && outcome !== "none") {
+    pieces.push(outcome);
+  }
+  const reason = compactWhitespace(item.reason || "");
+  if (reason) {
+    pieces.push(reason);
+  }
+  return pieces.join("; ");
+}
+
+function formatMechanicRoll(value) {
+  if (!value) {
+    return "";
+  }
+  if (typeof value !== "object") {
+    return compactWhitespace(value);
+  }
+  const formula = compactWhitespace(value.formula || value.dice || value.expression || value.type || "");
+  const total = value.total ?? value.result ?? value.value ?? null;
+  const bonus = value.bonus ?? value.modifier ?? null;
+  const natural = value.natural ?? value.d20 ?? value.roll ?? null;
+  const parts = [];
+  if (formula) {
+    parts.push(formula);
+  }
+  if (natural !== null && natural !== undefined && natural !== "") {
+    parts.push(`natural ${natural}`);
+  }
+  if (bonus !== null && bonus !== undefined && bonus !== "") {
+    parts.push(`bonus ${signedMechanicNumber(bonus)}`);
+  }
+  if (total !== null && total !== undefined && total !== "") {
+    parts.push(`total ${total}`);
+  }
+  return parts.join(", ");
+}
+
+function signedMechanicNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return String(value);
+  }
+  return number >= 0 ? `+${number}` : String(number);
+}
+
+function normalizeMechanicType(type) {
+  if (allowedMechanicTypes.has(type)) {
+    return type;
+  }
+  const aliases = {
+    skill_check: "check",
+    ability_check: "check",
+    roll: "check",
+    saving_throw: "save",
+    savingthrow: "save",
+    hit: "attack",
+    damage_roll: "damage",
+    resource: "resource_note",
+    resource_update: "resource_note",
+    note: "status",
+  };
+  if (aliases[type]) {
+    return aliases[type];
+  }
+  return type ? "status" : "none";
+}
+
+function normalizeMechanicOutcome(outcome) {
+  if (allowedMechanicOutcomes.has(outcome)) {
+    return outcome;
+  }
+  const aliases = {
+    partial: "mixed",
+    partial_success: "mixed",
+    complication: "mixed",
+    unresolved: "pending",
+    needs_roll: "pending",
+    waiting: "pending",
+    passed: "success",
+    succeeded: "success",
+    failed: "failure",
+    miss: "failure",
+  };
+  return aliases[outcome] || "none";
+}
+
 function normalizeFlags(flags = {}, proposedChanges = []) {
+  const hasMajorChange = proposedChanges.some((change) => change.importance === "major");
   return {
-    requiresReview: flags.requiresReview,
-    startsCombat: flags.startsCombat,
-    endsScene: flags.endsScene,
-    containsSecretInfo: flags.containsSecretInfo,
+    requiresReview: typeof flags.requiresReview === "boolean" ? flags.requiresReview : hasMajorChange,
+    startsCombat: typeof flags.startsCombat === "boolean" ? flags.startsCombat : false,
+    endsScene: typeof flags.endsScene === "boolean" ? flags.endsScene : false,
+    containsSecretInfo: typeof flags.containsSecretInfo === "boolean" ? flags.containsSecretInfo : false,
   };
 }
 
@@ -497,16 +1027,85 @@ function normalizeProposedChange(change) {
   }
 
   return {
-    operation: compactWhitespace(change.operation || ""),
-    domain: compactWhitespace(change.domain || ""),
+    operation: normalizeOperation(change.operation),
+    domain: normalizeChangeDomain(change.domain),
     targetId: change.targetId ?? null,
-    importance: compactWhitespace(change.importance || "normal"),
-    visibility: compactWhitespace(change.visibility || "player_visible"),
+    importance: normalizeImportance(change.importance),
+    visibility: normalizeChangeVisibility(change.visibility),
     summary: compactWhitespace(change.summary || "Unlabeled proposed update."),
     data: change.data && typeof change.data === "object" ? change.data : {},
     confidence: normalizeEnum(change.confidence, new Set(["low", "medium", "high", "unknown"]), "unknown"),
     reason: compactWhitespace(change.reason || ""),
   };
+}
+
+function normalizeOperation(value) {
+  const operation = normalizeToken(value);
+  if (allowedOperations.has(operation)) {
+    return operation;
+  }
+  return {
+    create: "add",
+    insert: "add",
+    upsert: "update",
+    modify: "update",
+    edit: "update",
+    delete: "remove",
+    append: "note",
+  }[operation] || operation;
+}
+
+function normalizeChangeDomain(value) {
+  const domain = normalizeToken(value);
+  if (allowedDomains.has(domain)) {
+    return domain;
+  }
+  return {
+    npc: "people",
+    npcs: "people",
+    person: "people",
+    character: "party",
+    player_character: "party",
+    party_member: "party",
+    place: "places",
+    location: "places",
+    item: "items",
+    thing: "items",
+    thread: "quests",
+    quest: "quests",
+    relationship: "relationships",
+    scene_status: "scene",
+    current_scene: "scene",
+    battle: "combat",
+  }[domain] || domain;
+}
+
+function normalizeImportance(value) {
+  const importance = normalizeToken(value || "normal");
+  if (allowedImportance.has(importance)) {
+    return importance;
+  }
+  return {
+    low: "minor",
+    small: "minor",
+    medium: "normal",
+    significant: "major",
+    high: "major",
+  }[importance] || "normal";
+}
+
+function normalizeChangeVisibility(value) {
+  const visibility = normalizeToken(value || "player_visible");
+  if (allowedVisibility.has(visibility)) {
+    return visibility;
+  }
+  if (/secret|hidden|private|gm|dm/.test(visibility)) {
+    return "dm_only";
+  }
+  if (visibility === "public" || visibility === "table" || visibility === "visible") {
+    return "player_visible";
+  }
+  return "player_visible";
 }
 
 function fallbackNarration(response) {
@@ -525,7 +1124,29 @@ function buildCompactContext(contextPack, campaign, options = {}) {
       presentPartyMemberIds: campaign.scene?.presentPartyMemberIds ?? [],
       activeQuestIds: campaign.scene?.activeQuestIds ?? [],
     },
+    combat: {
+      inCombat: Boolean(campaign.combat?.inCombat),
+      round: campaign.combat?.round ?? null,
+      currentTurnId: campaign.combat?.currentTurnId ?? null,
+      turnOrder: Array.isArray(campaign.combat?.turnOrder)
+        ? campaign.combat.turnOrder.slice(0, 12).map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          type: entry.type,
+          initiativeScore: entry.initiativeScore ?? null,
+        }))
+        : [],
+      enemies: Array.isArray(campaign.combat?.enemies)
+        ? campaign.combat.enemies.slice(0, 8).map((enemy) => ({
+          id: enemy.id,
+          name: enemy.name,
+          hp: enemy.hp ?? null,
+          conditions: enemy.conditions ?? [],
+        }))
+        : [],
+    },
     party: (campaign.party ?? []).map((member) => compactPartyMember(member, options)).slice(0, 8),
+    rulesLedger: compactRulesLedger(contextPack?.rulesLedger, options),
     tableVoices: (campaign.party ?? []).map((member) => ({
       id: member.id,
       name: member.name,
@@ -539,6 +1160,51 @@ function buildCompactContext(contextPack, campaign, options = {}) {
       title: section.title,
       entries: section.entries.map((entry) => compactText(entry, TEXT_LIMITS.sectionEntry)).slice(0, options.mode === "fast" ? 4 : 8),
     })),
+  };
+}
+
+function compactRulesLedger(ledger, options = {}) {
+  if (!ledger || typeof ledger !== "object") {
+    return {
+      system: "dnd-5e-lite",
+      source: "campaign_sqlite_snapshot",
+      mode: options.mode === "combat" ? "combat" : "scene",
+      actors: [],
+    };
+  }
+
+  return {
+    system: ledger.system,
+    source: ledger.source,
+    mode: ledger.mode,
+    round: ledger.round,
+    activeActorIds: Array.isArray(ledger.activeActorIds) ? ledger.activeActorIds.slice(0, 8) : [],
+    actors: Array.isArray(ledger.actors)
+      ? ledger.actors.slice(0, 8).map((actor) => ({
+        id: actor.id,
+        name: actor.name,
+        agency: actor.agency,
+        hp: actor.sheet?.hp ?? null,
+        armorClass: actor.sheet?.armorClass ?? null,
+        speedFt: actor.sheet?.speedFt ?? null,
+        resources: actor.sheet?.resources ?? {},
+        conditions: actor.sheet?.conditions ?? [],
+        turnEconomy: actor.turnEconomy ?? {},
+        legalOptions: (actor.legalOptions ?? []).slice(0, options.mode === "fast" ? 5 : 10).map((option) => ({
+          id: option.id,
+          letter: option.letter,
+          label: option.label,
+          type: option.type,
+          cost: option.cost,
+          requirements: option.requirements,
+          roll: option.roll,
+          effect: option.effect,
+          source: option.source,
+        })),
+        assumptions: actor.sheet?.assumptions ?? [],
+      }))
+      : [],
+    rules: Array.isArray(ledger.rules) ? ledger.rules.slice(0, 4) : [],
   };
 }
 
@@ -561,7 +1227,7 @@ function compactPartyMember(member, options = {}) {
 
 function inferActionIntent(value) {
   const text = String(value ?? "").toLowerCase();
-  if (/\b(attack|shoot|stab|strike|cast|damage|initiative)\b/.test(text)) {
+  if (/\b(combat|fight|attack|attacks|attacking|shoot|shot|fire|fires|firing|crossbow|bow|arrow|stab|strike|cast|damage|initiative|enemy|monster|creature|beast|wolf|wounded|under attack)\b/.test(text)) {
     return "combat_action";
   }
   if (/\b(check|roll|inspect|investigate|search|look|listen|track|sneak|hide|persuade|deceive|intimidate)\b/.test(text)) {
@@ -592,6 +1258,28 @@ function inferRequestedRolls(value) {
   return requests;
 }
 
+function normalizePlayerInputs(inputs) {
+  if (!Array.isArray(inputs)) {
+    return [];
+  }
+  return inputs
+    .map((input) => ({
+      type: compactText(input?.type || "table_input", 80),
+      id: compactText(input?.id || "", 80),
+      label: compactText(input?.label || "", 80),
+      playerId: compactText(input?.playerId || "", 80),
+      playerName: compactText(input?.playerName || "", 80),
+      characterId: compactText(input?.characterId || "", 80),
+      characterName: compactText(input?.characterName || "", 80),
+      prompt: compactText(input?.prompt || "", 240),
+      text: compactText(input?.text || "", 700),
+      legalOptionId: compactText(input?.legalOptionId || "", 120),
+      ready: input?.ready !== false,
+    }))
+    .filter((input) => input.text)
+    .slice(0, 8);
+}
+
 function inferGenerationMode(campaign, parsedMessage, options = {}) {
   if (options.fastMode) {
     return "fast";
@@ -618,6 +1306,71 @@ function inferResponseMode(campaign, parsedMessage, options = {}) {
   return "turn";
 }
 
+function inferChoicePolicy(campaign, parsedMessage, options = {}) {
+  const mode = options.mode || inferGenerationMode(campaign, parsedMessage, options);
+  const responseMode = options.responseMode || inferResponseMode(campaign, parsedMessage, options);
+  const raw = [
+    parsedMessage?.raw,
+    parsedMessage?.inWorldText,
+    ...(parsedMessage?.metaInstructions ?? []),
+  ].join(" ");
+  const explicitChoiceRequest = /\b(options?|choices?|what can i do|what should i do|give me ideas|suggest)\b/i.test(raw);
+  const tactical =
+    mode === "combat" ||
+    responseMode === "resolve_combat" ||
+    campaign.combat?.inCombat ||
+    inferDangerLevel(campaign, { mode }) === "immediate";
+  const choicesAllowed = Boolean(tactical || explicitChoiceRequest);
+
+  return {
+    default: choicesAllowed ? "choice_when_useful" : "narration_first",
+    choicesAllowed,
+    reason: choicesAllowed
+      ? tactical
+        ? "combat_or_immediate_danger"
+        : "user_requested_options"
+      : "ordinary_scene_flow",
+    useChoicesWhen: [
+      "combat or immediate danger needs tactical input",
+      "the user explicitly asks for options",
+      "the scene reaches a real irreversible branch",
+    ],
+    avoidChoicesWhen: [
+      "resolving a selected option",
+      "patrol/travel/investigation continuation",
+      "NPC reply or atmosphere",
+      "simple consequence narration",
+    ],
+  };
+}
+
+function inferNarrationTarget({ mode, responseMode } = {}) {
+  if (mode === "fast") {
+    return {
+      style: "brief_but_complete",
+      paragraphs: "1-2",
+      words: "80-160",
+      requiredBeats: ["direct consequence", "current situation"],
+    };
+  }
+
+  if (mode === "combat" || responseMode === "resolve_combat") {
+    return {
+      style: "tactical_cinematic",
+      paragraphs: "2-4",
+      words: "220-480",
+      requiredBeats: ["action result", "mechanical consequence", "current battlefield situation"],
+    };
+  }
+
+  return {
+    style: "immersive_tabletop",
+    paragraphs: "3-6",
+    words: "320-700",
+    requiredBeats: ["sensory detail", "NPC or world reaction", "consequence of the player action", "new concrete situation"],
+  };
+}
+
 function inferSceneMode(campaign, options = {}) {
   if (campaign.combat?.inCombat || options.mode === "combat") {
     return "combat";
@@ -637,7 +1390,7 @@ function inferDangerLevel(campaign, options = {}) {
     return "combat";
   }
   const text = [campaign.scene?.status, campaign.scene?.immediateSituation, campaign.scene?.situation].join(" ").toLowerCase();
-  if (/\battack|ambush|combat|initiative|bloodshed\b/.test(text)) {
+  if (/\battack|ambush|combat|initiative|bloodshed|beast|monster|creature|alarm|crossbow|weapon|massive|charging|approach(?:es|ing)?|closing in\b/.test(text)) {
     return "immediate";
   }
   if (/\btense|danger|threat|pursuit|suspicious|armed\b/.test(text)) {
@@ -778,6 +1531,17 @@ function compactText(value, limit) {
 
 function compactWhitespace(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeToken(value) {
+  return compactWhitespace(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function letterForIndex(index) {
+  return String.fromCharCode(65 + index);
 }
 
 function createRequestId() {

@@ -47,6 +47,7 @@ function createMessage(input, fallbackSessionId) {
     source: input.source || "lorekeeper_ui",
     providerRunId: input.providerRunId || null,
     createdAt: input.createdAt || now,
+    data: input.data,
   });
 }
 
@@ -71,11 +72,12 @@ function normalizeMessage(message) {
     source: message.source || "unknown",
     providerRunId: message.providerRunId || null,
     createdAt: message.createdAt || new Date().toISOString(),
+    data: message.data && typeof message.data === "object" ? message.data : {},
   };
 }
 
 function normalizeRole(role) {
-  if (role === "player" || role === "dm" || role === "system") {
+  if (role === "player" || role === "dm" || role === "system" || role === "party" || role === "npc") {
     return role;
   }
 

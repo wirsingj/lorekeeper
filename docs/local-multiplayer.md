@@ -1,0 +1,70 @@
+# Local Multiplayer
+
+LoreKeeper multiplayer is LAN-first and host-authoritative. It is meant for an occasional second player joining a mostly solo campaign, not for replacing the normal table UI.
+
+## Architecture
+
+- The host app owns the campaign SQLite file.
+- The host app owns AI/model calls, dice/math resolution, canon review, and persistence.
+- A guest app connects to the host over the local network.
+- A guest controls one assigned party member for the session.
+- The guest does not need Ollama, a browser bridge, or provider settings.
+
+The hosted party member remains campaign canon. The guest is only a temporary controller. If the guest leaves, the character falls back to host or AI companion control.
+
+## Current Vertical Slice
+
+The current implementation supports:
+
+- starting/stopping a local table session from setup
+- generating an invite link for a party member
+- joining from another app instance by pasting the invite link
+- host approval/denial of join requests
+- temporary remote controller assignment
+- public guest table messages
+- host "Submit" action on a visible guest message
+- guest polling of visible Table State every few seconds
+- structured `user.playerInputs[]` in the next model request
+- disconnect fallback to AI companion control
+
+This deliberately keeps multiplayer out of the primary solo UI until needed.
+
+## Turn Flow
+
+1. Guest types a message for the assigned character.
+2. Host receives it as a public table chat message from that character.
+3. The message is marked as waiting for host submit.
+4. Host clicks Submit on that table message, or resolves all ready party inputs.
+5. LoreKeeper builds a model request with `user.playerInputs[]`.
+6. The model response returns normal table entries, choices, mechanics, and proposed changes.
+7. Canon changes remain host-reviewed.
+
+Guests never mutate SQLite directly. The host endpoint validates the connection, assigned character, and controller state before accepting the visible message.
+
+## Table State Sync
+
+The guest app syncs a host-built `tableState` snapshot. This is the player-visible campaign surface, not a second campaign database.
+
+Table State currently includes:
+
+- table chat history
+- scene/location state
+- party members and controller badges
+- visible 5E-lite character sheet fields
+- people
+- places
+- things/items and inventory
+- threads/quests
+- factions, lore, and relationships when visible
+- combat state when visible
+- current choices
+- the guest's pending input state
+
+The host remains authoritative. ThinLoreKeeper polls this state every few seconds and can request a manual resync. If a guest had an older pending connection id, the host can recover by returning the approved sibling connection for the same invite/client.
+
+## Limitations
+
+- This is HTTP polling plus JSON endpoints for the first slice.
+- WebSocket streaming/broadcast can layer on later without changing the controller model.
+- LAN address detection is best effort.
+- Internet play should use the same invite/controller protocol, with tunneling or relay added later.

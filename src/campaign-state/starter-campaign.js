@@ -60,14 +60,14 @@ export function createStarterCampaign(options = {}) {
     providerSettings: options.providerSettings,
     style: {
       tone: options.tone?.trim() || "engaging D&D-style adventure with strong continuity and player agency",
-      pacing: "establish the scene, offer meaningful choices, and preserve consequences",
+      pacing: "establish the scene with narration first, preserve consequences, and offer structured choices only for combat, immediate danger, or explicit option requests",
       narrationRules: [
         "Preserve approved canon.",
         "Ask the user before making major player-character decisions.",
         "Track important names, places, items, relationships, and unresolved threads.",
       ],
       formattingRules: [
-        "End turns with clear choices or a direct prompt for the player.",
+        "End most turns with solid narration or a direct prompt; reserve structured choices for combat, immediate danger, or explicit option requests.",
         "Separate proposed Lorekeeper updates from in-world narration.",
         "Use structured combat turns when stakes rise.",
       ],
