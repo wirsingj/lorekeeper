@@ -1,0 +1,191 @@
+import { buildActorLedger } from "../rules/dnd5e-lite-ledger.js";
+import {
+  advanceCombatTurn as advanceExistingCombatTurn,
+  currentCombatActor,
+  ensureCombatTurnOrder,
+} from "../rules/combat-turns.js";
+import { extractFirstRollFormula, rollD20, rollFormula } from "./dice-engine.js";
+import { applyStateEffects } from "./state-effects.js";
+import { combatActionTypes } from "./types.js";
+
+export function getCombatState(campaign) {
+  return campaign?.combat ?? { inCombat: false };
+}
+
+export function startCombat(campaign, options = {}) {
+  const next = structuredClone(campaign);
+  next.combat = {
+    ...(next.combat ?? {}),
+    inCombat: true,
+    round: Number(next.combat?.round ?? 1) || 1,
+    enemies: options.enemies ?? next.combat?.enemies ?? [],
+    lastAction: "Combat started.",
+  };
+  return ensureCombatTurnOrder(next, { reroll: options.reroll ?? true, rolls: options.initiativeRolls });
+}
+
+export function getActiveCombatActor(campaign) {
+  return currentCombatActor(campaign);
+}
+
+export function legalActionsForActor(campaign, actorId, options = {}) {
+  const member = (campaign.party ?? []).find((item) => item.id === actorId);
+  if (member) {
+    return buildActorLedger(campaign, member, { mode: "combat", maxLegalOptions: options.maxLegalOptions ?? 8 }).legalOptions;
+  }
+  const enemy = (campaign.combat?.enemies ?? []).find((item) => item.id === actorId);
+  if (enemy) {
+    return [
+      { id: "attack", label: `Attack with ${enemy.attackName ?? "natural weapon"}`, type: combatActionTypes.ATTACK, roll: enemy.attack ?? { bonus: enemy.attackBonus ?? 0, damage: enemy.damage ?? "1d4" }, legal: true },
+      { id: "improvise", label: "Try an improvised tactic", type: combatActionTypes.IMPROVISE, roll: null, legal: true },
+    ];
+  }
+  return [];
+}
+
+export function resolveCombatAction(campaign, action, options = {}) {
+  const normalized = ensureCombatTurnOrder(campaign);
+  const actor = getActiveCombatActor(normalized);
+  if (!actor) throw new Error("Cannot resolve combat action without an active combat actor");
+  if (action.actorId && action.actorId !== actor.id) {
+    throw new Error(`Stale combat action: ${action.actorId} is not active actor ${actor.id}`);
+  }
+
+  const actionType = normalizeActionType(action.actionType ?? action.type);
+  const base = {
+    turnId: action.turnId ?? `combat-${Date.now()}`,
+    actorId: actor.id,
+    actionType,
+    targetIds: action.targetIds ?? [],
+    declaredText: action.declaredText ?? action.label ?? "",
+    rolls: [],
+    effects: [],
+    narration: action.narration ?? "",
+  };
+
+  const resolved = actionType === combatActionTypes.ATTACK
+    ? resolveAttack(normalized, actor, base, action, options)
+    : resolveNonAttack(normalized, actor, base, action);
+
+  const effectsResult = applyStateEffects(normalized, resolved.effects, { source: "combat_engine", turnId: base.turnId });
+  const advanced = advanceExistingCombatTurn(effectsResult.campaign, {
+    fromActorId: actor.id,
+    summary: resolved.summary ?? `${actor.name} resolved ${actionType}.`,
+  });
+
+  return {
+    campaign: advanced,
+    actionRecord: {
+      ...base,
+      rolls: resolved.rolls,
+      effects: effectsResult.appliedEffects,
+      narration: resolved.narration,
+    },
+    rolls: resolved.rolls,
+    effects: effectsResult.appliedEffects,
+    proposedChanges: effectsResult.proposedChanges,
+    errors: effectsResult.errors,
+    nextActorId: advanced.combat?.currentTurnId ?? null,
+    narrationTask: {
+      task: "narrate_resolved_action",
+      actionRecord: {
+        ...base,
+        rolls: resolved.rolls,
+        effects: effectsResult.appliedEffects,
+      },
+    },
+  };
+}
+
+export function advanceCombatTurn(campaign, options = {}) {
+  return advanceExistingCombatTurn(campaign, options);
+}
+
+function resolveAttack(campaign, actor, base, action, options) {
+  const targetId = base.targetIds[0] ?? firstHostileTargetId(campaign, actor);
+  if (!targetId) throw new Error("Attack requires a target");
+  const target = findActor(campaign, targetId);
+  const attack = findAttackOption(campaign, actor.id, action);
+  const attackBonus = Number(action.attackBonus ?? attack?.roll?.bonus ?? attack?.roll?.attackBonus ?? 0) || 0;
+  const ac = Number(target.record?.armorClass ?? target.record?.ac ?? target.record?.stats?.armorClass ?? 10) || 10;
+  const attackRoll = rollD20({
+    seed: `${options.seed ?? base.turnId}:attack`,
+    modifier: attackBonus,
+    label: "Attack roll",
+    actorId: actor.id,
+    targetId,
+    advantage: action.advantage,
+    disadvantage: action.disadvantage,
+  });
+  const hit = attackRoll.total >= ac;
+  const rolls = [attackRoll];
+  const effects = [];
+  let narration = `${actor.name} attacks ${target.name}. Attack ${attackRoll.total} vs AC ${ac}: ${hit ? "hit" : "miss"}.`;
+  if (hit) {
+    const damageFormula = action.damageFormula ?? extractFirstRollFormula(attack?.roll?.damage ?? attack?.damage ?? action.damage ?? target.record?.incomingDamageFallback, "1d4");
+    const damageRoll = rollFormula(damageFormula, {
+      seed: `${options.seed ?? base.turnId}:damage`,
+      label: "Damage roll",
+      actorId: actor.id,
+      targetId,
+    });
+    rolls.push(damageRoll);
+    effects.push({ type: "hp_delta", targetId, amount: -damageRoll.total, reason: `${actor.name} attack hit` });
+    narration += ` Damage ${damageRoll.breakdown}.`;
+  }
+  return {
+    rolls,
+    effects,
+    narration,
+    summary: `${actor.name} attacked ${target.name}${hit ? " and hit." : " and missed."}`,
+  };
+}
+
+function resolveNonAttack(campaign, actor, base, action) {
+  const effects = [];
+  if (base.actionType === combatActionTypes.DODGE) {
+    effects.push({ type: "condition_add", targetId: actor.id, condition: "dodging", reason: "Dodge action until next turn" });
+  } else if (action.positionNote) {
+    effects.push({ type: "position_note", targetId: actor.id, note: action.positionNote });
+  }
+  return {
+    rolls: [],
+    effects,
+    narration: `${actor.name} ${base.declaredText || base.actionType}.`,
+    summary: `${actor.name} resolved ${base.actionType}.`,
+  };
+}
+
+function findAttackOption(campaign, actorId, action) {
+  const actions = legalActionsForActor(campaign, actorId);
+  return actions.find((option) => option.id === action.optionId) ??
+    actions.find((option) => option.type === combatActionTypes.ATTACK && String(action.declaredText ?? "").toLowerCase().includes(String(option.label ?? "").toLowerCase())) ??
+    actions.find((option) => option.type === combatActionTypes.ATTACK);
+}
+
+function firstHostileTargetId(campaign, actor) {
+  if (actor.type === "enemy") {
+    return (campaign.party ?? []).find((member) => currentHp(member) > 0)?.id ?? null;
+  }
+  return (campaign.combat?.enemies ?? []).find((enemy) => currentHp(enemy) > 0)?.id ?? null;
+}
+
+function findActor(campaign, actorId) {
+  const party = (campaign.party ?? []).find((member) => member.id === actorId);
+  if (party) return { type: "party", name: party.name ?? actorId, record: party };
+  const enemy = (campaign.combat?.enemies ?? []).find((item) => item.id === actorId);
+  if (enemy) return { type: "enemy", name: enemy.name ?? actorId, record: enemy };
+  throw new Error(`Combat target not found: ${actorId}`);
+}
+
+function currentHp(record) {
+  if (typeof record.hp === "number") return record.hp;
+  if (record.hp && typeof record.hp === "object") return Number(record.hp.current ?? record.hp.max ?? 1);
+  if (record.stats?.hp && typeof record.stats.hp === "object") return Number(record.stats.hp.current ?? record.stats.hp.max ?? 1);
+  return 1;
+}
+
+function normalizeActionType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return Object.values(combatActionTypes).includes(normalized) ? normalized : combatActionTypes.IMPROVISE;
+}
