@@ -912,6 +912,7 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   } else if (!runResult?.providerReceived && !options.preserveInput && !elements.playerInput.value.trim()) {
     elements.playerInput.value = originalInput;
   }
+  schedulePostTurnRecovery(runResult?.imported ? "turn_imported" : "turn_not_imported");
   return runResult;
 }
 
@@ -1103,6 +1104,7 @@ async function boot() {
   clearResolvedRecoveredInputDraft("boot");
   schedulePendingPlayerTurnResume("boot");
   scheduleCombatPromptTurnRepair("boot");
+  schedulePostTurnRecovery("boot");
 }
 
 async function bootClientMode() {
@@ -1150,8 +1152,7 @@ function startMultiplayerPolling() {
         state.multiplayerSnapshot = payload.campaign?.multiplayer ?? state.multiplayerSnapshot;
         seedPlayLog();
         render();
-        await maybeAutoResolveEnemyCombatTurn();
-        await maybeAutoResolveCombatRemoteInputs();
+        schedulePostTurnRecovery("local_table_poll");
       }
     } catch (error) {
       if (state.guestSession?.hostBaseUrl) {
@@ -1228,6 +1229,30 @@ function scheduleCombatPromptTurnRepair(reason = "unknown") {
       });
     });
   }, 650);
+}
+
+function schedulePostTurnRecovery(reason = "unknown") {
+  if (clientMode || state.guestSession?.hostBaseUrl) {
+    return;
+  }
+  window.setTimeout(() => {
+    runPostTurnRecovery(reason).catch((error) => {
+      pushDiagnosticsEvent("post_turn_recovery_failed", {
+        reason,
+        message: error instanceof Error ? error.message : String(error ?? "Unknown error"),
+      });
+    });
+  }, 350);
+}
+
+async function runPostTurnRecovery(reason = "unknown") {
+  if (state.activeGeneration || state.turnRepair) {
+    return;
+  }
+  clearResolvedRecoveredInputDraft(`post_turn_${reason}`);
+  await repairStalePromptedCombatTurn(`post_turn_${reason}`);
+  await maybeAutoResolveEnemyCombatTurn();
+  await maybeAutoResolveCombatRemoteInputs();
 }
 
 async function repairStalePromptedCombatTurn(reason = "unknown") {
@@ -1437,6 +1462,7 @@ async function selectCampaignByPath(sqlitePath) {
     clearResolvedRecoveredInputDraft("campaign_open");
     schedulePendingPlayerTurnResume("campaign_open");
     scheduleCombatPromptTurnRepair("campaign_open");
+    schedulePostTurnRecovery("campaign_open");
     elements.bridgeStatus.textContent = "Campaign opened";
     setProviderActivity("Campaign opened", "idle");
   } catch (error) {
@@ -4969,6 +4995,22 @@ async function runPromptThroughLocalProvider(turn) {
   elements.cancelGeneration.disabled = false;
   elements.buildTurn.disabled = true;
   setProviderActivity("Generating locally with Ollama...", "working");
+  let responseText = "";
+  let providerReceived = false;
+  let timedOut = false;
+  const timeoutMs = Math.max(15000, Number(currentProviderSettings().generationTimeoutMs) || 120000) + 5000;
+  const timeoutId = window.setTimeout(() => {
+    if (state.activeGeneration !== controller) {
+      return;
+    }
+    timedOut = true;
+    pushDiagnosticsEvent("ollama_generation_renderer_timeout", {
+      timeoutMs,
+      providerReceived,
+      responseChars: responseText.length,
+    });
+    controller.abort();
+  }, timeoutMs);
   pushDiagnosticsEvent("ollama_generation_started", {
     playerMessage: turn.playerMessage,
     playerInputs: turn.playerInputs ?? [],
@@ -4976,9 +5018,6 @@ async function runPromptThroughLocalProvider(turn) {
     providerSettings: currentProviderSettings(),
   });
   render();
-
-  let responseText = "";
-  let providerReceived = false;
 
   try {
     const response = await fetchOrExplain(apiProviderGenerateTurnUrl, {
@@ -5075,13 +5114,16 @@ async function runPromptThroughLocalProvider(turn) {
   } catch (error) {
     if (error?.name === "AbortError") {
       pushDiagnosticsEvent("ollama_generation_canceled", {
+        timedOut,
         providerReceived,
         responseChars: responseText.length,
       });
-      setProviderActivity("Local generation canceled", "idle");
-      elements.bridgeStatus.textContent = "Local generation canceled";
-      render();
-      return { providerReceived, canceled: true };
+      setProviderActivity(
+        timedOut ? "Local generation timed out; Send Turn can retry" : "Local generation canceled",
+        timedOut ? "error" : "idle",
+      );
+      elements.bridgeStatus.textContent = timedOut ? "Local generation timed out" : "Local generation canceled";
+      return { providerReceived, canceled: !timedOut, timedOut };
     }
     pushDiagnosticsEvent("ollama_generation_failed", {
       providerReceived,
@@ -5094,6 +5136,7 @@ async function runPromptThroughLocalProvider(turn) {
     render();
     return { providerReceived: false, error };
   } finally {
+    window.clearTimeout(timeoutId);
     if (state.activeGeneration === controller) {
       state.activeGeneration = null;
     }
@@ -5101,6 +5144,7 @@ async function runPromptThroughLocalProvider(turn) {
     elements.cancelGeneration.disabled = true;
     elements.buildTurn.disabled = Boolean(state.turnRepair);
     updateNudgeAvailability();
+    render();
   }
 }
 
