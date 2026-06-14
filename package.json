@@ -20,6 +20,7 @@
     "build": "vite build",
     "desktop": "npm run build && electron .",
     "client": "node ./scripts/launch-desktop.js --client",
+    "package:thin": "npm run build && node ./scripts/package-thin-client.js",
     "cleanup": "node ./scripts/cleanup-processes.js",
     "shortcut": "cscript //nologo \"Create LoreKeeper Desktop Shortcut.vbs\""
   },

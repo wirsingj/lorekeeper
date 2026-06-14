@@ -856,12 +856,78 @@ button:disabled {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   padding: 10px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 34%),
     var(--stone-dark);
   border-radius: 16px;
+}
+
+.thin-join-panel {
+  display: grid;
+  place-items: center;
+  padding: 12px 12px 4px;
+}
+
+.thin-join-card {
+  width: min(620px, 94%);
+  padding: 18px;
+  border: 1px solid rgba(125, 213, 201, 0.28);
+  border-radius: 12px;
+  background: rgba(20, 26, 29, 0.96);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.thin-join-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.thin-join-copy {
+  margin: 0 0 14px;
+  color: #c8d2d8;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.thin-join-card label {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  color: #dfe7eb;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.thin-join-card input,
+.thin-join-card textarea {
+  width: 100%;
+  border: 1px solid rgba(174, 191, 202, 0.18);
+  border-radius: 9px;
+  background: rgba(10, 13, 15, 0.48);
+  color: #f2f6f8;
+  padding: 9px 10px;
+}
+
+.thin-join-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.thin-join-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-weight: 850;
+}
+
+.thin-join-status {
+  margin: 10px 0 0;
+  color: #b7c7cf;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .play-log {

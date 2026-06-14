@@ -82,6 +82,31 @@ export function LorekeeperShell() {
       <main className="play-screen" aria-label="Lorekeeper play screen">
         <div className="screen-bezel">
           <span id="session-label" className="visually-hidden">Campaign Play</span>
+          <section id="thin-join-panel" className="thin-join-panel" hidden>
+            <div className="thin-join-card">
+              <p className="eyebrow">ThinLoreKeeper</p>
+              <h2>Join A Hosted Table</h2>
+              <p className="thin-join-copy">Paste the invite link from the host, add your table name, and request the seat.</p>
+              <label>
+                <span>Invite link</span>
+                <textarea
+                  id="thin-join-invite-link"
+                  rows="3"
+                  spellCheck="false"
+                  placeholder="lorekeeper://join?host=192.168.1.24&port=4173&campaign=..."
+                ></textarea>
+              </label>
+              <label>
+                <span>Your name</span>
+                <input id="thin-join-player-name" autoComplete="off" placeholder="Jess" />
+              </label>
+              <div className="thin-join-actions">
+                <button id="thin-join-submit" type="button">Join Table</button>
+                <button id="thin-join-open-dialog" className="secondary-action" type="button">Advanced</button>
+              </div>
+              <p id="thin-join-status" className="thin-join-status">Paste an invite link to begin.</p>
+            </div>
+          </section>
           <div id="play-log" className="play-log"></div>
         </div>
       </main>

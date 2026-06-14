@@ -18,10 +18,11 @@ The current implementation supports:
 
 - starting/stopping a local table session from setup
 - generating an invite link for a party member
-- joining from another app instance by pasting the invite link
+- joining from ThinLoreKeeper by pasting the invite link into the front-center join card
 - host approval/denial of join requests
 - temporary remote controller assignment
 - public guest table messages
+- lightweight Table Talk side chat that stays out of campaign canon/provider context
 - host "Submit" action on a visible guest message
 - guest polling of visible Table State every few seconds
 - structured `user.playerInputs[]` in the next model request
@@ -40,6 +41,29 @@ This deliberately keeps multiplayer out of the primary solo UI until needed.
 7. Canon changes remain host-reviewed.
 
 Guests never mutate SQLite directly. The host endpoint validates the connection, assigned character, and controller state before accepting the visible message.
+
+## ThinLoreKeeper Portable Build
+
+For a nearby LAN guest, the host can build a portable Windows companion package:
+
+```powershell
+npm run package:thin
+```
+
+This creates:
+
+- `dist/portable/ThinLoreKeeper/ThinLoreKeeper.exe`
+- `dist/portable/ThinLoreKeeper.zip`
+
+The guest workflow should be:
+
+1. Unzip the package.
+2. Double-click `ThinLoreKeeper.exe`.
+3. Paste the invite link into the front-center join card.
+4. Enter a table name and click `Join Table`.
+5. Wait for host approval.
+
+The portable Thin client does not include campaign saves, SQLite authority, Ollama, or provider controls. It renders host-filtered table state and sends authenticated guest inputs back to the host.
 
 ## Table State Sync
 

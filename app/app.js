@@ -218,6 +218,12 @@ const elements = {
   promptSize: document.querySelector("#prompt-size"),
   promptDrawer: document.querySelector("#prompt-drawer"),
   sessionLabel: document.querySelector("#session-label"),
+  thinJoinPanel: document.querySelector("#thin-join-panel"),
+  thinJoinInviteLink: document.querySelector("#thin-join-invite-link"),
+  thinJoinPlayerName: document.querySelector("#thin-join-player-name"),
+  thinJoinSubmit: document.querySelector("#thin-join-submit"),
+  thinJoinOpenDialog: document.querySelector("#thin-join-open-dialog"),
+  thinJoinStatus: document.querySelector("#thin-join-status"),
   bridgeCard: document.querySelector("#bridge-card"),
   bridgeStatus: document.querySelector("#bridge-status"),
   checkSidecar: document.querySelector("#check-sidecar"),
@@ -492,6 +498,14 @@ elements.joinCampaign.addEventListener("click", () => {
 
 elements.joinCampaignMain?.addEventListener("click", () => {
   openJoinCampaignDialog();
+});
+
+elements.thinJoinOpenDialog?.addEventListener("click", () => {
+  openJoinCampaignDialog();
+});
+
+elements.thinJoinSubmit?.addEventListener("click", async () => {
+  await requestJoinFromThinPanel();
 });
 
 elements.syncGuestTable?.addEventListener("click", async () => {
@@ -1189,7 +1203,7 @@ async function bootClientMode() {
     }
   }
 
-  window.setTimeout(() => openJoinCampaignDialog(), 200);
+  window.setTimeout(() => elements.thinJoinInviteLink?.focus(), 200);
 }
 
 function startMultiplayerPolling() {
@@ -1748,29 +1762,58 @@ async function setPartyMemberController(member, controllerKind) {
 
 function openJoinCampaignDialog() {
   elements.joinCampaignForm.reset();
+  if (elements.thinJoinInviteLink?.value) {
+    elements.joinInviteLink.value = elements.thinJoinInviteLink.value;
+  }
+  if (elements.thinJoinPlayerName?.value) {
+    elements.joinPlayerName.value = elements.thinJoinPlayerName.value;
+  }
   elements.joinStatus.textContent = "Paste an invite link from the host.";
   elements.joinCampaignDialog.showModal();
   elements.joinInviteLink.focus();
 }
 
 async function requestJoinFromUi() {
+  await requestJoinWithValues({
+    inviteLink: elements.joinInviteLink.value,
+    playerName: elements.joinPlayerName.value,
+    statusElement: elements.joinStatus,
+    submitButton: null,
+  });
+}
+
+async function requestJoinFromThinPanel() {
+  await requestJoinWithValues({
+    inviteLink: elements.thinJoinInviteLink?.value,
+    playerName: elements.thinJoinPlayerName?.value,
+    statusElement: elements.thinJoinStatus,
+    submitButton: elements.thinJoinSubmit,
+  });
+}
+
+async function requestJoinWithValues({ inviteLink, playerName, statusElement, submitButton } = {}) {
   try {
-    const inviteLink = elements.joinInviteLink.value.trim();
-    const parsed = parseInviteLinkForClient(inviteLink);
+    const trimmedInviteLink = String(inviteLink ?? "").trim();
+    const parsed = parseInviteLinkForClient(trimmedInviteLink);
     if (!parsed.valid) {
       throw new Error(parsed.error);
     }
     const clientId = guestClientId();
-    elements.joinStatus.textContent = "Requesting host approval...";
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+    if (statusElement) {
+      statusElement.textContent = "Requesting host approval...";
+    }
     const baseUrl = `http://${parsed.host}:${parsed.port}`;
     const result = await postJson(`${baseUrl}${apiMultiplayerJoinUrl}`, {
-      inviteLink,
-      playerName: elements.joinPlayerName.value.trim() || "Guest Player",
+      inviteLink: trimmedInviteLink,
+      playerName: String(playerName ?? "").trim() || "Guest Player",
       clientId,
     });
     state.guestSession = {
       hostBaseUrl: baseUrl,
-      inviteLink,
+      inviteLink: trimmedInviteLink,
       clientId,
       connectionId: result.connection.id,
       connectionSecret: result.connectionSecret || "",
@@ -1782,18 +1825,36 @@ async function requestJoinFromUi() {
       lastRevision: result.snapshot?.revision ?? result.snapshot?.tableState?.revision ?? "",
     };
     saveGuestSession(state.guestSession);
-    elements.joinStatus.textContent = result.approved
+    const statusText = result.approved
       ? "Joined. You can submit actions for your assigned character."
       : "Join request sent. Waiting for host approval.";
-    setProviderActivity(elements.joinStatus.textContent, result.approved ? "idle" : "waiting");
+    if (statusElement) {
+      statusElement.textContent = statusText;
+    }
+    elements.joinStatus.textContent = statusText;
+    if (elements.thinJoinStatus) {
+      elements.thinJoinStatus.textContent = statusText;
+    }
+    setProviderActivity(statusText, result.approved ? "idle" : "waiting");
     if (result.snapshot) {
       renderGuestSnapshot(result.snapshot);
     } else {
       await refreshGuestSnapshot({ explicit: false });
     }
   } catch (error) {
-    elements.joinStatus.textContent = error instanceof Error ? error.message : "Join failed";
-    setProviderActivity(`Join failed: ${elements.joinStatus.textContent}`, "error");
+    const errorText = error instanceof Error ? error.message : "Join failed";
+    if (statusElement) {
+      statusElement.textContent = errorText;
+    }
+    elements.joinStatus.textContent = errorText;
+    if (elements.thinJoinStatus) {
+      elements.thinJoinStatus.textContent = errorText;
+    }
+    setProviderActivity(`Join failed: ${errorText}`, "error");
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
   }
 }
 
@@ -3777,6 +3838,7 @@ function render() {
   }
 
   renderPlayLog();
+  renderThinJoinPanel();
   renderParty(campaign);
   renderCombatTracker(campaign);
   renderPeople(campaign);
@@ -3816,6 +3878,30 @@ function renderSceneIntelligence(campaign) {
       ? `Consequence: ${consequences.slice(0, 2).map((consequence) => consequence.title).join("; ")}`
       : "";
     elements.sceneIntelligenceConsequences.hidden = consequences.length === 0;
+  }
+}
+
+function renderThinJoinPanel() {
+  if (!elements.thinJoinPanel) {
+    return;
+  }
+  const connected = state.guestSession?.status === "connected" || state.guestSnapshot?.connection?.status === "connected";
+  const show = clientMode && !connected;
+  elements.thinJoinPanel.hidden = !show;
+  elements.playLog.classList.toggle("play-log-with-join-panel", show);
+  if (!show) {
+    return;
+  }
+
+  const awaitingApproval = state.guestSession?.status === "pending" || state.guestSnapshot?.awaitingApproval;
+  if (elements.thinJoinStatus && awaitingApproval) {
+    elements.thinJoinStatus.textContent = "Join request sent. Waiting for host approval.";
+  }
+  if (elements.thinJoinInviteLink && state.guestSession?.inviteLink && !elements.thinJoinInviteLink.value) {
+    elements.thinJoinInviteLink.value = state.guestSession.inviteLink;
+  }
+  if (elements.thinJoinPlayerName && state.guestSession?.playerName && !elements.thinJoinPlayerName.value) {
+    elements.thinJoinPlayerName.value = state.guestSession.playerName;
   }
 }
 
