@@ -26,6 +26,7 @@ type ConsequenceRecord = {
   sourceSceneId: string | null;
   relatedSceneIds: string[];
   participantIds: string[];
+  relatedEntityIds: string[];
   relationshipIds: string[];
   threadIds: string[];
   tags: string[];

@@ -1,4 +1,4 @@
-import { contextPackKinds } from "../campaign-state/schema.js";
+import { contextPackKinds, normalizeCampaign } from "../campaign-state/schema.js";
 import { findById, labelEntity } from "../campaign-state/formatters.js";
 import { buildSceneRetrieval } from "../engine/scene-engine.js";
 import { buildRulesLedger } from "../rules/dnd5e-lite-ledger.js";
@@ -25,6 +25,7 @@ const SHORT_ENTRY_LIMIT = 220;
 const MEDIUM_ENTRY_LIMIT = 360;
 
 export function buildContextPack(campaign, options = {}) {
+  campaign = normalizeCampaign(campaign ?? {});
   const kinds = options.kinds ?? DEFAULT_PACK_KINDS;
 
   return {
@@ -101,7 +102,7 @@ function buildHistorySection(campaign) {
       .map((message) => {
         const speaker = message.title || (message.role === "player" ? "Player" : "DM");
         const limit = message.role === "player" ? HISTORY_PLAYER_CHAR_LIMIT : HISTORY_DM_CHAR_LIMIT;
-        const body = compactText(message.body, limit);
+        const body = compactText(message.body ?? message.text ?? message.content, limit);
         return body ? `${speaker}: ${body}` : null;
       })
       .filter(Boolean),
@@ -112,7 +113,7 @@ function buildSceneSection(campaign) {
   const retrieval = buildSceneRetrieval(campaign);
   const activeScene = retrieval.scene;
   const place = findById(campaign.places, campaign.scene.currentPlaceId);
-  const presentPeople = campaign.scene.presentPeopleIds.map((id) => labelEntity(campaign, id));
+  const presentPeople = (campaign.scene.presentPeopleIds ?? []).map((id) => labelEntity(campaign, id));
   const sceneLocation = campaign.scene.location || campaign.scene.place || campaign.scene.currentLocation;
   const location = sceneLocation || (place ? `${place.name} - ${place.summary}` : "Unknown");
   const situation = activeScene?.immediateSituation || campaign.scene.situation || campaign.scene.immediateSituation || "Not set.";
@@ -130,7 +131,7 @@ function buildSceneSection(campaign) {
       ...(activeScene?.tensions ?? []).slice(0, 4).map((tension) => `Tension: ${compactText(tension, SHORT_ENTRY_LIMIT)}`),
       ...(activeScene?.unresolvedQuestions ?? []).slice(0, 4).map((question) => `Unresolved: ${compactText(question, SHORT_ENTRY_LIMIT)}`),
       `Present NPCs: ${presentPeople.length > 0 ? presentPeople.join(", ") : "None recorded."}`,
-      ...campaign.scene.localNotes.slice(0, 3).map((note) => `Scene note: ${compactText(note, SHORT_ENTRY_LIMIT)}`),
+      ...(campaign.scene.localNotes ?? []).slice(0, 3).map((note) => `Scene note: ${compactText(note, SHORT_ENTRY_LIMIT)}`),
     ].filter(Boolean),
   };
 }
@@ -150,7 +151,7 @@ function buildConsequencesSection(campaign) {
 }
 
 function buildPartySection(campaign) {
-  const presentIds = new Set(campaign.scene.presentPartyMemberIds);
+  const presentIds = new Set(campaign.scene.presentPartyMemberIds ?? []);
   const party = campaign.party.filter((member) => presentIds.size === 0 || presentIds.has(member.id));
 
   return {
@@ -196,13 +197,13 @@ function formatControllerDetail(member) {
 }
 
 function buildNearbySection(campaign) {
-  const nearbyPlaces = campaign.scene.nearbyPlaceIds
+  const nearbyPlaces = (campaign.scene.nearbyPlaceIds ?? [])
     .map((id) => findById(campaign.places, id))
     .filter(Boolean);
   const nearbyPeople = campaign.people.filter(
     (person) =>
       person.locationId === campaign.scene.currentPlaceId ||
-      campaign.scene.presentPeopleIds.includes(person.id),
+      (campaign.scene.presentPeopleIds ?? []).includes(person.id),
   );
 
   return {
@@ -210,7 +211,7 @@ function buildNearbySection(campaign) {
     title: "Nearby People And Places",
     entries: [
       ...nearbyPeople.slice(0, 6).map((person) =>
-        compactText(`${person.name}: ${person.role}. ${(person.notes ?? []).join(" ")}`, SHORT_ENTRY_LIMIT),
+        compactText(`${person.name}: ${person.role}. ${formatCompactList(person.notes, 4)}`, SHORT_ENTRY_LIMIT),
       ),
       ...nearbyPlaces.slice(0, 6).map((place) => compactText(`${place.name}: ${place.summary}`, SHORT_ENTRY_LIMIT)),
     ],
@@ -319,7 +320,7 @@ function buildRelationshipSection(campaign) {
     entries: relationships.slice(0, 8).map(
       (relationship) =>
         compactText(
-          `${labelEntity(campaign, relationship.sourceId)} -> ${labelEntity(campaign, relationship.targetId)} (${relationship.type}): ${relationship.notes}`,
+          `${labelEntity(campaign, relationship.sourceId)} -> ${labelEntity(campaign, relationship.targetId)} (${relationship.type}): ${formatCompactList(relationship.notes, 4)}`,
           SHORT_ENTRY_LIMIT,
         ),
     ),
@@ -329,9 +330,9 @@ function buildRelationshipSection(campaign) {
 function buildLoreSection(campaign) {
   const activeIds = new Set([
     campaign.scene.currentPlaceId,
-    ...campaign.scene.presentPeopleIds,
-    ...campaign.scene.presentPartyMemberIds,
-    ...campaign.scene.activeQuestIds,
+    ...(campaign.scene.presentPeopleIds ?? []),
+    ...(campaign.scene.presentPartyMemberIds ?? []),
+    ...(campaign.scene.activeQuestIds ?? []),
   ]);
 
   const taggedLore = campaign.lore.filter((note) =>
@@ -343,7 +344,7 @@ function buildLoreSection(campaign) {
   return {
     kind: contextPackKinds.LORE,
     title: "Relevant Lore",
-    entries: lore.slice(0, 5).map((note) => compactText(`${note.title}: ${(note.notes ?? []).join(" ")}`, MEDIUM_ENTRY_LIMIT)),
+    entries: lore.slice(0, 5).map((note) => compactText(`${note.title}: ${formatCompactList(note.notes, 4)}`, MEDIUM_ENTRY_LIMIT)),
   };
 }
 

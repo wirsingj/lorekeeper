@@ -245,7 +245,7 @@ function summarizeRelationship(relationship) {
     sourceId: relationship.sourceId,
     targetId: relationship.targetId,
     type: relationship.type,
-    notes: relationship.notes,
+    notes: asText(relationship.notes),
   };
 }
 
@@ -257,6 +257,16 @@ function summarizeThread(thread) {
     stakes: thread.stakes ?? "",
     openQuestions: thread.openQuestions ?? [],
   };
+}
+
+function asText(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map((entry) => String(entry).trim()).filter(Boolean).join(" ");
+  }
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value ?? "");
 }
 
 function summarizeActor(campaign, actorId) {

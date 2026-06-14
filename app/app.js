@@ -3739,7 +3739,8 @@ function renderSceneIntelligence(campaign) {
   const scene = retrieval.scene;
   const tensions = scene?.tensions ?? campaign.scene?.tensions ?? [];
   const consequences = retrieval.activeConsequences;
-  const hasDetails = Boolean(scene?.title || tensions.length || consequences.length);
+  const hasFirstClassScene = Boolean(campaign.scene?.activeSceneId || (campaign.scenes ?? []).some((record) => record.status === "active"));
+  const hasDetails = Boolean(hasFirstClassScene || tensions.length || consequences.length);
   elements.sceneIntelligence.hidden = !hasDetails;
   if (elements.sceneIntelligenceTitle) {
     elements.sceneIntelligenceTitle.textContent = scene?.title || "Current scene";

@@ -7,6 +7,7 @@ import { buildInputComposerProjection } from "../app/input-composer-controller.j
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
+import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
 import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startCombat } from "../src/engine/combat-engine.js";
 import { createCampaignStateStore } from "../src/engine/campaign-state-store.js";
@@ -221,10 +222,20 @@ function testSceneAndConsequenceEngines() {
     threadIds: ["quest-1"],
     importance: "high",
   }, { now: "2026-01-01T00:00:01.000Z" });
+  campaign = addConsequence(campaign, {
+    id: "consequence-other-room",
+    title: "Kitchen staff panic",
+    description: "This should not dominate the brawl unless the scene moves to the kitchen.",
+    sourceSceneId: "scene-kitchen",
+    participantIds: ["cook"],
+    importance: "critical",
+  }, { now: "2026-01-01T00:00:01.500Z" });
 
   const retrieval = buildSceneRetrieval(campaign);
   assert.equal(retrieval.scene.title, "Tavern brawl standoff");
   assert.equal(retrieval.activeConsequences[0].id, "consequence-barkeep-memory");
+  assert.equal(campaign.scene.activeConsequenceIds.includes("consequence-other-room"), false, "unrelated consequences should not mark the current scene projection");
+  assert.equal(retrieval.activeConsequences.some((item) => item.id === "consequence-other-room"), false, "scene retrieval should not pull unrelated consequences by importance alone");
   assert.equal(retrieval.relevantRelationships[0].id, "rel-thor-barkeep");
   assert.equal(retrieval.activeThreads[0].id, "quest-1");
 
@@ -236,8 +247,42 @@ function testSceneAndConsequenceEngines() {
   assert.equal(buildSceneRetrieval(resolved).activeConsequences.length, 0);
 }
 
+function testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds() {
+  const sceneCampaign = transitionScene(campaignFixture(), {
+    id: "scene-participants",
+    title: "A tense talk",
+    partyMemberIds: ["thor"],
+    peopleIds: ["barkeep"],
+  });
+  const campaign = {
+    ...sceneCampaign,
+    scene: {
+      ...sceneCampaign.scene,
+      activeConsequenceIds: [],
+    },
+    consequences: [{
+      id: "consequence-participant-only",
+      title: "The barkeep is watching Thor",
+      description: "A consequence tied only by participant should still be retrieved.",
+      scope: "person",
+      state: "active",
+      importance: "medium",
+      sourceSceneId: null,
+      relatedSceneIds: [],
+      participantIds: ["thor", "barkeep"],
+      relationshipIds: [],
+      threadIds: [],
+      tags: [],
+    }],
+  };
+  const retrieval = buildSceneRetrieval(campaign);
+  assert.equal(retrieval.activeConsequences[0].id, "consequence-participant-only");
+}
+
 function testProviderBoundary() {
   const campaign = campaignFixture();
+  campaign.sessionLog.messages = [{ role: "dm", title: "DM", text: "Legacy text-only message." }];
+  campaign.relationships[0].notes = ["The barkeep remembers restraint.", "He dislikes broken furniture."];
   const sceneCampaign = addConsequence(transitionScene(campaign, {
     id: "scene-provider",
     title: "Barkeep's tense room",
@@ -260,11 +305,17 @@ function testProviderBoundary() {
   assert.equal(request.dmQuality.role, "creative_tabletop_dm_assistant");
   assert.ok(request.dmQuality.avoid.includes("random encounter table behavior"));
   assert.equal(request.readonlyContext.recentMessages.length, 1);
+  assert.equal(request.readonlyContext.recentMessages[0].text, "Legacy text-only message.");
   assert.equal(request.readonlyContext.scene.title, "Barkeep's tense room");
   assert.equal(request.readonlyContext.activeConsequences[0].id, "consequence-provider");
   assert.equal(request.readonlyContext.relevantRelationships[0].id, "rel-thor-barkeep");
+  assert.match(request.readonlyContext.relevantRelationships[0].notes, /broken furniture/);
   assert.equal(request.readonlyContext.activeThreads[0].id, "quest-1");
   assert.equal(request.readonlyContext.party, undefined, "provider request should not include whole campaign dumps");
+
+  const contextPack = buildContextPack(sceneCampaign);
+  assert.ok(contextPack.sections.some((section) => section.kind === "active_consequences"), "context pack should include active consequences");
+  assert.match(JSON.stringify(contextPack.sections), /broken furniture/, "context pack should tolerate array relationship notes");
 
   assert.equal(acceptProviderResponseForTurn(turn, { turnId: "wrong", narration: "late" }).accepted, false);
   const accepted = acceptProviderResponseForTurn(turn, {
@@ -523,6 +574,7 @@ testStateEffects();
 testCombatEngine();
 testCombatTrackerView();
 testSceneAndConsequenceEngines();
+testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testProviderBoundary();
 testCampaignStateStore();
 testInputComposerProjection();

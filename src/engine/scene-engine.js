@@ -15,6 +15,8 @@ export function normalizeSceneRecord(input = {}, campaign = {}, options = {}) {
   const now = options.now ?? new Date().toISOString();
   const participants = uniqueStrings([
     ...(input.participantIds ?? input.participants ?? []),
+    ...(input.partyMemberIds ?? []),
+    ...(input.peopleIds ?? []),
     ...(input.presentPeopleIds ?? []),
     ...(input.presentPartyMemberIds ?? []),
   ]);
@@ -90,6 +92,10 @@ export function updateCurrentScene(campaign, patch, options = {}) {
     scenes: upsertById(campaign.scenes ?? [], updated),
     scene: {
       ...(campaign.scene ?? {}),
+      currentPlaceId: updated.locationId,
+      presentPeopleIds: updated.peopleIds,
+      presentPartyMemberIds: updated.partyMemberIds,
+      activeQuestIds: updated.threadIds,
       tensions: updated.tensions,
       unresolvedQuestions: updated.unresolvedQuestions,
       activeConsequenceIds: updated.consequenceIds,
