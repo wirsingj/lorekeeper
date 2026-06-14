@@ -15,6 +15,7 @@ import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
+import { randomDevJumpStart } from "./dev-jump-start.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
@@ -297,6 +298,7 @@ const elements = {
   closeRecordDialog: document.querySelector("#close-record-dialog"),
   campaignDialog: document.querySelector("#campaign-dialog"),
   campaignForm: document.querySelector("#campaign-form"),
+  devJumpStartCampaign: document.querySelector("#dev-jump-start-campaign"),
   newCampaignTitle: document.querySelector("#new-campaign-title"),
   newCampaignPremise: document.querySelector("#new-campaign-premise"),
   newCampaignStartingLocation: document.querySelector("#new-campaign-starting-location"),
@@ -580,6 +582,10 @@ elements.closeRecordDialog.addEventListener("click", () => {
 
 elements.closeCampaignDialog.addEventListener("click", () => {
   elements.campaignDialog.close();
+});
+
+elements.devJumpStartCampaign?.addEventListener("click", () => {
+  applyDevJumpStartSeed(randomDevJumpStart());
 });
 
 elements.campaignForm.addEventListener("submit", async (event) => {
@@ -1698,6 +1704,22 @@ function resetCampaignWizardDefaults() {
   elements.newCharacterLevel.value = "1";
   elements.newCharacterConcept.value = "";
   elements.newCharacterAutoSheet.checked = true;
+}
+
+function applyDevJumpStartSeed(seed) {
+  elements.newCampaignTitle.value = seed.title;
+  elements.newCampaignPremise.value = seed.premise;
+  elements.newCampaignStartingLocation.value = seed.startingLocation;
+  elements.newCampaignTone.value = seed.tone;
+  elements.newCharacterName.value = seed.playerCharacter.name;
+  elements.newCharacterAncestry.value = seed.playerCharacter.ancestry;
+  elements.newCharacterClass.value = seed.playerCharacter.characterClass;
+  elements.newCharacterLevel.value = seed.playerCharacter.level;
+  elements.newCharacterConcept.value = seed.playerCharacter.concept;
+  elements.newCharacterAutoSheet.checked = seed.playerCharacter.autoSheet !== false;
+  setProviderActivity("Dev jump start filled; review or Create And Start", "idle");
+  elements.newCampaignTitle.focus();
+  elements.newCampaignTitle.select();
 }
 
 async function refreshMultiplayerSnapshot({ quiet = false } = {}) {

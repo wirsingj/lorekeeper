@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
+import { randomDevJumpStart } from "../app/dev-jump-start.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
@@ -173,6 +174,22 @@ async function testClipboardFallback() {
   });
   assert.equal(readBlocked.ok, false);
   assert.match(readBlocked.error, /blocked/i);
+}
+
+function testDevJumpStartSeed() {
+  const values = [0.1, 0.2, 0.3];
+  let index = 0;
+  const seed = randomDevJumpStart(() => values[index++ % values.length]);
+  assert.match(seed.title, /\d{3}$/);
+  assert.ok(seed.premise.length > 40);
+  assert.ok(seed.startingLocation.length > 2);
+  assert.ok(seed.tone.length > 10);
+  assert.ok(seed.playerCharacter.name);
+  assert.ok(seed.playerCharacter.ancestry);
+  assert.ok(seed.playerCharacter.characterClass);
+  assert.equal(seed.playerCharacter.level, "2");
+  assert.equal(seed.playerCharacter.autoSheet, true);
+  assert.ok(seed.playerCharacter.concept.length > 40);
 }
 
 function testAgencyController() {
@@ -697,6 +714,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 
 testDiceEngine();
 await testClipboardFallback();
+testDevJumpStartSeed();
 testAgencyController();
 testTurnEngine();
 testStateEffects();

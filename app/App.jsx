@@ -306,6 +306,7 @@ function CampaignDialog() {
         <section className="campaign-wizard-section">
           <div className="wizard-heading">
             <span>Campaign Seed</span>
+            <button id="dev-jump-start-campaign" className="mini-action" type="button">Dev Jump Start</button>
           </div>
           <div className="campaign-wizard-grid">
             <label>
