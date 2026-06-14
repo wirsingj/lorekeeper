@@ -8,6 +8,7 @@ import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { createEmptyCampaign, normalizeCampaign } from "../src/campaign-state/schema.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import {
+  buildTurnJsonPrompt,
   buildTurnRequestEnvelope,
   parseTurnJsonResponse,
   renderTurnResponseForImport,
@@ -116,6 +117,45 @@ assert.ok(requestEnvelope.generation.dmQuality.avoid.includes("random encounter 
 assert.ok(requestEnvelope.generation.dmQuality.beforeAddingNewContent.some((rule) => /Prefer existing people/.test(rule)));
 assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
+
+const editedChoiceText = "I choose B: Try to hide Rowan behind some crates. I throw a blanket over the shopkeeper, balance a small box on top, and loudly bluff that I am looking for the shopkeep.";
+const editedChoiceEnvelope = buildTurnRequestEnvelope({
+  campaign: testCampaign(),
+  contextPack: testContextPack(),
+  playerTurn: [
+    editedChoiceText,
+    "",
+    "(meta: The player selected B from the latest visible choice panel. The player edited/expanded the selected option; user.inWorld is the authoritative action and overrides the original option wording. Preserve concrete player details, props, positioning, dialogue, and intent from user.inWorld.)",
+  ].join("\n"),
+  parsedMessage: {
+    raw: [
+      editedChoiceText,
+      "",
+      "(meta: The player selected B from the latest visible choice panel. The player edited/expanded the selected option; user.inWorld is the authoritative action and overrides the original option wording. Preserve concrete player details, props, positioning, dialogue, and intent from user.inWorld.)",
+    ].join("\n"),
+    inWorldText: editedChoiceText,
+    metaInstructions: [
+      "meta: The player selected B from the latest visible choice panel. The player edited/expanded the selected option; user.inWorld is the authoritative action and overrides the original option wording. Preserve concrete player details, props, positioning, dialogue, and intent from user.inWorld.",
+    ],
+  },
+});
+assert.match(editedChoiceEnvelope.user.inWorld, /blanket/);
+assert.match(editedChoiceEnvelope.user.inWorld, /small box/);
+assert.match(editedChoiceEnvelope.user.inWorld, /shopkeep/);
+assert.ok(editedChoiceEnvelope.meta.instructionPriority.some((rule) => /edited user\.inWorld/.test(rule)));
+assert.equal(validateTurnRequest(editedChoiceEnvelope).valid, true);
+const editedChoicePrompt = buildTurnJsonPrompt({
+  campaign: testCampaign(),
+  contextPack: testContextPack(),
+  playerTurn: editedChoiceText,
+  parsedMessage: {
+    raw: editedChoiceText,
+    inWorldText: editedChoiceText,
+    metaInstructions: [],
+  },
+});
+assert.match(editedChoicePrompt, /extra details are authoritative/);
+assert.match(editedChoicePrompt, /blanket/);
 
 const fastEnvelope = buildTurnRequestEnvelope({
   campaign: testCampaign(),

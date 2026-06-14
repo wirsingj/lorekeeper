@@ -699,7 +699,7 @@ function normalizeSubmittedPlayerMessage(originalInput, options = {}) {
   const inWorldText = choiceSelectionInWorldText(selectedChoices, text);
   return [
     inWorldText,
-    choiceSelectionMeta(selectedChoices),
+    choiceSelectionMeta(selectedChoices, { actualAction: inWorldText }),
   ].join("\n\n");
 }
 
@@ -803,11 +803,14 @@ function pendingSelectionMatchesText(selection, text = "") {
   );
 }
 
-function choiceSelectionMeta(selection) {
+function choiceSelectionMeta(selection, { actualAction = "" } = {}) {
   const combatInstruction = state.campaign?.combat?.inCombat
     ? " This is a combat action for the active initiative actor; resolve it with visible mechanics, HP/resource updates, and advance the turn."
     : "";
-  return `(meta: The player selected ${selection.labels.join(", ")} from the latest visible choice panel. Resolve the selected choice text, not the bare numbers/letters. Do not ask the same choice question again unless new information changes the options.${combatInstruction})`;
+  const editedInstruction = actualAction && compactCompareText(actualAction) !== compactCompareText(selection.inWorldText)
+    ? " The player edited/expanded the selected option; user.inWorld is the authoritative action and overrides the original option wording."
+    : " Resolve the selected choice text, not the bare numbers/letters.";
+  return `(meta: The player selected ${selection.labels.join(", ")} from the latest visible choice panel.${editedInstruction} Preserve concrete player details, props, positioning, dialogue, and intent from user.inWorld. Do not ask the same choice question again unless new information changes the options.${combatInstruction})`;
 }
 
 function latestChoicePanelFromMessages() {
