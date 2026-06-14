@@ -54,6 +54,16 @@ Send/nudge/cancel/retry ownership is now split cleanly:
 
 Provider completion can create review items or import accepted narration, but it does not directly mutate canon outside the existing import/review path.
 
+## Renderer Projection Boundaries
+
+`app/app.js` should consume projections rather than own derived gameplay state. Current extracted projection/view modules:
+
+- `app/input-composer-controller.js` derives input/send state from turn, combat, agency, and guest session inputs.
+- `app/multiplayer-session-panel.js` derives local table host/guest render state from campaign multiplayer state and guest session state.
+- `app/proposed-changes-panel.js` derives pending/committed review display state from review batches.
+
+These modules are renderer helpers only. Canon remains in SQLite/campaign state; turn/combat/agency authority remains in engines.
+
 ## Schema 2.0 Logs
 
 Campaign state now includes engine-aligned logs:

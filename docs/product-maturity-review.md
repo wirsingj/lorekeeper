@@ -214,6 +214,7 @@ The app is close to a good “tabletop chatroom” feel. Keep:
 ## Technical Debt
 
 - `app/app.js` remains the highest-risk file.
+- The first renderer extraction cut moved multiplayer panel projection, input composer projection, and proposed-change panel projection out of `app/app.js`; remaining risk is concentrated in submit/import/repair and implicit combat recovery.
 - Provider import/review code still carries legacy assumptions.
 - Route authorization is centralized but not exhaustively tested.
 - Context packs are better than raw giant prompts, but not yet retrieval-grade.

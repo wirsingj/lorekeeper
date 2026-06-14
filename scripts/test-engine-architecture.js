@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
+import { buildInputComposerProjection } from "../app/input-composer-controller.js";
+import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
+import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
 import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startCombat } from "../src/engine/combat-engine.js";
@@ -331,6 +336,114 @@ function testCampaignStateStore() {
   assert.deepEqual(events, ["update", "effects"]);
 }
 
+function testInputComposerProjection() {
+  const campaign = campaignFixture();
+  assert.equal(buildInputComposerProjection({
+    clientMode: true,
+    campaign,
+    guestSession: null,
+  }).sendDisabled, true);
+
+  campaign.combat = {
+    ...campaign.combat,
+    inCombat: true,
+    currentTurnId: "thor",
+  };
+  const hostProjection = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    findPartyMember: (id) => campaign.party.find((member) => member.id === id),
+    isHostControlledPartyRecord: (member) => member.controllerKind === controllerKinds.HOST,
+    labelById: (id) => campaign.party.find((member) => member.id === id)?.name ?? id,
+  });
+  assert.equal(hostProjection.inputDisabled, false);
+  assert.match(hostProjection.placeholder, /Act as Thor/);
+
+  campaign.combat.currentTurnId = "karl";
+  const remoteBlocked = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    collectStagedRemoteInputs: () => [],
+    findPartyMember: (id) => campaign.party.find((member) => member.id === id),
+    isHostControlledPartyRecord: (member) => member.controllerKind === controllerKinds.HOST,
+    labelById: (id) => campaign.party.find((member) => member.id === id)?.name ?? id,
+  });
+  assert.equal(remoteBlocked.inputDisabled, true);
+  assert.equal(remoteBlocked.sendDisabled, true);
+
+  const remoteStaged = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    collectStagedRemoteInputs: () => [{ characterId: "karl", text: "Karl fires." }],
+    findPartyMember: (id) => campaign.party.find((member) => member.id === id),
+    isHostControlledPartyRecord: (member) => member.controllerKind === controllerKinds.HOST,
+    labelById: (id) => campaign.party.find((member) => member.id === id)?.name ?? id,
+  });
+  assert.equal(remoteStaged.inputDisabled, true);
+  assert.equal(remoteStaged.sendDisabled, false);
+  assert.match(remoteStaged.placeholder, /remote action is staged/i);
+}
+
+function testMultiplayerSessionProjection() {
+  const campaign = campaignFixture();
+  campaign.multiplayer = {
+    localTable: { running: true, lanAddress: "192.168.1.24", port: 7347 },
+    connections: [{ id: "conn-1", displayName: "Jess", status: "pending", partyMemberId: "karl" }],
+    pendingTurnInputs: [{ characterName: "Karl", text: "Karl scouts.", ready: true, passed: false }],
+  };
+  const hostProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
+  assert.equal(hostProjection.mode, "host");
+  assert.equal(hostProjection.canResolvePartyInputs, true);
+  assert.equal(hostProjection.connectedGuests.length, 1);
+  assert.match(hostProjection.localTableAddress, /192\.168\.1\.24:7347/);
+
+  const guestProjection = buildMultiplayerSessionProjection({
+    campaign,
+    clientMode: true,
+    guestSession: { hostBaseUrl: "http://192.168.1.24:7347", status: "connected" },
+    guestSnapshot: { pendingInput: { characterName: "Karl", text: "ready" } },
+  });
+  assert.equal(guestProjection.mode, "guest");
+  assert.equal(guestProjection.canStartLocalTable, false);
+  assert.equal(guestProjection.canSyncGuestTable, true);
+  assert.equal(guestProjection.pendingInputs.length, 1);
+}
+
+function testReviewPanelProjection() {
+  const pending = buildReviewPanelProjection({
+    reviewBatch: {
+      proposedChanges: [{
+        status: "pending",
+        operation: "update",
+        domain: "scene",
+        summary: "Move scene forward.",
+        validation: { valid: true, errors: [] },
+      }],
+    },
+  });
+  assert.equal(pending.count, 1);
+  assert.match(pending.entries[0].title, /pending/);
+
+  const committed = buildReviewPanelProjection({
+    campaign: {
+      reviewLog: [{
+        status: "committed",
+        decidedAt: "2026-01-01T00:00:00.000Z",
+        applied: [{ operation: "add", domain: "people", summary: "Added Karl." }],
+      }],
+    },
+  });
+  assert.equal(committed.count, 1);
+  assert.equal(committed.entries[0].body, "Added Karl.");
+}
+
+async function testAppJsNoLongerOwnsExtractedStateMachines() {
+  const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  assert.equal(/function hostCombatInputGate/.test(appJs), false);
+  assert.equal(/function renderConnectedGuests/.test(appJs), false);
+  assert.equal(/function latestCommittedReviewBatch/.test(appJs), false);
+}
+
 testDiceEngine();
 testAgencyController();
 testTurnEngine();
@@ -339,9 +452,13 @@ testCombatEngine();
 testCombatTrackerView();
 testProviderBoundary();
 testCampaignStateStore();
+testInputComposerProjection();
+testMultiplayerSessionProjection();
+testReviewPanelProjection();
 
 await testProviderExecutionLifecycle();
 await testInvalidProviderOutputIsRecoverable();
 await testCancelAndStaleCompletion();
+await testAppJsNoLongerOwnsExtractedStateMachines();
 
 console.log("engine architecture tests passed");

@@ -92,6 +92,16 @@ Still to migrate:
 
 These should be extracted in small cuts rather than one giant renderer rewrite.
 
+## App.js Extraction Cut
+
+The current extraction cut moved three renderer-owned responsibilities out of `app/app.js`:
+
+- `app/multiplayer-session-panel.js` owns the host/guest local-table panel projection and rendering.
+- `app/input-composer-controller.js` owns input placeholder and send-button projection for full, thin, RP, and combat states.
+- `app/proposed-changes-panel.js` owns the proposed-change review list projection.
+
+`app/app.js` now wires these modules instead of calculating those UI states inline. See `docs/app-js-responsibility-map.md` for the current ownership map and remaining extraction targets.
+
 ## Schema 2.0 Update
 
 Because LoreKeeper is still in dev-experimental mode, old save files can be wiped and recreated. The

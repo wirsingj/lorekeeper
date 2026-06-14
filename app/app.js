@@ -13,7 +13,10 @@ import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inp
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
+import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
+import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
+import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 
 const launchParams = new URLSearchParams(window.location.search);
@@ -2047,93 +2050,19 @@ function createGuestShellCampaign() {
 }
 
 function renderMultiplayerPanel() {
-  const multiplayer = state.campaign?.multiplayer ?? {};
-  const table = multiplayer.localTable ?? {};
-  if (clientMode) {
-    elements.localTableState.textContent = "Client";
-    elements.localTableAddress.textContent = state.guestSession?.hostBaseUrl
-      ? `${state.guestSession.status === "connected" ? "Connected" : "Waiting"}: ${state.guestSession.hostBaseUrl}`
-      : "Paste a host invite link to join.";
-    elements.startLocalTable.disabled = true;
-    elements.stopLocalTable.disabled = true;
-    if (elements.syncGuestTable) {
-      elements.syncGuestTable.disabled = !state.guestSession?.hostBaseUrl;
-    }
-    elements.resolvePartyInputs.disabled = true;
-    renderConnectedGuests([]);
-    renderPendingInputs(state.guestSnapshot?.pendingInput ? [state.guestSnapshot.pendingInput] : []);
-    return;
-  }
-
-  elements.localTableState.textContent = table.running ? "On" : "Off";
-  elements.localTableAddress.textContent = table.running
-    ? `LAN: ${table.lanAddress || "127.0.0.1"}:${table.port || location.port}`
-    : "Start a LAN table only when another local app is joining.";
-  elements.stopLocalTable.disabled = !table.running;
-  if (elements.syncGuestTable) {
-    elements.syncGuestTable.disabled = true;
-  }
-  elements.resolvePartyInputs.disabled = !(multiplayer.pendingTurnInputs ?? []).some((input) => input.ready && !input.passed && input.text);
-  renderConnectedGuests(multiplayer.connections ?? []);
-  renderPendingInputs(multiplayer.pendingTurnInputs ?? []);
-}
-
-function renderConnectedGuests(connections) {
-  elements.connectedGuests.replaceChildren(
-    ...emptyOrLocalTableRows(
-      connections.map((connection) => localTableRow({
-        title: connection.displayName || "Guest",
-        subtitle: `${connection.status} / ${labelById(state.campaign, connection.partyMemberId)}`,
-        actions: connection.status === "pending"
-          ? [
-            { label: "Approve", onClick: () => approveGuest(connection.id) },
-            { label: "Deny", onClick: () => denyGuest(connection.id) },
-          ]
-          : [],
-      })),
-      "No guests connected.",
-    ),
-  );
-}
-
-function renderPendingInputs(inputs) {
-  elements.pendingInputs.replaceChildren(
-    ...emptyOrLocalTableRows(
-      inputs.map((input) => localTableRow({
-        title: input.characterName || "Party member",
-        subtitle: input.passed ? "passed" : input.text || "not ready",
-        actions: [],
-      })),
-      "No pending party inputs.",
-    ),
-  );
-}
-
-function localTableRow({ title, subtitle, actions = [] }) {
-  const row = document.createElement("div");
-  row.className = "local-table-row";
-  const text = document.createElement("span");
-  text.textContent = `${title}: ${subtitle}`;
-  row.append(text);
-  for (const action of actions) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "mini-action";
-    button.textContent = action.label;
-    button.addEventListener("click", action.onClick);
-    row.append(button);
-  }
-  return row;
-}
-
-function emptyOrLocalTableRows(rows, message) {
-  if (rows.length) {
-    return rows;
-  }
-  const empty = document.createElement("p");
-  empty.className = "empty-state";
-  empty.textContent = message;
-  return [empty];
+  renderMultiplayerSessionPanel({
+    elements,
+    projection: buildMultiplayerSessionProjection({
+      campaign: state.campaign,
+      clientMode,
+      guestSession: state.guestSession,
+      guestSnapshot: state.guestSnapshot,
+      locationPort: location.port,
+    }),
+    labelById: (id) => labelById(state.campaign, id),
+    approveGuest,
+    denyGuest,
+  });
 }
 
 function controllerLabel(member) {
@@ -3251,17 +3180,13 @@ function applyThinModeChrome() {
     button.hidden = true;
     button.disabled = true;
   });
-  const connected = state.guestSession?.status === "connected";
-  const activeCombatTurn = state.campaign?.combat?.inCombat ? state.campaign.combat.currentTurnId : null;
-  const isGuestCombatTurn = !activeCombatTurn || activeCombatTurn === state.guestSession?.partyMemberId;
-  elements.playerInput.disabled = !connected || !isGuestCombatTurn;
-  elements.playerInput.placeholder = !connected
-    ? "Join a hosted LoreKeeper table before sending party-member actions."
-    : isGuestCombatTurn
-      ? `Type as ${state.guestSnapshot?.assignedCharacter?.name ?? "your assigned party member"}. The host submits it to the DM.`
-      : `Waiting for ${labelById(state.campaign, activeCombatTurn)}'s combat turn.`;
-  elements.buildTurn.disabled = !connected || !isGuestCombatTurn;
-  elements.buildTurn.textContent = "Send To Host";
+  applyInputComposerProjection(elements, buildInputComposerProjection({
+    clientMode: true,
+    campaign: state.campaign,
+    guestSession: state.guestSession,
+    guestSnapshot: state.guestSnapshot,
+    labelById: (id) => labelById(state.campaign, id),
+  }));
 }
 
 function applyFullModeChrome() {
@@ -3286,36 +3211,14 @@ function applyFullModeChrome() {
     button.hidden = false;
     button.disabled = false;
   });
-  const combatGate = hostCombatInputGate();
-  elements.playerInput.disabled = combatGate.inputDisabled;
-  elements.playerInput.placeholder = combatGate.placeholder || "I check the alley for watchers. (Keep this tense and heist-focused.)";
-  elements.buildTurn.disabled = !turnProjection().canSubmit || combatGate.sendDisabled;
-  elements.buildTurn.textContent = "Send Turn";
-}
-
-function hostCombatInputGate() {
-  const combat = state.campaign?.combat;
-  if (!combat?.inCombat || !combat.currentTurnId) {
-    return { inputDisabled: false, sendDisabled: false, placeholder: "" };
-  }
-  const activeId = combat.currentTurnId;
-  const activeMember = findById(state.campaign.party, activeId);
-  if (activeMember && isHostControlledPartyRecord(activeMember)) {
-    return {
-      inputDisabled: false,
-      sendDisabled: false,
-      placeholder: `Act as ${activeMember.name}. It is their combat turn.`,
-    };
-  }
-  const stagedForActive = collectStagedRemoteInputs().length > 0;
-  const activeName = labelById(state.campaign, activeId);
-  return {
-    inputDisabled: true,
-    sendDisabled: !stagedForActive,
-    placeholder: stagedForActive
-      ? `${activeName}'s remote action is staged. Send Turn resolves it.`
-      : `Waiting for ${activeName}'s combat turn.`,
-  };
+  applyInputComposerProjection(elements, buildInputComposerProjection({
+    campaign: state.campaign,
+    turnProjection: turnProjection(),
+    collectStagedRemoteInputs,
+    findPartyMember: (id) => findById(state.campaign.party, id),
+    isHostControlledPartyRecord,
+    labelById: (id) => labelById(state.campaign, id),
+  }));
 }
 
 function hideSetupSection(element, hidden) {
@@ -6780,47 +6683,20 @@ function renderContextPack(contextPack) {
 }
 
 function renderReviewBatch() {
-  if (state.reviewBatch?.proposedChanges?.length) {
-    const changes = state.reviewBatch.proposedChanges;
-    elements.reviewCount.textContent = String(changes.length);
-    elements.reviewList.replaceChildren(
-      ...changes.slice(0, 6).map((change) =>
-        recordElement({
-          title: `${change.status} / ${change.operation} / ${change.domain}`,
-          body: change.validation?.valid === false
-            ? `${change.summary} (${change.validation.errors.join("; ")})`
-            : change.summary,
-        }),
-      ),
-    );
-    return;
-  }
-
-  const lastCommitted = latestCommittedReviewBatch(state.campaign);
-  const changes = lastCommitted?.applied ?? [];
-  elements.reviewCount.textContent = String(changes.length);
-  elements.reviewList.replaceChildren(
-    ...emptyOrRecords(
-      changes.slice(0, 6).map((change) =>
-        recordElement({
-          title: `${change.operation} / ${change.domain}`,
-          body: change.summary,
-        }),
-      ),
-      "No pending state changes.",
-    ),
-  );
+  renderReviewPanel({
+    elements,
+    projection: buildReviewPanelProjection({
+      reviewBatch: state.reviewBatch,
+      campaign: state.campaign,
+    }),
+    recordElement,
+    emptyOrRecords,
+  });
 }
 
 function inferAncestryFromSheetText(value) {
   const match = String(value ?? "").match(/\b(human|elf|dwarf|halfling|gnome|orc|tiefling|dragonborn|half-elf|half-orc)\b/i);
   return match?.[1] ?? "";
-}
-
-function latestCommittedReviewBatch(campaign) {
-  return [...(campaign.reviewLog ?? [])]
-    .filter((batch) => batch.status === "committed")
-    .sort((a, b) => String(b.decidedAt || b.updatedAt || b.createdAt).localeCompare(String(a.decidedAt || a.updatedAt || a.createdAt)))[0] ?? null;
 }
 
 function renderPrompt(prompt) {

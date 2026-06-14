@@ -36,6 +36,19 @@ In combat, if settings allow immediate remote combat turns, the guest input can 
 - Thin client join should be visible on the main view.
 - Host approval should appear next to the relevant party member/seat.
 - "Submit" for guest input should be labeled "Stage" unless it immediately resolves an active combat turn.
+- The renderer should consume a multiplayer session projection rather than deriving host/guest local-table UI state inline.
+
+## Current Projection Module
+
+`app/multiplayer-session-panel.js` now derives:
+
+- local table state and address
+- whether host start/stop/sync/resolve controls are enabled
+- connected guest rows
+- pending input rows
+- guest client sync affordances
+
+It is not authoritative. Host state still comes from campaign multiplayer data; guest state still comes from scoped host snapshots.
 
 ## Security Notes
 
