@@ -39,6 +39,14 @@ export function LorekeeperShell() {
             <span id="scene-location">Loading...</span>
             <span id="save-status">SQLite: local file ready</span>
           </div>
+          <div id="scene-intelligence" className="scene-intelligence" hidden>
+            <div>
+              <span className="scene-intelligence-label">Scene</span>
+              <strong id="scene-intelligence-title">Current scene</strong>
+            </div>
+            <p id="scene-intelligence-tensions"></p>
+            <p id="scene-intelligence-consequences"></p>
+          </div>
           <span id="provider-status" className="visually-hidden">Provider: manual bridge</span>
         </section>
 

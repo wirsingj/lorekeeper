@@ -1,3 +1,5 @@
+import { buildSceneRetrieval } from "./scene-engine.js";
+
 const providerTasks = new Set([
   "generate_scene_beat",
   "narrate_resolved_action",
@@ -12,17 +14,21 @@ export function buildProviderTaskRequest({ task, campaign, turn, context = {}, a
   if (!providerTasks.has(task)) {
     throw new Error(`Unsupported provider task: ${task}`);
   }
+  const sceneRetrieval = buildSceneRetrieval(campaign ?? {});
   return {
     task,
     turnId: turn?.turnId ?? null,
     mode: turn?.mode ?? deriveMode(campaign),
     readonlyContext: {
-      scene: summarizeScene(campaign),
+      scene: summarizeScene(campaign, sceneRetrieval),
+      activeConsequences: sceneRetrieval.activeConsequences.map(summarizeConsequence),
+      relevantRelationships: sceneRetrieval.relevantRelationships.map(summarizeRelationship),
+      activeThreads: sceneRetrieval.activeThreads.map(summarizeThread),
       activeActor: summarizeActor(campaign, turn?.actorId ?? campaign?.combat?.currentTurnId),
       recentMessages: (campaign?.sessionLog?.messages ?? []).slice(-8).map((message) => ({
         role: message.role,
-        speaker: message.speaker ?? message.speakerName ?? null,
-        text: String(message.text ?? message.content ?? "").slice(0, 1200),
+        speaker: message.speaker ?? message.speakerName ?? message.title ?? null,
+        text: String(message.body ?? message.text ?? message.content ?? "").slice(0, 1200),
       })),
       combat: summarizeCombat(campaign),
       ...context,
@@ -199,11 +205,57 @@ function deriveMode(campaign) {
   return campaign?.combat?.inCombat ? "combat" : campaign?.scene?.status === "downtime" ? "downtime" : "rp";
 }
 
-function summarizeScene(campaign) {
+function summarizeScene(campaign, sceneRetrieval = buildSceneRetrieval(campaign ?? {})) {
+  const scene = sceneRetrieval.scene;
   return {
     status: campaign?.scene?.status ?? null,
     currentPlaceId: campaign?.scene?.currentPlaceId ?? null,
-    immediateSituation: campaign?.scene?.immediateSituation ?? "",
+    activeSceneId: campaign?.scene?.activeSceneId ?? scene?.id ?? null,
+    title: scene?.title ?? null,
+    type: scene?.type ?? null,
+    immediateSituation: scene?.immediateSituation ?? campaign?.scene?.immediateSituation ?? "",
+    whyHere: scene?.whyHere ?? "",
+    goals: scene?.goals ?? [],
+    tensions: scene?.tensions ?? campaign?.scene?.tensions ?? [],
+    unresolvedQuestions: scene?.unresolvedQuestions ?? campaign?.scene?.unresolvedQuestions ?? [],
+    participants: sceneRetrieval.participants.map((participant) => ({
+      id: participant.id,
+      name: participant.name ?? participant.title ?? participant.id,
+      role: participant.role ?? participant.type ?? participant.controllerKind ?? null,
+    })),
+  };
+}
+
+function summarizeConsequence(consequence) {
+  return {
+    id: consequence.id,
+    title: consequence.title,
+    scope: consequence.scope,
+    state: consequence.state,
+    importance: consequence.importance,
+    description: consequence.description,
+    participantIds: consequence.participantIds ?? [],
+    threadIds: consequence.threadIds ?? [],
+  };
+}
+
+function summarizeRelationship(relationship) {
+  return {
+    id: relationship.id ?? null,
+    sourceId: relationship.sourceId,
+    targetId: relationship.targetId,
+    type: relationship.type,
+    notes: relationship.notes,
+  };
+}
+
+function summarizeThread(thread) {
+  return {
+    id: thread.id,
+    title: thread.title,
+    status: thread.status,
+    stakes: thread.stakes ?? "",
+    openQuestions: thread.openQuestions ?? [],
   };
 }
 

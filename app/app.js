@@ -12,6 +12,7 @@ import { renderTurnResponseForImport } from "../src/model-contract/turn-json-con
 import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inputs.js";
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
+import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
@@ -149,6 +150,10 @@ const elements = {
   campaignSelect: document.querySelector("#campaign-select"),
   deleteCampaign: document.querySelector("#delete-campaign"),
   sceneLocation: document.querySelector("#scene-location"),
+  sceneIntelligence: document.querySelector("#scene-intelligence"),
+  sceneIntelligenceTitle: document.querySelector("#scene-intelligence-title"),
+  sceneIntelligenceTensions: document.querySelector("#scene-intelligence-tensions"),
+  sceneIntelligenceConsequences: document.querySelector("#scene-intelligence-consequences"),
   providerStatus: document.querySelector("#provider-status"),
   providerActivity: document.querySelector("#provider-activity"),
   providerActivityLabel: document.querySelector("#provider-activity-label"),
@@ -3694,6 +3699,7 @@ function render() {
   elements.title.textContent = campaign.title;
   elements.sessionLabel.textContent = activeSession?.title || "Campaign Play";
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
+  renderSceneIntelligence(campaign);
   const providerSettings = currentProviderSettings();
   elements.providerStatus.textContent = providerSettings.preferredProvider === "ollama"
     ? `Provider: Ollama ${providerSettings.selectedModel}`
@@ -3723,6 +3729,33 @@ function render() {
   renderCampaignSelector();
   renderProviderControls();
   renderMultiplayerPanel();
+}
+
+function renderSceneIntelligence(campaign) {
+  if (!elements.sceneIntelligence) {
+    return;
+  }
+  const retrieval = buildSceneRetrieval(campaign);
+  const scene = retrieval.scene;
+  const tensions = scene?.tensions ?? campaign.scene?.tensions ?? [];
+  const consequences = retrieval.activeConsequences;
+  const hasDetails = Boolean(scene?.title || tensions.length || consequences.length);
+  elements.sceneIntelligence.hidden = !hasDetails;
+  if (elements.sceneIntelligenceTitle) {
+    elements.sceneIntelligenceTitle.textContent = scene?.title || "Current scene";
+  }
+  if (elements.sceneIntelligenceTensions) {
+    elements.sceneIntelligenceTensions.textContent = tensions.length
+      ? `Tension: ${tensions.slice(0, 2).join("; ")}`
+      : "";
+    elements.sceneIntelligenceTensions.hidden = tensions.length === 0;
+  }
+  if (elements.sceneIntelligenceConsequences) {
+    elements.sceneIntelligenceConsequences.textContent = consequences.length
+      ? `Consequence: ${consequences.slice(0, 2).map((consequence) => consequence.title).join("; ")}`
+      : "";
+    elements.sceneIntelligenceConsequences.hidden = consequences.length === 0;
+  }
 }
 
 function renderCampaignSelector() {

@@ -10,11 +10,14 @@ export const entityTypes = Object.freeze({
   LORE_NOTE: "lore_note",
   TIMELINE_EVENT: "timeline_event",
   RELATIONSHIP: "relationship",
+  SCENE: "scene",
+  CONSEQUENCE: "consequence",
   MAP: "map",
 });
 
 export const contextPackKinds = Object.freeze({
   SCENE: "current_scene",
+  CONSEQUENCES: "active_consequences",
   HISTORY: "recent_play_history",
   PARTY: "active_party",
   NEARBY: "nearby_people_places",
@@ -49,6 +52,8 @@ export function createEmptyCampaign(overrides = {}) {
     timeline: arrayOrEmpty(overrides.timeline),
     quests: arrayOrEmpty(overrides.quests),
     relationships: arrayOrEmpty(overrides.relationships),
+    scenes: arrayOrEmpty(overrides.scenes),
+    consequences: arrayOrEmpty(overrides.consequences),
     scene: normalizeSceneState(overrides.scene),
     sessionLog: normalizeSessionLog(overrides.sessionLog),
     combat: normalizeCombatState(overrides.combat),
@@ -119,12 +124,16 @@ function normalizeMultiplayerState(multiplayer = {}) {
 
 export function createEmptyScene() {
   return {
+    activeSceneId: null,
     status: "between_scenes",
     currentPlaceId: null,
     nearbyPlaceIds: [],
     presentPeopleIds: [],
     presentPartyMemberIds: [],
     activeQuestIds: [],
+    activeConsequenceIds: [],
+    tensions: [],
+    unresolvedQuestions: [],
     localNotes: [],
     immediateSituation: "",
   };
@@ -140,7 +149,11 @@ function normalizeSceneState(scene = {}) {
     presentPeopleIds: arrayOrEmpty(source.presentPeopleIds),
     presentPartyMemberIds: arrayOrEmpty(source.presentPartyMemberIds),
     activeQuestIds: arrayOrEmpty(source.activeQuestIds),
+    activeConsequenceIds: arrayOrEmpty(source.activeConsequenceIds),
+    tensions: arrayOrEmpty(source.tensions),
+    unresolvedQuestions: arrayOrEmpty(source.unresolvedQuestions),
     localNotes: arrayOrEmpty(source.localNotes),
+    activeSceneId: source.activeSceneId ?? defaults.activeSceneId,
     status: source.status ?? defaults.status,
     currentPlaceId: source.currentPlaceId ?? defaults.currentPlaceId,
     immediateSituation: source.immediateSituation ?? source.situation ?? defaults.immediateSituation,
@@ -502,6 +515,8 @@ export function validateCampaign(campaign) {
   requireArray(campaign, "timeline", errors);
   requireArray(campaign, "quests", errors);
   requireArray(campaign, "relationships", errors);
+  requireArray(campaign, "scenes", errors);
+  requireArray(campaign, "consequences", errors);
   requireArray(campaign, "turnLog", errors);
   requireArray(campaign, "diceLog", errors);
   requireArray(campaign, "stateEffectLog", errors);

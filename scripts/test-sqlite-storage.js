@@ -26,6 +26,47 @@ try {
     startingLocation: "Schema Gate",
   });
   campaign.engineState.mode = "combat";
+  campaign.scene.activeSceneId = "scene-1";
+  campaign.scene.tensions = ["The gate is quiet, but too quiet."];
+  campaign.scene.activeConsequenceIds = ["consequence-1"];
+  campaign.scenes.push({
+    id: "scene-1",
+    title: "Schema Gate watch",
+    type: "exploration",
+    locationId: campaign.scene.currentPlaceId,
+    participantIds: [campaign.party[0]?.id ?? "actor-1"],
+    partyMemberIds: [campaign.party[0]?.id ?? "actor-1"],
+    peopleIds: [],
+    threadIds: [],
+    consequenceIds: ["consequence-1"],
+    goals: ["Keep watch."],
+    tensions: ["The gate is quiet, but too quiet."],
+    unresolvedQuestions: ["Who is testing the gate?"],
+    whyHere: "The watch shift is the current pressure point.",
+    immediateSituation: campaign.scene.immediateSituation,
+    status: "active",
+    startedAt: campaign.createdAt,
+    endedAt: null,
+    updatedAt: campaign.createdAt,
+  });
+  campaign.consequences.push({
+    id: "consequence-1",
+    title: "Suspicious quiet at the gate",
+    description: "Future checks should account for the eerie quiet.",
+    scope: "scene",
+    state: "active",
+    importance: "medium",
+    sourceSceneId: "scene-1",
+    relatedSceneIds: ["scene-1"],
+    participantIds: [campaign.party[0]?.id ?? "actor-1"],
+    relationshipIds: [],
+    threadIds: [],
+    tags: ["watch"],
+    createdAt: campaign.createdAt,
+    updatedAt: campaign.createdAt,
+    resolvedAt: null,
+    resolution: "",
+  });
   campaign.turnLog.push({
     id: "turn-1",
     mode: "combat",
@@ -84,6 +125,8 @@ try {
   assert.equal(summary.metadata["lorekeeper.sqlite_user_version"], String(SQLITE_USER_VERSION));
   assert.equal(summary.campaign.schema_version, "2.0.0");
   assert.ok(summary.counts.scene >= 1);
+  assert.equal(summary.counts.scenes, 1);
+  assert.equal(summary.counts.consequences, 1);
   assert.ok(summary.counts.combat >= 1);
   assert.ok(summary.counts.engine_state >= 1);
   assert.ok(summary.counts.rules_profile >= 1);
@@ -98,6 +141,9 @@ try {
   assert.equal(roundTrip.schemaVersion, "2.0.0");
   assert.equal(roundTrip.scene.currentPlaceId, campaign.scene.currentPlaceId);
   assert.deepEqual(roundTrip.scene.presentPeopleIds, campaign.scene.presentPeopleIds);
+  assert.equal(roundTrip.scene.activeSceneId, "scene-1");
+  assert.equal(roundTrip.scenes.length, 1);
+  assert.equal(roundTrip.consequences.length, 1);
   assert.equal(roundTrip.engineState.mode, "combat");
   assert.equal(roundTrip.turnLog.length, 1);
   assert.equal(roundTrip.diceLog.length, 1);

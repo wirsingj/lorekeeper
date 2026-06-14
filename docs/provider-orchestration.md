@@ -20,6 +20,9 @@ Each provider request should include:
 - active turn id
 - current mode
 - readonly scene summary
+- active consequences
+- relevant scene relationships
+- active threads
 - active actor summary
 - relevant recent messages
 - compact combat state when relevant
@@ -36,6 +39,19 @@ Each provider request should include:
 - Provider responses do not advance combat turns.
 - Provider responses do not apply HP/resource changes.
 - Provider responses should follow the DM quality policy: consequences, continuity, NPC motivation, sense of place, and meaningful choices before new/random events.
+
+## Scene-Aware Context
+
+Provider requests use `SceneEngine.buildSceneRetrieval` to include only the context that matters for
+the current beat:
+
+- current scene title, type, location, participants, tensions, and unresolved questions
+- active consequences connected to the scene or participants
+- relationships connected to active participants or consequences
+- active threads tied to the scene or consequences
+
+This is the app-owned foundation for better DM behavior. Prompt wording may improve later, but the
+provider should already see why this scene matters before inventing new content.
 
 ## Failure Rules
 

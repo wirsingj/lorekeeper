@@ -18,6 +18,8 @@ LoreKeeper should be a local-first D&D 5E-lite table engine:
 - `AgencyController` owns who can act for each actor.
 - `ProviderOrchestrator` owns focused provider tasks and response matching, but never mutates canon.
 - `MultiplayerSessionEngine` owns host authority, seats, invites, and pending remote inputs.
+- `SceneEngine` owns scene intelligence: why this scene exists, who is present, tensions, and unresolved questions.
+- `ConsequenceEngine` owns consequences as first-class campaign state.
 - UI renders derived engine state.
 
 ## App.js Breakup
@@ -89,6 +91,7 @@ Still to migrate:
 - Post-turn recovery helpers still live in `app.js`, though they now use runtime gates.
 - Multiplayer pending input resolution still calls the high-level submit function.
 - Repair import still uses existing review/import plumbing.
+- Some scene/consequence authoring is still manual or importer-driven; automatic consequence extraction should be a later cut.
 
 These should be extracted in small cuts rather than one giant renderer rewrite.
 
@@ -113,5 +116,17 @@ snapshot and SQLite:
 - dice roll records
 - validated state effect records
 - combat action records
+- first-class scene records
+- first-class consequence records
 
 This gives future debugging a source better than provider prose or screenshots.
+
+## Scene Intelligence Cut
+
+The current cut adds `SceneEngine` and `ConsequenceEngine` as app-owned foundations for DM quality.
+Provider requests now carry scene-aware readonly context: active scene, tensions, active
+consequences, relevant relationships, and active threads. The renderer also exposes a compact scene
+intelligence panel in the campaign rail.
+
+This deliberately avoids a prompt-only fix. Better DM behavior should come from the app knowing what
+matters, then asking the provider to narrate from that focused state.

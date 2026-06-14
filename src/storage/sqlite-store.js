@@ -147,6 +147,8 @@ function insertCampaign(db, campaign) {
   insertRecordGroup(db, campaign, "lore", campaign.lore, (record) => record.title);
   insertRecordGroup(db, campaign, "timeline", campaign.timeline, (record) => record.summary);
   insertRecordGroup(db, campaign, "quests", campaign.quests, (record) => record.title);
+  insertRecordGroup(db, campaign, "scenes", campaign.scenes, (record) => record.title);
+  insertRecordGroup(db, campaign, "consequences", campaign.consequences, (record) => record.title);
   insertRecordGroup(db, campaign, "scene", [campaign.scene], () => "Current scene", "scene-current");
   insertRecordGroup(db, campaign, "combat", [campaign.combat], () => "Combat state", "combat-current");
   insertRecordGroup(db, campaign, "engine_state", [campaign.engineState], () => "Engine state", "engine-state-current");

@@ -9,6 +9,8 @@
 | Dice rolls | `DiceEngine` | App-owned, deterministic when seeded, visible roll records. |
 | Turn lifecycle | `TurnEngine` | Prevents double-submit, stale-submit, and unexplained disabled UI. |
 | Combat state | `CombatEngine` | Owns initiative, current actor, legal actions, effects, and advancement. |
+| Scene intelligence | `SceneEngine` | Owns scene records, scene transitions, tensions, unresolved questions, and scene retrieval. |
+| Consequences | `ConsequenceEngine` | Owns consequence records and active/resolved lifecycle. |
 | Actor control | `AgencyController` | Separates canon party members from temporary controllers/seats. |
 | Provider text | `ProviderOrchestrator` | Readonly context in, narration/suggestions/proposed changes out. |
 | Guest inputs | `MultiplayerSessionEngine` | Host authoritative. Guests do not mutate SQLite. |
@@ -42,6 +44,10 @@ Provider chat history is not canon. Provider responses are never trusted as stat
 
 It may not directly advance turns, spend resources, apply HP damage, assign controllers, or mutate SQLite.
 
+Provider requests now receive scene-aware readonly context: current scene, active consequences,
+relevant relationships, active threads, active actor, recent messages, and compact combat state.
+This is intentionally a briefing, not a campaign dump.
+
 ## Current Send Flow
 
 Send/nudge/cancel/retry ownership is now split cleanly:
@@ -73,6 +79,8 @@ Campaign state now includes engine-aligned logs:
 - `stateEffectLog`
 - `combatActionLog`
 - `providerEventLog`
+- `scenes`
+- `consequences`
 
 SQLite also stores these in normalized schema 2.0 tables for audit and future context retrieval. The
 current writer still persists the whole campaign snapshot atomically; normalized tables are the

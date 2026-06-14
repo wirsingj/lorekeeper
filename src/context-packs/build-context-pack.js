@@ -1,9 +1,11 @@
 import { contextPackKinds } from "../campaign-state/schema.js";
 import { findById, labelEntity } from "../campaign-state/formatters.js";
+import { buildSceneRetrieval } from "../engine/scene-engine.js";
 import { buildRulesLedger } from "../rules/dnd5e-lite-ledger.js";
 
 const DEFAULT_PACK_KINDS = [
   contextPackKinds.SCENE,
+  contextPackKinds.CONSEQUENCES,
   contextPackKinds.HISTORY,
   contextPackKinds.PARTY,
   contextPackKinds.NEARBY,
@@ -62,6 +64,8 @@ function buildSection(kind, campaign, options) {
   switch (kind) {
     case contextPackKinds.SCENE:
       return buildSceneSection(campaign);
+    case contextPackKinds.CONSEQUENCES:
+      return buildConsequencesSection(campaign);
     case contextPackKinds.HISTORY:
       return buildHistorySection(campaign);
     case contextPackKinds.PARTY:
@@ -105,22 +109,43 @@ function buildHistorySection(campaign) {
 }
 
 function buildSceneSection(campaign) {
+  const retrieval = buildSceneRetrieval(campaign);
+  const activeScene = retrieval.scene;
   const place = findById(campaign.places, campaign.scene.currentPlaceId);
   const presentPeople = campaign.scene.presentPeopleIds.map((id) => labelEntity(campaign, id));
   const sceneLocation = campaign.scene.location || campaign.scene.place || campaign.scene.currentLocation;
   const location = sceneLocation || (place ? `${place.name} - ${place.summary}` : "Unknown");
-  const situation = campaign.scene.situation || campaign.scene.immediateSituation || "Not set.";
+  const situation = activeScene?.immediateSituation || campaign.scene.situation || campaign.scene.immediateSituation || "Not set.";
 
   return {
     kind: contextPackKinds.SCENE,
     title: "Current Scene",
     entries: [
+      `Scene: ${activeScene?.title ?? "Current scene"} (${activeScene?.type ?? campaign.scene.status})`,
+      activeScene?.whyHere ? `Why here: ${compactText(activeScene.whyHere, SHORT_ENTRY_LIMIT)}` : null,
       `Status: ${campaign.scene.status}`,
       `Location: ${compactText(location, SHORT_ENTRY_LIMIT)}`,
       `Immediate situation: ${compactText(situation, MEDIUM_ENTRY_LIMIT)}`,
+      ...(activeScene?.goals ?? []).slice(0, 3).map((goal) => `Scene goal: ${compactText(goal, SHORT_ENTRY_LIMIT)}`),
+      ...(activeScene?.tensions ?? []).slice(0, 4).map((tension) => `Tension: ${compactText(tension, SHORT_ENTRY_LIMIT)}`),
+      ...(activeScene?.unresolvedQuestions ?? []).slice(0, 4).map((question) => `Unresolved: ${compactText(question, SHORT_ENTRY_LIMIT)}`),
       `Present NPCs: ${presentPeople.length > 0 ? presentPeople.join(", ") : "None recorded."}`,
       ...campaign.scene.localNotes.slice(0, 3).map((note) => `Scene note: ${compactText(note, SHORT_ENTRY_LIMIT)}`),
-    ],
+    ].filter(Boolean),
+  };
+}
+
+function buildConsequencesSection(campaign) {
+  const retrieval = buildSceneRetrieval(campaign);
+  return {
+    kind: contextPackKinds.CONSEQUENCES,
+    title: "Active Consequences",
+    entries: retrieval.activeConsequences.map((consequence) =>
+      compactText(
+        `${consequence.title} (${consequence.importance}/${consequence.scope}): ${consequence.description}`,
+        MEDIUM_ENTRY_LIMIT,
+      ),
+    ),
   };
 }
 
@@ -284,10 +309,14 @@ function buildRulesProfileSection(campaign, options = {}) {
 }
 
 function buildRelationshipSection(campaign) {
+  const retrieval = buildSceneRetrieval(campaign);
+  const relationships = retrieval.relevantRelationships.length
+    ? retrieval.relevantRelationships
+    : campaign.relationships.slice(0, 8);
   return {
     kind: contextPackKinds.RELATIONSHIPS,
     title: "Relationship Notes",
-    entries: campaign.relationships.slice(0, 8).map(
+    entries: relationships.slice(0, 8).map(
       (relationship) =>
         compactText(
           `${labelEntity(campaign, relationship.sourceId)} -> ${labelEntity(campaign, relationship.targetId)} (${relationship.type}): ${relationship.notes}`,
