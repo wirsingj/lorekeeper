@@ -18,6 +18,7 @@ export function buildMultiplayerSessionProjection({
       canStopLocalTable: false,
       canSyncGuestTable: Boolean(guestSession?.hostBaseUrl),
       canResolvePartyInputs: false,
+      requireGuestActionApproval: false,
       connectedGuests: [],
       pendingInputs: guestSnapshot?.pendingInput ? [guestSnapshot.pendingInput] : [],
     };
@@ -34,6 +35,7 @@ export function buildMultiplayerSessionProjection({
     canStopLocalTable: Boolean(table.running),
     canSyncGuestTable: false,
     canResolvePartyInputs: pendingInputs.some((input) => input.ready && !input.passed && input.text),
+    requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
     connectedGuests: multiplayer.connections ?? [],
     pendingInputs,
   };
@@ -52,6 +54,10 @@ export function renderMultiplayerSessionPanel({
   elements.stopLocalTable.disabled = !projection.canStopLocalTable;
   if (elements.syncGuestTable) {
     elements.syncGuestTable.disabled = !projection.canSyncGuestTable;
+  }
+  if (elements.requireGuestActionApproval) {
+    elements.requireGuestActionApproval.checked = projection.requireGuestActionApproval;
+    elements.requireGuestActionApproval.disabled = projection.mode !== "host";
   }
   elements.resolvePartyInputs.disabled = !projection.canResolvePartyInputs;
   renderConnectedGuests(elements.connectedGuests, projection.connectedGuests, { labelById, approveGuest, denyGuest });

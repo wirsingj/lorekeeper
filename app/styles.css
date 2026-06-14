@@ -725,6 +725,11 @@ h3 {
   width: auto;
 }
 
+.local-table-option {
+  margin-top: 2px;
+  font-size: 0.74rem;
+}
+
 .setup-note {
   margin: 0;
   color: #aebbc2;

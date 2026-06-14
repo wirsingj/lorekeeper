@@ -19,6 +19,7 @@ WebSocket can be added for low-latency table updates and streamed generation whi
 - `GET /api/multiplayer/snapshot`
 - `POST /api/multiplayer/start`
 - `POST /api/multiplayer/stop`
+- `POST /api/multiplayer/settings`
 - `POST /api/multiplayer/invite`
 - `POST /api/multiplayer/invite/revoke`
 - `POST /api/multiplayer/join`
@@ -94,6 +95,16 @@ The host validates:
 - text is present for a ready action
 
 Accepted guest actions are written into visible table chat with `source: "remote_player_input_pending"` and a `data.pendingInputId`.
+
+Guest action approval is host-configurable:
+
+```json
+{
+  "requireGuestActionApproval": false
+}
+```
+
+`requireGuestActionApproval` defaults to `false` for same-room play. When it is off, accepted guest actions are queued for automatic host-side resolution as soon as the turn/provider pipeline is idle. Guests still cannot mutate SQLite or call the provider directly.
 
 ## Model Aggregation
 

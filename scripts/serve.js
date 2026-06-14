@@ -46,6 +46,7 @@ import {
   startLocalTable,
   stopLocalTable,
   submitGuestAction,
+  updateMultiplayerSettings,
 } from "../src/multiplayer/local-table.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -382,6 +383,18 @@ const server = createServer(async (request, response) => {
         clientId: url.searchParams.get("clientId"),
         connectionSecret: url.searchParams.get("connectionSecret"),
       }));
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/settings" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
+        campaign: updateMultiplayerSettings(campaign, body),
+      }));
+      sendJson(response, 200, {
+        ...payload,
+        multiplayer: createHostSnapshot(payload.campaign),
+      });
       return;
     }
 

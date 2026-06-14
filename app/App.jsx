@@ -515,6 +515,10 @@ function SetupDialog() {
             <span id="local-table-state" className="count-pill">Off</span>
           </div>
           <p id="local-table-address" className="setup-note">Start a LAN table only when another local app is joining.</p>
+          <label className="check-row local-table-option" title="When off, approved ThinLoreKeeper players send actions straight to the host turn queue.">
+            <input id="require-guest-action-approval" type="checkbox" />
+            Require host approval before guest actions reach the DM
+          </label>
           <div className="button-stack two-up">
             <button id="start-local-table" type="button">Start Local Table</button>
             <button id="stop-local-table" type="button">Stop</button>

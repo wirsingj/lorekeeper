@@ -28,6 +28,9 @@ export const inviteKinds = Object.freeze({
 
 const allowedControllerKinds = new Set(Object.values(controllerKinds));
 const allowedTurnStates = new Set(Object.values(hostTurnStates));
+const defaultMultiplayerSettings = Object.freeze({
+  requireGuestActionApproval: false,
+});
 const tableStateLimits = Object.freeze({
   party: 24,
   people: 80,
@@ -102,6 +105,21 @@ export function stopLocalTable(campaign) {
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "local_table_stopped",
     summary: "Local table stopped; remote controllers released.",
+  });
+  return touchCampaign(next);
+}
+
+export function updateMultiplayerSettings(campaign, settings = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  next.multiplayer.settings = {
+    ...next.multiplayer.settings,
+    requireGuestActionApproval: Boolean(settings.requireGuestActionApproval),
+  };
+  next.multiplayer.events = appendEvent(next.multiplayer.events, {
+    type: "multiplayer_settings_updated",
+    summary: next.multiplayer.settings.requireGuestActionApproval
+      ? "Remote player actions now require host approval."
+      : "Remote player actions now submit directly when the host table is ready.",
   });
   return touchCampaign(next);
 }
@@ -423,7 +441,9 @@ export function submitGuestAction(campaign, { connectionId, clientId, connection
     updatedAt: nowIso(),
   };
   next.multiplayer.pendingTurnInputs = upsertById(next.multiplayer.pendingTurnInputs, input);
-  appendVisibleRemoteMessage(next, input);
+  appendVisibleRemoteMessage(next, input, {
+    requireApproval: next.multiplayer.settings.requireGuestActionApproval,
+  });
   next.multiplayer.hostTurnState = hostTurnStates.COLLECTING_PARTY_INPUTS;
   connection.lastSeenAt = nowIso();
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
@@ -618,6 +638,7 @@ export function createHostSnapshot(campaign) {
     campaignId: normalized.id,
     campaignTitle: normalized.title,
     localTable: normalized.multiplayer.localTable,
+    settings: normalized.multiplayer.settings,
     hostTurnState: normalized.multiplayer.hostTurnState,
     party: normalized.party.map((member) => ({
       id: member.id,
@@ -680,6 +701,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
       choices: null,
       hostTurnState: normalized.multiplayer.hostTurnState,
       pendingInput: null,
+      settings: normalized.multiplayer.settings,
       awaitingApproval: !tableStopped && connection.status === "pending",
       tableStopped,
       tableState: {
@@ -732,6 +754,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
     tableTalk: tableState.tableTalk,
     choices: tableState.choices,
     hostTurnState: normalized.multiplayer.hostTurnState,
+    settings: normalized.multiplayer.settings,
     pendingInput: tableState.pendingInput,
     awaitingApproval: false,
     tableState,
@@ -804,6 +827,11 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
       lanAddress: multiplayer.localTable?.lanAddress || "",
       startedAt: multiplayer.localTable?.startedAt ?? null,
       stoppedAt: multiplayer.localTable?.stoppedAt ?? null,
+    },
+    settings: {
+      ...defaultMultiplayerSettings,
+      ...(multiplayer.settings ?? {}),
+      requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
     },
     hostTurnState: allowedTurnStates.has(multiplayer.hostTurnState) ? multiplayer.hostTurnState : hostTurnStates.WAITING_FOR_PLAYER,
     players: Array.isArray(multiplayer.players) ? multiplayer.players : [],
@@ -1231,7 +1259,7 @@ function isHiddenValue(value) {
   );
 }
 
-function appendVisibleRemoteMessage(campaign, input) {
+function appendVisibleRemoteMessage(campaign, input, { requireApproval = false } = {}) {
   const sessionLog = campaign.sessionLog ?? { activeSessionId: "session-main", sessions: [], messages: [] };
   const activeSessionId = sessionLog.activeSessionId || "session-main";
   if (!Array.isArray(sessionLog.sessions) || !sessionLog.sessions.some((session) => session.id === activeSessionId)) {
@@ -1254,7 +1282,9 @@ function appendVisibleRemoteMessage(campaign, input) {
     role: "party",
     title: input.characterName,
     body: input.text,
-    meta: `From ${input.playerName}; staged for next Send Turn`,
+    meta: requireApproval
+      ? `From ${input.playerName}; waiting for host approval`
+      : `From ${input.playerName}; queued for DM`,
     source: "remote_player_input_pending",
     providerRunId: null,
     createdAt: existingIndex === -1 ? nowIso() : sessionLog.messages[existingIndex].createdAt,
@@ -1263,7 +1293,8 @@ function appendVisibleRemoteMessage(campaign, input) {
       playerId: input.playerId,
       characterId: input.characterId,
       status: "pending_model_submit",
-      hostStaged: true,
+      hostStaged: !requireApproval,
+      requiresHostApproval: requireApproval,
       multiplayer: true,
     },
   };

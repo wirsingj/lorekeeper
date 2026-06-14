@@ -753,12 +753,14 @@ function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
     localTable: { running: true, lanAddress: "192.168.1.24", port: 7347 },
+    settings: { requireGuestActionApproval: false },
     connections: [{ id: "conn-1", displayName: "Jess", status: "pending", partyMemberId: "karl" }],
     pendingTurnInputs: [{ characterName: "Karl", text: "Karl scouts.", ready: true, passed: false }],
   };
   const hostProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
   assert.equal(hostProjection.mode, "host");
   assert.equal(hostProjection.canResolvePartyInputs, true);
+  assert.equal(hostProjection.requireGuestActionApproval, false);
   assert.equal(hostProjection.connectedGuests.length, 1);
   assert.match(hostProjection.localTableAddress, /192\.168\.1\.24:7347/);
 
@@ -776,6 +778,10 @@ function testMultiplayerSessionProjection() {
   assert.equal(stoppedProjection.localTableState, "Off");
   assert.equal(stoppedProjection.canStopLocalTable, false);
   assert.equal(stoppedProjection.canResolvePartyInputs, false);
+
+  campaign.multiplayer.settings.requireGuestActionApproval = true;
+  const approvalProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
+  assert.equal(approvalProjection.requireGuestActionApproval, true);
 
   const guestProjection = buildMultiplayerSessionProjection({
     campaign,

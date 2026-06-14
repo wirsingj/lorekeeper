@@ -9,7 +9,6 @@ import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-r
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
-import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inputs.js";
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
@@ -54,6 +53,7 @@ const apiMultiplayerGuestSnapshotUrl = "/api/multiplayer/guest-snapshot";
 const apiMultiplayerActionUrl = "/api/multiplayer/action";
 const apiMultiplayerPassUrl = "/api/multiplayer/pass";
 const apiMultiplayerTableTalkUrl = "/api/multiplayer/table-talk";
+const apiMultiplayerSettingsUrl = "/api/multiplayer/settings";
 const apiMultiplayerApproveUrl = "/api/multiplayer/join/approve";
 const apiMultiplayerDenyUrl = "/api/multiplayer/join/deny";
 const apiMultiplayerRevokeControllerUrl = "/api/multiplayer/controller/revoke";
@@ -100,6 +100,8 @@ const state = {
   guestPollInFlight: false,
   autoResolvingCombatInput: false,
   lastAutoResolvedRemoteKey: "",
+  autoResolveGuestInputsTimer: null,
+  autoResolvingGuestInputs: false,
   autoResolvingEnemyTurn: false,
   lastAutoResolvedEnemyKey: "",
   autoResumingPendingTurn: false,
@@ -255,6 +257,7 @@ const elements = {
   localTableState: document.querySelector("#local-table-state"),
   localTableAddress: document.querySelector("#local-table-address"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
+  requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
   startLocalTable: document.querySelector("#start-local-table"),
   stopLocalTable: document.querySelector("#stop-local-table"),
   copyCharacterInvite: document.querySelector("#copy-character-invite"),
@@ -501,6 +504,10 @@ elements.startLocalTable.addEventListener("click", async () => {
 
 elements.stopLocalTable.addEventListener("click", async () => {
   await stopLocalTableFromUi();
+});
+
+elements.requireGuestActionApproval?.addEventListener("change", async () => {
+  await saveGuestActionApprovalSetting();
 });
 
 elements.copyCharacterInvite?.addEventListener("click", async () => {
@@ -1731,6 +1738,28 @@ async function stopLocalTableFromUi() {
   }
 }
 
+async function saveGuestActionApprovalSetting() {
+  if (!elements.requireGuestActionApproval) {
+    return;
+  }
+  const requireGuestActionApproval = Boolean(elements.requireGuestActionApproval.checked);
+  try {
+    const result = await postJson(apiMultiplayerSettingsUrl, { requireGuestActionApproval });
+    setCampaignFromPayload(result, "local_table_settings_updated");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    setProviderActivity(
+      requireGuestActionApproval
+        ? "Guest actions now wait for host approval"
+        : "Guest actions now submit directly when the host is ready",
+      "idle",
+    );
+  } catch (error) {
+    elements.requireGuestActionApproval.checked = Boolean(state.campaign?.multiplayer?.settings?.requireGuestActionApproval);
+    setProviderActivity(error instanceof Error ? `Table setting failed: ${error.message}` : "Table setting failed", "error");
+  }
+}
+
 async function createInviteForMember(member) {
   try {
     if (!state.campaign.multiplayer?.localTable?.running) {
@@ -2119,8 +2148,7 @@ async function resolveCollectedPartyInputs() {
     return;
   }
 
-  const aggregate = buildAggregatedPlayerTurnFromInputs({ hostText, inputs: readyInputs });
-  await resolvePendingInputsWithText(readyInputs, aggregate.text);
+  await resolvePendingInputsWithText(readyInputs, hostText);
 }
 
 async function resolvePendingInput(inputId) {
@@ -2153,6 +2181,59 @@ async function resolvePendingInputsWithText(inputs, aggregateText) {
     state.multiplayerSnapshot = result.multiplayer;
     render();
   }
+}
+
+function scheduleAutoResolveGuestInputs(reason = "snapshot") {
+  if (clientMode || state.guestSession?.hostBaseUrl) {
+    return;
+  }
+  if (state.autoResolveGuestInputsTimer) {
+    window.clearTimeout(state.autoResolveGuestInputsTimer);
+  }
+  state.autoResolveGuestInputsTimer = window.setTimeout(() => {
+    state.autoResolveGuestInputsTimer = null;
+    maybeAutoResolveGuestInputs(reason);
+  }, 150);
+}
+
+async function maybeAutoResolveGuestInputs(reason = "snapshot") {
+  if (!shouldAutoResolveGuestInputs()) {
+    return;
+  }
+  const inputs = collectStagedRemoteInputs();
+  if (!inputs.length) {
+    return;
+  }
+  state.autoResolvingGuestInputs = true;
+  try {
+    pushDiagnosticsEvent("guest_inputs_auto_resolving", {
+      reason,
+      inputIds: inputs.map((input) => input.id),
+      combatActorId: state.campaign?.combat?.currentTurnId ?? null,
+    });
+    setProviderActivity(inputs.length === 1 ? `${inputs[0].characterName} sent an action; resolving...` : "Guest actions received; resolving...", "working");
+    await resolvePendingInputsWithText(inputs, "");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Guest action queued: ${error.message}` : "Guest action queued", "waiting");
+  } finally {
+    state.autoResolvingGuestInputs = false;
+  }
+}
+
+function shouldAutoResolveGuestInputs() {
+  if (!state.campaign?.multiplayer?.localTable?.running) {
+    return false;
+  }
+  if (state.campaign.multiplayer?.settings?.requireGuestActionApproval) {
+    return false;
+  }
+  if (state.autoResolvingGuestInputs || turnFlowBlocksNewTurn()) {
+    return false;
+  }
+  if (elements.playerInput?.value?.trim()) {
+    return false;
+  }
+  return collectStagedRemoteInputs().length > 0;
 }
 
 function renderGuestSnapshot(snapshot) {
@@ -3181,6 +3262,7 @@ function setCampaignFromPayload(payload, contextPurpose) {
   if (previousCampaignId && previousCampaignId !== state.campaign.id) {
     state.turnFlow.reset({ reason: "campaign_changed" });
   }
+  scheduleAutoResolveGuestInputs(contextPurpose);
 }
 
 function currentProviderSettings() {
@@ -3390,6 +3472,9 @@ function applyThinModeChrome() {
   if (elements.copyCharacterInvite) {
     elements.copyCharacterInvite.hidden = true;
   }
+  if (elements.requireGuestActionApproval) {
+    elements.requireGuestActionApproval.closest(".local-table-option")?.setAttribute("hidden", "");
+  }
   elements.resolvePartyInputs.hidden = true;
   elements.joinCampaign.hidden = false;
   if (elements.joinCampaignMain) {
@@ -3428,6 +3513,9 @@ function applyFullModeChrome() {
   elements.stopLocalTable.hidden = false;
   if (elements.copyCharacterInvite) {
     elements.copyCharacterInvite.hidden = false;
+  }
+  if (elements.requireGuestActionApproval) {
+    elements.requireGuestActionApproval.closest(".local-table-option")?.removeAttribute("hidden");
   }
   elements.resolvePartyInputs.hidden = false;
   elements.joinCampaign.hidden = false;

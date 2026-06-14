@@ -15,11 +15,13 @@ import {
   stopLocalTable,
   startLocalTable,
   submitGuestAction,
+  updateMultiplayerSettings,
 } from "../src/multiplayer/local-table.js";
 
 let campaign = testCampaign();
 campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
 assert.equal(campaign.multiplayer.localTable.running, true);
+assert.equal(campaign.multiplayer.settings.requireGuestActionApproval, false);
 
 const inviteResult = createInviteForPartyMember(campaign, {
   partyMemberId: "kevric",
@@ -160,10 +162,27 @@ assert.equal(publicMessage.title, "Kevric");
 assert.equal(publicMessage.body, "Kevric ducks behind the nearest tree and watches Jarin's blind side.");
 assert.equal(publicMessage.data.status, "pending_model_submit");
 assert.equal(publicMessage.data.hostStaged, true);
-assert.match(publicMessage.meta, /staged for next Send Turn/i);
+assert.equal(publicMessage.data.requiresHostApproval, false);
+assert.match(publicMessage.meta, /queued for DM/i);
+
+campaign = clearPendingTurnInputs(campaign, [campaign.multiplayer.pendingTurnInputs[0].id]);
+campaign = updateMultiplayerSettings(campaign, { requireGuestActionApproval: true });
+assert.equal(campaign.multiplayer.settings.requireGuestActionApproval, true);
+campaign = submitGuestAction(campaign, {
+  connectionId: connected.id,
+  clientId: "guest-client",
+  connectionSecret,
+  characterId: "kevric",
+  text: "Kevric waits for host approval before stepping into the clearing.",
+});
+const approvalMessage = campaign.sessionLog.messages.find((message) => message.data?.pendingInputId === campaign.multiplayer.pendingTurnInputs[0].id);
+assert.equal(approvalMessage.data.hostStaged, false);
+assert.equal(approvalMessage.data.requiresHostApproval, true);
+assert.match(approvalMessage.meta, /waiting for host approval/i);
 
 const hostSnapshot = createHostSnapshot(campaign);
 assert.equal(hostSnapshot.connections.some((connection) => "secret" in connection), false);
+assert.equal(hostSnapshot.settings.requireGuestActionApproval, true);
 const guestSnapshot = createGuestSnapshot(campaign, connected.id, { clientId: "guest-client", connectionSecret });
 assert.equal(guestSnapshot.assignedCharacter.name, "Kevric");
 assert.ok(guestSnapshot.revision);

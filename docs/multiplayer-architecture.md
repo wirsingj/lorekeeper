@@ -26,16 +26,20 @@ Seat state should support:
 
 ## Turn Inputs
 
-In RP/exploration, remote inputs are staged for host approval or grouped turn submission.
+Remote player action approval is a host table setting, separate from join approval. It defaults to off.
 
-In combat, if settings allow immediate remote combat turns, the guest input can be resolved when the remote-controlled actor is active. Otherwise it is staged for host approval.
+When `requireGuestActionApproval` is off, an approved guest's action is written as a visible party message and queued for the host turn pipeline. The host still owns SQLite, provider calls, state effects, and turn resolution. The renderer auto-resolves queued guest actions only while the provider/turn engine is idle, no repair is pending, and the host is not composing a message.
+
+When `requireGuestActionApproval` is on, remote inputs wait for the host to stage or resolve them manually.
+
+In combat, remote actions still respect active actor rules: a remote combat action resolves only when that remote-controlled actor is the current combatant. Guest clients do not skip initiative or mutate combat state.
 
 ## UI Requirements
 
 - Main app invite generation should be visible on the party/seat panel.
 - Thin client join should be visible on the main view.
 - Host approval should appear next to the relevant party member/seat.
-- "Submit" for guest input should be labeled "Stage" unless it immediately resolves an active combat turn.
+- "Host approval for guest actions" should remain a clear Local Table option, defaulting off for smoother same-room play.
 - The renderer should consume a multiplayer session projection rather than deriving host/guest local-table UI state inline.
 
 ## Current Projection Module
