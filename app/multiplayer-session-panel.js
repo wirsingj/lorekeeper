@@ -63,7 +63,9 @@ function renderConnectedGuests(container, connections, { labelById, approveGuest
     ...emptyOrRows(
       connections.map((connection) => localTableRow({
         title: connection.displayName || "Guest",
-        subtitle: `${connection.status} / ${labelById(connection.partyMemberId)}`,
+        subtitle: connection.proposedCharacter?.name
+          ? `${connection.status} / wants to join as ${connection.proposedCharacter.name}`
+          : `${connection.status} / ${labelById(connection.partyMemberId)}`,
         actions: connection.status === "pending"
           ? [
             { label: "Approve", onClick: () => approveGuest(connection.id) },

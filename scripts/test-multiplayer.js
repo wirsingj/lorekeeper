@@ -4,6 +4,7 @@ import {
   buildAggregatedPlayerTurn,
   clearPendingTurnInputs,
   controllerKinds,
+  createCharacterRequestInvite,
   createGuestSnapshot,
   createHostSnapshot,
   createInviteForPartyMember,
@@ -247,6 +248,36 @@ const revivedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connec
 assert.equal(revivedSnapshot.connection.status, "connected");
 assert.equal(revivedSnapshot.assignedCharacter.name, "Kevric");
 assert.equal(tableStopCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
+
+let joinAsCampaign = startLocalTable(testCampaign(), { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+const characterInviteResult = createCharacterRequestInvite(joinAsCampaign, { host: "192.168.1.24", port: 7347 });
+joinAsCampaign = characterInviteResult.campaign;
+const characterInvite = parseInviteLink(characterInviteResult.inviteLink);
+assert.equal(characterInvite.valid, true);
+assert.equal(characterInvite.seat, "new-character");
+const characterJoinResult = requestJoin(joinAsCampaign, {
+  inviteLink: characterInviteResult.inviteLink,
+  playerName: "Nora",
+  clientId: "join-as-client",
+  proposedCharacter: {
+    name: "Mira",
+    ancestry: "Human",
+    characterClass: "Ranger",
+    level: 2,
+    backstory: "A road scout looking for her missing sister.",
+  },
+});
+joinAsCampaign = characterJoinResult.campaign;
+assert.equal(characterJoinResult.approved, false);
+assert.equal(joinAsCampaign.party.some((member) => member.name === "Mira"), false);
+assert.equal(joinAsCampaign.multiplayer.connections[0].proposedCharacter.name, "Mira");
+joinAsCampaign = approveJoinRequest(joinAsCampaign, characterJoinResult.connection.id);
+const mira = joinAsCampaign.party.find((member) => member.name === "Mira");
+assert.ok(mira);
+assert.equal(mira.controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(mira.ancestryClass, "Human Ranger");
+assert.match(mira.background, /missing sister/);
+assert.equal(joinAsCampaign.multiplayer.connections[0].partyMemberId, mira.id);
 
 console.log("Lorekeeper multiplayer tests passed.");
 

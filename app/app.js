@@ -46,6 +46,7 @@ const apiMultiplayerSnapshotUrl = "/api/multiplayer/snapshot";
 const apiMultiplayerStartUrl = "/api/multiplayer/start";
 const apiMultiplayerStopUrl = "/api/multiplayer/stop";
 const apiMultiplayerInviteUrl = "/api/multiplayer/invite";
+const apiMultiplayerInviteCharacterUrl = "/api/multiplayer/invite-character";
 const apiMultiplayerJoinUrl = "/api/multiplayer/join";
 const apiMultiplayerGuestSnapshotUrl = "/api/multiplayer/guest-snapshot";
 const apiMultiplayerActionUrl = "/api/multiplayer/action";
@@ -221,6 +222,10 @@ const elements = {
   thinJoinPanel: document.querySelector("#thin-join-panel"),
   thinJoinInviteLink: document.querySelector("#thin-join-invite-link"),
   thinJoinPlayerName: document.querySelector("#thin-join-player-name"),
+  thinJoinCharacterName: document.querySelector("#thin-join-character-name"),
+  thinJoinCharacterAncestry: document.querySelector("#thin-join-character-ancestry"),
+  thinJoinCharacterClass: document.querySelector("#thin-join-character-class"),
+  thinJoinCharacterBackstory: document.querySelector("#thin-join-character-backstory"),
   thinJoinSubmit: document.querySelector("#thin-join-submit"),
   thinJoinOpenDialog: document.querySelector("#thin-join-open-dialog"),
   thinJoinStatus: document.querySelector("#thin-join-status"),
@@ -249,8 +254,10 @@ const elements = {
   localTableAddress: document.querySelector("#local-table-address"),
   startLocalTable: document.querySelector("#start-local-table"),
   stopLocalTable: document.querySelector("#stop-local-table"),
+  copyCharacterInvite: document.querySelector("#copy-character-invite"),
   joinCampaign: document.querySelector("#join-campaign"),
   joinCampaignMain: document.querySelector("#join-campaign-main"),
+  inviteNewCharacterMain: document.querySelector("#invite-new-character-main"),
   syncGuestTable: document.querySelector("#sync-guest-table"),
   resolvePartyInputs: document.querySelector("#resolve-party-inputs"),
   connectedGuests: document.querySelector("#connected-guests"),
@@ -492,12 +499,20 @@ elements.stopLocalTable.addEventListener("click", async () => {
   await stopLocalTableFromUi();
 });
 
+elements.copyCharacterInvite?.addEventListener("click", async () => {
+  await createCharacterRequestInviteFromUi();
+});
+
 elements.joinCampaign.addEventListener("click", () => {
   openJoinCampaignDialog();
 });
 
 elements.joinCampaignMain?.addEventListener("click", () => {
   openJoinCampaignDialog();
+});
+
+elements.inviteNewCharacterMain?.addEventListener("click", async () => {
+  await createCharacterRequestInviteFromUi();
 });
 
 elements.thinJoinOpenDialog?.addEventListener("click", () => {
@@ -1734,6 +1749,22 @@ async function createInviteForMember(member) {
   }
 }
 
+async function createCharacterRequestInviteFromUi() {
+  try {
+    if (!state.campaign?.multiplayer?.localTable?.running) {
+      await startLocalTableFromUi();
+    }
+    const result = await postJson(apiMultiplayerInviteCharacterUrl, {});
+    setCampaignFromPayload(result, "local_table_character_invite_created");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    await navigator.clipboard.writeText(result.inviteLink);
+    setProviderActivity("Join-as character invite copied", "idle");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Join-as invite failed: ${error.message}` : "Join-as invite failed", "error");
+  }
+}
+
 async function setPartyMemberController(member, controllerKind) {
   const url = controllerKind === "host"
     ? apiMultiplayerHostControllerUrl
@@ -1786,12 +1817,18 @@ async function requestJoinFromThinPanel() {
   await requestJoinWithValues({
     inviteLink: elements.thinJoinInviteLink?.value,
     playerName: elements.thinJoinPlayerName?.value,
+    proposedCharacter: {
+      name: elements.thinJoinCharacterName?.value,
+      ancestry: elements.thinJoinCharacterAncestry?.value,
+      characterClass: elements.thinJoinCharacterClass?.value,
+      backstory: elements.thinJoinCharacterBackstory?.value,
+    },
     statusElement: elements.thinJoinStatus,
     submitButton: elements.thinJoinSubmit,
   });
 }
 
-async function requestJoinWithValues({ inviteLink, playerName, statusElement, submitButton } = {}) {
+async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter = null, statusElement, submitButton } = {}) {
   try {
     const trimmedInviteLink = String(inviteLink ?? "").trim();
     const parsed = parseInviteLinkForClient(trimmedInviteLink);
@@ -1808,8 +1845,9 @@ async function requestJoinWithValues({ inviteLink, playerName, statusElement, su
     const baseUrl = `http://${parsed.host}:${parsed.port}`;
     const result = await postJson(`${baseUrl}${apiMultiplayerJoinUrl}`, {
       inviteLink: trimmedInviteLink,
-      playerName: String(playerName ?? "").trim() || "Guest Player",
+      playerName: String(playerName ?? "").trim() || String(proposedCharacter?.name ?? "").trim() || "Guest Player",
       clientId,
+      proposedCharacter,
     });
     state.guestSession = {
       hostBaseUrl: baseUrl,
@@ -3290,11 +3328,17 @@ function applyThinModeChrome() {
   hideSetupSection(elements.responseImport, true);
   elements.startLocalTable.hidden = true;
   elements.stopLocalTable.hidden = true;
+  if (elements.copyCharacterInvite) {
+    elements.copyCharacterInvite.hidden = true;
+  }
   elements.resolvePartyInputs.hidden = true;
   elements.joinCampaign.hidden = false;
   if (elements.joinCampaignMain) {
     elements.joinCampaignMain.hidden = false;
     elements.joinCampaignMain.disabled = hasActiveGeneration();
+  }
+  if (elements.inviteNewCharacterMain) {
+    elements.inviteNewCharacterMain.hidden = true;
   }
   if (elements.syncGuestTable) {
     elements.syncGuestTable.hidden = false;
@@ -3323,11 +3367,18 @@ function applyFullModeChrome() {
   hideSetupSection(elements.responseImport, false);
   elements.startLocalTable.hidden = false;
   elements.stopLocalTable.hidden = false;
+  if (elements.copyCharacterInvite) {
+    elements.copyCharacterInvite.hidden = false;
+  }
   elements.resolvePartyInputs.hidden = false;
   elements.joinCampaign.hidden = false;
   if (elements.joinCampaignMain) {
     elements.joinCampaignMain.hidden = true;
     elements.joinCampaignMain.disabled = true;
+  }
+  if (elements.inviteNewCharacterMain) {
+    elements.inviteNewCharacterMain.hidden = false;
+    elements.inviteNewCharacterMain.disabled = hasActiveGeneration();
   }
   if (elements.syncGuestTable) {
     elements.syncGuestTable.hidden = false;

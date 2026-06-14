@@ -62,6 +62,9 @@ export function LorekeeperShell() {
                 </svg>
                 <span>Join</span>
               </button>
+              <button id="invite-new-character-main" className="icon-action labeled-action table-action" type="button" title="Invite a player to bring a new character" aria-label="Invite a new player character">
+                <span>Invite New</span>
+              </button>
               <button className="icon-action" data-add-domain="party" type="button" title="Add party member">+</button>
               <span id="party-count" className="count-pill">0</span>
             </div>
@@ -100,6 +103,32 @@ export function LorekeeperShell() {
                 <span>Your name</span>
                 <input id="thin-join-player-name" autoComplete="off" placeholder="Jess" />
               </label>
+              <div className="thin-join-character">
+                <h3>Join As Your Character</h3>
+                <p className="thin-join-copy">For a new-character invite, fill this out and the host can approve it into the party.</p>
+                <label>
+                  <span>Character name</span>
+                  <input id="thin-join-character-name" autoComplete="off" placeholder="Mira" />
+                </label>
+                <div className="thin-join-two">
+                  <label>
+                    <span>Ancestry</span>
+                    <input id="thin-join-character-ancestry" autoComplete="off" placeholder="Human" />
+                  </label>
+                  <label>
+                    <span>Class</span>
+                    <input id="thin-join-character-class" autoComplete="off" placeholder="Ranger" />
+                  </label>
+                </div>
+                <label>
+                  <span>Backstory</span>
+                  <textarea
+                    id="thin-join-character-backstory"
+                    rows="4"
+                    placeholder="Who are they, why are they here, and what do they care about?"
+                  ></textarea>
+                </label>
+              </div>
               <div className="thin-join-actions">
                 <button id="thin-join-submit" type="button">Join Table</button>
                 <button id="thin-join-open-dialog" className="secondary-action" type="button">Advanced</button>
@@ -488,6 +517,7 @@ function SetupDialog() {
           <div className="button-stack two-up">
             <button id="start-local-table" type="button">Start Local Table</button>
             <button id="stop-local-table" type="button">Stop</button>
+            <button id="copy-character-invite" type="button">Copy Join-As Link</button>
             <button id="join-campaign" type="button">Join Campaign</button>
             <button id="sync-guest-table" type="button">Resync</button>
             <button id="resolve-party-inputs" type="button">Resolve Inputs</button>

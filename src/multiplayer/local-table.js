@@ -21,6 +21,11 @@ export const hostTurnStates = Object.freeze({
   REVIEWING_UPDATES: "reviewing_updates",
 });
 
+export const inviteKinds = Object.freeze({
+  PARTY_MEMBER: "party_member",
+  CHARACTER_REQUEST: "character_request",
+});
+
 const allowedControllerKinds = new Set(Object.values(controllerKinds));
 const allowedTurnStates = new Set(Object.values(hostTurnStates));
 const tableStateLimits = Object.freeze({
@@ -116,6 +121,7 @@ export function createInviteForPartyMember(campaign, { partyMemberId, host, port
     id: `invite-${randomToken(8)}`,
     token: randomToken(18),
     campaignId: next.id,
+    kind: inviteKinds.PARTY_MEMBER,
     seatId: member.id,
     partyMemberId: member.id,
     status: "active",
@@ -155,6 +161,47 @@ export function createInviteForPartyMember(campaign, { partyMemberId, host, port
   };
 }
 
+export function createCharacterRequestInvite(campaign, { host, port } = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  const table = next.multiplayer.localTable;
+  if (!table.running) {
+    throw new Error("Start Local Table before creating invite links.");
+  }
+
+  const invite = {
+    id: `invite-${randomToken(8)}`,
+    token: randomToken(18),
+    campaignId: next.id,
+    kind: inviteKinds.CHARACTER_REQUEST,
+    seatId: "new-character",
+    partyMemberId: null,
+    status: "active",
+    approvalRequired: true,
+    createdAt: nowIso(),
+    revokedAt: null,
+    claimedByPlayerId: null,
+  };
+  const inviteLink = buildInviteLink({
+    host: host || table.lanAddress || "127.0.0.1",
+    port: port || table.port || 4173,
+    campaign: next.id,
+    seat: invite.seatId,
+    token: invite.token,
+  });
+
+  next.multiplayer.invites = [...next.multiplayer.invites, invite];
+  next.multiplayer.events = appendEvent(next.multiplayer.events, {
+    type: "character_request_invite_created",
+    summary: "Open character request invite created.",
+  });
+
+  return {
+    campaign: touchCampaign(next),
+    invite,
+    inviteLink,
+  };
+}
+
 export function revokeInvite(campaign, inviteId) {
   const next = normalizeMultiplayerCampaign(campaign);
   const invite = next.multiplayer.invites.find((item) => item.id === inviteId);
@@ -171,7 +218,7 @@ export function revokeInvite(campaign, inviteId) {
   return touchCampaign(next);
 }
 
-export function requestJoin(campaign, { inviteLink, playerName, clientId } = {}) {
+export function requestJoin(campaign, { inviteLink, playerName, clientId, proposedCharacter } = {}) {
   const parsed = typeof inviteLink === "string" ? parseInviteLink(inviteLink) : inviteLink;
   if (!parsed.valid) {
     throw new Error(parsed.error || "Invalid invite link.");
@@ -182,8 +229,13 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
     throw new Error("Invite is for a different campaign.");
   }
   const invite = findActiveInvite(next, parsed);
-  const member = next.party.find((item) => item.id === invite.partyMemberId);
-  if (!member) {
+  const isCharacterRequest = invite.kind === inviteKinds.CHARACTER_REQUEST || !invite.partyMemberId;
+  const member = isCharacterRequest ? null : next.party.find((item) => item.id === invite.partyMemberId);
+  const characterProposal = isCharacterRequest ? normalizeCharacterProposal(proposedCharacter, playerName) : null;
+  if (isCharacterRequest && !characterProposal.name) {
+    throw new Error("Character name is required for this invite.");
+  }
+  if (!isCharacterRequest && !member) {
     throw new Error("Invite seat no longer exists.");
   }
   const existing = findExistingConnectionForClient(next, invite.id, clientId);
@@ -199,6 +251,9 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
     existing.displayName = existingPlayer?.displayName || existing.displayName;
     existing.deniedAt = existing.status === "denied" ? existing.deniedAt : null;
     existing.disconnectedAt = existing.status === "disconnected" ? existing.disconnectedAt : null;
+    if (characterProposal) {
+      existing.proposedCharacter = characterProposal;
+    }
     if (existing.status === "connected") {
       assignController(next, existing);
     }
@@ -233,7 +288,8 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
     playerId,
     displayName: player.displayName,
     inviteId: invite.id,
-    partyMemberId: member.id,
+    partyMemberId: member?.id ?? null,
+    proposedCharacter: characterProposal,
     status: invite.approvalRequired ? "pending" : "connected",
     secret: randomToken(24),
     requestedAt: nowIso(),
@@ -246,9 +302,11 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId } = {})
   next.multiplayer.connections = upsertById(next.multiplayer.connections, connection);
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "join_requested",
-    summary: `${player.displayName} requested control of ${member.name}.`,
+    summary: isCharacterRequest
+      ? `${player.displayName} requested to join as ${characterProposal.name}.`
+      : `${player.displayName} requested control of ${member.name}.`,
     connectionId,
-    partyMemberId: member.id,
+    partyMemberId: member?.id ?? null,
   });
 
   if (!invite.approvalRequired) {
@@ -273,6 +331,30 @@ export function approveJoinRequest(campaign, connectionId) {
   if (connection.status === "denied") {
     throw new Error("Join request was denied.");
   }
+  if (!connection.partyMemberId) {
+    const member = createPartyMemberFromProposal(connection.proposedCharacter, connection.displayName);
+    const existingIds = new Set(next.party.map((item) => item.id));
+    const uniqueMember = {
+      ...member,
+      id: uniqueId(member.id, existingIds),
+    };
+    next.party = [...next.party, uniqueMember];
+    connection.partyMemberId = uniqueMember.id;
+    const invite = next.multiplayer.invites.find((item) => item.id === connection.inviteId);
+    if (invite) {
+      invite.partyMemberId = uniqueMember.id;
+      invite.seatId = uniqueMember.id;
+    }
+    next.multiplayer.seats = upsertById(next.multiplayer.seats, {
+      id: uniqueMember.id,
+      partyMemberId: uniqueMember.id,
+      label: uniqueMember.name,
+      controllerKind: uniqueMember.controllerKind,
+      controllerId: uniqueMember.controllerId ?? null,
+      inviteId: connection.inviteId,
+      updatedAt: nowIso(),
+    });
+  }
   connection.status = "connected";
   connection.approvedAt = connection.approvedAt || nowIso();
   connection.disconnectedAt = null;
@@ -284,7 +366,7 @@ export function approveJoinRequest(campaign, connectionId) {
   assignController(next, connection);
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "join_approved",
-    summary: `${connection.displayName} joined the table.`,
+    summary: `${connection.displayName} joined the table${connection.proposedCharacter?.name ? ` as ${connection.proposedCharacter.name}` : ""}.`,
     connectionId,
     partyMemberId: connection.partyMemberId,
   });
@@ -847,7 +929,7 @@ function findActiveInvite(campaign, parsed) {
     item.status === "active" &&
     item.token === parsed.token &&
     item.campaignId === parsed.campaign &&
-    item.partyMemberId === parsed.seat
+    (item.partyMemberId === parsed.seat || item.seatId === parsed.seat)
   );
   if (!invite) {
     throw new Error("Invite token is invalid or revoked.");
@@ -1006,6 +1088,7 @@ function publicConnection(connection) {
     displayName: connection.displayName,
     status: connection.status,
     partyMemberId: connection.partyMemberId,
+    proposedCharacter: publicData(connection.proposedCharacter),
     requestedAt: connection.requestedAt,
     approvedAt: connection.approvedAt,
     deniedAt: connection.deniedAt,
@@ -1223,6 +1306,72 @@ function markSubmittedMessages(campaign, clearedIds) {
       },
     };
   });
+}
+
+function normalizeCharacterProposal(proposal = {}, playerName = "") {
+  const name = compactLine(proposal.name || playerName || "", 80);
+  return {
+    name,
+    ancestry: compactLine(proposal.ancestry || "", 80),
+    characterClass: compactLine(proposal.characterClass || proposal.class || "", 80),
+    level: clampNumber(proposal.level, 1, 20) || 1,
+    backstory: compactLine(proposal.backstory || proposal.background || proposal.concept || "", 1600),
+    personality: compactLine(proposal.personality || "", 600),
+    goals: compactLine(proposal.goals || "", 600),
+  };
+}
+
+function createPartyMemberFromProposal(proposal = {}, playerName = "") {
+  const character = normalizeCharacterProposal(proposal, playerName);
+  const ancestryClass = [character.ancestry, character.characterClass].filter(Boolean).join(" ") || "adventurer";
+  const level = character.level || 1;
+  const maxHp = Math.max(6, 8 + (level - 1) * 5);
+  return {
+    id: `party-${slugify(character.name || playerName || "guest-character")}`,
+    name: character.name || "Guest Character",
+    type: "player_character",
+    playerRole: "Remote player character",
+    ancestryClass,
+    level,
+    background: character.backstory || `${character.name || "This character"} joined the campaign from a remote player request.`,
+    summary: [ancestryClass, character.personality, character.goals].filter(Boolean).join(" - "),
+    stats: {
+      hp: {
+        current: maxHp,
+        max: maxHp,
+      },
+      armorClass: 12,
+    },
+    notes: [
+      "Created from a ThinLoreKeeper join-as character request.",
+      character.backstory ? `Backstory: ${character.backstory}` : "",
+      character.personality ? `Personality: ${character.personality}` : "",
+      character.goals ? `Goals: ${character.goals}` : "",
+    ].filter(Boolean),
+    controllerKind: controllerKinds.REMOTE_PLAYER,
+    controllerId: null,
+    fallbackControllerKind: controllerKinds.HOST,
+    createdAt: nowIso(),
+  };
+}
+
+function uniqueId(baseId, existingIds) {
+  const fallbackBase = baseId || "party-guest-character";
+  let candidate = fallbackBase;
+  let counter = 2;
+  while (existingIds.has(candidate)) {
+    candidate = `${fallbackBase}-${counter}`;
+    counter += 1;
+  }
+  return candidate;
+}
+
+function clampNumber(value, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+  return Math.min(max, Math.max(min, Math.trunc(number)));
 }
 
 function randomToken(bytes) {

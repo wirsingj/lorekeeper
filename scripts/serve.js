@@ -31,6 +31,7 @@ import {
   clearPendingTurnInputs,
   createGuestSnapshot,
   createHostSnapshot,
+  createCharacterRequestInvite,
   createInviteForPartyMember,
   denyJoinRequest,
   disconnectGuest,
@@ -282,6 +283,25 @@ const server = createServer(async (request, response) => {
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
         inviteResult = createInviteForPartyMember(campaign, {
           partyMemberId: body.partyMemberId,
+          host: body.host,
+          port: body.port || port,
+        });
+        return { campaign: inviteResult.campaign };
+      });
+      sendJson(response, 200, {
+        ...payload,
+        invite: inviteResult.invite,
+        inviteLink: inviteResult.inviteLink,
+        multiplayer: createHostSnapshot(payload.campaign),
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/invite-character" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      let inviteResult = null;
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        inviteResult = createCharacterRequestInvite(campaign, {
           host: body.host,
           port: body.port || port,
         });
@@ -1030,6 +1050,7 @@ function requiresCampaignPin(pathname) {
     "/api/multiplayer/start",
     "/api/multiplayer/stop",
     "/api/multiplayer/invite",
+    "/api/multiplayer/invite-character",
     "/api/multiplayer/invite/revoke",
     "/api/multiplayer/join/approve",
     "/api/multiplayer/join/deny",
