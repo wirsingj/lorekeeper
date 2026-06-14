@@ -29,6 +29,18 @@ const parsedInvite = parseInviteLink(inviteResult.inviteLink);
 assert.equal(parsedInvite.valid, true);
 assert.equal(parsedInvite.seat, "kevric");
 assert.equal(parsedInvite.port, 7347);
+assert.equal(
+  parseInviteLink("lorekeeper://join?host=example.com&port=7347&campaign=campaign-mp&seat=kevric&token=abc").valid,
+  false,
+);
+assert.equal(
+  parseInviteLink("lorekeeper://join?host=8.8.8.8&port=7347&campaign=campaign-mp&seat=kevric&token=abc").valid,
+  false,
+);
+assert.equal(
+  parseInviteLink("lorekeeper://join?host=127.0.0.1&port=7347&campaign=campaign-mp&seat=kevric&token=abc").valid,
+  true,
+);
 
 const joinResult = requestJoin(campaign, {
   inviteLink: inviteResult.inviteLink,

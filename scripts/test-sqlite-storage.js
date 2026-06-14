@@ -118,14 +118,13 @@ try {
   assert.ok(existsSync(second.sqlitePath));
 
   await assert.rejects(
-    () => deleteCampaign(repoRoot, { sqlitePath: first.sqlitePath, campaignTitle: "Wrong Name" }),
-    /Campaign name did not match/,
+    () => deleteCampaign(repoRoot, { sqlitePath: path.join(repoRoot, "not-campaign.sqlite") }),
+    /Campaign must be inside data\/campaigns/,
   );
   assert.ok(existsSync(first.sqlitePath));
 
   const afterDelete = await deleteCampaign(repoRoot, {
     sqlitePath: second.sqlitePath,
-    campaignTitle: "Keep Target",
   });
   assert.equal(existsSync(second.sqlitePath), false);
   assert.equal(afterDelete.campaign.title, "Delete Target");

@@ -10,6 +10,7 @@ import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
 import { buildAggregatedPlayerTurnFromInputs } from "../src/multiplayer/turn-inputs.js";
+import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
@@ -2187,6 +2188,9 @@ function parseInviteLinkForClient(value) {
     }
     if (!host || !Number.isInteger(port) || !campaign) {
       return { valid: false, error: "Invite link is missing host, port, or campaign." };
+    }
+    if (!isAllowedInviteHost(host)) {
+      return { valid: false, error: "Invite host must be a local or private LAN address." };
     }
     return { valid: true, host, port, campaign };
   } catch {
@@ -6833,7 +6837,7 @@ function renderAssets(campaign) {
       wrapper.className = "asset";
 
       const image = document.createElement("img");
-      image.src = `/local-asset?path=${encodeURIComponent(asset.path)}`;
+      image.src = withLaunchToken(`/local-asset?path=${encodeURIComponent(asset.path)}`);
       image.alt = asset.name;
       wrapper.append(image);
 
@@ -6911,6 +6915,15 @@ function labelById(campaign, id) {
     findById(campaign.combat?.enemies ?? [], id)?.name ||
     id
   );
+}
+
+function withLaunchToken(rawUrl) {
+  if (!apiToken) {
+    return rawUrl;
+  }
+  const url = new URL(rawUrl, window.location.href);
+  url.searchParams.set("lkToken", apiToken);
+  return url.pathname + url.search;
 }
 
 function recordElement({ title, body, badge, actions = [], onEdit }) {

@@ -35,6 +35,7 @@ Each provider request should include:
 - Provider responses do not write SQLite.
 - Provider responses do not advance combat turns.
 - Provider responses do not apply HP/resource changes.
+- Provider responses should follow the DM quality policy: consequences, continuity, NPC motivation, sense of place, and meaningful choices before new/random events.
 
 ## Failure Rules
 

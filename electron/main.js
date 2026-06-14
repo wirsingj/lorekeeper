@@ -46,9 +46,15 @@ async function createWindow() {
       preload: path.join(rootDir, "electron", "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
     },
   });
 
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
   mainWindow.once("ready-to-show", focusMainWindow);
   mainWindow.on("page-title-updated", (event) => {
     if (!clientMode) {
@@ -62,6 +68,11 @@ async function createWindow() {
       shell.openExternal(url);
     }
     return { action: "deny" };
+  });
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isAllowedRendererNavigation(url)) {
+      event.preventDefault();
+    }
   });
   setupRendererContextMenu(mainWindow);
 
@@ -80,6 +91,18 @@ function isSafeExternalUrl(rawUrl) {
   try {
     const parsed = new URL(rawUrl);
     return ["https:", "http:", "mailto:"].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedRendererNavigation(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (clientMode) {
+      return parsed.protocol === "file:";
+    }
+    return parsed.protocol === "http:" && parsed.hostname === "127.0.0.1" && Number(parsed.port) === apiPort;
   } catch {
     return false;
   }

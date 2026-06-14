@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { touchCampaign } from "../campaign-state/schema.js";
+import { isAllowedInviteHost } from "./invite-security.js";
 import { buildAggregatedPlayerTurn as buildAggregatedPlayerTurnPure } from "./turn-inputs.js";
 
 export const multiplayerProtocolVersion = 1;
@@ -629,6 +630,9 @@ export function parseInviteLink(value) {
     const token = url.searchParams.get("token") || "";
     if (!host || !Number.isInteger(port) || port < 1 || port > 65535 || !campaign || !seat || !token) {
       return { valid: false, error: "Invite link is missing host, port, campaign, seat, or token." };
+    }
+    if (!isAllowedInviteHost(host)) {
+      return { valid: false, error: "Invite host must be a local or private LAN address." };
     }
     return {
       valid: true,

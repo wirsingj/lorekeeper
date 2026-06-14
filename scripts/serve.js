@@ -72,6 +72,11 @@ const noCacheHeaders = {
   expires: "0",
 };
 
+const securityHeaders = {
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+};
+
 const corsHeaders = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,OPTIONS",
@@ -655,6 +660,7 @@ async function streamProviderTurn(request, response) {
 
   response.writeHead(200, {
     "content-type": "application/x-ndjson; charset=utf-8",
+    ...securityHeaders,
     ...corsHeaders,
     ...noCacheHeaders,
   });
@@ -722,6 +728,7 @@ async function streamOllamaPull(request, response) {
 
   response.writeHead(200, {
     "content-type": "application/x-ndjson; charset=utf-8",
+    ...securityHeaders,
     ...corsHeaders,
     ...noCacheHeaders,
   });
@@ -890,6 +897,7 @@ async function serveFile(filePath, response) {
   response.writeHead(200, {
     "content-type": mimeTypes.get(extension) ?? "application/octet-stream",
     "content-length": fileStat.size,
+    ...securityHeaders,
     ...noCacheHeaders,
   });
   createReadStream(filePath).pipe(response);
@@ -898,6 +906,7 @@ async function serveFile(filePath, response) {
 function sendText(response, statusCode, body) {
   response.writeHead(statusCode, {
     "content-type": "text/plain; charset=utf-8",
+    ...securityHeaders,
     ...corsHeaders,
     ...noCacheHeaders,
   });
@@ -907,6 +916,7 @@ function sendText(response, statusCode, body) {
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
+    ...securityHeaders,
     ...corsHeaders,
     ...noCacheHeaders,
   });
@@ -927,6 +937,9 @@ function sendError(response, error) {
 function isAuthorizedRequest(request, url) {
   if (!apiToken) {
     return true;
+  }
+  if (url.pathname === "/local-asset") {
+    return request.headers["x-lorekeeper-api-token"] === apiToken || url.searchParams.get("lkToken") === apiToken;
   }
   if (!isProtectedApiPath(url.pathname, request.method)) {
     return true;

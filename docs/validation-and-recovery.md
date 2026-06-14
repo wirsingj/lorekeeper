@@ -41,6 +41,8 @@ They are validated against allowed operations/domains/importance/visibility. Inv
 
 Current desktop behavior stores proposed changes as a pending review batch. The next UX step is a dedicated approve/reject/edit review panel.
 
+Provider output is not trusted as authority for private API access, file access, multiplayer control, combat HP/resources, or turn advancement. Those boundaries are app-owned and validated before persistence.
+
 ## Table Rendering
 
 The player-facing chat view is rendered from `response.table`.

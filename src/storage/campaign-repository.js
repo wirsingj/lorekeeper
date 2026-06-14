@@ -175,7 +175,7 @@ export async function hideCampaign(projectRoot, { sqlitePath, campaignTitle }) {
   return deleteCampaign(projectRoot, { sqlitePath, campaignTitle });
 }
 
-export async function deleteCampaign(projectRoot, { sqlitePath, campaignTitle }) {
+export async function deleteCampaign(projectRoot, { sqlitePath }) {
   const resolvedPath = path.resolve(sqlitePath ?? "");
   if (!isPathInside(resolvedPath, getCampaignsDir(projectRoot))) {
     throw new Error("Campaign must be inside data/campaigns.");
@@ -186,10 +186,6 @@ export async function deleteCampaign(projectRoot, { sqlitePath, campaignTitle })
   }
 
   const campaign = await readCampaignFromSqliteFile(resolvedPath);
-  if (campaign.title !== campaignTitle) {
-    throw new Error("Campaign name did not match.");
-  }
-
   const index = await loadCampaignIndex(projectRoot);
   await deleteSqliteStoreFiles(resolvedPath);
   const nextCampaigns = index.campaigns.filter((entry) =>

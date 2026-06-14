@@ -66,6 +66,8 @@ The app is ready for broad testing again when:
 
 This first architecture slice does not rewrite all of `app/app.js`. That should be done progressively, because a single large renderer rewrite would likely break the app while bugs are already hot. The important shift is that new logic now has a stable engine layer to move into.
 
+See `docs/product-maturity-review.md` for the broader release-readiness review across security, performance, multiplayer, state, DM quality, combat, RP, storage, and UI comfort.
+
 ## Send Flow Audit Findings
 
 The old send/nudge/cancel/retry path had several overlapping state owners:

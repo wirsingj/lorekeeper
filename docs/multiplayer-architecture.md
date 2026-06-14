@@ -9,6 +9,7 @@ LoreKeeper should be LAN-first and host-authoritative.
 - Host owns turn resolution.
 - Guests submit inputs and render snapshots.
 - Guests do not directly mutate SQLite.
+- Invite links are LAN-only: ThinLoreKeeper accepts loopback/private hosts, not arbitrary public hosts.
 
 ## Seats
 
@@ -35,3 +36,9 @@ In combat, if settings allow immediate remote combat turns, the guest input can 
 - Thin client join should be visible on the main view.
 - Host approval should appear next to the relevant party member/seat.
 - "Submit" for guest input should be labeled "Stage" unless it immediately resolves an active combat turn.
+
+## Security Notes
+
+LAN multiplayer currently uses invite tokens plus per-connection secrets. Guest routes are intentionally narrower than host routes: guests can request join, fetch a scoped snapshot, submit/pass their assigned action, or disconnect. Private host/campaign/provider routes remain launch-token protected.
+
+Future internet multiplayer needs a different authentication and transport model. Do not expose the current LAN API directly to the public internet.
