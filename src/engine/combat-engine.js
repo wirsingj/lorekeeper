@@ -68,10 +68,16 @@ export function resolveCombatAction(campaign, action, options = {}) {
     : resolveNonAttack(normalized, actor, base, action);
 
   const effectsResult = applyStateEffects(normalized, resolved.effects, { source: "combat_engine", turnId: base.turnId });
-  let advanced = advanceExistingCombatTurn(effectsResult.campaign, {
-    fromActorId: actor.id,
+  let advanced = finishCombatIfResolved(effectsResult.campaign, {
+    resolvedActorId: actor.id,
     summary: resolved.summary ?? `${actor.name} resolved ${actionType}.`,
   });
+  if (advanced.combat?.inCombat) {
+    advanced = advanceExistingCombatTurn(advanced, {
+      fromActorId: actor.id,
+      summary: resolved.summary ?? `${actor.name} resolved ${actionType}.`,
+    });
+  }
   const actionRecord = {
     ...base,
     id: action.id ?? `combat-action-${base.turnId}`,
@@ -95,6 +101,32 @@ export function resolveCombatAction(campaign, action, options = {}) {
       actionRecord,
     },
   };
+}
+
+export function finishCombatIfResolved(campaign, options = {}) {
+  if (!campaign?.combat?.inCombat) {
+    return campaign;
+  }
+  const enemiesAlive = (campaign.combat.enemies ?? []).some((enemy) => currentHp(enemy) > 0);
+  const partyAlive = (campaign.party ?? []).some((member) => currentHp(member) > 0);
+  if (enemiesAlive && partyAlive) {
+    return campaign;
+  }
+
+  const next = structuredClone(campaign);
+  next.combat = {
+    ...(next.combat ?? {}),
+    inCombat: false,
+    currentTurnId: null,
+    lastAction: options.summary ?? next.combat?.lastAction ?? "Combat resolved.",
+    lastOutcome: enemiesAlive ? "party_defeated" : "enemies_defeated",
+    resolvedAt: options.resolvedAt ?? new Date().toISOString(),
+  };
+  next.engineState = {
+    ...(next.engineState ?? {}),
+    mode: "rp",
+  };
+  return next;
 }
 
 export function advanceCombatTurn(campaign, options = {}) {

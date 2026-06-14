@@ -159,7 +159,7 @@ function testStateEffects() {
 
 function testCombatEngine() {
   const campaign = startCombat(campaignFixture(), {
-    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 10, max: 10 }, armorClass: 10, attackBonus: 3, damage: "1d4+1" }],
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 50, max: 50 }, armorClass: 10, attackBonus: 3, damage: "1d4+1" }],
     initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
   });
   const active = getActiveCombatActor(campaign);
@@ -184,6 +184,27 @@ function testCombatEngine() {
   assert.equal(resolved.campaign.combatActionLog.length, 1, "combat action should be logged to campaign state");
   assert.equal(resolved.campaign.diceLog.length >= 1, true, "combat rolls should be logged to campaign state");
   assert.equal(resolved.campaign.stateEffectLog.length, resolved.actionRecord.effects.length, "applied effects should be logged to campaign state");
+}
+
+function testCombatEndsWhenSideDrops() {
+  const campaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 1, max: 10 }, armorClass: 1, attackBonus: 3, damage: "1d4+1" }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const resolved = resolveCombatAction(campaign, {
+    turnId: "combat-ending-turn",
+    actorId: "thor",
+    actionType: "attack",
+    targetIds: ["miner"],
+    declaredText: "Attack with Greataxe",
+    attackBonus: 50,
+    damageFormula: "1d4",
+  }, { seed: "combat-ending-hit" });
+
+  assert.equal(resolved.campaign.combat.inCombat, false, "combat should end when all enemies drop");
+  assert.equal(resolved.campaign.combat.currentTurnId, null, "ended combat should not point at a stale active actor");
+  assert.equal(resolved.campaign.combat.lastOutcome, "enemies_defeated");
+  assert.equal(resolved.campaign.engineState.mode, "rp");
 }
 
 function testCombatTrackerView() {
@@ -572,6 +593,7 @@ testAgencyController();
 testTurnEngine();
 testStateEffects();
 testCombatEngine();
+testCombatEndsWhenSideDrops();
 testCombatTrackerView();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
