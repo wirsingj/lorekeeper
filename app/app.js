@@ -252,6 +252,7 @@ const elements = {
   cancelGeneration: document.querySelector("#cancel-generation"),
   localTableState: document.querySelector("#local-table-state"),
   localTableAddress: document.querySelector("#local-table-address"),
+  localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   startLocalTable: document.querySelector("#start-local-table"),
   stopLocalTable: document.querySelector("#stop-local-table"),
   copyCharacterInvite: document.querySelector("#copy-character-invite"),
@@ -1742,8 +1743,10 @@ async function createInviteForMember(member) {
     setCampaignFromPayload(result, "local_table_invite_created");
     state.multiplayerSnapshot = result.multiplayer;
     render();
-    await navigator.clipboard.writeText(result.inviteLink);
-    setProviderActivity(`Invite link copied for ${member.name}`, "idle");
+    await publishInviteLink(result.inviteLink, {
+      copiedMessage: `Invite link copied for ${member.name}`,
+      visibleMessage: `Invite link ready for ${member.name}; copy it from Local Table.`,
+    });
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Invite failed: ${error.message}` : "Invite failed", "error");
   }
@@ -1758,10 +1761,80 @@ async function createCharacterRequestInviteFromUi() {
     setCampaignFromPayload(result, "local_table_character_invite_created");
     state.multiplayerSnapshot = result.multiplayer;
     render();
-    await navigator.clipboard.writeText(result.inviteLink);
-    setProviderActivity("Join-as character invite copied", "idle");
+    await publishInviteLink(result.inviteLink, {
+      copiedMessage: "Join-as character invite copied",
+      visibleMessage: "Join-as character invite ready; copy it from Local Table.",
+    });
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Join-as invite failed: ${error.message}` : "Join-as invite failed", "error");
+  }
+}
+
+async function publishInviteLink(inviteLink, { copiedMessage, visibleMessage } = {}) {
+  const link = String(inviteLink ?? "").trim();
+  if (!link) {
+    throw new Error("Host did not return an invite link.");
+  }
+  showInviteLink(link);
+  const copied = await writeClipboardText(link);
+  if (copied) {
+    setProviderActivity(copiedMessage || "Invite link copied", "idle");
+    return true;
+  }
+  revealInviteLink();
+  setProviderActivity(visibleMessage || "Invite link ready; copy it from Local Table.", "waiting");
+  return false;
+}
+
+function showInviteLink(inviteLink) {
+  if (!elements.localTableInviteOutput) {
+    return;
+  }
+  elements.localTableInviteOutput.value = inviteLink;
+  elements.localTableInviteOutput.hidden = false;
+}
+
+function revealInviteLink() {
+  if (!elements.localTableInviteOutput) {
+    return;
+  }
+  if (elements.setupDialog && !elements.setupDialog.open) {
+    try {
+      elements.setupDialog.showModal();
+      if (!clientMode) {
+        refreshProviderStatus({ quiet: true });
+      }
+    } catch {
+      // The invite is still visible in the setup dialog when it can be opened.
+    }
+  }
+  elements.localTableInviteOutput.hidden = false;
+  try {
+    elements.localTableInviteOutput.focus();
+    elements.localTableInviteOutput.select();
+  } catch {
+    // Selection is a convenience; never fail invite creation because of focus.
+  }
+}
+
+async function writeClipboardText(text) {
+  const value = String(text ?? "");
+  if (!value) {
+    return false;
+  }
+  try {
+    const result = await window.lorekeeperDesktop?.writeClipboardText?.(value);
+    if (result?.ok) {
+      return true;
+    }
+  } catch {
+    // Fall back to the browser clipboard API below.
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -5512,16 +5585,18 @@ async function copyPromptToClipboard(prompt, messages = {}) {
   }
 
   try {
-    await navigator.clipboard.writeText(prompt);
-    elements.bridgeStatus.textContent = messages.successMessage ?? "Prompt copied";
-    setProviderActivity(messages.successMessage ?? "Prompt copied", "idle");
-    return true;
+    if (await writeClipboardText(prompt)) {
+      elements.bridgeStatus.textContent = messages.successMessage ?? "Prompt copied";
+      setProviderActivity(messages.successMessage ?? "Prompt copied", "idle");
+      return true;
+    }
   } catch {
-    elements.bridgeStatus.textContent = messages.failureMessage ?? "Clipboard blocked; prompt is in the drawer";
-    setProviderActivity(messages.failureMessage ?? "Clipboard blocked; prompt is in the drawer", "error");
-    openPromptDrawer();
-    return false;
+    // Handled below as a visible fallback.
   }
+  elements.bridgeStatus.textContent = messages.failureMessage ?? "Clipboard blocked; prompt is in the drawer";
+  setProviderActivity(messages.failureMessage ?? "Clipboard blocked; prompt is in the drawer", "error");
+  openPromptDrawer();
+  return false;
 }
 
 function openPromptDrawer() {
@@ -5551,7 +5626,9 @@ async function copyDiagnosticsToClipboard() {
   }
 
   try {
-    await navigator.clipboard.writeText(text);
+    if (!(await writeClipboardText(text))) {
+      throw new Error("Clipboard write failed.");
+    }
     elements.diagnosticsStatus.textContent = "Copied";
     setProviderActivity("Diagnostics JSON copied", "idle");
   } catch {

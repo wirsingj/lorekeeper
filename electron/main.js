@@ -1,4 +1,4 @@
-import { Menu, app, BrowserWindow, ipcMain, screen, shell } from "electron";
+import { Menu, app, BrowserWindow, clipboard, ipcMain, screen, shell } from "electron";
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import net from "node:net";
@@ -258,6 +258,15 @@ ipcMain.handle("lorekeeper:runtime-mode", () => ({
   mode: clientMode ? "thin" : "full",
   appName,
 }));
+
+ipcMain.handle("lorekeeper:clipboard-write-text", (_event, text) => {
+  const value = String(text ?? "");
+  if (!value || value.length > 200000) {
+    return { ok: false, error: "Clipboard text is empty or too large." };
+  }
+  clipboard.writeText(value);
+  return { ok: true };
+});
 
 ipcMain.handle("lorekeeper:relaunch-mode", (_event, requestedMode) => {
   const nextMode = requestedMode === "thin" ? "thin" : "full";

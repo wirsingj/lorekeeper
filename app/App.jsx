@@ -522,6 +522,14 @@ function SetupDialog() {
             <button id="sync-guest-table" type="button">Resync</button>
             <button id="resolve-party-inputs" type="button">Resolve Inputs</button>
           </div>
+          <textarea
+            id="local-table-invite-output"
+            className="rail-textarea invite-output"
+            rows="3"
+            spellCheck="false"
+            readOnly
+            placeholder="Generated invite links appear here for copying."
+          ></textarea>
           <div id="connected-guests" className="local-table-list"></div>
           <div id="pending-inputs" className="local-table-list"></div>
         </section>

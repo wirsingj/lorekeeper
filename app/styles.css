@@ -1845,6 +1845,14 @@ textarea::placeholder {
   min-height: 100px;
 }
 
+.setup-dialog .invite-output {
+  height: 68px;
+  min-height: 68px;
+  margin-top: 10px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
 .dialog-header,
 .dialog-actions {
   display: flex;
