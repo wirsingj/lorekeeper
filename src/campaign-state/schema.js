@@ -100,6 +100,7 @@ export function createDefaultMultiplayerState() {
     invites: [],
     connections: [],
     pendingTurnInputs: [],
+    tableTalk: [],
     events: [],
   };
 }
@@ -118,6 +119,7 @@ function normalizeMultiplayerState(multiplayer = {}) {
     invites: Array.isArray(multiplayer.invites) ? multiplayer.invites : [],
     connections: Array.isArray(multiplayer.connections) ? multiplayer.connections : [],
     pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs : [],
+    tableTalk: Array.isArray(multiplayer.tableTalk) ? multiplayer.tableTalk.slice(-120) : [],
     events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
   };
 }

@@ -50,6 +50,7 @@ const apiMultiplayerJoinUrl = "/api/multiplayer/join";
 const apiMultiplayerGuestSnapshotUrl = "/api/multiplayer/guest-snapshot";
 const apiMultiplayerActionUrl = "/api/multiplayer/action";
 const apiMultiplayerPassUrl = "/api/multiplayer/pass";
+const apiMultiplayerTableTalkUrl = "/api/multiplayer/table-talk";
 const apiMultiplayerApproveUrl = "/api/multiplayer/join/approve";
 const apiMultiplayerDenyUrl = "/api/multiplayer/join/deny";
 const apiMultiplayerRevokeControllerUrl = "/api/multiplayer/controller/revoke";
@@ -208,6 +209,11 @@ const elements = {
   thingCount: document.querySelector("#thing-count"),
   questList: document.querySelector("#quest-list"),
   questCount: document.querySelector("#quest-count"),
+  tableTalkLog: document.querySelector("#table-talk-log"),
+  tableTalkCount: document.querySelector("#table-talk-count"),
+  tableTalkForm: document.querySelector("#table-talk-form"),
+  tableTalkInput: document.querySelector("#table-talk-input"),
+  tableTalkSend: document.querySelector("#table-talk-send"),
   promptOutput: document.querySelector("#prompt-output"),
   promptSize: document.querySelector("#prompt-size"),
   promptDrawer: document.querySelector("#prompt-drawer"),
@@ -494,6 +500,11 @@ elements.syncGuestTable?.addEventListener("click", async () => {
 
 elements.resolvePartyInputs.addEventListener("click", async () => {
   await resolveCollectedPartyInputs();
+});
+
+elements.tableTalkForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await sendTableTalkFromUi();
 });
 
 elements.closeJoinCampaignDialog.addEventListener("click", () => {
@@ -1896,6 +1907,51 @@ async function submitGuestActionFromUi({ pass = false } = {}) {
   }
 }
 
+async function sendTableTalkFromUi() {
+  const text = elements.tableTalkInput?.value.trim() ?? "";
+  if (!text) {
+    return;
+  }
+  if (elements.tableTalkSend) {
+    elements.tableTalkSend.disabled = true;
+  }
+
+  try {
+    if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
+      const result = await postJson(`${state.guestSession.hostBaseUrl}${apiMultiplayerTableTalkUrl}`, {
+        connectionId: state.guestSession.connectionId,
+        clientId: state.guestSession.clientId || guestClientId(),
+        connectionSecret: state.guestSession.connectionSecret || "",
+        text,
+      });
+      if (result.snapshot) {
+        renderGuestSnapshot(result.snapshot);
+      } else {
+        await refreshGuestSnapshot({ explicit: false });
+      }
+      elements.tableTalkInput.value = "";
+      setProviderActivity("Table talk sent", "idle");
+      return;
+    }
+
+    const result = await postJson(apiMultiplayerTableTalkUrl, {
+      playerName: "Host",
+      text,
+    });
+    setCampaignFromPayload(result, "table_talk");
+    state.multiplayerSnapshot = result.multiplayer;
+    elements.tableTalkInput.value = "";
+    render();
+    setProviderActivity("Table talk sent", "idle");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Table talk failed: ${error.message}` : "Table talk failed", "error");
+  } finally {
+    if (elements.tableTalkSend) {
+      elements.tableTalkSend.disabled = false;
+    }
+  }
+}
+
 async function resolveCollectedPartyInputs() {
   const pending = state.campaign.multiplayer?.pendingTurnInputs ?? [];
   const readyInputs = pending.filter((input) => input.ready && !input.passed && input.text);
@@ -1975,6 +2031,9 @@ function renderGuestSnapshot(snapshot) {
         },
       ],
       messages: tableState.messages ?? snapshot.messages ?? [],
+    },
+    multiplayer: {
+      tableTalk: tableState.tableTalk ?? snapshot.tableTalk ?? [],
     },
   });
   seedPlayLog();
@@ -3724,6 +3783,7 @@ function render() {
   renderPlaces(campaign);
   renderThings(campaign);
   renderQuests(campaign);
+  renderTableTalk();
   renderPrompt(state.prompt);
   renderReviewBatch();
   renderCampaignSelector();
@@ -6689,6 +6749,63 @@ function renderQuests(campaign) {
       "No active threads.",
     ),
   );
+}
+
+function renderTableTalk() {
+  if (!elements.tableTalkLog || !elements.tableTalkCount) {
+    return;
+  }
+  const messages = currentTableTalkMessages();
+  elements.tableTalkCount.textContent = String(messages.length);
+  if (!messages.length) {
+    const empty = document.createElement("p");
+    empty.className = "table-talk-empty";
+    empty.textContent = clientMode || state.guestSession?.hostBaseUrl
+      ? "Side chat appears here after you join the host table."
+      : "No side chat yet.";
+    elements.tableTalkLog.replaceChildren(empty);
+  } else {
+    elements.tableTalkLog.replaceChildren(
+      ...messages.slice(-80).map((message) => {
+        const wrapper = document.createElement("article");
+        wrapper.className = "table-talk-message";
+
+        const header = document.createElement("div");
+        header.className = "table-talk-message-header";
+
+        const name = document.createElement("strong");
+        name.textContent = message.playerName || (message.role === "host" ? "Host" : "Player");
+
+        const time = document.createElement("time");
+        time.dateTime = message.createdAt || "";
+        time.textContent = formatMessageTime(message.createdAt);
+
+        const body = document.createElement("p");
+        body.textContent = message.text || "";
+
+        header.replaceChildren(name, time);
+        wrapper.replaceChildren(header, body);
+        return wrapper;
+      }),
+    );
+    elements.tableTalkLog.scrollTop = elements.tableTalkLog.scrollHeight;
+  }
+
+  if (elements.tableTalkInput) {
+    const waitingGuest = Boolean((clientMode || state.guestSession?.hostBaseUrl) && !state.guestSession?.connectionId);
+    elements.tableTalkInput.disabled = waitingGuest;
+    elements.tableTalkInput.placeholder = waitingGuest ? "Join a hosted table first..." : "Side chat...";
+  }
+  if (elements.tableTalkSend) {
+    elements.tableTalkSend.disabled = Boolean(elements.tableTalkInput?.disabled);
+  }
+}
+
+function currentTableTalkMessages() {
+  if (state.guestSnapshot) {
+    return state.guestSnapshot.tableState?.tableTalk ?? state.guestSnapshot.tableTalk ?? [];
+  }
+  return state.campaign?.multiplayer?.tableTalk ?? state.multiplayerSnapshot?.tableTalk ?? [];
 }
 
 function renderContextPack(contextPack) {

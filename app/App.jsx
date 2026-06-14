@@ -130,6 +130,21 @@ export function LorekeeperShell() {
           </div>
           <div id="quest-list" className="binder-list"></div>
         </section>
+
+        <section className="rail-section table-talk-section" aria-label="Table talk side chat">
+          <div className="section-title">
+            <h2>Table Talk</h2>
+            <span id="table-talk-count" className="count-pill">0</span>
+          </div>
+          <div id="table-talk-log" className="table-talk-log" aria-live="polite">
+            <p className="table-talk-empty">No side chat yet.</p>
+          </div>
+          <form id="table-talk-form" className="table-talk-form">
+            <label className="visually-hidden" htmlFor="table-talk-input">Table Talk</label>
+            <input id="table-talk-input" autoComplete="off" maxLength="800" placeholder="Side chat..." />
+            <button id="table-talk-send" type="submit">Send</button>
+          </form>
+        </section>
         <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
           <span id="provider-activity-label">Provider idle</span>
           <div className="provider-activity-actions">

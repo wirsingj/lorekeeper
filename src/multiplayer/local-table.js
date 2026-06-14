@@ -34,6 +34,7 @@ const tableStateLimits = Object.freeze({
   lore: 60,
   relationships: 80,
   messages: 100,
+  tableTalk: 120,
   objectKeys: 60,
   arrayItems: 80,
   stringLength: 4000,
@@ -389,6 +390,45 @@ export function passGuestAction(campaign, { connectionId, clientId, connectionSe
   return touchCampaign(next);
 }
 
+export function postTableTalk(campaign, { connectionId, clientId, connectionSecret, playerName, text } = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  const trimmedText = compactLine(text, 800);
+  if (!trimmedText) {
+    throw new Error("Table talk text is required.");
+  }
+
+  let connection = null;
+  let player = null;
+  if (connectionId) {
+    connection = next.multiplayer.connections.find((item) => item.id === connectionId);
+    if (!connection || connection.status !== "connected") {
+      throw new Error("Connection is not approved.");
+    }
+    assertClientMatchesConnection(next, connection, clientId);
+    assertConnectionSecret(connection, connectionSecret);
+    player = next.multiplayer.players.find((item) => item.id === connection.playerId) ?? null;
+    connection.lastSeenAt = nowIso();
+    if (player) {
+      player.lastSeenAt = nowIso();
+    }
+  }
+
+  const message = {
+    id: `talk-${randomToken(8)}`,
+    playerId: connection?.playerId ?? "host",
+    playerName: compactLine(connection?.displayName || playerName || "Host", 80),
+    role: connection ? "guest" : "host",
+    text: trimmedText,
+    createdAt: nowIso(),
+  };
+
+  next.multiplayer.tableTalk = [
+    ...(Array.isArray(next.multiplayer.tableTalk) ? next.multiplayer.tableTalk : []),
+    message,
+  ].slice(-tableStateLimits.tableTalk);
+  return touchCampaign(next);
+}
+
 export function disconnectGuest(campaign, connectionId) {
   const next = normalizeMultiplayerCampaign(campaign);
   const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
@@ -513,6 +553,7 @@ export function createHostSnapshot(campaign) {
     })),
     connections: normalized.multiplayer.connections.map(publicConnection),
     pendingTurnInputs: normalized.multiplayer.pendingTurnInputs,
+    tableTalk: normalized.multiplayer.tableTalk.map(publicTableTalkMessage),
     events: normalized.multiplayer.events.slice(-20),
   };
 }
@@ -579,6 +620,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
         relationships: [],
         combat: null,
         messages: [],
+        tableTalk: [],
         choices: null,
         pendingInput: null,
       },
@@ -605,6 +647,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
     relationships: tableState.relationships,
     combat: tableState.combat,
     messages: tableState.messages,
+    tableTalk: tableState.tableTalk,
     choices: tableState.choices,
     hostTurnState: normalized.multiplayer.hostTurnState,
     pendingInput: tableState.pendingInput,
@@ -686,8 +729,29 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
     invites: Array.isArray(multiplayer.invites) ? multiplayer.invites : [],
     connections: Array.isArray(multiplayer.connections) ? multiplayer.connections : [],
     pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs : [],
+    tableTalk: Array.isArray(multiplayer.tableTalk)
+      ? multiplayer.tableTalk.slice(-tableStateLimits.tableTalk).map(normalizeTableTalkMessage).filter(Boolean)
+      : [],
     events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
     lastChoices: multiplayer.lastChoices ?? null,
+  };
+}
+
+function normalizeTableTalkMessage(message) {
+  if (!message || typeof message !== "object") {
+    return null;
+  }
+  const text = compactLine(message.text, 800);
+  if (!text) {
+    return null;
+  }
+  return {
+    id: compactLine(message.id || `talk-${randomToken(8)}`, 80),
+    playerId: compactLine(message.playerId || "", 120),
+    playerName: compactLine(message.playerName || "Player", 80),
+    role: message.role === "guest" ? "guest" : "host",
+    text,
+    createdAt: message.createdAt || nowIso(),
   };
 }
 
@@ -898,8 +962,11 @@ function tableRevision(campaign) {
   const eventCount = campaign.multiplayer?.events?.length ?? 0;
   const messageCount = campaign.sessionLog?.messages?.length ?? 0;
   const pendingCount = campaign.multiplayer?.pendingTurnInputs?.length ?? 0;
+  const tableTalk = campaign.multiplayer?.tableTalk ?? [];
+  const tableTalkCount = tableTalk.length;
+  const latestTableTalkAt = tableTalk.at(-1)?.createdAt ?? "";
   const combatTurn = campaign.combat?.currentTurnId ?? "";
-  return `${updatedAt}:${eventCount}:${messageCount}:${pendingCount}:${combatTurn}`;
+  return `${updatedAt}:${eventCount}:${messageCount}:${pendingCount}:${tableTalkCount}:${latestTableTalkAt}:${combatTurn}`;
 }
 
 function upsertById(records, record) {
@@ -943,6 +1010,17 @@ function publicConnection(connection) {
     approvedAt: connection.approvedAt,
     deniedAt: connection.deniedAt,
     disconnectedAt: connection.disconnectedAt,
+  };
+}
+
+function publicTableTalkMessage(message) {
+  return {
+    id: message.id,
+    playerId: message.playerId,
+    playerName: message.playerName,
+    role: message.role,
+    text: message.text,
+    createdAt: message.createdAt,
   };
 }
 
@@ -992,6 +1070,7 @@ function createVisibleTableState(campaign, connection) {
       .filter((message) => message.data?.visibility !== "dm_only")
       .slice(-tableStateLimits.messages)
       .map(publicMessage),
+    tableTalk: campaign.multiplayer.tableTalk.map(publicTableTalkMessage),
     choices: campaign.multiplayer.lastChoices ?? null,
     pendingInput: campaign.multiplayer.pendingTurnInputs
       .find((input) => input.playerId === connection.playerId && input.characterId === connection.partyMemberId) ?? null,

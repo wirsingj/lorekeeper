@@ -185,7 +185,7 @@ h3 {
   display: flex;
   flex-direction: column;
   position: relative;
-  padding-bottom: 58px;
+  padding-bottom: 76px;
 }
 
 .rail-section {
@@ -326,6 +326,96 @@ h3 {
   font-size: 0.66rem;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.table-talk-section {
+  flex: 1 1 190px;
+  min-height: 190px;
+  margin-bottom: 4px;
+}
+
+.table-talk-log {
+  min-height: 0;
+  max-height: 260px;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding-right: 2px;
+}
+
+.table-talk-empty {
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #aebbc4;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.table-talk-message {
+  padding: 8px;
+  border: 1px solid rgba(174, 191, 202, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.table-talk-message-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.table-talk-message strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #f2f6f8;
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-talk-message time {
+  flex: 0 0 auto;
+  color: #8fa6b8;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.table-talk-message p {
+  margin: 0;
+  color: #d8e0e5;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.table-talk-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.table-talk-form input {
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid rgba(174, 191, 202, 0.16);
+  border-radius: 8px;
+  background: rgba(10, 13, 15, 0.38);
+  color: #eef3f5;
+  padding: 0 9px;
+  font-size: 0.76rem;
+}
+
+.table-talk-form button {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 850;
 }
 
 .empty-state {

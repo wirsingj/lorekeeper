@@ -9,6 +9,7 @@ import {
   createInviteForPartyMember,
   disconnectGuest,
   parseInviteLink,
+  postTableTalk,
   requestJoin,
   stopLocalTable,
   startLocalTable,
@@ -172,6 +173,35 @@ assert.equal(guestSnapshot.tableState.items.find((item) => item.id === "flag").n
 assert.equal(guestSnapshot.tableState.updatedAt, campaign.updatedAt);
 assert.equal(guestSnapshot.tableState.people.some((person) => person.name === "Hidden Handler"), false);
 assert.equal(guestSnapshot.tableState.party.find((member) => member.id === "kevric").notes.some((note) => /secret/i.test(note)), false);
+
+campaign = postTableTalk(campaign, {
+  playerName: "Host",
+  text: "Snack break after this scene?",
+});
+campaign = postTableTalk(campaign, {
+  connectionId: connected.id,
+  clientId: "guest-client",
+  connectionSecret,
+  text: "Yes please.",
+});
+assert.equal(campaign.multiplayer.tableTalk.length, 2);
+assert.equal(campaign.sessionLog.messages.some((message) => /Snack break/i.test(message.body)), false);
+assert.throws(
+  () => postTableTalk(campaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret: "wrong-secret",
+    text: "Spoofed side chat.",
+  }),
+  /secret does not match/,
+);
+const tableTalkHostSnapshot = createHostSnapshot(campaign);
+assert.equal(tableTalkHostSnapshot.tableTalk.length, 2);
+assert.equal(tableTalkHostSnapshot.tableTalk.at(-1).text, "Yes please.");
+assert.equal(tableTalkHostSnapshot.tableTalk.some((message) => "connectionSecret" in message || "secret" in message), false);
+const tableTalkGuestSnapshot = createGuestSnapshot(campaign, connected.id, { clientId: "guest-client", connectionSecret });
+assert.equal(tableTalkGuestSnapshot.tableState.tableTalk.at(-1).playerName, "Jess");
+assert.equal(tableTalkGuestSnapshot.tableState.tableTalk.at(-1).text, "Yes please.");
 
 const aggregated = buildAggregatedPlayerTurn(campaign, {
   hostText: "Jarin slows down and signals silently.",

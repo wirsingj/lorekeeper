@@ -36,6 +36,7 @@ import {
   disconnectGuest,
   firstLanAddress,
   passGuestAction,
+  postTableTalk,
   requestJoin,
   returnToAiCompanion,
   revokeController,
@@ -388,6 +389,28 @@ const server = createServer(async (request, response) => {
           clientId: body.clientId,
           connectionSecret: body.connectionSecret,
         }),
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/table-talk" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      if (!body.connectionId && apiToken && request.headers["x-lorekeeper-api-token"] !== apiToken) {
+        sendText(response, 401, "Host table talk requires local app authorization.");
+        return;
+      }
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
+        campaign: postTableTalk(campaign, body),
+      }));
+      sendJson(response, 200, {
+        ...payload,
+        multiplayer: createHostSnapshot(payload.campaign),
+        snapshot: body.connectionId
+          ? createGuestSnapshot(payload.campaign, body.connectionId, {
+            clientId: body.clientId,
+            connectionSecret: body.connectionSecret,
+          })
+          : null,
       });
       return;
     }
@@ -957,7 +980,8 @@ function isProtectedApiPath(pathname, method) {
   if (pathname === "/api/multiplayer/join"
     || pathname === "/api/multiplayer/guest-snapshot"
     || pathname === "/api/multiplayer/action"
-    || pathname === "/api/multiplayer/pass") {
+    || pathname === "/api/multiplayer/pass"
+    || pathname === "/api/multiplayer/table-talk") {
     return false;
   }
   if (method === "OPTIONS") {
@@ -1014,6 +1038,7 @@ function requiresCampaignPin(pathname) {
     "/api/multiplayer/controller/ai",
     "/api/multiplayer/controller/host",
     "/api/multiplayer/pending/clear",
+    "/api/multiplayer/table-talk",
     "/api/review/commit",
   ]).has(pathname);
 }
