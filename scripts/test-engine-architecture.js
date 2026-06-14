@@ -10,6 +10,7 @@ import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-pa
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
+import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
 import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startCombat } from "../src/engine/combat-engine.js";
 import { createCampaignStateStore } from "../src/engine/campaign-state-store.js";
@@ -484,6 +485,43 @@ function testProviderBoundary() {
   assert.equal(combatRequest.readonlyContext.combat.currentTurnId, "thor", "combat context must preserve active human actor");
 }
 
+function testStructuredInputsDoNotMergeIntoHostMessage() {
+  const turn = createPlayerTurn({
+    campaign: campaignFixture(),
+    playerMessage: "Rowan tells the shopkeeper to stay quiet.",
+    playerInputs: [{
+      playerId: "guest-eve",
+      playerName: "Jess",
+      characterId: "eve",
+      characterName: "Eve",
+      text: "Eve keeps the collector distracted near the doorway.",
+      ready: true,
+    }],
+  });
+
+  assert.equal(turn.parsedMessage.inWorldText, "Rowan tells the shopkeeper to stay quiet.");
+  assert.equal(turn.playerInputs[0].characterName, "Eve");
+  assert.match(turn.providerPrompt, /Structured Player Inputs/);
+  assert.match(turn.providerPrompt, /Eve keeps the collector distracted/);
+  assert.doesNotMatch(turn.parsedMessage.inWorldText, /Eve keeps/);
+
+  const remoteOnlyTurn = createPlayerTurn({
+    campaign: campaignFixture(),
+    playerMessage: "",
+    playerInputs: [{
+      playerId: "guest-eve",
+      playerName: "Jess",
+      characterId: "eve",
+      characterName: "Eve",
+      text: "Eve ducks behind the stall and watches the collector.",
+      ready: true,
+    }],
+  });
+  assert.equal(remoteOnlyTurn.parsedMessage.inWorldText, "");
+  assert.match(remoteOnlyTurn.providerPrompt, /Resolve the structured player inputs/);
+  assert.match(remoteOnlyTurn.providerPrompt, /Eve ducks behind the stall/);
+}
+
 async function testProviderExecutionLifecycle() {
   const events = [];
   const orchestrator = createProviderOrchestrator({
@@ -799,6 +837,7 @@ testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();
 testProviderBoundary();
+testStructuredInputsDoNotMergeIntoHostMessage();
 testCampaignStateStore();
 testInputComposerProjection();
 testMultiplayerSessionProjection();

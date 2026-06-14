@@ -941,23 +941,19 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   const approvedPartyInputs = options.playerInputs ? [] : collectApprovedPartyInputs();
   const stagedRemoteInputs = options.playerInputs ? [] : collectStagedRemoteInputs();
   const normalizedMessage = normalizeSubmittedPlayerMessage(originalInput, options);
-  const playerMessage = buildSubmittedTurnMessage({
-    playerMessage: normalizedMessage,
-    approvedPartyInputs,
-    stagedRemoteInputs,
-  });
-  if (!playerMessage) {
+  const playerInputs = options.playerInputs ?? [
+    ...playerInputsFromChoiceSelection(state.pendingChoiceSelection),
+    ...approvedPartyInputs,
+    ...stagedRemoteInputs,
+  ];
+  const playerMessage = normalizedMessage;
+  if (!playerMessage && !playerInputs.length) {
     elements.bridgeStatus.textContent = "Type an action or wait for a staged party input first";
     setProviderActivity("Type an action or stage a party input", "idle");
     return { providerReceived: false, reason: "empty" };
   }
 
   setProviderActivity("Building provider prompt...", "working");
-  const playerInputs = options.playerInputs ?? [
-    ...playerInputsFromChoiceSelection(state.pendingChoiceSelection),
-    ...approvedPartyInputs,
-    ...stagedRemoteInputs,
-  ];
   state.currentTurn = createPlayerTurn({
     campaign: state.campaign,
     playerMessage,
@@ -1023,20 +1019,6 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   return runResult;
 }
 
-function buildSubmittedTurnMessage({ playerMessage, approvedPartyInputs = [], stagedRemoteInputs = [] }) {
-  const parts = [];
-  if (playerMessage) {
-    parts.push(playerMessage);
-  }
-  if (approvedPartyInputs.length) {
-    parts.push(buildApprovedPartyTurnPrompt(approvedPartyInputs));
-  }
-  if (stagedRemoteInputs.length) {
-    parts.push(buildStagedRemoteTurnPrompt(stagedRemoteInputs));
-  }
-  return parts.join("\n\n").trim();
-}
-
 function findUnresolvedDuplicatePlayerMessage(body, meta = "") {
   const normalizedBody = compactCompareText(body);
   const normalizedMeta = compactCompareText(meta);
@@ -1065,22 +1047,6 @@ function findUnresolvedDuplicatePlayerMessage(body, meta = "") {
 
 function compactCompareText(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-function buildApprovedPartyTurnPrompt(inputs) {
-  return [
-    "Approved companion contributions:",
-    ...inputs.map((input) => `- ${input.characterName || input.characterId || "Companion"}: ${input.text}`),
-    "(meta: These companion contributions were approved by the host. Resolve them as party input this turn. Do not add an action for the host-controlled player character unless the player also provided one.)",
-  ].join("\n");
-}
-
-function buildStagedRemoteTurnPrompt(inputs) {
-  return [
-    "Staged remote party inputs:",
-    ...inputs.map((input) => `- ${input.characterName || input.characterId || "Remote party member"}: ${input.text}`),
-    "(meta: These actions came from connected ThinLoreKeeper clients and are staged behind the scenes. Resolve them as player-approved character actions. If combat.inCombat is true, resolve them as combat turns with rolls, mechanics, HP/resource updates, and tactical consequences.)",
-  ].join("\n");
 }
 
 function clearResolvedRecoveredInputDraft(reason = "unknown") {

@@ -3,9 +3,10 @@ import { buildSidecarPrompt } from "../prompt-builder/build-prompt.js";
 import { parsePlayerMessage } from "./player-message.js";
 
 export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgpt", playerInputs = [] }) {
-  const trimmedMessage = playerMessage.trim();
-  if (!trimmedMessage) {
-    throw new Error("Player message is required.");
+  const trimmedMessage = String(playerMessage ?? "").trim();
+  const structuredInputs = normalizeTurnPlayerInputs(playerInputs);
+  if (!trimmedMessage && !structuredInputs.length) {
+    throw new Error("Player message or structured player input is required.");
   }
   const parsedMessage = parsePlayerMessage(trimmedMessage);
 
@@ -16,8 +17,9 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
   const providerPrompt = buildSidecarPrompt({
     campaign,
     contextPack,
-    userIntent: parsedMessage.inWorldText || "No in-world action supplied this turn.",
+    userIntent: parsedMessage.inWorldText || (structuredInputs.length ? "Resolve the structured player inputs for this turn." : "No in-world action supplied this turn."),
     metaInstructions: parsedMessage.metaInstructions,
+    playerInputs: structuredInputs,
   });
 
   return {
@@ -28,12 +30,23 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
     createdAt: new Date().toISOString(),
     playerMessage: trimmedMessage,
     parsedMessage,
-    playerInputs,
+    playerInputs: structuredInputs,
     contextPack,
     providerPrompt,
     importedResponse: null,
     proposedChanges: [],
   };
+}
+
+function normalizeTurnPlayerInputs(playerInputs) {
+  return Array.isArray(playerInputs)
+    ? playerInputs
+      .map((input) => ({
+        ...input,
+        text: String(input?.text ?? "").trim(),
+      }))
+      .filter((input) => input.text)
+    : [];
 }
 
 function isCombatRelevant(parsedMessage) {

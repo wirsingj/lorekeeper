@@ -6,6 +6,7 @@ export function buildSidecarPrompt({
   contextPack,
   userIntent = "",
   metaInstructions = [],
+  playerInputs = [],
   template = sidecarTurnTemplate,
 }) {
   const metaLines = metaInstructions.length
@@ -22,6 +23,9 @@ export function buildSidecarPrompt({
     "",
     "## Player Turn",
     compactLine(userIntent || "Continue the current scene while preserving established canon.", 1200),
+    "",
+    "Structured Player Inputs:",
+    ...formatPlayerInputs(playerInputs),
     "",
     "Resolve the Player Turn above as the newest table action. Do not repeat an older DM question or offer the same choices again after the player has moved past them.",
     "If the player calls to, questions, or asks help from an NPC/party member, narrate that character's immediate response or visible action.",
@@ -43,6 +47,19 @@ export function buildSidecarPrompt({
   ];
 
   return sections.join("\n").trim();
+}
+
+function formatPlayerInputs(playerInputs) {
+  const inputs = Array.isArray(playerInputs)
+    ? playerInputs.filter((input) => String(input?.text ?? "").trim())
+    : [];
+  if (!inputs.length) {
+    return ["- None."];
+  }
+  return inputs.slice(0, 8).map((input) => {
+    const name = input.characterName || input.playerName || input.characterId || "Player";
+    return `- ${compactLine(name, 80)}: ${compactLine(input.text, 500)}`;
+  });
 }
 
 function shortCampaignId(id = "") {
