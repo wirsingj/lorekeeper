@@ -268,6 +268,14 @@ ipcMain.handle("lorekeeper:clipboard-write-text", (_event, text) => {
   return { ok: true };
 });
 
+ipcMain.handle("lorekeeper:clipboard-read-text", () => {
+  const value = clipboard.readText();
+  if (value.length > 500000) {
+    return { ok: false, error: "Clipboard text is too large." };
+  }
+  return { ok: true, text: value };
+});
+
 ipcMain.handle("lorekeeper:relaunch-mode", (_event, requestedMode) => {
   const nextMode = requestedMode === "thin" ? "thin" : "full";
   if ((nextMode === "thin") === clientMode) {

@@ -4,4 +4,5 @@ contextBridge.exposeInMainWorld("lorekeeperDesktop", {
   runtimeMode: () => ipcRenderer.invoke("lorekeeper:runtime-mode"),
   relaunchMode: (mode) => ipcRenderer.invoke("lorekeeper:relaunch-mode", mode),
   writeClipboardText: (text) => ipcRenderer.invoke("lorekeeper:clipboard-write-text", text),
+  readClipboardText: () => ipcRenderer.invoke("lorekeeper:clipboard-read-text"),
 });

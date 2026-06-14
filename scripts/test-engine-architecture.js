@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
@@ -111,6 +112,67 @@ function testDiceEngine() {
 
   const damage = rollFormula("1d8+3", { seed: "damage", now: "now" });
   assert.match(damage.breakdown, /= \d+$/);
+}
+
+async function testClipboardFallback() {
+  const nativeFirst = await writeTextWithFallback("invite", {
+    desktopWriteText: async (text) => ({ ok: text === "invite" }),
+    browserWriteText: async () => {
+      throw new Error("Browser clipboard should not be needed.");
+    },
+  });
+  assert.deepEqual(nativeFirst, { copied: true, method: "electron" });
+
+  let browserValue = "";
+  const browserFallback = await writeTextWithFallback("invite-link", {
+    desktopWriteText: async () => {
+      throw new Error("Electron clipboard unavailable.");
+    },
+    browserWriteText: async (text) => {
+      browserValue = text;
+    },
+  });
+  assert.equal(browserFallback.copied, true);
+  assert.equal(browserFallback.method, "browser");
+  assert.equal(browserValue, "invite-link");
+
+  const blocked = await writeTextWithFallback("invite-link", {
+    desktopWriteText: async () => ({ ok: false }),
+    browserWriteText: async () => {
+      throw new Error("permission denied");
+    },
+  });
+  assert.equal(blocked.copied, false);
+  assert.match(blocked.error, /blocked/i);
+
+  const empty = await writeTextWithFallback("");
+  assert.equal(empty.copied, false);
+  assert.match(empty.error, /empty/i);
+
+  const readNativeFirst = await readTextWithFallback({
+    desktopReadText: async () => ({ ok: true, text: "native text" }),
+    browserReadText: async () => {
+      throw new Error("Browser clipboard should not be needed.");
+    },
+  });
+  assert.deepEqual(readNativeFirst, { ok: true, text: "native text", method: "electron" });
+
+  const readBrowserFallback = await readTextWithFallback({
+    desktopReadText: async () => {
+      throw new Error("Electron clipboard unavailable.");
+    },
+    browserReadText: async () => "browser text",
+  });
+  assert.deepEqual(readBrowserFallback, { ok: true, text: "browser text", method: "browser" });
+
+  const readBlocked = await readTextWithFallback({
+    desktopReadText: async () => ({ ok: false }),
+    browserReadText: async () => {
+      throw new Error("permission denied");
+    },
+  });
+  assert.equal(readBlocked.ok, false);
+  assert.match(readBlocked.error, /blocked/i);
 }
 
 function testAgencyController() {
@@ -455,6 +517,36 @@ async function testCancelAndStaleCompletion() {
   assert.equal(turnFlow.getProjection().state, before, "stale completion must not change state");
 }
 
+function testTurnFlowResetCancelsAndIgnoresStaleEvents() {
+  const turnFlow = createTurnFlowRuntime();
+  const turn = { playerMessage: "I open the door.", playerInputs: [] };
+  turnFlow.beginLogicalTurn({ campaign: campaignFixture(), turn });
+  let cancelled = false;
+  turnFlow.startGeneration({
+    turnId: turn.turnId,
+    requestId: "request-reset",
+    cancel: () => {
+      cancelled = true;
+    },
+  });
+
+  const resetProjection = turnFlow.reset({ reason: "campaign_changed" });
+  assert.equal(cancelled, true, "campaign switch reset should cancel active provider work");
+  assert.equal(resetProjection.state, turnStates.IDLE);
+  assert.equal(resetProjection.hasActiveGeneration, false);
+  assert.equal(resetProjection.canSubmit, true);
+
+  turnFlow.applyProviderEvent({
+    type: "generation_completed",
+    turnId: turn.turnId,
+    requestId: "request-reset",
+    response: { responseText: "late stale result" },
+  });
+  const afterStale = turnFlow.getProjection();
+  assert.equal(afterStale.state, turnStates.IDLE, "late provider completion after reset must not revive old state");
+  assert.equal(afterStale.hasActiveGeneration, false);
+}
+
 function ndjsonStream(events) {
   const encoder = new TextEncoder();
   return new ReadableStream({
@@ -541,6 +633,21 @@ function testMultiplayerSessionProjection() {
   assert.equal(hostProjection.connectedGuests.length, 1);
   assert.match(hostProjection.localTableAddress, /192\.168\.1\.24:7347/);
 
+  const stoppedProjection = buildMultiplayerSessionProjection({
+    campaign: {
+      ...campaign,
+      multiplayer: {
+        ...campaign.multiplayer,
+        localTable: { running: false, stoppedAt: "now" },
+        pendingTurnInputs: [],
+      },
+    },
+    locationPort: "4173",
+  });
+  assert.equal(stoppedProjection.localTableState, "Off");
+  assert.equal(stoppedProjection.canStopLocalTable, false);
+  assert.equal(stoppedProjection.canResolvePartyInputs, false);
+
   const guestProjection = buildMultiplayerSessionProjection({
     campaign,
     clientMode: true,
@@ -589,6 +696,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 }
 
 testDiceEngine();
+await testClipboardFallback();
 testAgencyController();
 testTurnEngine();
 testStateEffects();
@@ -606,6 +714,7 @@ testReviewPanelProjection();
 await testProviderExecutionLifecycle();
 await testInvalidProviderOutputIsRecoverable();
 await testCancelAndStaleCompletion();
+testTurnFlowResetCancelsAndIgnoresStaleEvents();
 await testAppJsNoLongerOwnsExtractedStateMachines();
 
 console.log("engine architecture tests passed");

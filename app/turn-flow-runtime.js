@@ -74,6 +74,22 @@ export function createTurnFlowRuntime(options = {}) {
     hasRepair() {
       return Boolean(repair);
     },
+    reset({ reason = "reset", cancelActiveRun = true } = {}) {
+      const run = activeRun;
+      activeRun = null;
+      repair = null;
+      lastTurn = null;
+      turnState = createTurnEngineState();
+      if (cancelActiveRun && run?.cancel) {
+        try {
+          run.cancel();
+        } catch {
+          // Reset must leave the UI safe even if provider cancellation fails.
+        }
+      }
+      emit({ type: "turn_flow_reset", reason });
+      return getProjection();
+    },
     canSubmit() {
       return getProjection().canSubmit;
     },

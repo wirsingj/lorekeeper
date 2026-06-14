@@ -14,6 +14,7 @@ import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
+import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
@@ -554,7 +555,14 @@ setupCommandDeckResize();
 
 elements.pasteResponse.addEventListener("click", async () => {
   try {
-    elements.responseImport.value = await navigator.clipboard.readText();
+    const result = await readTextWithFallback({
+      desktopReadText: window.lorekeeperDesktop?.readClipboardText,
+      browserReadText: navigator.clipboard?.readText?.bind(navigator.clipboard),
+    });
+    if (!result.ok) {
+      throw new Error(result.error || "Clipboard read failed.");
+    }
+    elements.responseImport.value = result.text;
     elements.bridgeStatus.textContent = "Response pasted from clipboard";
   } catch {
     elements.bridgeStatus.textContent = "Clipboard paste unavailable";
@@ -1818,24 +1826,11 @@ function revealInviteLink() {
 }
 
 async function writeClipboardText(text) {
-  const value = String(text ?? "");
-  if (!value) {
-    return false;
-  }
-  try {
-    const result = await window.lorekeeperDesktop?.writeClipboardText?.(value);
-    if (result?.ok) {
-      return true;
-    }
-  } catch {
-    // Fall back to the browser clipboard API below.
-  }
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch {
-    return false;
-  }
+  const result = await writeTextWithFallback(text, {
+    desktopWriteText: window.lorekeeperDesktop?.writeClipboardText,
+    browserWriteText: navigator.clipboard?.writeText?.bind(navigator.clipboard),
+  });
+  return result.copied;
 }
 
 async function setPartyMemberController(member, controllerKind) {
@@ -3178,7 +3173,7 @@ async function loadImportedCampaign() {
   });
   state.prompt = "";
   state.reviewBatch = null;
-  state.turnFlow.clearRepair();
+  state.turnFlow.reset({ reason: "fallback_imported_campaign_loaded" });
 }
 
 function setCampaignFromPayload(payload, contextPurpose) {
@@ -3193,7 +3188,7 @@ function setCampaignFromPayload(payload, contextPurpose) {
   state.prompt = "";
   state.reviewBatch = null;
   if (previousCampaignId && previousCampaignId !== state.campaign.id) {
-    state.turnFlow.clearRepair();
+    state.turnFlow.reset({ reason: "campaign_changed" });
   }
 }
 
@@ -5251,6 +5246,7 @@ async function runPromptThroughLocalProvider(turn) {
     return { providerReceived: false };
   }
 
+  const generationCampaignId = state.campaign?.id ?? null;
   state.turnFlow.beginLogicalTurn({
     campaign: state.campaign,
     turn,
@@ -5280,6 +5276,15 @@ async function runPromptThroughLocalProvider(turn) {
     });
     state.turnFlow.startGeneration(run);
     const result = await run.promise;
+    if (generationCampaignId && state.campaign?.id !== generationCampaignId) {
+      setProviderActivity("Ignored provider response from previous campaign", "idle");
+      pushDiagnosticsEvent("ollama_generation_ignored_campaign_changed", {
+        turnId: turn.turnId,
+        originalCampaignId: generationCampaignId,
+        currentCampaignId: state.campaign?.id ?? null,
+      });
+      return { providerReceived: Boolean(result?.providerReceived), ignored: true, reason: "campaign_changed" };
+    }
     if (result?.timedOut || result?.canceled) {
       setProviderActivity(
         result.timedOut ? "Local generation timed out; Send Turn can retry" : "Local generation canceled",
