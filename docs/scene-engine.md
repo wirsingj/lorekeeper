@@ -62,3 +62,28 @@ type SceneRecord = {
 - relevant recent events
 
 This is intentionally smaller than the whole campaign. It helps the provider behave like a long-running DM by making the current pressure and continuity visible.
+
+## Scene Intent Pack
+
+`buildSceneIntentPack(campaign)` converts retrieval into a provider-ready intent packet:
+
+- current scene facts
+- active consequences
+- relevant relationships
+- active threads
+- recent scene events
+- escalation policy
+- provider/app ownership boundaries
+
+The intent pack is not a prompt gimmick. It is app-owned scene state that tells the provider what kind of beat is appropriate.
+
+## Escalation Policy
+
+`deriveEscalationPolicy(campaign)` chooses one of:
+
+- `none`: let the scene breathe; use atmosphere, relationships, and ordinary consequence.
+- `soft`: apply social pressure, suspicion, rumor, memory, or a grounded next beat.
+- `moderate`: escalate only through an active consequence or established tension.
+- `hard`: combat or immediate danger is already active; resolve current combatants and do not invent unrelated threats.
+
+This is meant to prevent random-encounter behavior. After a small fight, the next good beat is usually a witness, favor, fear, rumor, or cleanup consequence, not a fresh monster.

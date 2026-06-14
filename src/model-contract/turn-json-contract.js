@@ -50,6 +50,7 @@ const allowedSectionKinds = new Set([
   "rules_profile",
   "active_party",
   "current_inventory",
+  "active_consequences",
   "relationship_notes",
 ]);
 const TEXT_LIMITS = Object.freeze({

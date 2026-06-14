@@ -156,6 +156,109 @@ export function buildSceneRetrieval(campaign, options = {}) {
   };
 }
 
+export function buildSceneIntentPack(campaign, options = {}) {
+  const retrieval = options.sceneRetrieval ?? buildSceneRetrieval(campaign, options);
+  const scene = retrieval.scene;
+  const escalationPolicy = deriveEscalationPolicy(campaign, retrieval, options);
+
+  return {
+    scene: scene ? {
+      id: scene.id,
+      title: scene.title,
+      type: scene.type,
+      status: scene.status,
+      locationId: scene.locationId,
+      whyHere: scene.whyHere,
+      immediateSituation: scene.immediateSituation,
+      goals: scene.goals ?? [],
+      tensions: scene.tensions ?? [],
+      unresolvedQuestions: scene.unresolvedQuestions ?? [],
+      participantIds: scene.participantIds ?? [],
+    } : null,
+    consequences: retrieval.activeConsequences.map((consequence) => ({
+      id: consequence.id,
+      title: consequence.title,
+      scope: consequence.scope,
+      importance: consequence.importance,
+      description: consequence.description,
+      participantIds: consequence.participantIds ?? [],
+      threadIds: consequence.threadIds ?? [],
+    })),
+    relationships: retrieval.relevantRelationships.map((relationship) => ({
+      id: relationship.id ?? null,
+      sourceId: relationship.sourceId,
+      targetId: relationship.targetId,
+      type: relationship.type,
+      notes: asText(relationship.notes),
+    })),
+    threads: retrieval.activeThreads.map((thread) => ({
+      id: thread.id,
+      title: thread.title,
+      status: thread.status,
+      stakes: thread.stakes ?? "",
+    })),
+    recentEvents: retrieval.relevantRecentEvents.map((event) => ({
+      id: event.id ?? null,
+      title: event.title ?? event.summary ?? "Recent event",
+      summary: event.summary ?? event.text ?? "",
+      relatedIds: event.relatedIds ?? [],
+    })),
+    escalationPolicy,
+    providerScope: {
+      providerOwns: ["narration", "dialogue", "atmosphere", "NPC reactions", "suggestions"],
+      appOwns: ["facts", "scene state", "consequences", "relationships", "combat", "dice", "HP", "resources"],
+    },
+  };
+}
+
+export function deriveEscalationPolicy(campaign, retrieval = buildSceneRetrieval(campaign), options = {}) {
+  if (options.escalationPolicy) {
+    return normalizeEscalationPolicy(options.escalationPolicy);
+  }
+  if (campaign?.combat?.inCombat || retrieval.scene?.type === sceneTypes.COMBAT) {
+    return {
+      level: "hard",
+      reason: "Combat is already active.",
+      guidance: "Resolve the current combatants and battlefield consequences. Do not introduce unrelated enemies or new crises.",
+      preferredBeats: ["active combatant action", "visible mechanical result", "battlefield consequence"],
+      avoid: ["unrelated reinforcements", "new random threat", "skipping the active actor"],
+    };
+  }
+
+  const consequences = retrieval.activeConsequences ?? [];
+  const hasCritical = consequences.some((consequence) => consequence.importance === "critical");
+  const hasHigh = consequences.some((consequence) => consequence.importance === "high");
+  const hasTension = Boolean(retrieval.scene?.tensions?.length);
+
+  if (hasCritical) {
+    return {
+      level: "moderate",
+      reason: "A critical active consequence is tied to this scene.",
+      guidance: "Escalate only through the listed consequence or tension. Let established people react before inventing new danger.",
+      preferredBeats: ["consequence pressure", "NPC reaction", "relationship shift"],
+      avoid: ["unrelated combat", "new faction without setup", "random encounter"],
+    };
+  }
+
+  if (hasHigh || hasTension) {
+    return {
+      level: "soft",
+      reason: hasHigh ? "A high-importance consequence is active." : "The scene has active tension.",
+      guidance: "Show social pressure, memory, rumor, suspicion, or a grounded next beat. Let the scene breathe unless the player pushes harder.",
+      preferredBeats: ["NPC/world reaction", "consequence follow-through", "meaningful but non-forced choice"],
+      avoid: ["sudden unrelated threat", "immediate combat by default", "generic fantasy filler"],
+    };
+  }
+
+  return {
+    level: "none",
+    reason: "No app-owned escalation pressure is active.",
+    guidance: "Continue the scene through atmosphere, character response, relationship, and consequence. Do not add a new threat unless the player creates one.",
+    preferredBeats: ["sense of place", "NPC reaction", "continuity"],
+    avoid: ["random bandits", "sudden monsters", "new crisis without setup"],
+  };
+}
+
 function relevantRelationships(campaign, participantIds, consequences, limit) {
   const consequenceRelationshipIds = new Set(consequences.flatMap((consequence) => consequence.relationshipIds ?? []));
   return (campaign?.relationships ?? [])
@@ -170,6 +273,27 @@ function relevantRecentEvents(campaign, participantIds, limit) {
   return (campaign?.timeline ?? [])
     .filter((event) => (event.relatedIds ?? []).some((id) => participantIds.has(id)))
     .slice(-limit);
+}
+
+function normalizeEscalationPolicy(policy = {}) {
+  const level = ["none", "soft", "moderate", "hard"].includes(policy.level) ? policy.level : "none";
+  return {
+    level,
+    reason: String(policy.reason ?? ""),
+    guidance: String(policy.guidance ?? ""),
+    preferredBeats: uniqueStrings(policy.preferredBeats ?? policy.allowed ?? []),
+    avoid: uniqueStrings(policy.avoid ?? []),
+  };
+}
+
+function asText(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map((entry) => String(entry).trim()).filter(Boolean).join(" ");
+  }
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value ?? "");
 }
 
 function deriveSceneType(input, campaign) {

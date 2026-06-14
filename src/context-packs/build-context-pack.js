@@ -1,6 +1,6 @@
 import { contextPackKinds, normalizeCampaign } from "../campaign-state/schema.js";
 import { findById, labelEntity } from "../campaign-state/formatters.js";
-import { buildSceneRetrieval } from "../engine/scene-engine.js";
+import { buildSceneIntentPack, buildSceneRetrieval } from "../engine/scene-engine.js";
 import { buildRulesLedger } from "../rules/dnd5e-lite-ledger.js";
 
 const DEFAULT_PACK_KINDS = [
@@ -111,6 +111,8 @@ function buildHistorySection(campaign) {
 
 function buildSceneSection(campaign) {
   const retrieval = buildSceneRetrieval(campaign);
+  const intentPack = buildSceneIntentPack(campaign, { sceneRetrieval: retrieval });
+  const escalation = intentPack.escalationPolicy;
   const activeScene = retrieval.scene;
   const place = findById(campaign.places, campaign.scene.currentPlaceId);
   const presentPeople = (campaign.scene.presentPeopleIds ?? []).map((id) => labelEntity(campaign, id));
@@ -130,6 +132,8 @@ function buildSceneSection(campaign) {
       ...(activeScene?.goals ?? []).slice(0, 3).map((goal) => `Scene goal: ${compactText(goal, SHORT_ENTRY_LIMIT)}`),
       ...(activeScene?.tensions ?? []).slice(0, 4).map((tension) => `Tension: ${compactText(tension, SHORT_ENTRY_LIMIT)}`),
       ...(activeScene?.unresolvedQuestions ?? []).slice(0, 4).map((question) => `Unresolved: ${compactText(question, SHORT_ENTRY_LIMIT)}`),
+      escalation ? `Escalation policy: ${escalation.level} - ${compactText(escalation.guidance, MEDIUM_ENTRY_LIMIT)}` : null,
+      ...(escalation?.avoid ?? []).slice(0, 3).map((avoid) => `Avoid: ${compactText(avoid, SHORT_ENTRY_LIMIT)}`),
       `Present NPCs: ${presentPeople.length > 0 ? presentPeople.join(", ") : "None recorded."}`,
       ...(campaign.scene.localNotes ?? []).slice(0, 3).map((note) => `Scene note: ${compactText(note, SHORT_ENTRY_LIMIT)}`),
     ].filter(Boolean),
@@ -349,14 +353,17 @@ function buildLoreSection(campaign) {
 }
 
 function buildStyleSection(campaign) {
+  const style = campaign.style ?? {};
+  const narrationRules = Array.isArray(style.narrationRules) ? style.narrationRules : [];
+  const formattingRules = Array.isArray(style.formattingRules) ? style.formattingRules : [];
   return {
     kind: contextPackKinds.STYLE,
     title: "Campaign Style And Formatting Rules",
     entries: [
-      `Tone: ${campaign.style.tone}`,
-      `Pacing: ${campaign.style.pacing}`,
-      ...campaign.style.narrationRules.slice(0, 2).map((rule) => `Narration: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
-      ...campaign.style.formattingRules.slice(0, 2).map((rule) => `Format: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
+      `Tone: ${style.tone ?? "tabletop fantasy"}`,
+      `Pacing: ${style.pacing ?? "narration first; choices when useful"}`,
+      ...narrationRules.slice(0, 2).map((rule) => `Narration: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
+      ...formattingRules.slice(0, 2).map((rule) => `Format: ${compactText(rule, SHORT_ENTRY_LIMIT)}`),
     ],
   };
 }
@@ -379,7 +386,7 @@ function compactText(value, limit = SHORT_ENTRY_LIMIT) {
     return compact;
   }
 
-  return `${compact.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+  return `${compact.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
 }
 
 function stripUpdatePayloads(value) {

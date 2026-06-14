@@ -1,4 +1,4 @@
-import { buildSceneRetrieval } from "./scene-engine.js";
+import { buildSceneIntentPack, buildSceneRetrieval } from "./scene-engine.js";
 
 const providerTasks = new Set([
   "generate_scene_beat",
@@ -15,12 +15,15 @@ export function buildProviderTaskRequest({ task, campaign, turn, context = {}, a
     throw new Error(`Unsupported provider task: ${task}`);
   }
   const sceneRetrieval = buildSceneRetrieval(campaign ?? {});
+  const sceneIntent = buildSceneIntentPack(campaign ?? {}, { sceneRetrieval });
   return {
     task,
     turnId: turn?.turnId ?? null,
     mode: turn?.mode ?? deriveMode(campaign),
     readonlyContext: {
       scene: summarizeScene(campaign, sceneRetrieval),
+      sceneIntent,
+      escalationPolicy: sceneIntent.escalationPolicy,
       activeConsequences: sceneRetrieval.activeConsequences.map(summarizeConsequence),
       relevantRelationships: sceneRetrieval.relevantRelationships.map(summarizeRelationship),
       activeThreads: sceneRetrieval.activeThreads.map(summarizeThread),

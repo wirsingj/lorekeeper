@@ -220,6 +220,50 @@ const ledgerEnvelope = buildTurnRequestEnvelope({
 });
 assert.equal(ledgerEnvelope.context.rulesLedger.actors[0].legalOptions[0].letter, "A");
 assert.ok(ledgerEnvelope.context.rulesLedger.actors[0].legalOptions.some((option) => option.id === "spell-entangle"));
+assert.equal(validateTurnRequest(ledgerEnvelope).valid, true);
+
+const consequenceCampaign = testCampaign();
+consequenceCampaign.scene.activeSceneId = "scene-market";
+consequenceCampaign.scene.currentPlaceId = "place-market";
+consequenceCampaign.scene.presentPeopleIds = ["npc-merchant"];
+consequenceCampaign.scenes = [{
+  id: "scene-market",
+  type: "social",
+  title: "Market aftermath",
+  locationId: "place-market",
+  peopleIds: ["npc-merchant"],
+  participantIds: ["npc-merchant"],
+  consequenceIds: ["consequence-merchant-trust"],
+  tensions: ["The merchant is deciding whether to trust the party."],
+  unresolvedQuestions: [],
+  goals: [],
+  immediateSituation: "The merchant is safe and waiting for a response.",
+  whyHere: "The party protected the merchant.",
+  status: "active",
+}];
+consequenceCampaign.consequences = [{
+  id: "consequence-merchant-trust",
+  title: "Merchant trusts the party",
+  description: "The merchant may vouch for the party if they treat him well.",
+  scope: "person",
+  state: "active",
+  importance: "high",
+  sourceSceneId: "scene-market",
+  relatedSceneIds: [],
+  participantIds: ["npc-merchant"],
+  relationshipIds: [],
+  threadIds: [],
+  tags: [],
+}];
+const consequenceContextPack = buildContextPack(consequenceCampaign);
+assert.ok(consequenceContextPack.sections.some((section) => section.kind === "active_consequences"));
+const consequenceEnvelope = buildTurnRequestEnvelope({
+  campaign: consequenceCampaign,
+  contextPack: consequenceContextPack,
+  playerTurn: "I ask if he is alright.",
+  parsedMessage: { raw: "I ask if he is alright.", inWorldText: "I ask if he is alright.", metaInstructions: [] },
+});
+assert.equal(validateTurnRequest(consequenceEnvelope).valid, true);
 
 const emptyCombatDefaults = createEmptyCampaign({ title: "Combat Defaults" }).combat;
 assert.deepEqual(emptyCombatDefaults.turnEconomy, {});

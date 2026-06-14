@@ -16,6 +16,7 @@ export function createTurnFlowRuntime(options = {}) {
   let activeRun = null;
   let lastTurn = null;
   let repair = null;
+  const ignoredProviderRequestIds = new Set();
   const listeners = new Set();
 
   function emit(event) {
@@ -28,6 +29,14 @@ export function createTurnFlowRuntime(options = {}) {
     turnState = next;
     emit(event);
     return turnState;
+  }
+
+  function rememberIgnoredProviderRequest(requestId) {
+    if (!requestId) return;
+    ignoredProviderRequestIds.add(requestId);
+    if (ignoredProviderRequestIds.size > 60) {
+      ignoredProviderRequestIds.delete(ignoredProviderRequestIds.values().next().value);
+    }
   }
 
   function modeForCampaign(campaign) {
@@ -76,6 +85,7 @@ export function createTurnFlowRuntime(options = {}) {
     },
     reset({ reason = "reset", cancelActiveRun = true } = {}) {
       const run = activeRun;
+      rememberIgnoredProviderRequest(run?.requestId ?? turnState.activeProviderRequestId);
       activeRun = null;
       repair = null;
       lastTurn = null;
@@ -119,12 +129,25 @@ export function createTurnFlowRuntime(options = {}) {
       if (activeRun) {
         throw new Error("A provider generation is already active");
       }
+      ignoredProviderRequestIds.delete(run.requestId);
       activeRun = run;
       const next = startGenerating(turnState, { requestId: run.requestId });
       setTurnState(next, { type: "generation_started", turnId: run.turnId, requestId: run.requestId });
       return run;
     },
     applyProviderEvent(event) {
+      if (event?.requestId && ignoredProviderRequestIds.has(event.requestId)) {
+        if (activeRun?.requestId === event.requestId) {
+          activeRun = null;
+        }
+        emit({
+          type: "provider_event_ignored_after_cancel",
+          ignoredEventType: event.type,
+          turnId: event.turnId,
+          requestId: event.requestId,
+        });
+        return turnState;
+      }
       const next = applyTurnProviderEvent(turnState, event);
       setTurnState(next, event);
       if (event.type === "generation_completed" || event.type === "generation_failed" || event.type === "generation_cancelled") {
@@ -146,12 +169,26 @@ export function createTurnFlowRuntime(options = {}) {
       return setTurnState(failTurn(turnState, error), { type: "generation_failed", error });
     },
     cancelGeneration(reason = "cancelled") {
-      if (activeRun?.cancel) {
-        activeRun.cancel();
-      } else {
-        activeRun = null;
-        setTurnState(cancelTurn(turnState), { type: "generation_cancelled", reason });
+      const run = activeRun;
+      const requestId = run?.requestId ?? turnState.activeProviderRequestId;
+      const turnId = run?.turnId ?? turnState.turnId;
+      rememberIgnoredProviderRequest(requestId);
+      activeRun = null;
+      if (run?.cancel) {
+        try {
+          run.cancel();
+        } catch {
+          // Cancellation is locally authoritative; the UI must recover even if provider abort throws.
+        }
       }
+      setTurnState(cancelTurn(turnState, { turnId, requestId }), {
+        type: "generation_cancelled",
+        turnId,
+        requestId,
+        reason,
+        local: true,
+      });
+      return getProjection();
     },
     retryLastTurn() {
       if (activeRun) {

@@ -16,7 +16,7 @@ import { createCampaignStateStore } from "../src/engine/campaign-state-store.js"
 import { addConsequence, resolveConsequence } from "../src/engine/consequence-engine.js";
 import { rollD20, rollFormula } from "../src/engine/dice-engine.js";
 import { buildProviderTaskRequest, acceptProviderResponseForTurn, createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
-import { buildSceneRetrieval, transitionScene } from "../src/engine/scene-engine.js";
+import { buildSceneIntentPack, buildSceneRetrieval, transitionScene } from "../src/engine/scene-engine.js";
 import { applyStateEffects } from "../src/engine/state-effects.js";
 import {
   addPendingInput,
@@ -338,6 +338,11 @@ function testSceneAndConsequenceEngines() {
   assert.equal(retrieval.activeConsequences.some((item) => item.id === "consequence-other-room"), false, "scene retrieval should not pull unrelated consequences by importance alone");
   assert.equal(retrieval.relevantRelationships[0].id, "rel-thor-barkeep");
   assert.equal(retrieval.activeThreads[0].id, "quest-1");
+  const intentPack = buildSceneIntentPack(campaign, { sceneRetrieval: retrieval });
+  assert.equal(intentPack.escalationPolicy.level, "soft");
+  assert.match(intentPack.escalationPolicy.guidance, /social pressure|grounded next beat/i);
+  assert.ok(intentPack.providerScope.appOwns.includes("consequences"));
+  assert.ok(intentPack.escalationPolicy.avoid.some((entry) => /sudden|combat|generic/i.test(entry)));
 
   const resolved = resolveConsequence(campaign, "consequence-barkeep-memory", {
     now: "2026-01-01T00:00:02.000Z",
@@ -379,6 +384,42 @@ function testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds() {
   assert.equal(retrieval.activeConsequences[0].id, "consequence-participant-only");
 }
 
+function testSceneIntentDiscouragesRandomEscalationAfterSmallFight() {
+  const base = campaignFixture();
+  base.people.push({ id: "merchant-zean", name: "Zean", role: "protected merchant", notes: ["Garren protected him on the mining road."] });
+  let campaign = transitionScene(base, {
+    id: "scene-road-aftermath",
+    title: "Mining road aftermath",
+    type: "social",
+    locationId: "road",
+    presentPartyMemberIds: ["thor"],
+    presentPeopleIds: ["merchant-zean"],
+    tensions: ["The miners have backed down, but witnesses will remember how Garren handled it."],
+    immediateSituation: "The hostile miner is defeated and Zean is unharmed.",
+    whyHere: "A small fight just ended and the social consequences matter more than spawning another fight.",
+  });
+  campaign = addConsequence(campaign, {
+    id: "consequence-zean-grateful",
+    title: "Zean owes Garren a favor",
+    description: "Zean is grateful and may vouch for Garren in town.",
+    sourceSceneId: "scene-road-aftermath",
+    participantIds: ["thor", "merchant-zean"],
+    importance: "high",
+    scope: "person",
+  });
+
+  const request = buildProviderTaskRequest({
+    task: "generate_scene_beat",
+    campaign,
+    turn: { turnId: "turn-road-aftermath", mode: gameModes.RP, actorId: "thor" },
+  });
+
+  assert.equal(request.readonlyContext.escalationPolicy.level, "soft");
+  assert.match(request.readonlyContext.escalationPolicy.guidance, /social pressure|grounded next beat/i);
+  assert.ok(request.readonlyContext.escalationPolicy.avoid.some((entry) => /sudden|random|generic/i.test(entry)));
+  assert.equal(request.readonlyContext.sceneIntent.consequences[0].id, "consequence-zean-grateful");
+}
+
 function testProviderBoundary() {
   const campaign = campaignFixture();
   campaign.sessionLog.messages = [{ role: "dm", title: "DM", text: "Legacy text-only message." }];
@@ -407,6 +448,8 @@ function testProviderBoundary() {
   assert.equal(request.readonlyContext.recentMessages.length, 1);
   assert.equal(request.readonlyContext.recentMessages[0].text, "Legacy text-only message.");
   assert.equal(request.readonlyContext.scene.title, "Barkeep's tense room");
+  assert.equal(request.readonlyContext.sceneIntent.scene.title, "Barkeep's tense room");
+  assert.equal(request.readonlyContext.escalationPolicy.level, "soft");
   assert.equal(request.readonlyContext.activeConsequences[0].id, "consequence-provider");
   assert.equal(request.readonlyContext.relevantRelationships[0].id, "rel-thor-barkeep");
   assert.match(request.readonlyContext.relevantRelationships[0].notes, /broken furniture/);
@@ -527,11 +570,42 @@ async function testCancelAndStaleCompletion() {
   turnFlow.startGeneration(run);
   assert.throws(() => turnFlow.retryLastTurn(), /active/i, "retry during active generation should be rejected");
   turnFlow.cancelGeneration("test_cancel");
+  assert.equal(turnFlow.getProjection().state, turnStates.AWAITING_INPUT, "cancel should recover UI before provider abort resolves");
+  assert.equal(turnFlow.getProjection().hasActiveGeneration, false);
+  assert.equal(turnFlow.getProjection().canSubmit, true);
   await run.promise;
   assert.equal(turnFlow.getProjection().state, turnStates.AWAITING_INPUT);
   const before = turnFlow.getProjection().state;
   turnFlow.applyProviderEvent({ type: "generation_completed", turnId: "stale", requestId: "stale", response: {} });
   assert.equal(turnFlow.getProjection().state, before, "stale completion must not change state");
+  turnFlow.applyProviderEvent({ type: "generation_completed", turnId: turn.turnId, requestId: run.requestId, response: {} });
+  assert.equal(turnFlow.getProjection().state, before, "late completion from a cancelled request must not change state");
+}
+
+function testCancelWithoutProviderAbortEventRecoversImmediately() {
+  const turnFlow = createTurnFlowRuntime();
+  const turn = { playerMessage: "I wait.", playerInputs: [] };
+  turnFlow.beginLogicalTurn({ campaign: campaignFixture(), turn });
+  let cancelled = false;
+  turnFlow.startGeneration({
+    turnId: turn.turnId,
+    requestId: "request-no-abort-event",
+    cancel: () => {
+      cancelled = true;
+    },
+  });
+  const projection = turnFlow.cancelGeneration("manual_cancel");
+  assert.equal(cancelled, true);
+  assert.equal(projection.state, turnStates.AWAITING_INPUT);
+  assert.equal(projection.hasActiveGeneration, false);
+  assert.equal(projection.canSubmit, true);
+  turnFlow.applyProviderEvent({
+    type: "generation_completed",
+    turnId: turn.turnId,
+    requestId: "request-no-abort-event",
+    response: { responseText: "late" },
+  });
+  assert.equal(turnFlow.getProjection().state, turnStates.AWAITING_INPUT);
 }
 
 function testTurnFlowResetCancelsAndIgnoresStaleEvents() {
@@ -723,6 +797,7 @@ testCombatEndsWhenSideDrops();
 testCombatTrackerView();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
+testSceneIntentDiscouragesRandomEscalationAfterSmallFight();
 testProviderBoundary();
 testCampaignStateStore();
 testInputComposerProjection();
@@ -732,6 +807,7 @@ testReviewPanelProjection();
 await testProviderExecutionLifecycle();
 await testInvalidProviderOutputIsRecoverable();
 await testCancelAndStaleCompletion();
+testCancelWithoutProviderAbortEventRecoversImmediately();
 testTurnFlowResetCancelsAndIgnoresStaleEvents();
 await testAppJsNoLongerOwnsExtractedStateMachines();
 
