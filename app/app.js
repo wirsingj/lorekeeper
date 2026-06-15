@@ -70,6 +70,7 @@ const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
 const debugMetaStorageKey = "lorekeeper.showDebugMeta";
+const rightRailCollapsedStorageKey = "lorekeeper.rightRailCollapsed";
 const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -118,6 +119,7 @@ const state = {
   lastAutoResumedMessageId: "",
   repairingCombatPromptTurn: false,
   lastCombatPromptRepairKey: "",
+  rightRailCollapsed: loadRightRailCollapsed(),
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
@@ -167,6 +169,7 @@ function shouldAttachLorekeeperApiToken(input) {
 }
 
 const elements = {
+  app: document.querySelector("#app"),
   title: document.querySelector("#campaign-title"),
   campaignSelect: document.querySelector("#campaign-select"),
   deleteCampaign: document.querySelector("#delete-campaign"),
@@ -217,6 +220,7 @@ const elements = {
   autoFillCharacterSheet: document.querySelector("#auto-fill-character-sheet"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
+  rightRailToggle: document.querySelector("#right-rail-toggle"),
   combatTrackerSection: document.querySelector("#combat-tracker-section"),
   combatRound: document.querySelector("#combat-round"),
   combatActiveActor: document.querySelector("#combat-active-actor"),
@@ -403,6 +407,12 @@ elements.openSetup.addEventListener("click", () => {
 
 elements.nudgeDm?.addEventListener("click", async () => {
   await nudgeDm();
+});
+
+elements.rightRailToggle?.addEventListener("click", () => {
+  state.rightRailCollapsed = !state.rightRailCollapsed;
+  localStorage.setItem(rightRailCollapsedStorageKey, state.rightRailCollapsed ? "1" : "0");
+  renderRightRailState();
 });
 
 elements.closeSetup.addEventListener("click", () => {
@@ -3259,6 +3269,10 @@ function loadRecentGuestSession() {
   }
 }
 
+function loadRightRailCollapsed() {
+  return localStorage.getItem(rightRailCollapsedStorageKey) === "1";
+}
+
 function saveGuestSession(session) {
   localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
   rememberGuestSession(session);
@@ -4984,6 +4998,7 @@ function render() {
   const currentPlace = findById(campaign.places, campaign.scene.currentPlaceId);
   const activeSession = activeSessionRecord(campaign);
 
+  renderRightRailState();
   elements.title.textContent = campaign.title;
   elements.sessionLabel.textContent = activeSession?.title || "Campaign Play";
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
@@ -5022,6 +5037,17 @@ function render() {
   renderProviderControls();
   renderDebugMetaControl();
   renderMultiplayerPanel();
+}
+
+function renderRightRailState() {
+  elements.app?.classList.toggle("binder-collapsed", state.rightRailCollapsed);
+  if (!elements.rightRailToggle) {
+    return;
+  }
+  const label = state.rightRailCollapsed ? "Show binder" : "Hide binder";
+  elements.rightRailToggle.title = label;
+  elements.rightRailToggle.setAttribute("aria-label", label);
+  elements.rightRailToggle.setAttribute("aria-expanded", String(!state.rightRailCollapsed));
 }
 
 function renderDebugMetaControl() {

@@ -188,6 +188,60 @@ h3 {
   padding-bottom: 76px;
 }
 
+.right-rail-header {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(174, 191, 202, 0.12);
+  border-radius: 10px;
+  background: rgba(16, 19, 21, 0.42);
+}
+
+.right-rail-heading {
+  min-width: 0;
+}
+
+.right-rail-heading h2 {
+  overflow: hidden;
+  color: #eef3f5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-rail-toggle svg {
+  transition: transform 160ms ease;
+}
+
+.handheld-shell.binder-collapsed {
+  grid-template-columns: 260px minmax(640px, 1fr) 48px;
+}
+
+.handheld-shell.binder-collapsed .right-panel {
+  align-items: center;
+  overflow: hidden;
+  padding: 8px;
+  padding-bottom: 8px;
+}
+
+.handheld-shell.binder-collapsed .right-rail-header {
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.handheld-shell.binder-collapsed .right-rail-heading,
+.handheld-shell.binder-collapsed .right-panel .binder-section,
+.handheld-shell.binder-collapsed .right-panel .table-talk-section {
+  display: none;
+}
+
+.handheld-shell.binder-collapsed .right-rail-toggle svg {
+  transform: rotate(180deg);
+}
+
 .rail-section {
   display: grid;
   gap: 10px;
@@ -2220,6 +2274,10 @@ textarea::placeholder {
       "screen"
       "right"
       "bottom";
+  }
+
+  .handheld-shell.binder-collapsed {
+    grid-template-columns: 1fr;
   }
 
   .command-deck,

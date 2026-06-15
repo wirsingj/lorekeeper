@@ -50,6 +50,7 @@ Status legend:
 26. Improved - Failed provider turns now mark approved/remote party inputs as "Still staged" instead of leaving them looking silently consumed or indefinitely processing.
 27. Improved - Local table setup now explains whether guest actions auto-resolve, wait for host approval, or are held for a grouped host turn.
 28. Improved - Enemy HP policy is explicit: host view can show exact HP, while guest/Thin snapshots redact enemy HP and render it as unknown.
+29. Improved - The right-side campaign binder can collapse into a narrow rail, letting live play take the room during active sessions while keeping notes one click away.
 
 ## Top Immersion Risks Still Open
 
@@ -60,7 +61,7 @@ Status legend:
 5. Improved - Hidden DM story direction now gives the provider long/mid/short campaign intent. Scene purpose, current tension, and consequence summaries still need stronger visible presentation.
 6. Open - AI companion contribution rules are improved, but the UI still relies on badges and buttons that need learning.
 7. Improved - Long provider generations now surface in the main play area. Needs real-session soak testing for whether it is visible enough under pressure.
-8. Open - The right-side binder can compete with live play. It is powerful, but the play surface is not yet fully separated from campaign management.
+8. Improved - The right-side binder can collapse during active play. It still needs real-session soak testing to decide whether tabs or context-sensitive sections would be better long term.
 9. Open - Table talk exists but can be missed by guests and hosts during active play.
 10. Open - Local multiplayer still needs longer two-machine soak testing across disconnect, reconnect, campaign switch, combat turn, and host approval modes.
 11. Watch - Choice panels can still become a crutch if local models ignore the narration-first policy.
@@ -103,7 +104,7 @@ Status legend:
 14. Improved - Make group-hold multiplayer mode explain itself before public use. Local Table now shows a live flow note and pending rows say queued, waiting for host approval, or held for group turn.
 15. Improved - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck. Approved and remote party inputs now keep retryable "Still staged" lifecycle badges after provider failure.
 16. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
-17. Medium - Make right-side binder collapsible or context-sensitive during active play.
+17. Improved - Make right-side binder collapsible or context-sensitive during active play. The binder now has a persisted collapse toggle that widens the play surface.
 18. Low - Replace remaining overly specific placeholder text with neutral table examples.
 19. Low - Improve empty states so they teach the next table action.
 20. Low - Add a plain "session health" summary for host troubleshooting.
@@ -215,6 +216,7 @@ Current coverage includes:
 18. Failed provider turn paths preserve approved/remote party inputs visually as retryable staged table actions.
 19. Multiplayer session projection covers auto-resolve, host-approval, group-hold, and guest-sent wording.
 20. Guest multiplayer snapshots redact exact enemy HP while combat tracker projection renders hidden enemy HP as unknown.
+21. Right-side binder collapse control is present and persists its state between launches.
 
 ## Remaining Product Risk
 

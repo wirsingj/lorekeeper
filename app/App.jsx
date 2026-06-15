@@ -194,6 +194,18 @@ export function LorekeeperShell() {
       </main>
 
       <aside className="right-panel panel-rail">
+        <section className="right-rail-header" aria-label="Campaign binder controls">
+          <div className="right-rail-heading">
+            <p className="eyebrow">Binder</p>
+            <h2>Campaign Notes</h2>
+          </div>
+          <button id="right-rail-toggle" className="icon-action right-rail-toggle" type="button" title="Hide binder" aria-label="Hide binder">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M9 18l6-6l-6-6"></path>
+            </svg>
+          </button>
+        </section>
+
         <section className="rail-section binder-section">
           <div className="section-title">
             <h2>People</h2>

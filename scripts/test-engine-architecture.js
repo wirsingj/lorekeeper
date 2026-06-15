@@ -977,11 +977,14 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /new-joiner-host-context/);
   assert.match(appShell, /table-timeline-summary/);
   assert.match(appShell, /local-table-guidance/);
+  assert.match(appShell, /id="right-rail-toggle"/);
   assert.ok(
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
     "table status strip should live above the play log",
   );
   assert.match(appShell, /id="show-debug-meta"/);
+  assert.match(appJs, /rightRailCollapsedStorageKey/);
+  assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /collectWizardAdditionalCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
