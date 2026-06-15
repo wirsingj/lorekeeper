@@ -25,6 +25,7 @@ export function buildCombatTrackerView(campaign, options = {}) {
       rank: index + 1,
       active: entry.id === activeId,
       controlled: entry.id === options.controlledActorId,
+      defeated: entry.defeated,
       meta: combatOrderMeta(entry, options.controlledActorId),
       hpLabel: combatHpLabel(entry.hp, {
         hidden: entry.type === "enemy" && options.hideEnemyHp === true,
@@ -45,6 +46,9 @@ export function normalizedCombatTurnOrder(campaign) {
       initiativeModifier: entry.initiativeModifier ?? 0,
       initiativeScore: entry.initiativeScore ?? entry.initiative ?? null,
       hp: combatActorHp(campaign, entry.id || entry.actorId, entry),
+      conditions: combatActorConditions(campaign, entry.id || entry.actorId, entry),
+      turnEconomy: combat.turnEconomy?.[entry.id || entry.actorId] ?? entry.turnEconomy ?? {},
+      defeated: combatActorDefeated(campaign, entry.id || entry.actorId, entry),
     })).filter((entry) => entry.id);
   }
   const initiativeIds = combat.initiative?.length
@@ -61,6 +65,9 @@ export function normalizedCombatTurnOrder(campaign) {
     initiativeModifier: 0,
     initiativeScore: null,
     hp: combatActorHp(campaign, id),
+    conditions: combatActorConditions(campaign, id),
+    turnEconomy: combat.turnEconomy?.[id] ?? {},
+    defeated: combatActorDefeated(campaign, id),
   }));
 }
 
@@ -75,9 +82,32 @@ export function combatActorType(campaign, id) {
 }
 
 function combatOrderMeta(entry, controlledActorId) {
-  if (entry.id === controlledActorId) return "You";
-  if (entry.type === "enemy") return "DM";
-  return "Party";
+  const tags = [];
+  if (entry.id === controlledActorId) {
+    tags.push("You");
+  } else if (entry.type === "enemy") {
+    tags.push("DM");
+  } else {
+    tags.push("Party");
+  }
+
+  if (entry.defeated) {
+    tags.push("Defeated");
+  }
+  tags.push(...(entry.conditions ?? [])
+    .filter((condition) => !isDefeatedCondition(condition))
+    .slice(0, 2)
+    .map(titleCaseToken));
+
+  const economy = entry.turnEconomy ?? {};
+  if (isSpent(economy.action)) {
+    tags.push("Action spent");
+  }
+  if (Number.isFinite(Number(economy.movementRemainingFt))) {
+    tags.push(`${Number(economy.movementRemainingFt)} ft`);
+  }
+
+  return tags.join(" / ");
 }
 
 function labelById(campaign, id) {
@@ -104,6 +134,47 @@ function combatActorHp(campaign, id, fallback = {}) {
   }
 
   return normalizeHpValue(fallback.hp);
+}
+
+function combatActorConditions(campaign, id, fallback = {}) {
+  const partyMember = (campaign.party ?? []).find((member) => member.id === id);
+  if (partyMember) {
+    return normalizeList(partyMember.conditions ?? partyMember.stats?.conditions ?? fallback.conditions);
+  }
+
+  const enemy = (campaign.combat?.enemies ?? []).find((item) => item.id === id);
+  if (enemy) {
+    return normalizeList(enemy.conditions ?? enemy.stats?.conditions ?? fallback.conditions);
+  }
+
+  return normalizeList(fallback.conditions);
+}
+
+function combatActorDefeated(campaign, id, fallback = {}) {
+  const hp = combatActorHp(campaign, id, fallback);
+  if (hp?.current !== null && hp?.current <= 0) {
+    return true;
+  }
+  return combatActorConditions(campaign, id, fallback).some(isDefeatedCondition);
+}
+
+function isDefeatedCondition(condition) {
+  return /^(dead|defeated|destroyed|unconscious)$/i.test(String(condition ?? "").trim());
+}
+
+function isSpent(value) {
+  return value === true || /^(spent|used|unavailable)$/i.test(String(value ?? ""));
+}
+
+function titleCaseToken(value) {
+  const text = String(value ?? "").replace(/[_-]+/g, " ").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+function normalizeList(value) {
+  return (Array.isArray(value) ? value : [value])
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
 }
 
 function normalizeHpValue(value) {

@@ -323,16 +323,33 @@ function testCombatEndsWhenSideDrops() {
 }
 
 function testCombatTrackerView() {
-  const campaign = startCombat(campaignFixture(), {
+  let campaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: 10, armorClass: 10 }],
     initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
   });
+  campaign.party = campaign.party.map((member) => member.id === "thor"
+    ? { ...member, conditions: ["dodging"] }
+    : member);
+  campaign.combat.turnEconomy = {
+    ...campaign.combat.turnEconomy,
+    thor: { action: "spent", movementRemainingFt: 10 },
+  };
   const view = buildCombatTrackerView(campaign, { controlledActorId: "karl" });
   assert.equal(view.inCombat, true);
   assert.equal(view.rows.some((row) => row.name === "Drunk miner" && row.meta === "DM"), true);
   assert.equal(view.rows.find((row) => row.id === "miner").hpLabel, "10/10");
   assert.equal(view.rows.find((row) => row.id === "thor").hpLabel, "12/12");
+  assert.match(view.rows.find((row) => row.id === "thor").meta, /Dodging/);
+  assert.match(view.rows.find((row) => row.id === "thor").meta, /Action spent/);
+  assert.match(view.rows.find((row) => row.id === "thor").meta, /10 ft/);
   assert.equal(view.rows.find((row) => row.id === "karl").controlled, true);
+
+  campaign.combat.enemies = campaign.combat.enemies.map((enemy) => enemy.id === "miner"
+    ? { ...enemy, hp: { current: 0, max: 10 }, conditions: ["defeated"] }
+    : enemy);
+  const defeatedView = buildCombatTrackerView(campaign);
+  assert.equal(defeatedView.rows.find((row) => row.id === "miner").defeated, true);
+  assert.match(defeatedView.rows.find((row) => row.id === "miner").meta, /Defeated/);
 }
 
 function testSceneAndConsequenceEngines() {

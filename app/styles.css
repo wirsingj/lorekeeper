@@ -556,6 +556,15 @@ h3 {
   background: rgba(76, 37, 37, 0.22);
 }
 
+.combat-order-row.defeated {
+  opacity: 0.62;
+}
+
+.combat-order-row.defeated strong {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
 .combat-order-rank {
   grid-row: span 2;
   width: 22px;

@@ -7731,6 +7731,7 @@ function renderCombatTracker(campaign) {
         entry.active ? "active" : "",
         entry.type === "enemy" ? "enemy" : "party",
         entry.controlled ? "controlled" : "",
+        entry.defeated ? "defeated" : "",
       ].filter(Boolean).join(" ");
       const rank = document.createElement("span");
       rank.className = "combat-order-rank";

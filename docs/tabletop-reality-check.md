@@ -45,6 +45,8 @@ Status legend:
 21. Fixed - Setup diagnostics now includes a visible debug-meta toggle for play/debug mode.
 22. Improved - App-owned combat can now end through nonlethal outcomes such as surrender, retreat, or de-escalation instead of only HP defeat.
 23. Fixed - A two-machine first-playtest checklist now exists at `docs/two-machine-playtest-checklist.md`.
+24. Improved - Ollama context tokens are cached per campaign/model/mode as non-canon provider memory, so same-campaign warmth can help without cross-campaign bleed.
+25. Improved - Combat tracker rows now include compact conditions, defeated state, movement remaining, and action-spent hints.
 
 ## Top Immersion Risks Still Open
 
@@ -94,7 +96,7 @@ Status legend:
 10. Improved - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating. A first-playtest checklist exists; scripted/disconnect soak remains.
 11. Medium - Make scene tension/consequence summaries and optional hidden-story debug summaries more visible in settings/diagnostics, not live play.
 12. Medium - Clarify enemy HP visibility policy for host and guest views.
-13. Medium - Improve combat tracker density for longer encounters: conditions, action spent, concentration, and defeated state.
+13. Improved - Improve combat tracker density for longer encounters: conditions, defeated state, movement remaining, and action spent now show in compact row metadata. Concentration and richer resource badges remain.
 14. Medium - Make group-hold multiplayer mode explain itself before public use.
 15. Medium - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck.
 16. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
@@ -205,6 +207,8 @@ Current coverage includes:
 13. Table status vocabulary covers waiting for a named combat actor and waiting for guest/player action.
 14. The table status strip is above the play log and the debug-meta toggle exists in Setup diagnostics.
 15. App-owned combat resolves dodge state and explicit surrender/de-escalation endings without relying on HP defeat.
+16. Per-campaign Ollama context cache normalization prevents model/mode/campaign context reuse across mismatched runs.
+17. Combat tracker projection covers condition tags, action spent, movement remaining, and defeated state.
 
 ## Remaining Product Risk
 
