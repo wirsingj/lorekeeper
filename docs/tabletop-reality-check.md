@@ -37,14 +37,18 @@ Status legend:
 13. Improved - Combat prompts tell the provider to stop after the current actor's resolved action and not roll the next actor in the same response.
 14. Improved - Choice panels are suppressed more aggressively outside combat, immediate danger, explicit option requests, or real tactical branches.
 15. Improved - Join-as character requests carry more complete character details and host integration notes.
+16. Improved - Normal play hides raw provider/model `Meta:` lines; debug meta remains available with `?debugMeta=1` or `localStorage.lorekeeper.showDebugMeta = "1"`.
+17. Improved - The DM prompt now receives hidden long, mid, and short term story threads so play has private campaign direction beyond the immediate scene.
+18. Fixed - Hidden story threads are stored as `dm_only` story-arc quest records, are auto-committed when proposed by the DM, and are filtered out of visible thread/context lists and multiplayer public snapshots.
+19. Improved - Table status language now translates waiting-for-combat-actor and guest-action states into table-facing wording.
 
 ## Top Immersion Risks Still Open
 
 1. Open - Combat resolution is still partly provider-led for enemy turns and improvised actions. The app has a combat engine, but not every table combat beat is app-owned before narration.
 2. Open - Auto-resume and recovery states are better surfaced, but the user still needs a clearer "recovering last turn" table affordance before anything is replayed.
 3. Open - Repair/retry/import controls still expose some software-shaped concepts. The labels are friendlier, but the mental model is not yet purely table-shaped.
-4. Open - Meta lines under bubbles still expose provider/model plumbing during play. Useful for debugging, but immersion-breaking for normal sessions.
-5. Open - Scene purpose, current tension, and consequence summaries are present but not yet prominent enough to make DM behavior feel obvious.
+4. Improved - Meta lines under bubbles are hidden during normal play. A visible play/debug toggle is still needed.
+5. Improved - Hidden DM story direction now gives the provider long/mid/short campaign intent. Scene purpose, current tension, and consequence summaries still need stronger visible presentation.
 6. Open - AI companion contribution rules are improved, but the UI still relies on badges and buttons that need learning.
 7. Open - Long provider generations can still feel like the table is frozen if the status line is missed.
 8. Open - The right-side binder can compete with live play. It is powerful, but the play surface is not yet fully separated from campaign management.
@@ -68,6 +72,7 @@ Status legend:
 | Combat has one row per active combatant. | Fixed | Count/quantity expansion covers grouped enemies. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
 | The DM continues scenes without forcing options. | Improved | Prompts and choice suppression improved. Needs more social/travel/downtime fixtures. |
+| The DM has a story beyond the current scene. | Improved | Hidden story arcs are sent to the provider and can be updated as `dm_only` quest records. Needs scenario soak testing. |
 | Recovery after provider failure feels understandable. | Open | Timeline helps, but recovery should be table-facing before replay. |
 | Character creation is consistent across entry points. | Fixed | Shared compact auto-complete and aligned controller defaults are in place. |
 
@@ -77,13 +82,13 @@ Status legend:
 2. Critical - Add explicit table-facing recovery before auto-resume or repair retry reuses any prior player action.
 3. Critical - Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, and combat/multiplayer domain modules.
 4. High - Add scenario fixtures that prove the provider cannot speak for host/remote PCs across social, combat, and join-transfer cases.
-5. High - Add a "what the table is waiting for" surface that is always visible and uses table language.
-6. High - Separate debug meta from normal play mode. Keep diagnostics available, but hide provider/model details during ordinary play.
+5. High - Continue strengthening the "what the table is waiting for" surface so it is always visible and covers every stuck state.
+6. Improved - Separate debug meta from normal play mode. Raw bubble meta is hidden by default; still add a visible play/debug toggle.
 7. High - Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
 8. High - Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
 9. High - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests.
 10. High - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating.
-11. Medium - Make scene tension/consequence summaries more visible during play.
+11. Medium - Make scene tension/consequence summaries and optional hidden-story debug summaries more visible in settings/diagnostics, not live play.
 12. Medium - Clarify enemy HP visibility policy for host and guest views.
 13. Medium - Improve combat tracker density for longer encounters: conditions, action spent, concentration, and defeated state.
 14. Medium - Make group-hold multiplayer mode explain itself before public use.
@@ -162,15 +167,16 @@ Still open:
 2. Provider output still needs scenario-based regression tests for social play, travel, mystery, downtime, and recovery.
 3. The app should make consequences visible enough that the host understands why the DM is reacting a certain way.
 4. Local model quality may still need shorter, stronger scene packets and repair prompts.
+5. Hidden long/mid/short story threads now exist as private DM context, but need scenario tests to prove they adapt without leaking future twists.
 
 ## Recommended Next Fixes
 
-1. Build a table-facing "Waiting For" strip: DM thinking, waiting for Tilli, waiting for host approval, recovering failed turn, guest action staged, enemy turn resolving.
+1. Expand the table-facing "Waiting For" strip: current wording covers DM thinking, combat actor waits, guest action waits, host review, and enemy turns; still needs a stronger always-visible layout.
 2. Move the remaining provider recovery and auto-resume decisions out of `app/app.js`.
 3. Add combat resolution fixtures for attack, save, skill contest, spell, dodge, help, disengage, surrender, flee, and enemy turn.
 4. Add provider-output fixtures that intentionally mislabel speaker roles and verify controlled party agency is preserved.
 5. Add two-machine multiplayer soak checklist and run it before broad playtesting.
-6. Add a play/debug mode toggle so meta provider lines disappear during ordinary play.
+6. Add a visible play/debug mode toggle. Raw provider meta is hidden by default now, but the toggle should be discoverable.
 7. Add campaign-aware character auto-complete that can use party theme, campaign premise, and existing characters without overriding supplied fields.
 8. Add a compact encounter tracker upgrade: conditions, defeated state, active resources, action spent.
 9. Add curated scenario fixtures for social negotiation, wilderness travel, investigation, downtime, and combat.
@@ -190,6 +196,9 @@ Current coverage includes:
 8. Join-as character creation during normal and combat flows.
 9. Combat start, turn advance, defeated-enemy end, and combat tracker projection.
 10. SQLite storage round-trip for engine state, turn records, and combat actions.
+11. Hidden DM story threads are included in provider context but filtered from visible context/thread lists.
+12. `dm_only` story-arc quest changes preserve visibility and do not attach secret quest IDs to the visible scene.
+13. Table status vocabulary covers waiting for a named combat actor and waiting for guest/player action.
 
 ## Remaining Product Risk
 

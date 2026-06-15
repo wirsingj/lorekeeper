@@ -121,8 +121,13 @@ function createRecord(domain, input, now) {
       id: input.id || uniqueId("quest", name),
       title: name,
       status: input.status || "active",
+      visibility: input.visibility || "player_visible",
+      threadType: input.threadType || input.thread_type || input.kind || "quest",
+      horizon: input.horizon || input.timeHorizon || "",
       stakes: input.summary || notes[0] || "Unresolved campaign thread.",
       openQuestions: [],
+      nextBeat: input.nextBeat || input.next_beat || "",
+      notes,
       relatedIds: [],
       createdAt: now,
       updatedAt: now,
@@ -183,6 +188,9 @@ function applySceneHints(campaign, domain, record) {
   }
 
   if (domain === "quests" && !campaign.scene.activeQuestIds.includes(record.id)) {
+    if (record.visibility === "dm_only" || record.threadType === "story_arc") {
+      return;
+    }
     campaign.scene.activeQuestIds.push(record.id);
   }
 }

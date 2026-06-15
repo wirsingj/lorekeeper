@@ -2,6 +2,7 @@ import { contextPackKinds, normalizeCampaign } from "../campaign-state/schema.js
 import { findById, labelEntity } from "../campaign-state/formatters.js";
 import { buildSceneIntentPack, buildSceneRetrieval } from "../engine/scene-engine.js";
 import { buildRulesLedger } from "../rules/dnd5e-lite-ledger.js";
+import { isHiddenStoryThread } from "./story-threads.js";
 
 const DEFAULT_PACK_KINDS = [
   contextPackKinds.SCENE,
@@ -238,7 +239,9 @@ function buildInventorySection(campaign) {
 }
 
 function buildThreadsSection(campaign) {
-  const active = campaign.quests.filter((quest) => quest.status !== "completed");
+  const active = campaign.quests
+    .filter((quest) => quest.status !== "completed")
+    .filter((quest) => !isHiddenStoryThread(quest));
 
   return {
     kind: contextPackKinds.THREADS,

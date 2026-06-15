@@ -1,3 +1,5 @@
+import { compactHiddenStoryThreads } from "../context-packs/story-threads.js";
+
 const REQUEST_TYPE = "lorekeeper.turn.request";
 const RESPONSE_TYPE = "lorekeeper.turn.response";
 const SCHEMA_VERSION = 1;
@@ -71,6 +73,8 @@ export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedM
     "Do not invent speech, thoughts, scouting, scanning, movement, or purposeful actions for remote/player-controlled party members unless their controller submitted that input.",
     "Before adding a new threat, NPC, or twist, use generation.dmQuality: existing context, natural consequences, NPC motivations, and campaign continuity come first.",
     "Do not be terse. For normal scene turns, write immersive DM narration with enough detail to feel like tabletop play.",
+    "Use context.hiddenDmStory as private DM planning only. Never reveal those notes directly, but keep the campaign moving with long, mid, and short term purpose.",
+    "Maintain private story direction with proposedChanges when useful: domain quests, visibility dm_only, data.threadType story_arc, data.horizon long|mid|short.",
     "No markdown. No fenced code. No prose outside JSON.",
     JSON.stringify(request),
   ].join("\n");
@@ -122,6 +126,16 @@ export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, pa
       dmQuality: createDmQualityPolicy({ mode, responseMode }),
       allowMechanics: true,
       allowProposedChanges: true,
+      hiddenStoryPolicy: {
+        purpose: "Keep play from becoming disconnected scenes by maintaining DM-only long, mid, and short term story threads.",
+        recordShape: "Use proposedChanges with domain quests, visibility dm_only, data.threadType story_arc, and data.horizon long|mid|short.",
+        revealPolicy: "Do not narrate hidden thread titles, plans, secrets, or future twists directly. Reveal only table-visible clues and consequences when earned.",
+        updateWhen: [
+          "the party's action changes the likely direction of the campaign",
+          "a clue, NPC motive, faction pressure, or consequence should carry forward",
+          "there are no hidden story threads yet and the campaign premise gives enough direction",
+        ],
+      },
       tone: compactText(campaign.style?.tone || "engaging D&D-style adventure with strong continuity and player agency", 180),
     },
     context: buildCompactContext(contextPack, campaign, { mode }),
@@ -667,6 +681,8 @@ function createResponseFormatSchema() {
       "Narration/dialogue/feelings may be freeform table text. Stats, rolls, choices, lore, history, relationships, inventory, and character facts must be structured data.",
       "Put checks, rolls, DCs, HP/resource notes, and outcomes in mechanics, not only in narration.",
       "Put canon changes in proposedChanges, not only in narration.",
+      "Use context.hiddenDmStory as private planning. Never reveal its titles, secrets, or future twists directly.",
+      "For hidden story direction, use proposedChanges with domain quests, visibility dm_only, data.threadType story_arc, and data.horizon long|mid|short.",
       "In combat, respect context.combat.currentTurnId/current turn. Offer choices only for the active actor unless resolving an enemy turn.",
       "If context.combat.currentTurnId is an enemy, resolve that enemy/DM turn using mechanics and then advanceTurn.",
       "If context.combat.currentTurnId is a party member and user.inWorld does not contain that actor's submitted action, do not move, speak, attack, cast, dodge, aim, signal, or choose for them. Spotlight the situation, ask what they do, and optionally provide choices for that actor.",
@@ -697,6 +713,7 @@ function createDmQualityPolicy({ mode, responseMode } = {}) {
     priorities: [
       "consequence of the latest player action",
       "existing NPC motivations and relationships",
+      "hidden long, mid, and short term story direction",
       "world continuity and unresolved threads",
       "tension that follows naturally from the scene",
       "meaningful choices only when the scene truly branches",
@@ -1328,6 +1345,7 @@ function buildCompactContext(contextPack, campaign, options = {}) {
     },
     party: (campaign.party ?? []).map((member) => compactPartyMember(member, options)).slice(0, 8),
     rulesLedger: compactRulesLedger(contextPack?.rulesLedger, options),
+    hiddenDmStory: compactHiddenStoryThreads(campaign),
     tableVoices: (campaign.party ?? []).map((member) => ({
       id: member.id,
       name: member.name,

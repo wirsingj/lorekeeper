@@ -12,6 +12,7 @@ import { renderTurnResponseForImport } from "../src/model-contract/turn-json-con
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
+import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
 import { randomDevJumpStart } from "./dev-jump-start.js";
@@ -68,6 +69,7 @@ const extensionResponseType = "lorekeeper.appBridge.response";
 const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
+const debugMetaStorageKey = "lorekeeper.showDebugMeta";
 const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -5262,10 +5264,24 @@ function shouldAutoApproveChange(change) {
   if (change.validation?.valid === false || change.status === "rejected") {
     return false;
   }
+  if (isHiddenStoryChange(change)) {
+    return true;
+  }
   if (change.importance === "major" || change.visibility === "dm_only" || change.visibility === "system_only") {
     return false;
   }
   return true;
+}
+
+function isHiddenStoryChange(change = {}) {
+  return (
+    normalizeChangeDomain(change.domain) === "quests" &&
+    change.visibility === "dm_only" &&
+    (change.data?.threadType === "story_arc" ||
+      change.data?.thread_type === "story_arc" ||
+      change.data?.kind === "story_arc" ||
+      change.data?.type === "story_arc")
+  );
 }
 
 function createImplicitSceneProgressChange(tableMessages = [], proposedChanges = []) {
@@ -7269,7 +7285,7 @@ function renderPlayLog() {
         bubble.append(lifecycleBadge);
       }
       const cleanedMeta = cleanMessageMeta(message.meta);
-      if (cleanedMeta) {
+      if (cleanedMeta && shouldShowDebugMessageMeta()) {
         const meta = document.createElement("small");
         meta.className = "message-meta";
         meta.textContent = `Meta: ${cleanedMeta}`;
@@ -7309,6 +7325,10 @@ function renderPlayLog() {
     playLog.scrollTop = Math.max(0, playLog.scrollHeight - previousScrollBottom);
   }
   state.forceScrollToBottom = false;
+}
+
+function shouldShowDebugMessageMeta() {
+  return launchParams.get("debugMeta") === "1" || localStorage.getItem(debugMetaStorageKey) === "1";
 }
 
 function isPlayLogNearBottom(playLog) {
@@ -8265,7 +8285,10 @@ function formatHp(hp) {
 }
 
 function renderQuests(campaign) {
-  const active = campaign.quests.filter((quest) => quest.status !== "completed").slice(0, 8);
+  const active = campaign.quests
+    .filter((quest) => quest.status !== "completed")
+    .filter((quest) => !isHiddenStoryThread(quest))
+    .slice(0, 8);
   elements.questCount.textContent = String(active.length);
   elements.questList.replaceChildren(
     ...emptyOrRecords(

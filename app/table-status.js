@@ -20,6 +20,24 @@ const ACTIVITY_RULES = [
     phase: "enemy_turn",
   },
   {
+    match: /waiting for (.+?)'?s combat turn/i,
+    text: (message) => {
+      const actor = message.match(/waiting for (.+?)'?s combat turn/i)?.[1] || "the active character";
+      return `Waiting for ${actor}'s combat choice.`;
+    },
+    phase: "waiting_for_combat_actor",
+  },
+  {
+    match: /waiting for (?:guest|player|remote).*action/i,
+    text: "Waiting for the other player.",
+    phase: "waiting_for_player",
+  },
+  {
+    match: /host reviewing guest action|guest action.*approval/i,
+    text: "Host reviewing guest action.",
+    phase: "host_reviewing_guest_action",
+  },
+  {
     match: /combat input received|resolving staged remote action/i,
     text: "Resolving staged combat action...",
     phase: "resolving_remote_action",

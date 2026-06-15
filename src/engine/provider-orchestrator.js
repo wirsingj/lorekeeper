@@ -1,4 +1,5 @@
 import { buildSceneIntentPack, buildSceneRetrieval } from "./scene-engine.js";
+import { compactHiddenStoryThreads } from "../context-packs/story-threads.js";
 
 const providerTasks = new Set([
   "generate_scene_beat",
@@ -27,6 +28,7 @@ export function buildProviderTaskRequest({ task, campaign, turn, context = {}, a
       activeConsequences: sceneRetrieval.activeConsequences.map(summarizeConsequence),
       relevantRelationships: sceneRetrieval.relevantRelationships.map(summarizeRelationship),
       activeThreads: sceneRetrieval.activeThreads.map(summarizeThread),
+      hiddenDmStory: compactHiddenStoryThreads(campaign),
       activeActor: summarizeActor(campaign, turn?.actorId ?? campaign?.combat?.currentTurnId),
       recentMessages: (campaign?.sessionLog?.messages ?? []).slice(-8).map((message) => ({
         role: message.role,
@@ -39,7 +41,7 @@ export function buildProviderTaskRequest({ task, campaign, turn, context = {}, a
     actionRecord,
     outputContract: outputContractForTask(task),
     dmQuality: dmQualityPolicyForTask(task),
-    mutationPolicy: "Provider may propose changes only. Canonical state changes are app-owned and validated.",
+    mutationPolicy: "Provider may propose changes only. Canonical state changes are app-owned and validated. Hidden story planning uses dm_only quest changes with data.threadType story_arc and data.horizon long|mid|short.",
   };
 }
 

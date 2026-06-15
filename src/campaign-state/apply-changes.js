@@ -182,6 +182,9 @@ function mergeRecordPatch(record, patch) {
 
 function inferRevealedRecordData(change, domain, targetId) {
   const data = { ...(change.data ?? {}) };
+  if (change.visibility && data.visibility === undefined) {
+    data.visibility = change.visibility;
+  }
   if (domain !== "party" || !targetId || data.name || data.title) {
     return data;
   }
@@ -526,6 +529,9 @@ function applySceneHints(campaign, domain, record) {
   }
 
   if (domain === "quests" && !campaign.scene.activeQuestIds.includes(record.id)) {
+    if (record.visibility === "dm_only" || record.threadType === "story_arc") {
+      return;
+    }
     campaign.scene.activeQuestIds.push(record.id);
   }
 }
@@ -604,8 +610,13 @@ function normalizeRecordForDomain(domain, record) {
       id: record.id || uniqueId("quest", title),
       title,
       status: record.status || "active",
+      visibility: record.visibility || record.data?.visibility || "player_visible",
+      threadType: record.threadType || record.thread_type || record.kind || record.type || "quest",
+      horizon: record.horizon || record.timeHorizon || record.time_horizon || "",
       stakes: record.stakes || record.summary || record.description || "Unresolved campaign thread.",
       openQuestions: normalizeList(record.openQuestions || record.open_questions),
+      nextBeat: record.nextBeat || record.next_beat || record.currentBeat || "",
+      notes: normalizeNotes(record.notes),
       relatedIds: normalizeList(record.relatedIds || record.related_ids),
       createdAt: record.createdAt || now,
       updatedAt: now,

@@ -1,4 +1,5 @@
 import { renderContextPackMarkdown } from "../context-packs/build-context-pack.js";
+import { storyThreadPromptLines } from "../context-packs/story-threads.js";
 import { renderTemplateInstructions, sidecarTurnTemplate } from "./templates.js";
 
 export function buildSidecarPrompt({
@@ -35,10 +36,16 @@ export function buildSidecarPrompt({
     "",
     `Campaign Summary: ${compactLine(campaign.summary || "No campaign summary recorded.", 900)}`,
     "",
+    "## Hidden DM Story Threads",
+    "Private DM planning only. Do not reveal these titles, secrets, plans, or future twists directly to the table. Use them to make scenes feel purposeful and connected.",
+    "Maintain long, mid, and short term direction with dm_only quest proposedChanges when the party's actions or meta/RP direction change the campaign path.",
+    ...storyThreadPromptLines(campaign),
+    "",
     renderContextPackMarkdown(contextPack),
     "",
     "## Lorekeeper Update Contract",
     "Only include changed/new canon that matters. Prefer compact data. One record per party/person/place/item/quest/etc. Use party for PCs and trusted companions.",
+    "For hidden DM story planning, use domain quests, visibility dm_only, and data.threadType story_arc with data.horizon long|mid|short.",
     "Your final lines must be exactly one fenced block like this. If nothing changed, use an empty proposedChanges array.",
     "",
     "```json lorekeeper_updates",
@@ -74,6 +81,7 @@ export function createEmptyUpdateContract() {
         operation: "add|update|remove|note",
         domain: "party|people|factions|places|items|inventory|lore|timeline|quests|relationships|scene|combat|style",
         targetId: null,
+        visibility: "player_visible|dm_only|system_only",
         summary: "",
         data: {},
         confidence: "low|medium|high",

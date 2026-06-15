@@ -778,6 +778,8 @@ function testTableStatusVocabulary() {
   assert.equal(tableStatusForActivity("Generating locally with Ollama...", "working").text, "DM is thinking...");
   assert.equal(tableStatusForActivity("Needs repair - sceneStatus.awaitingPlayer must be boolean. Inspect or retry.", "error").text, "DM response needs review.");
   assert.equal(tableStatusForActivity("Resolving Drunk miner's enemy turn", "working").text, "DM resolving Drunk miner's enemy turn...");
+  assert.equal(tableStatusForActivity("Waiting for Tilli's combat turn.", "idle").text, "Waiting for Tilli's combat choice.");
+  assert.equal(tableStatusForActivity("Waiting for guest action", "waiting").text, "Waiting for the other player.");
   assert.equal(tableStatusForActivity("Action sent to host", "idle").text, "Action sent to host table.");
   assert.equal(tableStatusForActivity("Local generation timed out; Send Turn can retry", "error").text, "DM response timed out; retry is available.");
 

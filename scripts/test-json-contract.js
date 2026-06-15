@@ -116,7 +116,44 @@ assert.match(requestEnvelope.generation.dmQuality.philosophy, /skilled long-runn
 assert.ok(requestEnvelope.generation.dmQuality.avoid.includes("random encounter generation"));
 assert.ok(requestEnvelope.generation.dmQuality.beforeAddingNewContent.some((rule) => /Prefer existing people/.test(rule)));
 assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
+assert.equal(requestEnvelope.context.hiddenDmStory.length, 3);
+assert.equal(requestEnvelope.context.hiddenDmStory[0].horizon, "long");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
+
+const hiddenStoryCampaign = createEmptyCampaign({
+  title: "Hidden Story Test",
+  quests: [
+    {
+      id: "public-thread",
+      title: "Find the bridge",
+      status: "active",
+      stakes: "The road is washed out.",
+      openQuestions: [],
+    },
+    {
+      id: "secret-arc",
+      title: "The baron is funding the raids",
+      status: "active",
+      visibility: "dm_only",
+      threadType: "story_arc",
+      horizon: "long",
+      stakes: "A hidden patron turns random raids into a campaign problem.",
+      openQuestions: ["Who notices the coin trail?"],
+    },
+  ],
+});
+const hiddenStoryContext = buildContextPack(hiddenStoryCampaign);
+const visibleThreadSection = hiddenStoryContext.sections.find((section) => section.kind === "unresolved_threads");
+assert.match(visibleThreadSection.entries.join(" "), /Find the bridge/);
+assert.doesNotMatch(visibleThreadSection.entries.join(" "), /baron is funding/);
+const hiddenStoryEnvelope = buildTurnRequestEnvelope({
+  campaign: hiddenStoryCampaign,
+  contextPack: hiddenStoryContext,
+  playerTurn: "I keep watch.",
+  parsedMessage: { raw: "I keep watch.", inWorldText: "I keep watch.", metaInstructions: [] },
+});
+assert.equal(hiddenStoryEnvelope.context.hiddenDmStory[0].title, "The baron is funding the raids");
+assert.equal(validateTurnRequest(hiddenStoryEnvelope).valid, true);
 
 const editedChoiceText = "I choose B: Try to hide Rowan behind some crates. I throw a blanket over the shopkeeper, balance a small box on top, and loudly bluff that I am looking for the shopkeep.";
 const editedChoiceEnvelope = buildTurnRequestEnvelope({
@@ -282,6 +319,33 @@ assert.deepEqual(partialThinCampaign.scene.localNotes, []);
 assert.deepEqual(partialThinCampaign.people, []);
 assert.deepEqual(partialThinCampaign.party, []);
 assert.doesNotThrow(() => buildContextPack(partialThinCampaign, { purpose: "partial_thin_snapshot" }));
+
+const hiddenStoryApplied = applyCanonicalChanges(createEmptyCampaign({ title: "Hidden Canon" }), [
+  {
+    id: "hidden-story-add",
+    operation: "add",
+    domain: "quests",
+    targetId: null,
+    importance: "normal",
+    visibility: "dm_only",
+    summary: "Create a private long-term story thread.",
+    data: {
+      title: "The old road was closed for a reason",
+      threadType: "story_arc",
+      horizon: "long",
+      stakes: "The road trouble points toward a buried regional secret.",
+      openQuestions: ["Who benefits from keeping travelers away?"],
+      nextBeat: "Seed a small clue in the next grounded scene.",
+    },
+    confidence: "high",
+    reason: "DM needs private campaign direction.",
+  },
+]);
+const hiddenQuest = hiddenStoryApplied.campaign.quests.find((quest) => quest.threadType === "story_arc");
+assert.equal(hiddenQuest.visibility, "dm_only");
+assert.equal(hiddenQuest.horizon, "long");
+assert.equal(hiddenQuest.nextBeat, "Seed a small clue in the next grounded scene.");
+assert.equal(hiddenStoryApplied.campaign.scene.activeQuestIds.includes(hiddenQuest.id), false);
 
 const combatApplied = applyCanonicalChanges(rulesCampaignData, [
   {
