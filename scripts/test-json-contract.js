@@ -739,6 +739,28 @@ const textWrapped = parseTurnJsonResponse(`Here is JSON:\n${JSON.stringify(valid
 assert.equal(textWrapped.ok, true);
 assert.equal(textWrapped.recovery, "extracted_json_object");
 
+const qwenThinkingWrapped = parseTurnJsonResponse(`<think>{"table":[{"text":"ignore this private reasoning object"}]}</think>
+${JSON.stringify(validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", content: "Qwen content alias becomes table narration." }],
+}))}`);
+assert.equal(qwenThinkingWrapped.ok, true);
+assert.match(renderTurnResponseForImport(qwenThinkingWrapped.response), /Qwen content alias becomes table narration/);
+assert.doesNotMatch(renderTurnResponseForImport(qwenThinkingWrapped.response), /private reasoning/);
+
+const qwenNestedNarrative = parseTurnJsonResponse(JSON.stringify({
+  requestId: requestEnvelope.requestId,
+  response: {
+    narrative: "The shrine stones hum softly as the untouched offering glints in the dusk.",
+    sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+    proposedChanges: [],
+  },
+}), {
+  requestId: requestEnvelope.requestId,
+});
+assert.equal(qwenNestedNarrative.ok, true);
+assert.match(renderTurnResponseForImport(qwenNestedNarrative.response), /shrine stones hum softly/);
+assert.doesNotMatch(renderTurnResponseForImport(qwenNestedNarrative.response), /empty table response/);
+
 const partialStructured = parseTurnJsonResponse('{"type":"lorekeeper.turn.response","schemaVersion":1,"requestId":"oops"');
 assert.equal(partialStructured.ok, false);
 assert.equal(partialStructured.response.proposedChanges.length, 0);

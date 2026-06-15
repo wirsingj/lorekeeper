@@ -747,20 +747,21 @@ function createDmQualityPolicy({ mode, responseMode } = {}) {
 }
 
 function normalizeTurnResponse(response, options = {}) {
-  const rawTable = Array.isArray(response.table) ? response.table : [];
+  const unwrapped = unwrapTurnResponse(response);
+  const rawTable = normalizedTableRows(unwrapped);
   const table = rawTable.map(normalizeTableEntry).filter((entry) => entry.text);
-  const sceneStatus = normalizeSceneStatus(response.sceneStatus);
-  const mechanics = Array.isArray(response.mechanics)
-    ? response.mechanics.map(normalizeMechanic).filter((item) => item.text || item.reason)
+  const sceneStatus = normalizeSceneStatus(unwrapped.sceneStatus);
+  const mechanics = Array.isArray(unwrapped.mechanics)
+    ? unwrapped.mechanics.map(normalizeMechanic).filter((item) => item.text || item.reason)
     : [];
-  const proposedChanges = Array.isArray(response.proposedChanges)
-    ? response.proposedChanges.map(normalizeProposedChange).filter(Boolean)
-    : Array.isArray(response.updates?.proposedChanges)
-      ? response.updates.proposedChanges.map(normalizeProposedChange).filter(Boolean)
+  const proposedChanges = Array.isArray(unwrapped.proposedChanges)
+    ? unwrapped.proposedChanges.map(normalizeProposedChange).filter(Boolean)
+    : Array.isArray(unwrapped.updates?.proposedChanges)
+      ? unwrapped.updates.proposedChanges.map(normalizeProposedChange).filter(Boolean)
       : [];
-  const flags = normalizeFlags(response.flags, proposedChanges);
-  const warnings = Array.isArray(response.warnings) ? response.warnings.map(compactWhitespace).filter(Boolean) : [];
-  const choices = applyChoicePolicy(normalizeChoices(response.choices), {
+  const flags = normalizeFlags(unwrapped.flags, proposedChanges);
+  const warnings = Array.isArray(unwrapped.warnings) ? unwrapped.warnings.map(compactWhitespace).filter(Boolean) : [];
+  const choices = applyChoicePolicy(normalizeChoices(unwrapped.choices), {
     choicePolicy: options.choicePolicy,
     sceneStatus,
     mechanics,
@@ -769,10 +770,10 @@ function normalizeTurnResponse(response, options = {}) {
   });
 
   return {
-    type: response.type || RESPONSE_TYPE,
-    schemaVersion: Number(response.schemaVersion) || SCHEMA_VERSION,
-    requestId: response.requestId || options.expectedRequestId || "",
-    table: table.length ? table : [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: fallbackNarration(response) }],
+    type: unwrapped.type || RESPONSE_TYPE,
+    schemaVersion: Number(unwrapped.schemaVersion) || SCHEMA_VERSION,
+    requestId: unwrapped.requestId || options.expectedRequestId || "",
+    table: table.length ? table : [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: fallbackNarration(unwrapped) }],
     sceneStatus,
     choices,
     mechanics,
@@ -780,6 +781,53 @@ function normalizeTurnResponse(response, options = {}) {
     proposedChanges,
     warnings,
   };
+}
+
+function unwrapTurnResponse(response) {
+  if (!response || typeof response !== "object") {
+    return {};
+  }
+  const wrapperKeys = ["response", "turn", "result", "output", "data"];
+  for (const key of wrapperKeys) {
+    const value = response[key];
+    if (value && typeof value === "object" && !Array.isArray(value) && hasTurnResponseShape(value)) {
+      return {
+        ...value,
+        type: value.type || response.type,
+        schemaVersion: value.schemaVersion || response.schemaVersion,
+        requestId: value.requestId || response.requestId,
+        warnings: [...(Array.isArray(response.warnings) ? response.warnings : []), ...(Array.isArray(value.warnings) ? value.warnings : [])],
+      };
+    }
+  }
+  return response;
+}
+
+function hasTurnResponseShape(value) {
+  return Boolean(
+    Array.isArray(value.table) ||
+    Array.isArray(value.tableRows) ||
+    Array.isArray(value.entries) ||
+    Array.isArray(value.messages) ||
+    value.narration ||
+    value.narrative ||
+    value.description ||
+    value.content ||
+    value.text ||
+    value.message
+  );
+}
+
+function normalizedTableRows(response) {
+  if (Array.isArray(response.table)) {
+    return response.table;
+  }
+  for (const key of ["tableRows", "entries", "messages", "rows"]) {
+    if (Array.isArray(response[key])) {
+      return response[key];
+    }
+  }
+  return [];
 }
 
 function createFallbackResponse({ requestId = "", text, warning }) {
@@ -802,8 +850,8 @@ function normalizeTableEntry(entry) {
     return { speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: normalizeTableText(entry) };
   }
 
-  const speaker = compactWhitespace(entry?.speaker || "DM");
-  const text = normalizeTableText(entry?.text || entry?.body || "");
+  const speaker = compactWhitespace(entry?.speaker || entry?.name || entry?.actor || "DM");
+  const text = normalizeTableText(entry?.text || entry?.body || entry?.content || entry?.narration || entry?.narrative || entry?.description || entry?.message || "");
   return {
     speaker,
     speakerId: entry?.speakerId ?? null,
@@ -1307,7 +1355,23 @@ function normalizeChangeVisibility(value) {
 }
 
 function fallbackNarration(response) {
-  return compactWhitespace(response.narration || response.text || response.message || "The local model returned an empty table response.");
+  const value = response.narration ||
+    response.narrative ||
+    response.description ||
+    response.content ||
+    response.text ||
+    response.message ||
+    response.responseText ||
+    response.response_text ||
+    "The local model returned an empty table response.";
+  return compactWhitespace(typeof value === "object" ? tableTextFromObject(value) : value);
+}
+
+function tableTextFromObject(value) {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+  return compactWhitespace(value.text || value.body || value.content || value.narration || value.narrative || value.description || value.message || "");
 }
 
 function buildCompactContext(contextPack, campaign, options = {}) {
@@ -1640,7 +1704,8 @@ function parseJsonObject(rawText) {
     return { value: null, error: "Empty model response.", recovery: "empty" };
   }
 
-  const stripped = text
+  const withoutThinking = stripThinkingBlocks(text);
+  const stripped = withoutThinking
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/```$/i, "")
     .trim();
@@ -1663,6 +1728,12 @@ function parseJsonObject(rawText) {
       return { value: null, error: candidateError.message, recovery: "failed" };
     }
   }
+}
+
+function stripThinkingBlocks(text) {
+  return String(text ?? "")
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .trim();
 }
 
 function extractBalancedObject(text) {
