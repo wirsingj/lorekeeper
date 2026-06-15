@@ -1879,15 +1879,53 @@ textarea::placeholder {
   white-space: pre;
 }
 
+.session-health-summary,
 .table-timeline-summary {
   display: grid;
   gap: 6px;
-  max-height: 180px;
   overflow: auto;
   padding: 8px;
   border: 1px solid rgba(174, 191, 202, 0.14);
   border-radius: 8px;
   background: rgba(13, 17, 20, 0.42);
+}
+
+.session-health-summary {
+  max-height: 150px;
+}
+
+.table-timeline-summary {
+  max-height: 180px;
+}
+
+.session-health-summary[data-tone="attention"] {
+  border-color: rgba(206, 118, 105, 0.38);
+}
+
+.session-health-summary[data-tone="working"] {
+  border-color: rgba(125, 213, 201, 0.3);
+}
+
+.session-health-summary[data-tone="waiting"] {
+  border-color: rgba(222, 188, 120, 0.32);
+}
+
+.session-health-summary strong {
+  color: #eef3f5;
+  font-size: 0.8rem;
+}
+
+.session-health-summary ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.session-health-summary li {
+  color: #d8e1e5;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .table-timeline-summary p {

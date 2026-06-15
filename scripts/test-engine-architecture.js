@@ -950,6 +950,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /turn_waiting_for_dm/, "submitted turns should be visibly marked while waiting for the DM");
   assert.match(appJs, /updatePlayerTurnEchoLifecycle/, "submitted turn bubbles should update after provider completion or failure");
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
+  assert.match(appJs, /buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
+  assert.match(appJs, /sessionHealth: buildSessionHealthSummary\(\)/, "renderer diagnostics should serialize session health");
   assert.match(appJs, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
   assert.match(appJs, /stripInlineResponseJsonTail/, "table narration cleanup should remove inline provider JSON tails");
   assert.equal(/label:\s*"Play"/.test(appJs), false, "AI companion cards should use Nudge instead of a Play button");
@@ -976,6 +978,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /new-joiner-integration/);
   assert.match(appShell, /new-joiner-host-context/);
   assert.match(appShell, /table-timeline-summary/);
+  assert.match(appShell, /session-health-summary/);
   assert.match(appShell, /local-table-guidance/);
   assert.match(appShell, /id="right-rail-toggle"/);
   assert.ok(

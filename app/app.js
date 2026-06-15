@@ -276,6 +276,7 @@ const elements = {
   diagnosticsOutput: document.querySelector("#diagnostics-output"),
   diagnosticsStatus: document.querySelector("#diagnostics-status"),
   showDebugMeta: document.querySelector("#show-debug-meta"),
+  sessionHealthSummary: document.querySelector("#session-health-summary"),
   tableTimelineSummary: document.querySelector("#table-timeline-summary"),
   generationTimeout: document.querySelector("#generation-timeout"),
   outputLimit: document.querySelector("#output-limit"),
@@ -5033,6 +5034,7 @@ function render() {
   renderTableTalk();
   renderPrompt(state.prompt);
   renderReviewBatch();
+  renderSessionHealthSummary();
   renderCampaignSelector();
   renderProviderControls();
   renderDebugMetaControl();
@@ -6787,6 +6789,7 @@ async function refreshDiagnostics() {
   elements.diagnosticsStatus.textContent = "Reading";
   const bundle = await buildDiagnosticsSnapshot();
   elements.diagnosticsOutput.value = JSON.stringify(bundle, null, 2);
+  renderSessionHealthSummary(bundle?.renderer?.sessionHealth);
   renderTableTimelineSummary(bundle?.renderer?.tableTimeline ?? []);
   elements.diagnosticsStatus.textContent = "Ready";
   return bundle;
@@ -6886,6 +6889,7 @@ function buildRendererDiagnostics() {
     reviewBatch: state.reviewBatch,
     bridge: state.bridge,
     turnRepair: summarizeTurnRepair(activeTurnRepair()),
+    sessionHealth: buildSessionHealthSummary(),
     recentPlayMessages: state.playMessages.slice(-30),
     tableTimeline: state.tableTimeline.slice(-80),
     diagnosticsEvents: state.diagnosticsEvents.slice(-80),
@@ -6897,6 +6901,119 @@ function buildRendererDiagnostics() {
       threads: state.campaign.quests?.length ?? 0,
       messages: state.campaign.sessionLog?.messages?.length ?? 0,
     } : {},
+  };
+}
+
+function renderSessionHealthSummary(summary = buildSessionHealthSummary()) {
+  if (!elements.sessionHealthSummary) {
+    return;
+  }
+  const headline = document.createElement("strong");
+  headline.textContent = summary.headline || "Table Ready";
+  const lines = Array.isArray(summary.lines) && summary.lines.length
+    ? summary.lines
+    : ["No blockers detected."];
+  const list = document.createElement("ul");
+  list.replaceChildren(
+    ...lines.slice(0, 6).map((line) => {
+      const item = document.createElement("li");
+      item.textContent = line;
+      return item;
+    }),
+  );
+  elements.sessionHealthSummary.dataset.tone = summary.tone || "ready";
+  elements.sessionHealthSummary.replaceChildren(headline, list);
+}
+
+function buildSessionHealthSummary() {
+  const lines = [];
+  const providerState = elements.providerActivity?.dataset.state || "idle";
+  const providerText = (elements.providerActivityLabel?.textContent || "").trim();
+  const campaign = state.campaign;
+  const repair = activeTurnRepair();
+  const pendingInputs = campaign?.multiplayer?.pendingTurnInputs ?? [];
+  const readyInputs = pendingInputs.filter((input) => input.ready && !input.passed && input.text);
+  const waitingInputs = pendingInputs.filter((input) => !input.ready || input.passed || !input.text);
+  const pendingGuests = (campaign?.multiplayer?.connections ?? []).filter((connection) => connection.status === "pending");
+  const combat = campaign?.combat;
+  const activeCombatant = combat?.inCombat
+    ? normalizedCombatTurnOrder(campaign).find((entry) => entry.id === combat.currentTurnId)
+    : null;
+  const reviewCount = state.reviewBatch?.proposals?.filter((proposal) => proposal.status !== "committed")?.length ?? 0;
+  const tableRunning = Boolean(state.multiplayerSnapshot?.localTable?.running || campaign?.multiplayer?.table?.running);
+  const providerSettings = currentProviderSettings();
+
+  if (providerState === "working") {
+    lines.push(providerText ? `DM is working: ${providerText}` : "DM is working on the next table beat.");
+  } else if (providerState === "error") {
+    lines.push(providerText ? `Needs attention: ${providerText}` : "Something needs attention before play continues.");
+  } else if (providerState === "waiting") {
+    lines.push(providerText ? `Waiting: ${providerText}` : "The table is waiting for the next host or provider step.");
+  }
+
+  if (repair) {
+    lines.push("A DM response needs recovery. Use Retry, Inspect, or Import from the table status strip.");
+  }
+
+  if (combat?.inCombat) {
+    lines.push(activeCombatant
+      ? `Combat is active: ${activeCombatant.name}'s turn in round ${combat.round ?? 1}.`
+      : `Combat is active: round ${combat.round ?? 1}.`);
+  }
+
+  if (readyInputs.length) {
+    lines.push(readyInputs.length === 1
+      ? `${readyInputs[0].characterName || "A party member"} has an action staged for the DM.`
+      : `${readyInputs.length} party actions are staged for the DM.`);
+  }
+
+  if (waitingInputs.length) {
+    lines.push(waitingInputs.length === 1
+      ? "One party input is waiting on the player or host."
+      : `${waitingInputs.length} party inputs are waiting on players or host.`);
+  }
+
+  if (pendingGuests.length) {
+    lines.push(pendingGuests.length === 1
+      ? `${pendingGuests[0].displayName || "A guest"} is waiting for host approval.`
+      : `${pendingGuests.length} guests are waiting for host approval.`);
+  }
+
+  if (reviewCount) {
+    lines.push(`${reviewCount} proposed state ${reviewCount === 1 ? "change is" : "changes are"} waiting for review.`);
+  }
+
+  if (clientMode || state.guestSession?.hostBaseUrl) {
+    lines.push(state.guestSession?.connectionId
+      ? "ThinLoreKeeper is connected to the host table."
+      : "ThinLoreKeeper is not connected to a host table.");
+  } else {
+    lines.push(tableRunning ? "Local Table hosting is running." : "Local Table hosting is off.");
+  }
+
+  lines.push(providerSettings.preferredProvider === "ollama"
+    ? `Provider: Ollama ${providerSettings.selectedModel}.`
+    : "Provider: ChatGPT bridge/manual flow.");
+
+  const tone = repair || providerState === "error"
+    ? "attention"
+    : providerState === "working"
+      ? "working"
+      : providerState === "waiting" || readyInputs.length || waitingInputs.length || pendingGuests.length || reviewCount
+        ? "waiting"
+        : "ready";
+  const headline = tone === "attention"
+    ? "Needs Attention"
+    : tone === "working"
+      ? "DM Resolving"
+      : tone === "waiting"
+        ? "Table Waiting"
+        : "Table Ready";
+
+  return {
+    headline,
+    tone,
+    lines: lines.length ? lines : ["No blockers detected."],
   };
 }
 

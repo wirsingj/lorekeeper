@@ -51,6 +51,7 @@ Status legend:
 27. Improved - Local table setup now explains whether guest actions auto-resolve, wait for host approval, or are held for a grouped host turn.
 28. Improved - Enemy HP policy is explicit: host view can show exact HP, while guest/Thin snapshots redact enemy HP and render it as unknown.
 29. Improved - The right-side campaign binder can collapse into a narrow rail, letting live play take the room during active sessions while keeping notes one click away.
+30. Improved - Setup diagnostics now includes a plain session health summary for host troubleshooting: provider state, combat turn, staged party inputs, guest approvals, review state, Local Table state, and provider mode.
 
 ## Top Immersion Risks Still Open
 
@@ -107,7 +108,7 @@ Status legend:
 17. Improved - Make right-side binder collapsible or context-sensitive during active play. The binder now has a persisted collapse toggle that widens the play surface.
 18. Low - Replace remaining overly specific placeholder text with neutral table examples.
 19. Low - Improve empty states so they teach the next table action.
-20. Low - Add a plain "session health" summary for host troubleshooting.
+20. Improved - Add a plain "session health" summary for host troubleshooting. Setup diagnostics now summarizes blockers and table state in human terms.
 
 ## Combat Reality Check
 
@@ -190,7 +191,7 @@ Still open:
 7. Add campaign-aware character auto-complete that can use party theme, campaign premise, and existing characters without overriding supplied fields.
 8. Add a compact encounter tracker upgrade: conditions, defeated state, active resources, action spent.
 9. Add curated scenario fixtures for social negotiation, wilderness travel, investigation, downtime, and combat.
-10. Add a host-facing "session health" panel that explains stuck states in human terms.
+10. Improved - Add a host-facing "session health" panel that explains stuck states in human terms. Setup diagnostics now includes this summary.
 
 ## Regression Tests Added Or Updated
 
@@ -217,6 +218,7 @@ Current coverage includes:
 19. Multiplayer session projection covers auto-resolve, host-approval, group-hold, and guest-sent wording.
 20. Guest multiplayer snapshots redact exact enemy HP while combat tracker projection renders hidden enemy HP as unknown.
 21. Right-side binder collapse control is present and persists its state between launches.
+22. Renderer diagnostics include a plain session health summary.
 
 ## Remaining Product Risk
 

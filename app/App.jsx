@@ -615,6 +615,10 @@ function SetupDialog() {
             <button id="refresh-diagnostics" type="button">Refresh Diagnostics</button>
             <button id="copy-diagnostics" type="button">Copy JSON</button>
           </div>
+          <div id="session-health-summary" className="session-health-summary" aria-live="polite">
+            <strong>Table ready</strong>
+            <p>No blockers detected.</p>
+          </div>
           <div id="table-timeline-summary" className="table-timeline-summary" aria-live="polite">
             <p>No table timeline yet.</p>
           </div>
