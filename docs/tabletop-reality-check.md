@@ -52,11 +52,12 @@ Status legend:
 28. Improved - Enemy HP policy is explicit: host view can show exact HP, while guest/Thin snapshots redact enemy HP and render it as unknown.
 29. Improved - The right-side campaign binder can collapse into a narrow rail, letting live play take the room during active sessions while keeping notes one click away.
 30. Improved - Setup diagnostics now includes a plain session health summary for host troubleshooting: provider state, combat turn, staged party inputs, guest approvals, review state, Local Table state, and provider mode.
+31. Improved - Auto-resumed unresolved player actions now mark the original table bubble as "Recovering" before replaying the action, then settle to the normal DM answered/review/failed lifecycle.
 
 ## Top Immersion Risks Still Open
 
 1. Open - Combat resolution is still partly provider-led for enemy turns and improvised actions. The app has a combat engine, but not every table combat beat is app-owned before narration.
-2. Open - Auto-resume and recovery states are better surfaced, but the user still needs a clearer "recovering last turn" table affordance before anything is replayed.
+2. Improved - Auto-resume marks the original unresolved player bubble as "Recovering" before replay. Broader repair/retry decisions still need a fuller table-shaped flow.
 3. Open - Repair/retry/import controls still expose some software-shaped concepts. The labels are friendlier, but the mental model is not yet purely table-shaped.
 4. Fixed - Meta lines under bubbles are hidden during normal play, and Setup diagnostics has a visible debug-meta toggle.
 5. Improved - Hidden DM story direction now gives the provider long/mid/short campaign intent. Scene purpose, current tension, and consequence summaries still need stronger visible presentation.
@@ -90,7 +91,7 @@ Status legend:
 ## Current Top 20 Issues To Keep Attacking
 
 1. Critical - Make common combat action resolution app-owned before provider narration: attack roll, check/save, damage/healing, HP/resource/condition updates, and initiative advancement.
-2. Critical - Add explicit table-facing recovery before auto-resume or repair retry reuses any prior player action.
+2. Improved - Add explicit table-facing recovery before auto-resume or repair retry reuses any prior player action. Auto-resume now marks the original player bubble as "Recovering" before replay; repair retry still needs the same treatment.
 3. Critical - Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, and combat/multiplayer domain modules.
 4. High - Add scenario fixtures that prove the provider cannot speak for host/remote PCs across social, combat, and join-transfer cases.
 5. High - Continue strengthening the "what the table is waiting for" surface so it is always visible and covers every stuck state.
@@ -219,6 +220,7 @@ Current coverage includes:
 20. Guest multiplayer snapshots redact exact enemy HP while combat tracker projection renders hidden enemy HP as unknown.
 21. Right-side binder collapse control is present and persists its state between launches.
 22. Renderer diagnostics include a plain session health summary.
+23. Auto-resumed unresolved player turns get a visible "Recovering" lifecycle before replay.
 
 ## Remaining Product Risk
 

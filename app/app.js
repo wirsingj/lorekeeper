@@ -1696,16 +1696,35 @@ async function resumePendingPlayerTurn(reason = "unknown") {
       body: pending.body,
       meta: pending.meta,
     });
+    await markPendingPlayerTurnRecovering(pending, reason);
     setProviderActivity("Resuming unresolved player turn...", "working");
-    await submitPlayerTurnFromInput(turnText, {
+    const runResult = await submitPlayerTurnFromInput(turnText, {
       skipPlayerEcho: true,
       skipPartySeed: true,
       preserveInput: true,
       resumePendingTurn: true,
     });
+    await updatePlayerTurnEchoLifecycle(pending.id, {
+      ...runResult,
+      recovered: true,
+    });
   } finally {
     state.autoResumingPendingTurn = false;
   }
+}
+
+async function markPendingPlayerTurnRecovering(message, reason = "unknown") {
+  if (!message?.id) {
+    return;
+  }
+  await patchPlayMessage(message.id, {
+    data: {
+      status: "turn_recovering",
+      lifecycle: "recovering",
+      recoveryReason: reason,
+      recoveryStartedAt: new Date().toISOString(),
+    },
+  });
 }
 
 function findPendingPlayerTurnMessage() {
@@ -7760,6 +7779,16 @@ function messageLifecycleForMessage(message) {
       turn_waiting_for_import: {
         label: "Waiting for DM result",
         title: "The provider received this action, but the DM result has not been imported yet.",
+        tone: "waiting",
+      },
+      recovering: {
+        label: "Recovering",
+        title: "The app is replaying this unresolved action so the DM can answer it.",
+        tone: "waiting",
+      },
+      turn_recovering: {
+        label: "Recovering",
+        title: "The app is replaying this unresolved action so the DM can answer it.",
         tone: "waiting",
       },
       resolved: {
