@@ -256,7 +256,7 @@ export function LorekeeperShell() {
             <span id="table-talk-count" className="count-pill">0</span>
           </div>
           <div id="table-talk-log" className="table-talk-log" aria-live="polite">
-            <p className="table-talk-empty">No side chat yet.</p>
+            <p className="table-talk-empty">Side chat is quiet.</p>
           </div>
           <form id="table-talk-form" className="table-talk-form">
             <label className="visually-hidden" htmlFor="table-talk-input">Table Talk</label>

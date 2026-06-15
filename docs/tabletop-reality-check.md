@@ -53,6 +53,7 @@ Status legend:
 29. Improved - The right-side campaign binder can collapse into a narrow rail, letting live play take the room during active sessions while keeping notes one click away.
 30. Improved - Setup diagnostics now includes a plain session health summary for host troubleshooting: provider state, combat turn, staged party inputs, guest approvals, review state, Local Table state, and provider mode.
 31. Improved - Auto-resumed unresolved player actions now mark the original table bubble as "Recovering" before replaying the action, then settle to the normal DM answered/review/failed lifecycle.
+32. Improved - Empty side-panel states now use table-shaped language for contacts, places, things, threads, staged party actions, side chat, and state review.
 
 ## Top Immersion Risks Still Open
 
@@ -108,7 +109,7 @@ Status legend:
 16. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
 17. Improved - Make right-side binder collapsible or context-sensitive during active play. The binder now has a persisted collapse toggle that widens the play surface.
 18. Low - Replace remaining overly specific placeholder text with neutral table examples.
-19. Low - Improve empty states so they teach the next table action.
+19. Improved - Improve empty states so they teach the next table action. Side-panel and review/local-table empties now describe what will appear there in table terms.
 20. Improved - Add a plain "session health" summary for host troubleshooting. Setup diagnostics now summarizes blockers and table state in human terms.
 
 ## Combat Reality Check
@@ -221,6 +222,7 @@ Current coverage includes:
 21. Right-side binder collapse control is present and persists its state between launches.
 22. Renderer diagnostics include a plain session health summary.
 23. Auto-resumed unresolved player turns get a visible "Recovering" lifecycle before replay.
+24. Empty states use table-shaped language for binder, review, local-table, and side-chat panels.
 
 ## Remaining Product Risk
 

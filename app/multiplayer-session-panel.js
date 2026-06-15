@@ -155,7 +155,7 @@ function renderPendingInputs(container, inputs) {
         subtitle: input.statusLabel || input.text || "not ready",
         actions: [],
       })),
-      "No pending party inputs.",
+      "No guest or party actions are staged right now.",
     ),
   );
 }

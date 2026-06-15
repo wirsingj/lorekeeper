@@ -2,7 +2,7 @@ export function buildReviewPanelProjection({ reviewBatch = null, campaign = null
   if (reviewBatch?.proposedChanges?.length) {
     return {
       count: reviewBatch.proposedChanges.length,
-      emptyMessage: "No pending state changes.",
+      emptyMessage: "No state changes are waiting for review.",
       entries: reviewBatch.proposedChanges.slice(0, 6).map((change) => ({
         title: `${change.status} / ${change.operation} / ${change.domain}`,
         body: change.validation?.valid === false
@@ -16,7 +16,7 @@ export function buildReviewPanelProjection({ reviewBatch = null, campaign = null
   const changes = lastCommitted?.applied ?? [];
   return {
     count: changes.length,
-    emptyMessage: "No pending state changes.",
+    emptyMessage: "No recent state changes to review.",
     entries: changes.slice(0, 6).map((change) => ({
       title: `${change.operation} / ${change.domain}`,
       body: change.summary,

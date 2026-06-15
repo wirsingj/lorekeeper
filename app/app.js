@@ -8438,7 +8438,7 @@ function renderPeople(campaign) {
           onEdit: () => openRecordDialog("people", person),
         }),
       ),
-      "No people recorded yet.",
+      "NPCs and contacts the table meets will appear here.",
     ),
   );
 }
@@ -8473,7 +8473,7 @@ function renderPlaces(campaign) {
           onEdit: () => openRecordDialog("places", place),
         }),
       ),
-      "No places recorded yet.",
+      "Current and discovered locations will appear here.",
     ),
   );
 }
@@ -8527,7 +8527,7 @@ function renderThings(campaign) {
           onEdit: () => openRecordDialog(thing.domain, thing.record),
         }),
       ),
-      "No things recorded yet.",
+      "Items, clues, handouts, and assets will appear here.",
     ),
   );
 }
@@ -8568,7 +8568,7 @@ function renderQuests(campaign) {
           onEdit: () => openRecordDialog("quests", quest),
         }),
       ),
-      "No active threads.",
+      "Open quests and unresolved story threads will appear here.",
     ),
   );
 }
@@ -8584,7 +8584,7 @@ function renderTableTalk() {
     empty.className = "table-talk-empty";
     empty.textContent = clientMode || state.guestSession?.hostBaseUrl
       ? "Side chat appears here after you join the host table."
-      : "No side chat yet.";
+      : "Side chat is quiet.";
     elements.tableTalkLog.replaceChildren(empty);
   } else {
     elements.tableTalkLog.replaceChildren(
@@ -8716,7 +8716,7 @@ function binderRecordElement({ title, subtitle, body, onEdit }) {
   summary.append(titleNode, subtitleNode);
 
   const copy = document.createElement("p");
-  copy.textContent = body || "No details recorded.";
+  copy.textContent = body || "No details recorded yet.";
   wrapper.append(summary, copy);
 
   if (onEdit) {
@@ -8800,7 +8800,7 @@ function recordElement({ title, body, badge, actions = [], onEdit }) {
   }
 
   const copy = document.createElement("p");
-  copy.textContent = body || "No notes recorded.";
+  copy.textContent = body || "No notes recorded yet.";
 
   wrapper.append(heading, copy);
   if (actions.length) {
