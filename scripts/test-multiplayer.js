@@ -8,6 +8,7 @@ import {
   createGuestSnapshot,
   createHostSnapshot,
   createInviteForPartyMember,
+  createJoinPreview,
   disconnectGuest,
   parseInviteLink,
   postTableTalk,
@@ -46,6 +47,12 @@ assert.equal(
   parseInviteLink("lorekeeper://join?host=127.0.0.1&port=7347&campaign=campaign-mp&seat=kevric&token=abc").valid,
   true,
 );
+const joinPreview = createJoinPreview(campaign, inviteResult.inviteLink);
+assert.equal(joinPreview.campaignTitle, "Campaign Test");
+assert.match(joinPreview.campaignSummary, /test campaign/i);
+assert.match(joinPreview.scene.immediateSituation, /hidden camp/i);
+assert.equal(joinPreview.party.some((member) => member.name === "Jarin"), true);
+assert.equal(joinPreview.people?.some?.((person) => person.name === "Hidden Handler"), false);
 
 const joinResult = requestJoin(campaign, {
   inviteLink: inviteResult.inviteLink,
@@ -164,7 +171,32 @@ assert.equal(publicMessage.body, "Kevric ducks behind the nearest tree and watch
 assert.equal(publicMessage.data.status, "pending_model_submit");
 assert.equal(publicMessage.data.hostStaged, true);
 assert.equal(publicMessage.data.requiresHostApproval, false);
-assert.match(publicMessage.meta, /queued for DM/i);
+assert.match(publicMessage.meta, /sent to host and queued for DM/i);
+
+campaign.sessionLog.messages.push({
+  id: "dm-after-first-remote-draft",
+  sessionId: "session-main",
+  role: "dm",
+  title: "DM",
+  body: "The DM asks a follow-up after the first remote action.",
+  meta: "Test DM prompt after first guest action.",
+  source: "test",
+  providerRunId: null,
+  createdAt: new Date().toISOString(),
+  data: {},
+});
+campaign = submitGuestAction(campaign, {
+  connectionId: connected.id,
+  clientId: "guest-client",
+  connectionSecret,
+  characterId: "kevric",
+  text: "Kevric changes course and signals Jarin instead.",
+});
+const updatedPublicMessage = campaign.sessionLog.messages.at(-1);
+assert.equal(campaign.multiplayer.pendingTurnInputs.length, 1);
+assert.equal(updatedPublicMessage.title, "Kevric");
+assert.equal(updatedPublicMessage.body, "Kevric changes course and signals Jarin instead.");
+assert.equal(updatedPublicMessage.data.pendingInputId, campaign.multiplayer.pendingTurnInputs[0].id);
 
 campaign = clearPendingTurnInputs(campaign, [campaign.multiplayer.pendingTurnInputs[0].id]);
 campaign = updateMultiplayerSettings(campaign, { holdGuestActionsForGroupInput: true });
@@ -273,6 +305,17 @@ assert.equal(
 campaign = disconnectGuest(campaign, connected.id);
 const releasedKevric = campaign.party.find((member) => member.id === "kevric");
 assert.equal(releasedKevric.controllerKind, controllerKinds.AI_COMPANION);
+const reconnectResult = requestJoin(campaign, {
+  inviteLink: inviteResult.inviteLink,
+  playerName: "Jess",
+  clientId: "guest-client",
+});
+campaign = reconnectResult.campaign;
+assert.equal(reconnectResult.connection.id, connected.id);
+assert.equal(reconnectResult.approved, true);
+assert.equal(reconnectResult.connection.status, "connected");
+assert.equal(campaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(campaign.multiplayer.events.some((event) => event.type === "guest_reconnected"), true);
 
 let tableStopCampaign = approveJoinRequest(joinResult.campaign, joinResult.connection.id);
 tableStopCampaign = stopLocalTable(tableStopCampaign);
@@ -334,6 +377,89 @@ assert.equal(joinAsCampaign.sessionLog.messages.some((message) =>
   /flooded bridge detour/.test(message.body)
 ), true);
 assert.equal(joinAsCampaign.multiplayer.connections[0].partyMemberId, mira.id);
+
+let combatJoinAsCampaign = startLocalTable({
+  ...testCampaign(),
+  combat: {
+    inCombat: true,
+    round: 1,
+    currentTurnId: "jarin",
+    initiative: ["jarin"],
+    turnOrder: [{ id: "jarin", name: "Jarin", type: "party", initiativeScore: 12 }],
+    enemies: [{ id: "enemy-miner", name: "Hostile miner", hp: { current: 8, max: 8 }, armorClass: 12 }],
+  },
+}, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+const combatJoinInviteResult = createCharacterRequestInvite(combatJoinAsCampaign, { host: "192.168.1.24", port: 7347 });
+combatJoinAsCampaign = combatJoinInviteResult.campaign;
+const combatMiraJoinResult = requestJoin(combatJoinAsCampaign, {
+  inviteLink: combatJoinInviteResult.inviteLink,
+  playerName: "Mira Player",
+  clientId: "combat-mira-client",
+  proposedCharacter: {
+    name: "Mira",
+    ancestry: "Dwarf",
+    characterClass: "Ranger",
+    backstory: "A road scout already standing beside the party.",
+  },
+});
+combatJoinAsCampaign = approveJoinRequest(combatMiraJoinResult.campaign, combatMiraJoinResult.connection.id);
+const combatMira = combatJoinAsCampaign.party.find((member) => member.name === "Mira");
+assert.ok(combatMira, "approving a join-as character during combat should create the party member");
+assert.equal(combatJoinAsCampaign.scene.presentPartyMemberIds.includes(combatMira.id), true, "join-as character should be marked present in the scene");
+assert.equal(combatJoinAsCampaign.combat.turnOrder.some((entry) => entry.id === combatMira.id), true, "join-as character should be added to initiative");
+assert.equal(combatJoinAsCampaign.combat.currentTurnId, "jarin", "adding a combatant should not steal the active turn");
+
+let nameOnlyJoinCampaign = startLocalTable(testCampaign(), { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+const nameOnlyInviteResult = createCharacterRequestInvite(nameOnlyJoinCampaign, { host: "192.168.1.24", port: 7347 });
+nameOnlyJoinCampaign = nameOnlyInviteResult.campaign;
+const nameOnlyJoinResult = requestJoin(nameOnlyJoinCampaign, {
+  inviteLink: nameOnlyInviteResult.inviteLink,
+  playerName: "Am",
+  clientId: "name-only-client",
+});
+nameOnlyJoinCampaign = nameOnlyJoinResult.campaign;
+assert.equal(nameOnlyJoinResult.connection.proposedCharacter.name, "Am");
+assert.equal(nameOnlyJoinResult.connection.partyMemberId, null);
+nameOnlyJoinCampaign = approveJoinRequest(nameOnlyJoinCampaign, nameOnlyJoinResult.connection.id);
+assert.ok(nameOnlyJoinCampaign.party.find((member) => member.name === "Am"));
+
+assert.throws(
+  () => requestJoin(nameOnlyJoinCampaign, {
+    inviteLink: nameOnlyInviteResult.inviteLink.replace("campaign=campaign-test", "campaign=stale-campaign"),
+    playerName: "Am",
+    clientId: "stale-client",
+  }),
+  (error) => error.statusCode === 409 && /fresh invite/i.test(error.publicMessage),
+);
+
+let wrongInviteCampaign = startLocalTable(testCampaign(), { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+const garrenInviteResult = createInviteForPartyMember(wrongInviteCampaign, {
+  partyMemberId: "jarin",
+  host: "192.168.1.24",
+  port: 7347,
+});
+wrongInviteCampaign = garrenInviteResult.campaign;
+const eveJoinResult = requestJoin(wrongInviteCampaign, {
+  inviteLink: garrenInviteResult.inviteLink,
+  playerName: "Jess",
+  clientId: "eve-client",
+  proposedCharacter: {
+    name: "Eve",
+    ancestry: "Fairy",
+    characterClass: "Druid",
+    backstory: "A tiny storm-bright troublemaker who wants to help.",
+    integrationPrompt: "Eve flutters in as an old friend who knows the tavern's back room.",
+  },
+});
+wrongInviteCampaign = eveJoinResult.campaign;
+assert.equal(eveJoinResult.connection.partyMemberId, null, "filled join-as forms must not claim the existing invited seat");
+assert.equal(eveJoinResult.connection.proposedCharacter.name, "Eve");
+wrongInviteCampaign = approveJoinRequest(wrongInviteCampaign, eveJoinResult.connection.id);
+const eve = wrongInviteCampaign.party.find((member) => member.name === "Eve");
+assert.ok(eve, "approving a filled join-as form should create the submitted character");
+assert.equal(eve.controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.notEqual(wrongInviteCampaign.party.find((member) => member.id === "jarin").controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(wrongInviteCampaign.multiplayer.connections.find((connection) => connection.id === eveJoinResult.connection.id).partyMemberId, eve.id);
 
 console.log("Lorekeeper multiplayer tests passed.");
 

@@ -19,6 +19,7 @@ import { buildInputComposerProjection, applyInputComposerProjection } from "./in
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
+import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 
 const launchParams = new URLSearchParams(window.location.search);
@@ -49,9 +50,11 @@ const apiMultiplayerStopUrl = "/api/multiplayer/stop";
 const apiMultiplayerInviteUrl = "/api/multiplayer/invite";
 const apiMultiplayerInviteCharacterUrl = "/api/multiplayer/invite-character";
 const apiMultiplayerJoinUrl = "/api/multiplayer/join";
+const apiMultiplayerJoinPreviewUrl = "/api/multiplayer/join-preview";
 const apiMultiplayerGuestSnapshotUrl = "/api/multiplayer/guest-snapshot";
 const apiMultiplayerActionUrl = "/api/multiplayer/action";
 const apiMultiplayerPassUrl = "/api/multiplayer/pass";
+const apiMultiplayerCombatJoinUrl = "/api/multiplayer/combat/join";
 const apiMultiplayerTableTalkUrl = "/api/multiplayer/table-talk";
 const apiMultiplayerSettingsUrl = "/api/multiplayer/settings";
 const apiMultiplayerApproveUrl = "/api/multiplayer/join/approve";
@@ -64,6 +67,7 @@ const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
 const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const guestSessionStorageKey = "lorekeeper.guestSession";
+const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
 const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -92,12 +96,16 @@ const state = {
   activeCharacterSheet: null,
   activeCharacterSheetAutofill: null,
   diagnosticsEvents: [],
+  tableTimeline: [],
+  lastTableStatusText: "",
   pendingChoiceSelection: null,
   forceScrollToBottom: false,
   multiplayerSnapshot: null,
   guestSession: loadGuestSession(),
+  recentGuestSession: loadRecentGuestSession(),
   guestSnapshot: null,
   guestPollInFlight: false,
+  joinPreviewTimer: null,
   autoResolvingCombatInput: false,
   lastAutoResolvedRemoteKey: "",
   autoResolveGuestInputsTimer: null,
@@ -113,12 +121,17 @@ const state = {
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
 
 state.turnFlow = createTurnFlowRuntime();
+state.turnFlow.subscribe(handleTurnFlowVisibilityEvent);
 const providerOrchestrator = createProviderOrchestrator({
   fetchFn: (...args) => window.fetch(...args),
   endpoint: apiProviderGenerateTurnUrl,
   setTimeoutFn: (...args) => window.setTimeout(...args),
   clearTimeoutFn: (...args) => window.clearTimeout(...args),
 });
+
+function isRemoteTableClient() {
+  return Boolean(state.guestSession?.hostBaseUrl);
+}
 
 function withLorekeeperApiAuth(input, init = {}) {
   if (!apiToken || !shouldAttachLorekeeperApiToken(input)) {
@@ -225,6 +238,7 @@ const elements = {
   sessionLabel: document.querySelector("#session-label"),
   thinJoinPanel: document.querySelector("#thin-join-panel"),
   thinJoinInviteLink: document.querySelector("#thin-join-invite-link"),
+  thinJoinPreview: document.querySelector("#thin-join-preview"),
   thinJoinPlayerName: document.querySelector("#thin-join-player-name"),
   thinJoinCharacterName: document.querySelector("#thin-join-character-name"),
   thinJoinCharacterAncestry: document.querySelector("#thin-join-character-ancestry"),
@@ -254,6 +268,7 @@ const elements = {
   copyDiagnostics: document.querySelector("#copy-diagnostics"),
   diagnosticsOutput: document.querySelector("#diagnostics-output"),
   diagnosticsStatus: document.querySelector("#diagnostics-status"),
+  tableTimelineSummary: document.querySelector("#table-timeline-summary"),
   generationTimeout: document.querySelector("#generation-timeout"),
   outputLimit: document.querySelector("#output-limit"),
   fastMode: document.querySelector("#fast-mode"),
@@ -278,7 +293,16 @@ const elements = {
   closeJoinCampaignDialog: document.querySelector("#close-join-campaign-dialog"),
   cancelJoinCampaign: document.querySelector("#cancel-join-campaign"),
   joinInviteLink: document.querySelector("#join-invite-link"),
+  joinPreview: document.querySelector("#join-preview"),
   joinPlayerName: document.querySelector("#join-player-name"),
+  joinCharacterName: document.querySelector("#join-character-name"),
+  joinCharacterAncestry: document.querySelector("#join-character-ancestry"),
+  joinCharacterClass: document.querySelector("#join-character-class"),
+  joinCharacterLevel: document.querySelector("#join-character-level"),
+  joinCharacterRole: document.querySelector("#join-character-role"),
+  joinCharacterAppearance: document.querySelector("#join-character-appearance"),
+  joinCharacterBackstory: document.querySelector("#join-character-backstory"),
+  joinCharacterIntegration: document.querySelector("#join-character-integration"),
   joinStatus: document.querySelector("#join-status"),
   newCampaign: document.querySelector("#new-campaign"),
   loadImported: document.querySelector("#load-imported"),
@@ -551,6 +575,14 @@ elements.thinJoinSubmit?.addEventListener("click", async () => {
   await requestJoinFromThinPanel();
 });
 
+elements.thinJoinInviteLink?.addEventListener("input", () => {
+  scheduleJoinPreview(elements.thinJoinInviteLink.value, "thin");
+});
+
+elements.joinInviteLink?.addEventListener("input", () => {
+  scheduleJoinPreview(elements.joinInviteLink.value, "dialog");
+});
+
 elements.syncGuestTable?.addEventListener("click", async () => {
   await refreshGuestSnapshot({ explicit: true });
 });
@@ -681,7 +713,7 @@ elements.playerForm.addEventListener("submit", async (event) => {
 });
 
 async function nudgeDm() {
-  if (clientMode || state.guestSession?.hostBaseUrl) {
+  if (clientMode || isRemoteTableClient()) {
     setProviderActivity("Only the host can nudge the DM", "waiting");
     return { providerReceived: false, reason: "guest_mode" };
   }
@@ -708,11 +740,36 @@ function buildDmNudgePrompt() {
     "Advance the current scene like a real tabletop DM: 3-5 paragraphs with sensory detail, tension, NPC/world reaction, and consequence.",
     "Do not force an option list. Prefer choices.options: [] for narration, consequences, patrol/travel flow, NPC replies, or atmosphere.",
     "Use a direct question instead of a structured option panel unless there is combat, immediate danger, or the user explicitly asks for options.",
-    "If combat.inCombat and the current initiative actor is a player or party member, do not roll, deal damage, or advance initiative unless the player submitted an action; instead orient the battlefield and ask for that actor's action.",
+    "If combat.inCombat and the current initiative actor is any party member, do not roll, deal damage, move them, speak for them, choose their tactic, or advance initiative unless that character's controller submitted an action.",
+    "For any party-member combat turn with no submitted action, write a short spotlight frame: what the actor sees, immediate danger, useful positioning/resources, then ask what they do. Offer 2-4 optional tactical choices only if helpful.",
     "If combat.inCombat and the current initiative actor is an enemy/DM actor, resolve that enemy turn with mechanics and advance initiative.",
     "If combat/enemies look stale or mismatched with the current scene, propose a compact combat update to clear or correct them.",
     "Do not repeat this instruction in the table narration.)",
   ].join(" ");
+}
+
+async function nudgeAiPartyMember(member) {
+  if (!member?.id || clientMode || isRemoteTableClient()) {
+    return { providerReceived: false, reason: "unavailable" };
+  }
+  if (state.campaign?.combat?.inCombat) {
+    setProviderActivity(`${member.name} can be nudged for RP after combat, or on their own combat turn.`, "waiting");
+    return { providerReceived: false, reason: "combat" };
+  }
+  const prompt = [
+    `Invite ${member.name} to make one brief AI companion RP contribution now.`,
+    `(AI companion nudge: ${member.name} may speak, react, ask a useful question, notice a small grounded detail, or take a low-stakes helpful action that fits their character.`,
+    "Do not decide the party's direction, consume major resources, start combat, make attacks, move or speak for any host/remote-controlled character, or override a human player's agency.",
+    `If ${member.name} contributes, render it as a party table entry from ${member.name}; include a short DM response only if the scene needs one.`,
+    "Use existing scene context and consequences. No option list unless there is an immediate natural question.)",
+  ].join(" ");
+  setProviderActivity(`Prompting ${member.name} for a companion RP beat...`, "working");
+  return submitPlayerTurnFromInput(prompt, {
+    skipPlayerEcho: true,
+    skipPartySeed: true,
+    skipChoiceExpansion: true,
+    preserveInput: true,
+  });
 }
 
 function normalizeSubmittedPlayerMessage(originalInput, options = {}) {
@@ -839,7 +896,7 @@ function pendingSelectionMatchesText(selection, text = "") {
 
 function choiceSelectionMeta(selection, { actualAction = "" } = {}) {
   const combatInstruction = state.campaign?.combat?.inCombat
-    ? " This is a combat action for the active initiative actor; resolve it with visible mechanics, HP/resource updates, and advance the turn."
+    ? " This is a combat action for the active initiative actor; resolve it with visible mechanics, HP/resource updates, and advance the turn. Do not resolve or narrate the next initiative actor's attack/action in this response."
     : "";
   const editedInstruction = actualAction && compactCompareText(actualAction) !== compactCompareText(selection.inWorldText)
     ? " The player edited/expanded the selected option; user.inWorld is the authoritative action and overrides the original option wording."
@@ -995,8 +1052,11 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   });
   state.contextPack = state.currentTurn.contextPack;
   state.prompt = state.currentTurn.providerPrompt;
+  state.currentTurn.turnId = state.currentTurn.turnId || state.currentTurn.id;
+  const currentTurnId = state.currentTurn.turnId;
   const visiblePlayerText = state.currentTurn.parsedMessage?.inWorldText;
   const metaText = (state.currentTurn.parsedMessage?.metaInstructions ?? []).join(" ");
+  let playerEchoMessageId = null;
   if (!options.skipPlayerEcho && normalizedMessage && visiblePlayerText) {
     const duplicate = findUnresolvedDuplicatePlayerMessage(visiblePlayerText, metaText);
     if (duplicate) {
@@ -1004,23 +1064,43 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
         duplicateOf: duplicate.id,
         body: visiblePlayerText,
       });
+      playerEchoMessageId = duplicate.id;
+      patchPlayMessageLocal(duplicate.id, {
+        data: {
+          turnId: currentTurnId,
+          status: "turn_waiting_for_dm",
+          lifecycle: "waiting_for_dm",
+        },
+      });
     } else {
-      await appendPlayMessage({
+      const playerEcho = await appendPlayMessage({
         role: "player",
         title: "You",
         body: visiblePlayerText,
         meta: metaText,
         source: "player_input",
+        data: {
+          turnId: currentTurnId,
+          status: "turn_waiting_for_dm",
+          lifecycle: "waiting_for_dm",
+        },
       });
+      playerEchoMessageId = playerEcho.id;
     }
   } else if (!options.skipPlayerEcho && normalizedMessage && metaText) {
-    await appendPlayMessage({
+    const playerEcho = await appendPlayMessage({
       role: "player",
       title: "You (meta)",
       body: metaText,
       meta: "Out-of-world instruction",
       source: "player_meta",
+      data: {
+        turnId: currentTurnId,
+        status: "turn_waiting_for_dm",
+        lifecycle: "waiting_for_dm",
+      },
     });
+    playerEchoMessageId = playerEcho.id;
   }
   if (!options.skipPartySeed && normalizedMessage) {
     await seedPartyFromPlayerOpening(state.currentTurn.parsedMessage?.inWorldText || playerMessage);
@@ -1033,11 +1113,13 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   });
   state.contextPack = state.currentTurn.contextPack;
   state.prompt = state.currentTurn.providerPrompt;
+  state.currentTurn.turnId = currentTurnId;
   render();
   const providerMode = currentProviderSettings().preferredProvider;
   const runResult = providerMode === "ollama"
     ? await runPromptThroughLocalProvider(state.currentTurn)
     : await runPromptThroughSidecar(state.prompt);
+  await updatePlayerTurnEchoLifecycle(playerEchoMessageId, runResult);
   if (runResult?.imported && approvedPartyInputs.length) {
     await markApprovedPartyInputsSubmitted(approvedPartyInputs);
   }
@@ -1051,6 +1133,47 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   }
   schedulePostTurnRecovery(runResult?.imported ? "turn_imported" : "turn_not_imported");
   return runResult;
+}
+
+async function updatePlayerTurnEchoLifecycle(messageId, runResult = {}) {
+  if (!messageId) {
+    return;
+  }
+  let status = "turn_waiting_for_dm";
+  let lifecycle = "waiting_for_dm";
+  if (runResult?.imported) {
+    status = "turn_resolved";
+    lifecycle = "resolved";
+  } else if (runResult?.needsRepair) {
+    status = "turn_needs_review";
+    lifecycle = "needs_review";
+  } else if (runResult?.timedOut) {
+    status = "turn_timed_out";
+    lifecycle = "timed_out";
+  } else if (runResult?.canceled) {
+    status = "turn_canceled";
+    lifecycle = "canceled";
+  } else if (runResult?.error || runResult?.providerReceived === false) {
+    status = "turn_failed";
+    lifecycle = "failed";
+  } else if (runResult?.providerReceived) {
+    status = "turn_waiting_for_import";
+    lifecycle = "waiting_for_import";
+  }
+
+  await patchPlayMessage(messageId, {
+    data: {
+      status,
+      lifecycle,
+      providerReceived: Boolean(runResult?.providerReceived),
+      imported: Boolean(runResult?.imported),
+      recovered: Boolean(runResult?.recovered),
+      needsRepair: Boolean(runResult?.needsRepair),
+      timedOut: Boolean(runResult?.timedOut),
+      canceled: Boolean(runResult?.canceled),
+      failureReason: runResult?.error instanceof Error ? runResult.error.message : "",
+    },
+  });
 }
 
 function findUnresolvedDuplicatePlayerMessage(body, meta = "") {
@@ -1203,6 +1326,10 @@ async function boot() {
     await bootClientMode();
     return;
   }
+  if (isRemoteTableClient() && state.guestSession?.connectionId) {
+    await bootRemoteClientMode();
+    return;
+  }
   await loadCampaign();
   await reconcilePartyDirectivesFromHistory();
   await refreshProviderStatus({ quiet: true });
@@ -1238,6 +1365,32 @@ async function bootClientMode() {
   }
 
   window.setTimeout(() => elements.thinJoinInviteLink?.focus(), 200);
+}
+
+async function bootRemoteClientMode() {
+  state.sourceMode = "guest";
+  state.campaigns = [];
+  state.sqlitePath = "";
+  state.campaign = createGuestShellCampaign();
+  state.contextPack = buildContextPack(state.campaign, {
+    purpose: "remote_full_client_shell",
+  });
+  seedPlayLog();
+  render();
+  setProviderActivity("Rejoining hosted table...", "waiting");
+
+  try {
+    await refreshGuestSnapshot({ explicit: false });
+  } catch {
+    clearGuestSession();
+    state.sourceMode = "loading";
+    setProviderActivity("Saved host connection is unavailable. Join again with a fresh invite.", "waiting");
+    await loadCampaign();
+    await refreshProviderStatus({ quiet: true });
+    await refreshMultiplayerSnapshot({ quiet: true });
+    seedPlayLog();
+    render();
+  }
 }
 
 function startMultiplayerPolling() {
@@ -1581,7 +1734,7 @@ async function selectCampaignByPath(sqlitePath) {
 }
 
 async function createNewCampaign({ title, premise, startingLocation, tone, playerCharacter, startingPartyMember }) {
-  const trimmedTitle = String(title ?? "").trim() || "New Campaign Binder";
+  const trimmedTitle = String(title ?? "").trim() || "Untitled Campaign";
   const trimmedPremise = String(premise ?? "").trim() || "Start a new D&D 5e-lite campaign. Ask for missing essentials, then open with a playable scene.";
   const trimmedStartingLocation = String(startingLocation ?? "").trim();
   const trimmedTone = String(tone ?? "").trim();
@@ -1704,7 +1857,7 @@ function openCampaignDialog() {
 }
 
 function resetCampaignWizardDefaults() {
-  elements.newCampaignTitle.value = "New Campaign Binder";
+  elements.newCampaignTitle.value = "";
   elements.newCampaignPremise.value = "";
   elements.newCampaignStartingLocation.value = "";
   elements.newCampaignTone.value = "";
@@ -1940,8 +2093,13 @@ function openJoinCampaignDialog() {
   if (elements.thinJoinPlayerName?.value) {
     elements.joinPlayerName.value = elements.thinJoinPlayerName.value;
   }
+  copyThinJoinCharacterToDialog();
   elements.joinStatus.textContent = "Paste an invite link from the host.";
+  renderJoinPreview(null, elements.joinPreview);
   elements.joinCampaignDialog.showModal();
+  if (elements.joinInviteLink?.value) {
+    scheduleJoinPreview(elements.joinInviteLink.value, "dialog", { immediate: true });
+  }
   elements.joinInviteLink.focus();
 }
 
@@ -1949,6 +2107,7 @@ async function requestJoinFromUi() {
   await requestJoinWithValues({
     inviteLink: elements.joinInviteLink.value,
     playerName: elements.joinPlayerName.value,
+    proposedCharacter: joinDialogCharacterProposal(),
     statusElement: elements.joinStatus,
     submitButton: null,
   });
@@ -1973,6 +2132,167 @@ async function requestJoinFromThinPanel() {
   });
 }
 
+function copyThinJoinCharacterToDialog() {
+  const pairs = [
+    [elements.joinCharacterName, elements.thinJoinCharacterName],
+    [elements.joinCharacterAncestry, elements.thinJoinCharacterAncestry],
+    [elements.joinCharacterClass, elements.thinJoinCharacterClass],
+    [elements.joinCharacterLevel, elements.thinJoinCharacterLevel],
+    [elements.joinCharacterRole, elements.thinJoinCharacterRole],
+    [elements.joinCharacterAppearance, elements.thinJoinCharacterAppearance],
+    [elements.joinCharacterBackstory, elements.thinJoinCharacterBackstory],
+    [elements.joinCharacterIntegration, elements.thinJoinCharacterIntegration],
+  ];
+  for (const [target, source] of pairs) {
+    if (target && source?.value) {
+      target.value = source.value;
+    }
+  }
+}
+
+function joinDialogCharacterProposal() {
+  return {
+    name: elements.joinCharacterName?.value,
+    ancestry: elements.joinCharacterAncestry?.value,
+    characterClass: elements.joinCharacterClass?.value,
+    level: elements.joinCharacterLevel?.value,
+    roleIntent: elements.joinCharacterRole?.value,
+    appearance: elements.joinCharacterAppearance?.value,
+    backstory: elements.joinCharacterBackstory?.value,
+    integrationPrompt: elements.joinCharacterIntegration?.value,
+  };
+}
+
+function hasJoinCharacterProposal(proposal = {}) {
+  return Object.values(proposal ?? {}).some((value) => String(value ?? "").trim());
+}
+
+function scheduleJoinPreview(inviteLink, target = "thin", options = {}) {
+  if (state.joinPreviewTimer) {
+    window.clearTimeout(state.joinPreviewTimer);
+  }
+  const run = () => refreshJoinPreview(inviteLink, target);
+  if (options.immediate) {
+    run();
+    return;
+  }
+  state.joinPreviewTimer = window.setTimeout(run, 250);
+}
+
+async function refreshJoinPreview(inviteLink, target = "thin") {
+  const previewElement = target === "dialog" ? elements.joinPreview : elements.thinJoinPreview;
+  const text = String(inviteLink ?? "").trim();
+  if (!previewElement) {
+    return;
+  }
+  if (!text) {
+    renderJoinPreview(null, previewElement);
+    return;
+  }
+  const parsed = parseInviteLinkForClient(text);
+  if (!parsed.valid) {
+    renderJoinPreview({ error: parsed.error }, previewElement);
+    return;
+  }
+  try {
+    renderJoinPreview({ loading: true }, previewElement);
+    const baseUrl = `http://${parsed.host}:${parsed.port}`;
+    const url = new URL(`${baseUrl}${apiMultiplayerJoinPreviewUrl}`);
+    url.searchParams.set("inviteLink", text);
+    const preview = await fetchJson(url.toString());
+    renderJoinPreview(preview, previewElement);
+    if (target === "thin" && elements.joinInviteLink?.value === text) {
+      renderJoinPreview(preview, elements.joinPreview);
+    }
+    if (target === "dialog" && elements.thinJoinInviteLink?.value === text) {
+      renderJoinPreview(preview, elements.thinJoinPreview);
+    }
+  } catch (error) {
+    renderJoinPreview({
+      error: error instanceof Error ? error.message : "Could not preview this table.",
+    }, previewElement);
+  }
+}
+
+function renderJoinPreview(preview, container) {
+  if (!container) {
+    return;
+  }
+  container.hidden = false;
+  if (!preview) {
+    const empty = document.createElement("p");
+    empty.className = "join-preview-empty";
+    empty.textContent = "Paste a host invite link to preview the table.";
+    container.replaceChildren(empty);
+    return;
+  }
+  if (preview.loading) {
+    const loading = document.createElement("p");
+    loading.className = "join-preview-empty";
+    loading.textContent = "Checking the host table...";
+    container.replaceChildren(loading);
+    return;
+  }
+  if (preview.error) {
+    const error = document.createElement("p");
+    error.className = "join-preview-empty error";
+    error.textContent = preview.error;
+    container.replaceChildren(error);
+    return;
+  }
+
+  const title = document.createElement("h3");
+  title.textContent = preview.campaignTitle || "Hosted Table";
+  const scene = preview.scene ?? {};
+  const summary = compactJoinPreviewLine([
+    preview.campaignSummary,
+    scene.immediateSituation,
+  ].filter(Boolean).join(" "));
+  const copy = document.createElement("p");
+  copy.textContent = summary || "The host is sharing this local table.";
+
+  const facts = document.createElement("div");
+  facts.className = "join-preview-facts";
+  const place = scene.currentPlaceId || scene.location || scene.place || "";
+  if (place) {
+    facts.append(joinPreviewPill(`Scene: ${place}`));
+  }
+  const partyNames = (preview.party ?? []).map((member) => member.name).filter(Boolean).slice(0, 5);
+  if (partyNames.length) {
+    facts.append(joinPreviewPill(`Party: ${partyNames.join(", ")}`));
+  }
+  const placeNames = (preview.places ?? []).map((placeRecord) => placeRecord.name || placeRecord.title).filter(Boolean).slice(0, 3);
+  if (placeNames.length) {
+    facts.append(joinPreviewPill(`Places: ${placeNames.join(", ")}`));
+  }
+  const peopleNames = (preview.people ?? []).map((person) => person.name || person.title).filter(Boolean).slice(0, 3);
+  if (peopleNames.length) {
+    facts.append(joinPreviewPill(`Known faces: ${peopleNames.join(", ")}`));
+  }
+  const questNames = (preview.quests ?? []).map((quest) => quest.title || quest.name).filter(Boolean).slice(0, 2);
+  if (questNames.length) {
+    facts.append(joinPreviewPill(`Threads: ${questNames.join(", ")}`));
+  }
+
+  const hint = document.createElement("p");
+  hint.className = "join-preview-hint";
+  hint.textContent = partyNames.length
+    ? `Use this to explain how your character knows ${partyNames[0]} or why they are present in this scene.`
+    : "Use this context to write why your character is already connected to this situation.";
+
+  container.replaceChildren(title, copy, facts, hint);
+}
+
+function joinPreviewPill(text) {
+  const pill = document.createElement("span");
+  pill.textContent = text;
+  return pill;
+}
+
+function compactJoinPreviewLine(text) {
+  return String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 420);
+}
+
 async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter = null, statusElement, submitButton } = {}) {
   try {
     const trimmedInviteLink = String(inviteLink ?? "").trim();
@@ -1980,6 +2300,12 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
     if (!parsed.valid) {
       throw new Error(parsed.error);
     }
+    const trimmedPlayerName = String(playerName ?? "").trim();
+    const normalizedProposal = hasJoinCharacterProposal(proposedCharacter)
+      ? proposedCharacter
+      : parsed.seat === "new-character"
+        ? { name: trimmedPlayerName }
+        : null;
     const clientId = guestClientId();
     if (submitButton) {
       submitButton.disabled = true;
@@ -1990,9 +2316,9 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
     const baseUrl = `http://${parsed.host}:${parsed.port}`;
     const result = await postJson(`${baseUrl}${apiMultiplayerJoinUrl}`, {
       inviteLink: trimmedInviteLink,
-      playerName: String(playerName ?? "").trim() || String(proposedCharacter?.name ?? "").trim() || "Guest Player",
+      playerName: trimmedPlayerName || String(normalizedProposal?.name ?? "").trim() || "Guest Player",
       clientId,
-      proposedCharacter,
+      proposedCharacter: normalizedProposal,
     });
     state.guestSession = {
       hostBaseUrl: baseUrl,
@@ -2008,9 +2334,11 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
       lastRevision: result.snapshot?.revision ?? result.snapshot?.tableState?.revision ?? "",
     };
     saveGuestSession(state.guestSession);
+    const requestedCharacterName = String(normalizedProposal?.name ?? "").trim();
+    const assignedName = result.snapshot?.assignedCharacter?.name || result.connection?.proposedCharacter?.name || requestedCharacterName;
     const statusText = result.approved
-      ? "Joined. You can submit actions for your assigned character."
-      : "Join request sent. Waiting for host approval.";
+      ? `Joined${assignedName ? ` as ${assignedName}` : ""}. You can submit actions for your assigned character.`
+      : `Join request sent${assignedName ? ` for ${assignedName}` : ""}. Waiting for host approval.`;
     if (statusElement) {
       statusElement.textContent = statusText;
     }
@@ -2115,8 +2443,14 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Guest resync failed";
     if (/connection secret/i.test(message) || (/connection/i.test(message) && /not found/i.test(message))) {
-      clearGuestSession();
+      clearGuestSession({ keepRecent: false });
       setProviderActivity("Guest session expired. Rejoin from a fresh invite.", "error");
+      render();
+      return null;
+    }
+    if (/failed to fetch|networkerror|load failed|fetch/i.test(message)) {
+      clearGuestSession({ keepRecent: true });
+      setProviderActivity("Host disconnected. Reconnect when the host table is available.", "waiting");
       render();
       return null;
     }
@@ -2484,16 +2818,18 @@ function parseInviteLinkForClient(value) {
     const host = url.searchParams.get("host") || "";
     const port = Number(url.searchParams.get("port"));
     const campaign = url.searchParams.get("campaign") || "";
+    const seat = url.searchParams.get("seat") || "";
+    const token = url.searchParams.get("token") || "";
     if (url.protocol !== "lorekeeper:" || url.hostname !== "join") {
       return { valid: false, error: "Invite link must start with lorekeeper://join." };
     }
-    if (!host || !Number.isInteger(port) || !campaign) {
-      return { valid: false, error: "Invite link is missing host, port, or campaign." };
+    if (!host || !Number.isInteger(port) || !campaign || !seat || !token) {
+      return { valid: false, error: "Invite link is missing host, port, campaign, seat, or token." };
     }
     if (!isAllowedInviteHost(host)) {
       return { valid: false, error: "Invite host must be a local or private LAN address." };
     }
-    return { valid: true, host, port, campaign };
+    return { valid: true, host, port, campaign, seat, token };
   } catch {
     return { valid: false, error: "Invite link is not valid." };
   }
@@ -2518,11 +2854,38 @@ function loadGuestSession() {
   }
 }
 
-function saveGuestSession(session) {
-  localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
+function loadRecentGuestSession() {
+  try {
+    return JSON.parse(localStorage.getItem(guestRecentSessionStorageKey) || "null");
+  } catch {
+    return null;
+  }
 }
 
-function clearGuestSession() {
+function saveGuestSession(session) {
+  localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
+  rememberGuestSession(session);
+}
+
+function rememberGuestSession(session) {
+  if (!session?.inviteLink || !session?.hostBaseUrl) {
+    return;
+  }
+  state.recentGuestSession = {
+    inviteLink: session.inviteLink,
+    hostBaseUrl: session.hostBaseUrl,
+    playerName: session.playerName || "",
+    campaignId: session.campaignId || "",
+    partyMemberId: session.partyMemberId || "",
+    savedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(guestRecentSessionStorageKey, JSON.stringify(state.recentGuestSession));
+}
+
+function clearGuestSession({ keepRecent = true } = {}) {
+  if (keepRecent && state.guestSession) {
+    rememberGuestSession(state.guestSession);
+  }
   state.guestSession = null;
   state.guestSnapshot = null;
   localStorage.removeItem(guestSessionStorageKey);
@@ -4184,7 +4547,9 @@ function render() {
       ? "Provider: campaign chat ready"
       : "Provider: campaign chat waiting";
   }
-  elements.saveStatus.textContent = clientMode ? "ThinLoreKeeper: host-owned SQLite" : `Binder: ${state.sourceMode} / SQLite target`;
+  elements.saveStatus.textContent = clientMode || isRemoteTableClient()
+    ? "Remote table: host-owned SQLite"
+    : `Binder: ${state.sourceMode} / SQLite target`;
   if (state.sqlitePath) {
     elements.saveStatus.textContent = "SQLite: active campaign file";
   }
@@ -4252,11 +4617,21 @@ function renderThinJoinPanel() {
   if (elements.thinJoinStatus && awaitingApproval) {
     elements.thinJoinStatus.textContent = "Join request sent. Waiting for host approval.";
   }
-  if (elements.thinJoinInviteLink && state.guestSession?.inviteLink && !elements.thinJoinInviteLink.value) {
-    elements.thinJoinInviteLink.value = state.guestSession.inviteLink;
+  const savedSession = state.guestSession || state.recentGuestSession;
+  if (elements.thinJoinInviteLink && savedSession?.inviteLink && !elements.thinJoinInviteLink.value) {
+    elements.thinJoinInviteLink.value = savedSession.inviteLink;
+    scheduleJoinPreview(elements.thinJoinInviteLink.value, "thin", { immediate: true });
   }
-  if (elements.thinJoinPlayerName && state.guestSession?.playerName && !elements.thinJoinPlayerName.value) {
-    elements.thinJoinPlayerName.value = state.guestSession.playerName;
+  if (elements.thinJoinPlayerName && savedSession?.playerName && !elements.thinJoinPlayerName.value) {
+    elements.thinJoinPlayerName.value = savedSession.playerName;
+  }
+  if (elements.thinJoinStatus && !awaitingApproval && !state.guestSession && state.recentGuestSession?.inviteLink) {
+    elements.thinJoinStatus.textContent = "Previous table remembered. Request join again when the host is available.";
+  }
+  if (elements.thinJoinSubmit) {
+    elements.thinJoinSubmit.textContent = !state.guestSession && state.recentGuestSession?.inviteLink
+      ? "Reconnect"
+      : "Join Table";
   }
 }
 
@@ -4264,10 +4639,10 @@ function renderCampaignSelector() {
   const campaigns = state.campaigns ?? [];
   elements.deleteCampaign.disabled = !state.sqlitePath || !state.campaign?.title;
 
-  if (clientMode) {
+  if (clientMode || isRemoteTableClient()) {
     const option = document.createElement("option");
     option.value = "thin-lorekeeper";
-    option.textContent = state.campaign?.title ?? "ThinLoreKeeper";
+    option.textContent = state.campaign?.title ?? "Remote Table";
     option.selected = true;
     elements.campaignSelect.replaceChildren(option);
     elements.campaignSelect.disabled = true;
@@ -4635,8 +5010,8 @@ function createImplicitCombatAdvanceChange(proposedChanges = [], turnResponse = 
     return null;
   }
   const currentTurn = submittedTurn ?? state.currentTurn;
-  const rawTurn = String(currentTurn?.playerMessage || "").trim();
-  if (!rawTurn || /^\(DM nudge:/i.test(rawTurn)) {
+  const rawTurn = submittedCombatTurnText(currentTurn);
+  if (!rawTurn || isNonResolvingCombatInput(rawTurn)) {
     return null;
   }
   const combatChanges = proposedChanges.filter((change) => normalizeChangeDomain(change.domain) === "combat");
@@ -4652,6 +5027,9 @@ function createImplicitCombatAdvanceChange(proposedChanges = [], turnResponse = 
     currentTurn?.playerInputs?.find((input) => input.characterId)?.characterId ||
     combat.currentTurnId;
   if (!actorId || actorId !== combat.currentTurnId) {
+    return null;
+  }
+  if (!isTurnEndingCombatInput(rawTurn, turnResponse)) {
     return null;
   }
   return {
@@ -4671,6 +5049,59 @@ function createImplicitCombatAdvanceChange(proposedChanges = [], turnResponse = 
     confidence: turnResponse?.sceneStatus?.mode === "combat" ? "high" : "medium",
     reason: "Advances the persisted 5E initiative tracker after the active actor's action resolves.",
   };
+}
+
+function submittedCombatTurnText(turn = {}) {
+  const direct = String(turn?.playerMessage || "").trim();
+  const structured = (turn?.playerInputs ?? [])
+    .map((input) => input?.text)
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  return [direct, structured].filter(Boolean).join("\n").trim();
+}
+
+function isNonResolvingCombatInput(text = "") {
+  const trimmed = String(text ?? "").trim();
+  if (!trimmed) {
+    return true;
+  }
+  if (/^\(DM nudge:/i.test(trimmed) || /^\(?\s*meta\s*:/i.test(trimmed)) {
+    return true;
+  }
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length <= 3 && !/\b(attack|attacks|shoot|shot|fire|stab|strike|cast|dash|dodge|disengage|hide|help|ready|release|loose|swing|slash|thrust|charge|flee|retreat)\b/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+function isTurnEndingCombatInput(text = "", turnResponse = null) {
+  const normalized = String(text ?? "").toLowerCase();
+  if (/\b(wait|hold|pause|ask|say|tell|call|shout|yell|look|listen|inspect|what|where|why|who|ready\s+to|prepare\s+to)\b/.test(normalized) &&
+      !/\b(attack|attacks|shoot|shot|fire|fires|stab|strike|cast|dash|dodge|disengage|hide|help|release|loose|swing|slash|thrust|charge|grapple|shove|flee|retreat)\b/.test(normalized)) {
+    return false;
+  }
+  if (turnResponse?.sceneStatus?.awaitingPlayer === true && !hasResolvedMechanics(turnResponse)) {
+    return false;
+  }
+  return /\b(attack|attacks|shoot|shot|fire|fires|firing|stab|stabs|strike|strikes|cast|casts|dash|dodge|disengage|hide|help|release|loose|swing|slash|thrust|charge|grapple|shove|heal|drink|use|throw|hurl|flee|retreat)\b/i.test(text) ||
+    hasResolvedMechanics(turnResponse);
+}
+
+function hasResolvedMechanics(turnResponse = null) {
+  return (turnResponse?.mechanics ?? []).some((mechanic) =>
+    mechanic &&
+    mechanic.type !== "none" &&
+    mechanic.outcome !== "pending" &&
+    /\d|roll|damage|healing|hp|hit|miss|success|failure|resource|condition/i.test([
+      mechanic.text,
+      mechanic.roll,
+      mechanic.damage,
+      mechanic.reason,
+      mechanic.outcome,
+    ].filter(Boolean).join(" "))
+  );
 }
 
 function createImplicitCombatActorPromptChange(tableMessages = [], proposedChanges = [], turnResponse = null) {
@@ -5477,7 +5908,7 @@ async function runPromptThroughSidecar(prompt) {
 }
 
 async function runPromptThroughLocalProvider(turn) {
-  if (!turn?.playerMessage?.trim()) {
+  if (!turn?.playerMessage?.trim() && !turn?.playerInputs?.length) {
     setProviderActivity("Build a table turn first", "idle");
     return { providerReceived: false };
   }
@@ -5855,6 +6286,7 @@ async function refreshDiagnostics() {
   elements.diagnosticsStatus.textContent = "Reading";
   const bundle = await buildDiagnosticsSnapshot();
   elements.diagnosticsOutput.value = JSON.stringify(bundle, null, 2);
+  renderTableTimelineSummary(bundle?.renderer?.tableTimeline ?? []);
   elements.diagnosticsStatus.textContent = "Ready";
   return bundle;
 }
@@ -5906,6 +6338,34 @@ async function buildDiagnosticsSnapshot() {
   }
 }
 
+function renderTableTimelineSummary(timeline = []) {
+  if (!elements.tableTimelineSummary) {
+    return;
+  }
+  const recent = Array.isArray(timeline) ? timeline.slice(-8).reverse() : [];
+  if (!recent.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No table timeline yet.";
+    elements.tableTimelineSummary.replaceChildren(empty);
+    return;
+  }
+
+  const list = document.createElement("ol");
+  list.className = "table-timeline-list";
+  for (const event of recent) {
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    label.className = "table-timeline-label";
+    label.textContent = event.label || event.message || event.type || "Table event";
+    const time = document.createElement("time");
+    time.dateTime = event.at || "";
+    time.textContent = formatMessageTime(event.at);
+    item.append(label, time);
+    list.append(item);
+  }
+  elements.tableTimelineSummary.replaceChildren(list);
+}
+
 function buildRendererDiagnostics() {
   return {
     generatedAt: new Date().toISOString(),
@@ -5926,6 +6386,7 @@ function buildRendererDiagnostics() {
     bridge: state.bridge,
     turnRepair: summarizeTurnRepair(activeTurnRepair()),
     recentPlayMessages: state.playMessages.slice(-30),
+    tableTimeline: state.tableTimeline.slice(-80),
     diagnosticsEvents: state.diagnosticsEvents.slice(-80),
     campaignCounts: state.campaign ? {
       party: state.campaign.party?.length ?? 0,
@@ -5994,6 +6455,46 @@ function pushDiagnosticsEvent(type, detail = {}) {
   }
 }
 
+function pushTableTimelineEvent(type, detail = {}) {
+  const event = tableTimelineEvent(type, detail);
+  state.tableTimeline.push(event);
+  if (state.tableTimeline.length > 120) {
+    state.tableTimeline.splice(0, state.tableTimeline.length - 120);
+  }
+  return event;
+}
+
+function handleTurnFlowVisibilityEvent(event = {}) {
+  const type = event.type || "turn_state_changed";
+  const label = tableLabelForTurnEvent(type, event);
+  if (!label) {
+    return;
+  }
+  pushTableTimelineEvent(type, {
+    message: label,
+    turnId: event.turnId || event.projection?.turnId || "",
+    requestId: event.requestId || event.projection?.activeRequestId || "",
+    reason: event.reason || event.error || "",
+  });
+}
+
+function tableLabelForTurnEvent(type, event = {}) {
+  if (type === "turn_locked") return "Turn submitted; DM is resolving it.";
+  if (type === "generation_started") return "DM started thinking.";
+  if (type === "generation_completed") return "DM response received.";
+  if (type === "generation_cancelled") return "DM response canceled.";
+  if (type === "generation_failed") return "DM response failed; retry is available.";
+  if (type === "turn_retrying") return "Retrying the DM response.";
+  if (type === "turn_repair_required") return "DM response needs review.";
+  if (type === "turn_repair_cleared") return "DM response review cleared.";
+  if (type === "turn_flow_reset") {
+    return event.reason === "campaign_changed"
+      ? "Campaign switched; table state reset."
+      : "Table turn state reset.";
+  }
+  return "";
+}
+
 function reportUiError(error) {
   const message = error instanceof Error ? error.message : String(error ?? "Unknown UI error");
   pushDiagnosticsEvent("ui_error", {
@@ -6010,15 +6511,31 @@ function setProviderActivity(message, status = "idle") {
   if (!elements.providerActivity) {
     return;
   }
+  const tableStatus = tableStatusForActivity(message, status);
+  const visibleMessage = tableStatus.text;
 
   if (elements.providerActivityLabel) {
-    elements.providerActivityLabel.textContent = message;
-    elements.providerActivityLabel.title = message;
+    elements.providerActivityLabel.textContent = visibleMessage;
+    elements.providerActivityLabel.title = tableStatus.raw && tableStatus.raw !== visibleMessage
+      ? `${visibleMessage}\n\nDetail: ${tableStatus.raw}`
+      : visibleMessage;
   } else {
-    elements.providerActivity.textContent = message;
-    elements.providerActivity.title = message;
+    elements.providerActivity.textContent = visibleMessage;
+    elements.providerActivity.title = tableStatus.raw && tableStatus.raw !== visibleMessage
+      ? `${visibleMessage}\n\nDetail: ${tableStatus.raw}`
+      : visibleMessage;
   }
   elements.providerActivity.dataset.state = status;
+  elements.providerActivity.dataset.phase = tableStatus.phase;
+  if (visibleMessage && visibleMessage !== state.lastTableStatusText) {
+    state.lastTableStatusText = visibleMessage;
+    pushTableTimelineEvent("table_status_changed", {
+      message: visibleMessage,
+      rawMessage: tableStatus.raw,
+      phase: tableStatus.phase,
+      status,
+    });
+  }
   updateTurnRepairControls();
 }
 
@@ -6027,11 +6544,13 @@ function updateNudgeAvailability() {
     return;
   }
   const projection = turnProjection();
-  elements.nudgeDm.disabled = clientMode || !projection.canNudge || !state.campaign;
+  elements.nudgeDm.disabled = clientMode || isRemoteTableClient() || !projection.canNudge || !state.campaign;
   elements.nudgeDm.title = projection.hasRepair
     ? "Resolve the model repair first"
     : projection.hasActiveGeneration
       ? "DM is already generating"
+      : isRemoteTableClient()
+        ? "Only the host can nudge the DM"
       : "Nudge DM";
 }
 
@@ -6050,7 +6569,7 @@ function updateTurnRepairControls() {
     elements.repairImportAnyway.disabled = projection.hasActiveGeneration;
   }
   if (elements.recheckProvider) {
-    elements.recheckProvider.hidden = active || clientMode || currentProviderSettings().preferredProvider !== "bridge";
+    elements.recheckProvider.hidden = active || clientMode || isRemoteTableClient() || currentProviderSettings().preferredProvider !== "bridge";
   }
 }
 
@@ -6358,6 +6877,14 @@ function renderPlayLog() {
 
       header.append(title, timestamp);
       bubble.append(header, ...messageBodyElements(message.body, message.role, message.data));
+      const lifecycle = messageLifecycleForMessage(message);
+      if (lifecycle) {
+        const lifecycleBadge = document.createElement("small");
+        lifecycleBadge.className = `message-lifecycle ${lifecycle.tone}`;
+        lifecycleBadge.textContent = lifecycle.label;
+        lifecycleBadge.title = lifecycle.title;
+        bubble.append(lifecycleBadge);
+      }
       const cleanedMeta = cleanMessageMeta(message.meta);
       if (cleanedMeta) {
         const meta = document.createElement("small");
@@ -6587,6 +7114,100 @@ function pendingInputActionForMessage(message) {
     .find((input) => input.id === pendingInputId && input.ready && !input.passed && input.text);
 }
 
+function messageLifecycleForMessage(message) {
+  const status = message?.data?.status || "";
+  const lifecycle = message?.data?.lifecycle || "";
+  if (message.role === "player" || message.role === "party") {
+    const key = lifecycle || status;
+    const labels = {
+      waiting_for_dm: {
+        label: "Waiting for DM",
+        title: "This action is submitted. The table is waiting for the DM response.",
+        tone: "waiting",
+      },
+      turn_waiting_for_dm: {
+        label: "Waiting for DM",
+        title: "This action is submitted. The table is waiting for the DM response.",
+        tone: "waiting",
+      },
+      waiting_for_import: {
+        label: "Waiting for DM result",
+        title: "The provider received this action, but the DM result has not been imported yet.",
+        tone: "waiting",
+      },
+      turn_waiting_for_import: {
+        label: "Waiting for DM result",
+        title: "The provider received this action, but the DM result has not been imported yet.",
+        tone: "waiting",
+      },
+      resolved: {
+        label: "DM answered",
+        title: "The DM response for this action was imported.",
+        tone: "done",
+      },
+      turn_resolved: {
+        label: "DM answered",
+        title: "The DM response for this action was imported.",
+        tone: "done",
+      },
+      needs_review: {
+        label: "DM response needs review",
+        title: "The provider responded, but the app needs review before trusting the result.",
+        tone: "review",
+      },
+      turn_needs_review: {
+        label: "DM response needs review",
+        title: "The provider responded, but the app needs review before trusting the result.",
+        tone: "review",
+      },
+      timed_out: {
+        label: "DM timed out",
+        title: "The DM response timed out. Retry is available.",
+        tone: "error",
+      },
+      turn_timed_out: {
+        label: "DM timed out",
+        title: "The DM response timed out. Retry is available.",
+        tone: "error",
+      },
+      canceled: {
+        label: "Canceled",
+        title: "This DM response was canceled.",
+        tone: "muted",
+      },
+      turn_canceled: {
+        label: "Canceled",
+        title: "This DM response was canceled.",
+        tone: "muted",
+      },
+      failed: {
+        label: "DM failed",
+        title: message.data?.failureReason || "The DM response failed. Retry is available.",
+        tone: "error",
+      },
+      turn_failed: {
+        label: "DM failed",
+        title: message.data?.failureReason || "The DM response failed. Retry is available.",
+        tone: "error",
+      },
+      pending_model_submit: {
+        label: message.data?.hostStaged ? "Processing" : "Waiting for host",
+        title: message.data?.hostStaged
+          ? "This action was sent to the host table and is queued for the DM/provider."
+          : "This guest action is waiting for the host to stage it.",
+        tone: "waiting",
+      },
+      submitted_to_dm: {
+        label: "Submitted to DM",
+        title: "This party action was sent to the DM.",
+        tone: "done",
+      },
+    };
+    return labels[key] || null;
+  }
+  return null;
+}
+
 function isLocalControllerMessage(message) {
   if (state.guestSession?.status === "connected") {
     const characterId = state.guestSession.partyMemberId;
@@ -6643,8 +7264,12 @@ function formatMessageTime(value) {
 }
 
 function renderParty(campaign) {
-  elements.partyCount.textContent = String(campaign.party.length);
+  const pendingNewCharacterConnections = pendingNewCharacterJoinConnections(campaign);
+  elements.partyCount.textContent = pendingNewCharacterConnections.length
+    ? `${campaign.party.length}+${pendingNewCharacterConnections.length}`
+    : String(campaign.party.length);
   elements.partyList.replaceChildren(
+    ...pendingNewCharacterConnections.map((connection) => pendingJoinRequestElement(connection)),
     ...campaign.party.map((member) => {
       const pendingConnection = pendingJoinConnectionForMember(campaign, member.id);
       const details = [
@@ -6709,6 +7334,71 @@ function pendingJoinConnectionForMember(campaign, memberId) {
   );
 }
 
+function pendingNewCharacterJoinConnections(campaign) {
+  if (clientMode || isRemoteTableClient()) {
+    return [];
+  }
+  return (campaign.multiplayer?.connections ?? []).filter((connection) =>
+    connection.status === "pending" &&
+    !connection.partyMemberId &&
+    Boolean(connection.proposedCharacter?.name || connection.displayName)
+  );
+}
+
+function pendingJoinRequestElement(connection) {
+  const proposal = connection.proposedCharacter ?? {};
+  const name = proposal.name || connection.displayName || "Guest";
+  const classLine = [proposal.ancestry, proposal.characterClass].filter(Boolean).join(" ");
+  const body = [
+    `${connection.displayName || "Guest"} wants to join as ${name}.`,
+    classLine || proposal.summary || "",
+    proposal.integrationPrompt ? "Has story integration notes." : "",
+  ].filter(Boolean).join(" ");
+  const tile = recordElement({
+    title: `Join request: ${name}`,
+    body,
+    badge: "Pending",
+    actions: [
+      {
+        label: "Approve",
+        title: `Approve ${name}`,
+        onClick: () => approveGuest(connection.id),
+      },
+      {
+        label: "Deny",
+        title: `Deny ${name}`,
+        onClick: () => denyGuest(connection.id),
+      },
+    ],
+    onEdit: () => showJoinRequestDetails(connection),
+  });
+  tile.classList.add("join-request-tile");
+  return tile;
+}
+
+function joinRequestDetailsText(connection) {
+  const proposal = connection.proposedCharacter ?? {};
+  const lines = [
+    `Player: ${connection.displayName || "Guest"}`,
+    `Character: ${proposal.name || connection.displayName || "Unnamed"}`,
+    `Class: ${[proposal.ancestry, proposal.characterClass].filter(Boolean).join(" ") || "Not provided"}`,
+    proposal.level ? `Level: ${proposal.level}` : "",
+    proposal.summary ? `Summary: ${proposal.summary}` : "",
+    proposal.backstory ? `Backstory: ${proposal.backstory}` : "",
+    proposal.integrationPrompt ? `Player integration notes: ${proposal.integrationPrompt}` : "",
+    proposal.sheetNotes ? `Sheet notes: ${proposal.sheetNotes}` : "",
+  ].filter(Boolean);
+  return lines.join("\n\n");
+}
+
+async function showJoinRequestDetails(connection) {
+  await confirmInApp({
+    title: "Join Request Details",
+    message: joinRequestDetailsText(connection),
+    acceptLabel: "Close",
+  });
+}
+
 function firstVisibleNote(member) {
   const note = (member.notes ?? []).find((item) => {
     if (!item) {
@@ -6759,6 +7449,13 @@ function partyControllerActions(member, pendingConnection = null) {
       label: "AI",
       title: `Return ${member.name} to AI companion control`,
       onClick: () => setPartyMemberController(member, "ai_companion"),
+    });
+  }
+  if (kind === "ai_companion") {
+    actions.push({
+      label: "Play",
+      title: `Ask ${member.name} for a brief AI companion RP contribution`,
+      onClick: () => nudgeAiPartyMember(member),
     });
   }
   actions.push({

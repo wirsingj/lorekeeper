@@ -329,18 +329,20 @@ h3 {
 }
 
 .table-talk-section {
-  flex: 1 1 190px;
-  min-height: 190px;
+  flex: 0 0 252px;
+  min-height: 220px;
+  max-height: 292px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   margin-bottom: 4px;
 }
 
 .table-talk-log {
   min-height: 0;
-  max-height: 260px;
   overflow: auto;
   display: grid;
   align-content: start;
-  gap: 7px;
+  gap: 5px;
   padding-right: 2px;
 }
 
@@ -355,9 +357,9 @@ h3 {
 }
 
 .table-talk-message {
-  padding: 8px;
+  padding: 6px 7px;
   border: 1px solid rgba(174, 191, 202, 0.1);
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.045);
 }
 
@@ -388,19 +390,22 @@ h3 {
 .table-talk-message p {
   margin: 0;
   color: #d8e0e5;
-  font-size: 0.74rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
 .table-talk-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 48px;
   gap: 6px;
+  align-items: center;
+  margin-top: 6px;
 }
 
 .table-talk-form input {
   min-width: 0;
+  height: 32px;
   min-height: 32px;
   border: 1px solid rgba(174, 191, 202, 0.16);
   border-radius: 8px;
@@ -411,10 +416,12 @@ h3 {
 }
 
 .table-talk-form button {
+  width: 48px;
+  height: 32px;
   min-height: 32px;
-  padding: 0 10px;
+  padding: 0;
   border-radius: 8px;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 850;
 }
 
@@ -433,6 +440,15 @@ h3 {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.055);
   border: 1px solid rgba(174, 191, 202, 0.12);
+}
+
+.join-request-tile {
+  border-color: rgba(125, 213, 201, 0.34);
+  background: linear-gradient(180deg, rgba(125, 213, 201, 0.13), rgba(255, 255, 255, 0.055));
+}
+
+.join-request-tile h3 {
+  color: #e9fff9;
 }
 
 .record[tabindex="0"] {
@@ -921,6 +937,71 @@ button:disabled {
   padding: 9px 10px;
 }
 
+.thin-join-card .compact-invite-input,
+.join-dialog .compact-invite-input {
+  min-height: 46px;
+  max-height: 58px;
+  resize: vertical;
+  font-size: 0.72rem;
+}
+
+.join-preview-card {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(125, 213, 201, 0.22);
+  border-radius: 9px;
+  background: rgba(9, 21, 20, 0.46);
+}
+
+.join-preview-card h3 {
+  margin: 0;
+  color: #e9fff9;
+  font-size: 0.82rem;
+  text-transform: none;
+}
+
+.join-preview-card p {
+  margin: 0;
+  color: #d6e2e4;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.join-preview-empty {
+  color: #aebbc4;
+}
+
+.join-preview-empty.error {
+  color: #ffc1b8;
+}
+
+.join-preview-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.join-preview-facts span {
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid rgba(174, 191, 202, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #c7d8dc;
+  font-size: 0.66rem;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.join-preview-card .join-preview-hint {
+  color: #9fb8ba;
+  font-size: 0.7rem;
+}
+
 .thin-join-character {
   margin-top: 14px;
   padding-top: 12px;
@@ -1239,6 +1320,46 @@ button:disabled {
   border-top: 1px solid rgba(174, 191, 202, 0.14);
   color: #aab7bd;
   font-size: 0.76rem;
+}
+
+.message-lifecycle {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 3px 7px;
+  border: 1px solid rgba(174, 191, 202, 0.16);
+  border-radius: 999px;
+  background: rgba(12, 16, 19, 0.28);
+  color: #b9c6cc;
+  font-size: 0.7rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.message-lifecycle.waiting {
+  border-color: rgba(125, 213, 201, 0.28);
+  color: #bfe5dc;
+}
+
+.message-lifecycle.done {
+  border-color: rgba(127, 163, 139, 0.34);
+  color: #cfe7c6;
+}
+
+.message-lifecycle.review {
+  border-color: rgba(222, 188, 120, 0.34);
+  color: #ffe2a8;
+}
+
+.message-lifecycle.error {
+  border-color: rgba(206, 118, 105, 0.42);
+  color: #ffc1b8;
+}
+
+.message-lifecycle.muted {
+  opacity: 0.72;
 }
 
 .message-actions {
@@ -1640,6 +1761,43 @@ textarea::placeholder {
   width: min(760px, calc(100vw - 32px));
 }
 
+.join-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+.join-dialog form {
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.join-character-card {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(174, 191, 202, 0.14);
+}
+
+.join-character-card h3 {
+  margin: 0;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+}
+
+.join-help {
+  margin: -4px 0 2px;
+  color: #b7c7cf;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.join-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .diagnostics-section {
   gap: 10px;
 }
@@ -1651,6 +1809,56 @@ textarea::placeholder {
   font-size: 0.72rem;
   line-height: 1.45;
   white-space: pre;
+}
+
+.table-timeline-summary {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgba(174, 191, 202, 0.14);
+  border-radius: 8px;
+  background: rgba(13, 17, 20, 0.42);
+}
+
+.table-timeline-summary p {
+  margin: 0;
+  color: #aebbc2;
+  font-size: 0.78rem;
+}
+
+.table-timeline-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.table-timeline-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 7px;
+  border: 1px solid rgba(174, 191, 202, 0.11);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.table-timeline-label {
+  min-width: 0;
+  color: #e6edf0;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.table-timeline-list time {
+  color: #9eabb4;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .character-sheet-dialog {
@@ -1928,10 +2136,16 @@ textarea::placeholder {
   min-height: 112px;
 }
 
+.record-dialog textarea.compact-invite-input {
+  min-height: 46px;
+  max-height: 58px;
+}
+
 .dialog-copy {
   margin: 0;
   color: #d4dce1;
   line-height: 1.45;
+  white-space: pre-line;
 }
 
 @media (max-width: 1180px) {

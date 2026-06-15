@@ -69,8 +69,8 @@ export function createProviderOrchestrator(options = {}) {
       if (!endpoint) {
         throw new Error("ProviderOrchestrator requires an endpoint for local generation");
       }
-      if (!turn?.playerMessage?.trim()) {
-        throw new Error("Cannot start provider generation without a player message");
+      if (!turn?.playerMessage?.trim() && !turn?.playerInputs?.length) {
+        throw new Error("Cannot start provider generation without a player message or structured player input");
       }
       const turnId = turn.turnId ?? turn.id ?? `turn-${Date.now()}`;
       const requestId = `provider-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

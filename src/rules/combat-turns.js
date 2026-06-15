@@ -49,6 +49,70 @@ export function ensureCombatTurnOrder(campaign, options = {}) {
   return next;
 }
 
+export function addMissingCombatantsToTurnOrder(campaign, options = {}) {
+  if (!campaign?.combat?.inCombat) {
+    return campaign;
+  }
+
+  const next = structuredClone(campaign);
+  next.combat = {
+    ...(next.combat ?? {}),
+    inCombat: true,
+    round: next.combat?.round ?? 1,
+  };
+
+  const existingOrder = normalizeExistingOrder(next);
+  if (!existingOrder.length) {
+    return ensureCombatTurnOrder(next, { reroll: options.reroll === true, rolls: options.rolls });
+  }
+
+  const existingIds = new Set(existingOrder.map((entry) => entry.id));
+  const missing = combatants(next).filter((combatant) => !existingIds.has(combatant.id));
+  if (!missing.length) {
+    next.combat.turnOrder = existingOrder;
+    next.combat.initiative = existingOrder.map((entry) => entry.id);
+    next.combat.currentTurnId = existingIds.has(next.combat.currentTurnId)
+      ? next.combat.currentTurnId
+      : existingOrder[0]?.id ?? null;
+    return next;
+  }
+
+  const roll = typeof options.roll === "function" ? options.roll : defaultD20;
+  const missingOrder = missing.map((combatant) => {
+    const naturalRoll = clampRoll(Number(options.rolls?.[combatant.id] ?? roll(combatant)) || 10);
+    const dexMod = dexterityModifier(combatant.record);
+    return {
+      id: combatant.id,
+      name: combatant.name,
+      type: combatant.type,
+      initiativeRoll: naturalRoll,
+      initiativeModifier: dexMod,
+      initiativeScore: naturalRoll + dexMod,
+    };
+  });
+
+  const combined = [...existingOrder, ...missingOrder]
+    .sort((a, b) =>
+      (b.initiativeScore ?? 0) - (a.initiativeScore ?? 0) ||
+      (b.initiativeRoll ?? 0) - (a.initiativeRoll ?? 0) ||
+      a.name.localeCompare(b.name)
+    );
+
+  const previousTurnId = next.combat.currentTurnId;
+  next.combat.turnOrder = combined;
+  next.combat.initiative = combined.map((entry) => entry.id);
+  next.combat.currentTurnId = previousTurnId && combined.some((entry) => entry.id === previousTurnId)
+    ? previousTurnId
+    : combined[0]?.id ?? null;
+  next.combat.turnEconomy = {
+    ...(next.combat.turnEconomy ?? {}),
+    ...Object.fromEntries(missingOrder.flatMap((entry) => Object.entries(turnEconomyForActor(next, entry.id, { preserveExisting: true })))),
+    ...turnEconomyForActor(next, next.combat.currentTurnId, { preserveExisting: true }),
+  };
+  next.combat.lastAction = options.summary || next.combat.lastAction || "Combatants joined initiative.";
+  return next;
+}
+
 export function advanceCombatTurn(campaign, options = {}) {
   const next = ensureCombatTurnOrder(campaign);
   const order = next.combat.turnOrder ?? [];

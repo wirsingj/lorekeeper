@@ -192,12 +192,12 @@ function formatControllerDetail(member) {
     return "controller: host/player; do not speak or choose actions for this character unless delegated";
   }
   if (kind === "remote_player") {
-    return "controller: remote player; wait for that player's input";
+    return "controller: remote player; they may be physically present, but do not narrate their speech, thoughts, scanning, reactions, or purposeful actions unless that player submitted input";
   }
   if (kind === "unassigned") {
     return "controller: unassigned; ask before using as an active player voice";
   }
-  return "controller: AI companion; may advise or act in character";
+  return "controller: AI companion; may make brief low-stakes RP contributions when nudged or idle, but no major party decisions and combat turns still wait for host/controller input";
 }
 
 function buildNearbySection(campaign) {

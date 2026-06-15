@@ -94,18 +94,22 @@ export function LorekeeperShell() {
                 <span>Invite link</span>
                 <textarea
                   id="thin-join-invite-link"
-                  rows="3"
+                  className="compact-invite-input"
+                  rows="2"
                   spellCheck="false"
                   placeholder="lorekeeper://join?host=192.168.1.24&port=4173&campaign=..."
                 ></textarea>
               </label>
+              <section id="thin-join-preview" className="join-preview-card" hidden>
+                <p className="join-preview-empty">Paste a host invite link to preview the table.</p>
+              </section>
               <label>
                 <span>Your name</span>
                 <input id="thin-join-player-name" autoComplete="off" placeholder="Jess" />
               </label>
               <div className="thin-join-character">
                 <h3>Join As Your Character</h3>
-                <p className="thin-join-copy">For a new-character invite, fill this out and the host can approve it into the party.</p>
+                <p className="thin-join-copy">Fill this out to request a new party character. Leave it blank only when the host specifically invited you to control an existing party member.</p>
                 <label>
                   <span>Character name</span>
                   <input id="thin-join-character-name" autoComplete="off" placeholder="Mira" />
@@ -226,21 +230,21 @@ export function LorekeeperShell() {
           </form>
         </section>
         <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
-          <span id="provider-activity-label">Provider idle</span>
+          <span id="provider-activity-label">Table ready.</span>
           <div className="provider-activity-actions">
-            <button id="repair-retry" className="mini-action" type="button" title="Retry the last turn with the strict JSON contract" hidden>
+            <button id="repair-retry" className="mini-action" type="button" title="Ask the DM to try the failed response again" hidden>
               Retry
             </button>
-            <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics for the failed model response" hidden>
+            <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics and timeline for what happened" hidden>
               Inspect
             </button>
-            <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Import this response even though it failed validation" hidden>
+            <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Use this DM response even though it needs review" hidden>
               Import
             </button>
-            <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel generation" hidden>
+            <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel the DM response in progress" hidden>
               Cancel
             </button>
-            <button id="recheck-provider" className="mini-action" type="button" title="Read latest provider response" hidden>
+            <button id="recheck-provider" className="mini-action" type="button" title="Check the latest DM chat response" hidden>
               Read Latest
             </button>
           </div>
@@ -337,7 +341,7 @@ function CampaignDialog() {
           <div className="campaign-wizard-grid">
             <label>
               <span>Campaign name</span>
-              <input id="new-campaign-title" autoComplete="off" required defaultValue="New Campaign Binder" />
+              <input id="new-campaign-title" autoComplete="off" required placeholder="Campaign name" />
             </label>
             <label>
               <span>Starting place</span>
@@ -579,6 +583,9 @@ function SetupDialog() {
             <button id="refresh-diagnostics" type="button">Refresh Diagnostics</button>
             <button id="copy-diagnostics" type="button">Copy JSON</button>
           </div>
+          <div id="table-timeline-summary" className="table-timeline-summary" aria-live="polite">
+            <p>No table timeline yet.</p>
+          </div>
           <textarea
             id="diagnostics-output"
             className="rail-textarea diagnostics-output"
@@ -794,7 +801,7 @@ function DeleteCampaignDialog() {
 
 function JoinCampaignDialog() {
   return (
-    <dialog id="join-campaign-dialog" className="record-dialog confirm-dialog">
+    <dialog id="join-campaign-dialog" className="record-dialog join-dialog">
       <form id="join-campaign-form" method="dialog">
         <header className="dialog-header">
           <div>
@@ -807,15 +814,71 @@ function JoinCampaignDialog() {
           <span>Invite link</span>
           <textarea
             id="join-invite-link"
-            rows="3"
+            className="compact-invite-input"
+            rows="2"
             spellCheck="false"
             placeholder="lorekeeper://join?host=192.168.1.24&port=7347&campaign=..."
           ></textarea>
         </label>
+        <section id="join-preview" className="join-preview-card" hidden>
+          <p className="join-preview-empty">Paste a host invite link to preview the table.</p>
+        </section>
         <label>
           <span>Player name</span>
           <input id="join-player-name" autoComplete="off" placeholder="Your table name" />
         </label>
+        <div className="join-character-card">
+          <h3>Join As Your Character</h3>
+          <p className="join-help">Fill this out when the invite is for a new character. If the host invited you to an existing party member, leave the character details blank.</p>
+          <label>
+            <span>Character name</span>
+            <input id="join-character-name" autoComplete="off" placeholder="Mira" />
+          </label>
+          <div className="join-two">
+            <label>
+              <span>Ancestry</span>
+              <input id="join-character-ancestry" autoComplete="off" placeholder="Fairy, elf, human..." />
+            </label>
+            <label>
+              <span>Class</span>
+              <input id="join-character-class" autoComplete="off" placeholder="Ranger, druid, rogue..." />
+            </label>
+          </div>
+          <div className="join-two">
+            <label>
+              <span>Level</span>
+              <input id="join-character-level" inputMode="numeric" placeholder="1" />
+            </label>
+            <label>
+              <span>Table role</span>
+              <input id="join-character-role" autoComplete="off" placeholder="Scout, healer, chaotic helper..." />
+            </label>
+          </div>
+          <label>
+            <span>Look / vibe</span>
+            <textarea
+              id="join-character-appearance"
+              rows="3"
+              placeholder="What do people notice first? Style, demeanor, tells, magic, gear..."
+            ></textarea>
+          </label>
+          <label>
+            <span>Character pitch</span>
+            <textarea
+              id="join-character-backstory"
+              rows="4"
+              placeholder="Who are they, what do they care about, and what kind of trouble follows them?"
+            ></textarea>
+          </label>
+          <label>
+            <span>Why they join this party</span>
+            <textarea
+              id="join-character-integration"
+              rows="4"
+              placeholder="How should the DM weave them into this scene or party?"
+            ></textarea>
+          </label>
+        </div>
         <p id="join-status" className="setup-note">Paste an invite link from the host.</p>
         <footer className="dialog-actions">
           <button id="cancel-join-campaign" type="button" className="secondary-action">Cancel</button>

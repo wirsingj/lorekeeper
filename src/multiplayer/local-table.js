@@ -3,6 +3,7 @@ import { networkInterfaces } from "node:os";
 import { touchCampaign } from "../campaign-state/schema.js";
 import { isAllowedInviteHost } from "./invite-security.js";
 import { buildAggregatedPlayerTurn as buildAggregatedPlayerTurnPure } from "./turn-inputs.js";
+import { addMissingCombatantsToTurnOrder } from "../rules/combat-turns.js";
 
 export const multiplayerProtocolVersion = 1;
 
@@ -244,22 +245,23 @@ export function revokeInvite(campaign, inviteId) {
 export function requestJoin(campaign, { inviteLink, playerName, clientId, proposedCharacter } = {}) {
   const parsed = typeof inviteLink === "string" ? parseInviteLink(inviteLink) : inviteLink;
   if (!parsed.valid) {
-    throw new Error(parsed.error || "Invalid invite link.");
+    throw publicMultiplayerError(parsed.error || "Invalid invite link.", 400);
   }
 
   const next = normalizeMultiplayerCampaign(campaign);
   if (parsed.campaign !== next.id) {
-    throw new Error("Invite is for a different campaign.");
+    throw publicMultiplayerError("Invite is for a different campaign. Ask the host for a fresh invite link.", 409);
   }
   const invite = findActiveInvite(next, parsed);
-  const isCharacterRequest = invite.kind === inviteKinds.CHARACTER_REQUEST || !invite.partyMemberId;
+  const requestedNewCharacter = hasCharacterProposal(proposedCharacter);
+  const isCharacterRequest = invite.kind === inviteKinds.CHARACTER_REQUEST || !invite.partyMemberId || requestedNewCharacter;
   const member = isCharacterRequest ? null : next.party.find((item) => item.id === invite.partyMemberId);
   const characterProposal = isCharacterRequest ? normalizeCharacterProposal(proposedCharacter, playerName) : null;
   if (isCharacterRequest && !characterProposal.name) {
-    throw new Error("Character name is required for this invite.");
+    throw publicMultiplayerError("Character name is required for this invite.", 400);
   }
   if (!isCharacterRequest && !member) {
-    throw new Error("Invite seat no longer exists.");
+    throw publicMultiplayerError("Invite seat no longer exists. Ask the host for a fresh invite link.", 409);
   }
   const existing = findExistingConnectionForClient(next, invite.id, clientId);
   if (existing) {
@@ -276,6 +278,17 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId, propos
     existing.disconnectedAt = existing.status === "disconnected" ? existing.disconnectedAt : null;
     if (characterProposal) {
       existing.proposedCharacter = characterProposal;
+    }
+    if (existing.status === "disconnected") {
+      existing.status = "connected";
+      existing.approvedAt = existing.approvedAt || nowIso();
+      existing.disconnectedAt = null;
+      next.multiplayer.events = appendEvent(next.multiplayer.events, {
+        type: "guest_reconnected",
+        summary: `${existing.displayName || "Guest"} reconnected to the table.`,
+        connectionId: existing.id,
+        partyMemberId: existing.partyMemberId ?? null,
+      });
     }
     if (existing.status === "connected") {
       assignController(next, existing);
@@ -313,6 +326,7 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId, propos
     inviteId: invite.id,
     partyMemberId: member?.id ?? null,
     proposedCharacter: characterProposal,
+    requestedNewCharacter,
     status: invite.approvalRequired ? "pending" : "connected",
     secret: randomToken(24),
     requestedAt: nowIso(),
@@ -370,7 +384,7 @@ export function approveJoinRequest(campaign, connectionId, options = {}) {
     createdMember = uniqueMember;
     connection.partyMemberId = uniqueMember.id;
     const invite = next.multiplayer.invites.find((item) => item.id === connection.inviteId);
-    if (invite) {
+    if (invite && (invite.kind === inviteKinds.CHARACTER_REQUEST || !invite.partyMemberId)) {
       invite.partyMemberId = uniqueMember.id;
       invite.seatId = uniqueMember.id;
     }
@@ -394,6 +408,10 @@ export function approveJoinRequest(campaign, connectionId, options = {}) {
   ));
   assignController(next, connection);
   if (createdMember) {
+    markPartyMemberPresent(next, createdMember.id);
+    const reconciledCombat = reconcileActiveCombatParty(next, `${createdMember.name} joined the combat.`);
+    next.combat = reconciledCombat.combat;
+    next.scene = reconciledCombat.scene;
     appendCharacterJoinMessage(next, createdMember, connection);
   }
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
@@ -403,6 +421,40 @@ export function approveJoinRequest(campaign, connectionId, options = {}) {
     partyMemberId: connection.partyMemberId,
   });
   return touchCampaign(next);
+}
+
+export function joinPartyMemberCombat(campaign, { partyMemberId, connectionId = "", clientId = "", connectionSecret = "" } = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  const member = next.party.find((item) => item.id === partyMemberId);
+  if (!member) {
+    throw new Error("Party member not found.");
+  }
+  if (!next.combat?.inCombat) {
+    throw new Error("No active combat to join.");
+  }
+
+  if (connectionId) {
+    const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
+    if (!connection || connection.status !== "connected") {
+      throw new Error("Connection is not approved.");
+    }
+    assertClientMatchesConnection(next, connection, clientId);
+    assertConnectionSecret(connection, connectionSecret);
+    if (connection.partyMemberId !== partyMemberId) {
+      throw new Error("This player cannot join combat for that character.");
+    }
+    connection.lastSeenAt = nowIso();
+  }
+
+  markPartyMemberPresent(next, partyMemberId);
+  const reconciled = reconcileActiveCombatParty(next, `${member.name} joined the combat.`);
+  reconciled.multiplayer.events = appendEvent(reconciled.multiplayer.events, {
+    type: "combat_joined",
+    summary: `${member.name} joined the combat.`,
+    connectionId,
+    partyMemberId,
+  });
+  return touchCampaign(reconciled);
 }
 
 export function denyJoinRequest(campaign, connectionId) {
@@ -776,6 +828,42 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
   };
 }
 
+export function createJoinPreview(campaign, inviteLink) {
+  const parsed = typeof inviteLink === "string" ? parseInviteLink(inviteLink) : inviteLink;
+  if (!parsed.valid) {
+    throw publicMultiplayerError(parsed.error || "Invalid invite link.", 400);
+  }
+  const normalized = normalizeMultiplayerCampaign(campaign);
+  if (parsed.campaign !== normalized.id) {
+    throw publicMultiplayerError("Invite is for a different campaign. Ask the host for a fresh invite link.", 409);
+  }
+  const invite = findActiveInvite(normalized, parsed);
+  const scene = publicData(normalized.scene) ?? {};
+  const recentMessages = (normalized.sessionLog?.messages ?? [])
+    .filter((message) => message.data?.visibility !== "dm_only")
+    .slice(-6)
+    .map(publicMessage);
+  return {
+    protocolVersion: multiplayerProtocolVersion,
+    revision: tableRevision(normalized),
+    campaignId: normalized.id,
+    campaignTitle: normalized.title,
+    campaignSummary: compactLine(normalized.summary || normalized.description || "", 1200),
+    invite: {
+      id: invite.id,
+      kind: invite.kind,
+      seatId: invite.seatId,
+      partyMemberId: invite.partyMemberId,
+    },
+    scene,
+    party: normalized.party.slice(-tableStateLimits.party).map(publicPartyMember),
+    people: publicRecords(normalized.people, 8),
+    places: publicRecords(normalized.places, 8),
+    quests: publicRecords(normalized.quests, 8),
+    recentMessages,
+  };
+}
+
 export function parseInviteLink(value) {
   const text = String(value ?? "").trim();
   try {
@@ -905,6 +993,28 @@ function normalizeSeats(seats = [], party = []) {
   }));
 }
 
+function markPartyMemberPresent(campaign, partyMemberId) {
+  if (!partyMemberId) {
+    return;
+  }
+  campaign.scene = {
+    ...(campaign.scene ?? {}),
+    presentPartyMemberIds: Array.isArray(campaign.scene?.presentPartyMemberIds)
+      ? campaign.scene.presentPartyMemberIds
+      : [],
+  };
+  if (!campaign.scene.presentPartyMemberIds.includes(partyMemberId)) {
+    campaign.scene.presentPartyMemberIds = [...campaign.scene.presentPartyMemberIds, partyMemberId];
+  }
+}
+
+function reconcileActiveCombatParty(campaign, summary = "Party combatants reconciled.") {
+  if (!campaign?.combat?.inCombat) {
+    return campaign;
+  }
+  return addMissingCombatantsToTurnOrder(campaign, { reroll: false, summary });
+}
+
 function assignController(campaign, connection) {
   const invite = campaign.multiplayer.invites.find((item) => item.id === connection.inviteId);
   if (invite) {
@@ -986,9 +1096,16 @@ function findActiveInvite(campaign, parsed) {
     (item.partyMemberId === parsed.seat || item.seatId === parsed.seat)
   );
   if (!invite) {
-    throw new Error("Invite token is invalid or revoked.");
+    throw publicMultiplayerError("Invite token is invalid, expired, or revoked. Ask the host for a fresh invite link.", 410);
   }
   return invite;
+}
+
+function publicMultiplayerError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.publicMessage = message;
+  return error;
 }
 
 function findExistingConnectionForClient(campaign, inviteId, clientId) {
@@ -1004,7 +1121,7 @@ function findExistingConnectionForClient(campaign, inviteId, clientId) {
   return campaign.multiplayer.connections.find((connection) =>
     connection.inviteId === inviteId &&
     playerIds.has(connection.playerId) &&
-    (connection.status === "pending" || connection.status === "connected")
+    (connection.status === "pending" || connection.status === "connected" || connection.status === "disconnected")
   ) ?? null;
 }
 
@@ -1302,6 +1419,7 @@ function appendVisibleRemoteMessage(campaign, input, { requireApproval = false, 
   }
 
   const existingIndex = (sessionLog.messages ?? []).findIndex((message) => message.data?.pendingInputId === input.id);
+  const createdAt = input.updatedAt || nowIso();
   const message = {
     id: existingIndex === -1 ? `msg-${input.id}` : sessionLog.messages[existingIndex].id,
     sessionId: activeSessionId,
@@ -1312,10 +1430,10 @@ function appendVisibleRemoteMessage(campaign, input, { requireApproval = false, 
       ? `From ${input.playerName}; waiting for host approval`
       : holdForGroup
         ? `From ${input.playerName}; queued for grouped host turn`
-        : `From ${input.playerName}; queued for DM`,
+        : `From ${input.playerName}; sent to host and queued for DM`,
     source: "remote_player_input_pending",
     providerRunId: null,
-    createdAt: existingIndex === -1 ? nowIso() : sessionLog.messages[existingIndex].createdAt,
+    createdAt,
     data: {
       pendingInputId: input.id,
       playerId: input.playerId,
@@ -1332,11 +1450,14 @@ function appendVisibleRemoteMessage(campaign, input, { requireApproval = false, 
   if (existingIndex === -1) {
     messages.push(message);
   } else {
-    messages[existingIndex] = {
-      ...messages[existingIndex],
+    messages.splice(existingIndex, 1);
+    messages.push({
       ...message,
-      createdAt: messages[existingIndex].createdAt,
-    };
+      data: {
+        ...(sessionLog.messages[existingIndex].data ?? {}),
+        ...message.data,
+      },
+    });
   }
   campaign.sessionLog = {
     ...sessionLog,
@@ -1382,6 +1503,30 @@ function normalizeCharacterProposal(proposal = {}, playerName = "") {
     personality: compactLine(proposal.personality || "", 600),
     goals: compactLine(proposal.goals || "", 600),
   };
+}
+
+function hasCharacterProposal(proposal = {}) {
+  if (!proposal || typeof proposal !== "object") {
+    return false;
+  }
+  return [
+    proposal.name,
+    proposal.ancestry,
+    proposal.characterClass,
+    proposal.class,
+    proposal.roleIntent,
+    proposal.role,
+    proposal.appearance,
+    proposal.vibe,
+    proposal.backstory,
+    proposal.background,
+    proposal.concept,
+    proposal.integrationPrompt,
+    proposal.integration,
+    proposal.partyConnection,
+    proposal.personality,
+    proposal.goals,
+  ].some((value) => String(value ?? "").trim());
 }
 
 function createPartyMemberFromProposal(proposal = {}, playerName = "", options = {}) {

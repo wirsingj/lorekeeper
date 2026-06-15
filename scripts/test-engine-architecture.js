@@ -8,6 +8,7 @@ import { randomDevJumpStart } from "../app/dev-jump-start.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
+import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
@@ -555,6 +556,30 @@ async function testProviderExecutionLifecycle() {
   assert.equal(result.providerReceived, true);
   assert.equal(turnFlow.getProjection().state, turnStates.COMPLETE);
   assert.equal(events.some((event) => event.type === "generation_delta"), true);
+
+  let structuredOnlyRequest = null;
+  const structuredOrchestrator = createProviderOrchestrator({
+    endpoint: "/generate",
+    fetchFn: async (_url, init) => {
+      structuredOnlyRequest = JSON.parse(init.body);
+      return {
+        ok: true,
+        body: ndjsonStream([{ type: "done", result: { text: "{\"table\":[]}", structured: { table: [] } } }]),
+      };
+    },
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => {},
+  });
+  const structuredRun = structuredOrchestrator.startLocalGeneration({
+    turn: {
+      playerMessage: "",
+      playerInputs: [{ characterName: "Eve", text: "Eve ducks behind the stall." }],
+    },
+  });
+  const structuredResult = await structuredRun.promise;
+  assert.equal(structuredResult.providerReceived, true, "structured-only turns should reach the provider");
+  assert.equal(structuredOnlyRequest.playerMessage, "");
+  assert.equal(structuredOnlyRequest.playerInputs[0].text, "Eve ducks behind the stall.");
 }
 
 async function testInvalidProviderOutputIsRecoverable() {
@@ -749,6 +774,22 @@ function testInputComposerProjection() {
   assert.match(remoteStaged.placeholder, /remote action is staged/i);
 }
 
+function testTableStatusVocabulary() {
+  assert.equal(tableStatusForActivity("Generating locally with Ollama...", "working").text, "DM is thinking...");
+  assert.equal(tableStatusForActivity("Needs repair - sceneStatus.awaitingPlayer must be boolean. Inspect or retry.", "error").text, "DM response needs review.");
+  assert.equal(tableStatusForActivity("Resolving Drunk miner's enemy turn", "working").text, "DM resolving Drunk miner's enemy turn...");
+  assert.equal(tableStatusForActivity("Action sent to host", "idle").text, "Action sent to host table.");
+  assert.equal(tableStatusForActivity("Local generation timed out; Send Turn can retry", "error").text, "DM response timed out; retry is available.");
+
+  const event = tableTimelineEvent("turn_locked", {
+    message: "Turn submitted; DM is resolving it.",
+    turnId: "turn-1",
+    at: "2026-01-01T00:00:00.000Z",
+  });
+  assert.equal(event.label, "Turn submitted; DM is resolving it.");
+  assert.equal(event.at, "2026-01-01T00:00:00.000Z");
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -834,6 +875,16 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
   assert.equal(/function latestCommittedReviewBatch/.test(appJs), false);
+  assert.match(
+    appJs,
+    /!turn\?\.playerMessage\?\.trim\(\)\s*&&\s*!turn\?\.playerInputs\?\.length/,
+    "local provider runner must accept remote-only structured player inputs",
+  );
+  assert.match(appJs, /tableTimeline: state\.tableTimeline\.slice\(-80\)/, "renderer diagnostics should include the table-facing timeline");
+  assert.match(appJs, /messageLifecycleForMessage/, "play bubbles should surface turn lifecycle state");
+  assert.match(appJs, /turn_waiting_for_dm/, "submitted turns should be visibly marked while waiting for the DM");
+  assert.match(appJs, /updatePlayerTurnEchoLifecycle/, "submitted turn bubbles should update after provider completion or failure");
+  assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
@@ -842,6 +893,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Starting Party \/ Joiner/);
   assert.match(appShell, /new-joiner-integration/);
   assert.match(appShell, /new-joiner-host-context/);
+  assert.match(appShell, /table-timeline-summary/);
   assert.match(appJs, /normalizeWizardJoiner/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /Host scene context for joiner/);
@@ -863,6 +915,7 @@ testProviderBoundary();
 testStructuredInputsDoNotMergeIntoHostMessage();
 testCampaignStateStore();
 testInputComposerProjection();
+testTableStatusVocabulary();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 

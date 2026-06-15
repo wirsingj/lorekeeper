@@ -729,6 +729,82 @@ assert.ok(combatMissingAdvanceRepaired.response.proposedChanges.some((change) =>
 ));
 assert.match(combatMissingAdvanceRepaired.response.warnings.join(" "), /inferred turnResolved/);
 
+const combatStructuredInputAdvanceRepaired = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  mechanics: [{ type: "attack", actor: "Mira", roll: "d20+1 = 16", damage: "1d6+2 = 6", outcome: "success", text: "Mira's dagger hits the wolf." }],
+  proposedChanges: [],
+})), {
+  requestId: "combat-validation",
+  request: {
+    ...combatValidationRequest,
+    user: {
+      ...combatValidationRequest.user,
+      inWorld: "",
+      playerInputs: [{
+        playerId: "guest-am",
+        playerName: "Am",
+        characterId: "mira",
+        characterName: "Mira",
+        text: "Mira stabs the wolf.",
+        ready: true,
+      }],
+    },
+  },
+});
+assert.equal(combatStructuredInputAdvanceRepaired.ok, true);
+assert.ok(combatStructuredInputAdvanceRepaired.response.proposedChanges.some((change) =>
+  change.domain === "combat" &&
+  change.data.turnResolved === true &&
+  change.data.advanceTurn === true &&
+  change.data.resolvedActorId === "mira"
+));
+
+const combatNextActorOverreach = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  table: [{
+    speaker: "DM",
+    speakerId: null,
+    role: "dm",
+    kind: "narration",
+    visibility: "table",
+    text: "Mira's blade bites into the wolf. The Massive wolf attacks Garren with its powerful jaws.",
+  }],
+  mechanics: [{ type: "attack", actor: "Mira", roll: "d20+1 = 16", damage: "1d6+2 = 6", outcome: "success", text: "Mira hits the wolf." }],
+  proposedChanges: [{
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Mira's combat turn resolves.",
+    data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "mira" },
+    confidence: "high",
+    reason: "Combat action resolved.",
+  }],
+})), {
+  requestId: "combat-validation",
+  request: {
+    ...combatValidationRequest,
+    context: {
+      ...combatValidationRequest.context,
+      combat: {
+        ...combatValidationRequest.context.combat,
+        turnOrder: [
+          { id: "massive-wolf", name: "Massive wolf", type: "enemy", initiativeScore: 18 },
+          { id: "garren", name: "Garren", type: "party", initiativeScore: 15 },
+          { id: "mira", name: "Mira", type: "party", initiativeScore: 11 },
+        ],
+        currentTurnId: "mira",
+      },
+    },
+    user: { ...combatValidationRequest.user, inWorld: "Mira stabs the wolf." },
+  },
+});
+assert.equal(combatNextActorOverreach.ok, false);
+assert.match(combatNextActorOverreach.error, /must not narrate or resolve another combatant/);
+
 const combatWithAdvance = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   requestId: "combat-validation",
   sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },

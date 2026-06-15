@@ -144,9 +144,10 @@ export async function selectCampaign(projectRoot, sqlitePath) {
 }
 
 export async function createNewActiveCampaign(projectRoot, options = {}) {
-  await assertUniqueCampaignTitle(projectRoot, options.title ?? "New Campaign Binder");
+  const title = cleanCampaignTitle(options.title);
+  await assertUniqueCampaignTitle(projectRoot, title);
   const starterCampaign = createStarterCampaign({
-    title: options.title ?? "New Campaign Binder",
+    title,
     premise: options.premise ?? "A new D&D 5e-lite campaign ready to grow through play.",
     openingScene: options.openingScene,
     startingLocation: options.startingLocation,
@@ -294,11 +295,16 @@ export async function loadImportedCampaign(projectRoot) {
 async function loadSeedCampaign(projectRoot) {
   return {
     campaign: createStarterCampaign({
-      title: "New Campaign Binder",
+      title: await uniqueCampaignTitle(projectRoot, "Untitled Campaign"),
       premise: "A new D&D 5e-lite campaign ready to grow through play.",
     }),
     source: "starter",
   };
+}
+
+function cleanCampaignTitle(title) {
+  const trimmed = String(title ?? "").trim();
+  return trimmed || "Untitled Campaign";
 }
 
 async function loadCampaignIndex(projectRoot) {

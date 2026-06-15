@@ -68,6 +68,7 @@ export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedM
     "Resolve user.inWorld as the latest table action. Do not ignore it, reset to a prior choice prompt, or repeat the previous DM question.",
     "If user.inWorld includes a choice label plus extra details, the extra details are authoritative; treat the original choice as context only.",
     "If user.inWorld addresses an NPC or asks another character to act, narrate that character's immediate response or the visible consequence.",
+    "Do not invent speech, thoughts, scouting, scanning, movement, or purposeful actions for remote/player-controlled party members unless their controller submitted that input.",
     "Before adding a new threat, NPC, or twist, use generation.dmQuality: existing context, natural consequences, NPC motivations, and campaign continuity come first.",
     "Do not be terse. For normal scene turns, write immersive DM narration with enough detail to feel like tabletop play.",
     "No markdown. No fenced code. No prose outside JSON.",
@@ -92,6 +93,8 @@ export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, pa
         "Never contradict canon context.",
         "Do not decide the primary player character's major choices.",
         "Do not write autonomous table posts for host/player-controlled characters.",
+        "Remote/player-controlled party members may be present, but do not invent their speech, thoughts, reactions, scouting, scanning, movement, or purposeful actions unless their controller submitted input.",
+        "In combat, do not decide any party member's action on their initiative turn unless that party member's controller submitted it.",
         "Parenthetical player text is meta direction, not in-world speech.",
         "Resolve the latest user.inWorld action before consulting older scene text.",
         "When a selected option is edited or expanded, honor the edited user.inWorld props, positioning, dialogue, and intent over the original option wording.",
@@ -460,6 +463,11 @@ function validateCombatResolution(response, options = {}, errors = []) {
   if (!hasCombatAdvanceChange(response)) {
     errors.push("resolved combat must include a combat proposedChange with data.turnResolved true or data.advanceTurn true");
   }
+
+  const nextActorOverreach = detectNextActorCombatOverreach(response, request);
+  if (nextActorOverreach) {
+    errors.push(nextActorOverreach);
+  }
 }
 
 function expectsResolvedCombat(request) {
@@ -500,6 +508,64 @@ function hasCombatAdvanceChange(response) {
     change?.data &&
     (change.data.advanceTurn === true || change.data.turnResolved === true)
   );
+}
+
+function detectNextActorCombatOverreach(response, request) {
+  const currentActorId = request?.context?.combat?.currentTurnId || "";
+  if (!currentActorId || !isPartyActorInRequest(request, currentActorId)) {
+    return "";
+  }
+
+  const currentActorName = normalizeHumanName(combatActorName(request, currentActorId));
+  const otherCombatants = (request?.context?.combat?.turnOrder ?? [])
+    .filter((entry) => entry?.id && entry.id !== currentActorId)
+    .map((entry) => ({
+      id: entry.id,
+      name: normalizeHumanName(entry.name || entry.id),
+    }))
+    .filter((entry) => entry.name && entry.name !== currentActorName);
+
+  if (!otherCombatants.length) {
+    return "";
+  }
+
+  const combined = [
+    ...(response.table ?? []).map((entry) => entry?.text || ""),
+    ...(response.mechanics ?? []).map((mechanic) =>
+      [mechanic?.actor, mechanic?.target, mechanic?.text, mechanic?.reason, mechanic?.roll, mechanic?.damage].filter(Boolean).join(" ")
+    ),
+  ].join("\n");
+  if (!/\b(attacks?|lunges?|bites?|claws?|slashes?|stabs?|strikes?|shoots?|fires?|casts?|deals?\s+\d+|damage)\b/i.test(combined)) {
+    return "";
+  }
+
+  for (const combatant of otherCombatants) {
+    if (combatant.name.length < 3) {
+      continue;
+    }
+    const namePattern = new RegExp(`\\b${escapeRegExp(combatant.name)}\\b.{0,90}\\b(attacks?|lunges?|bites?|claws?|slashes?|stabs?|strikes?|shoots?|fires?|casts?|deals?\\s+\\d+|damage)\\b`, "i");
+    const possessivePattern = new RegExp(`\\b${escapeRegExp(combatant.name)}'?s\\b.{0,90}\\b(attack|bite|claws?|slash|stab|strike|shot|spell|damage)\\b`, "i");
+    if (namePattern.test(combined) || possessivePattern.test(combined)) {
+      return `resolved party combat response must not narrate or resolve another combatant's action before initiative advances (${combatant.name})`;
+    }
+  }
+  return "";
+}
+
+function isPartyActorInRequest(request, actorId) {
+  return (request?.context?.combat?.turnOrder ?? []).some((entry) =>
+    entry?.id === actorId && normalizeToken(entry.type || "") === "party"
+  ) || (request?.context?.party ?? []).some((member) => member?.id === actorId);
+}
+
+function normalizeHumanName(value) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(value) {
+  return String(value ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function combatActorName(request, actorId) {
@@ -598,6 +664,10 @@ function createResponseFormatSchema() {
       "Put canon changes in proposedChanges, not only in narration.",
       "In combat, respect context.combat.currentTurnId/current turn. Offer choices only for the active actor unless resolving an enemy turn.",
       "If context.combat.currentTurnId is an enemy, resolve that enemy/DM turn using mechanics and then advanceTurn.",
+      "If context.combat.currentTurnId is a party member and user.inWorld does not contain that actor's submitted action, do not move, speak, attack, cast, dodge, aim, signal, or choose for them. Spotlight the situation, ask what they do, and optionally provide choices for that actor.",
+      "Party-member combat turns are input turns, including AI companions. The host/controller may pick an option or type a custom action/dialogue before resolution.",
+      "When resolving a party member's submitted combat action, stop after that actor's action, consequences, state updates, and turn advancement. Do not narrate or resolve the next initiative actor's attack/action in the same response.",
+      "If the next initiative actor is an enemy, leave its intent unresolved for the next DM/enemy turn; the app will advance initiative and request that turn separately.",
       "Resolved combat should feel like a tabletop combat beat: actor + current HP when known, chosen action, attack/check/save roll, damage/healing roll, HP/resource update, then vivid narration.",
       "For dodge/counter/reaction-style options, show each relevant step separately: defensive check/save/AC contest, attack roll if counterattacking, damage roll if it hits, and the final HP/resource result.",
       "Do not hide combat rolls in prose. Put the exact visible dice/math in mechanics.text or mechanics.roll/damage so the app can render it.",
@@ -605,8 +675,9 @@ function createResponseFormatSchema() {
       "For resolved combat, propose concrete state updates: party HP/resources/conditions and combat initiative/round/turnEconomy/enemies.",
       "Combat proposedChanges may use domain combat data.actorUpdates for party HP/resource/condition changes and data.enemyUpdates for enemy changes.",
       "When options are for a specific party member or NPC, include choices.forActor/forActorId or option.actor/actorId.",
-      "Never put host/player-controlled character speech or action in table entries unless it came from user.playerInputs or user.inWorld.",
-      "AI companions may suggest one concise contribution, but the host approves companion actions before they become the next model turn.",
+      "Never put party-member speech or chosen action in table entries unless it came from user.playerInputs or user.inWorld, or it is clearly labeled as a non-binding suggestion.",
+      "Remote/player-controlled party members may be described as present only in neutral staging; do not narrate what they think, notice, scan, say, decide, or do without submitted input.",
+      "AI companions may suggest one concise low-stakes contribution outside their own combat turn when nudged or when the table is idle, but their combat turn should still be presented for controller/host input before resolution.",
       "Do not silently change HP, inventory, relationships, quests, or major canon.",
       "If stats are missing, suggest a pending check instead of inventing exact math.",
     ],
@@ -1255,9 +1326,8 @@ function buildCompactContext(contextPack, campaign, options = {}) {
       id: member.id,
       name: member.name,
       voice: compactText(member.voice || member.personality || member.role || "reacts as an individual party member", 140),
-      agency: member.playerRole === "player" || /player/i.test(member.role ?? "")
-        ? "primary_player_character"
-        : "companion",
+      controllerKind: normalizeControllerKind(member),
+      agency: describePartyAgency(member),
     })).slice(0, 8),
     sections: (contextPack?.sections ?? []).map((section) => ({
       kind: normalizeSectionKind(section.kind),
@@ -1318,6 +1388,7 @@ function compactPartyMember(member, options = {}) {
     id: member.id,
     name: member.name,
     role: compactText(member.ancestryClass || member.role || member.class || "party member", 90),
+    controllerKind: normalizeControllerKind(member),
     hp: member.stats?.hp?.current ?? member.stats?.hp ?? member.hp ?? member.hitPoints ?? null,
     maxHp: member.stats?.hp?.max ?? member.maxHp ?? member.hitPointMaximum ?? null,
     level: member.level ?? member.stats?.level ?? member.characterLevel ?? null,
@@ -1327,6 +1398,28 @@ function compactPartyMember(member, options = {}) {
     resources: compactArray(member.resources ?? member.stats?.resources ?? member.spells, includeDetail ? 8 : 4),
     notes: compactArray(member.notes, includeDetail ? 4 : 2, TEXT_LIMITS.partyNote),
   };
+}
+
+function normalizeControllerKind(member = {}) {
+  const raw = normalizeToken(member.controllerKind || member.controller || member.control || "");
+  if (["host", "remote_player", "ai_companion", "npc_dm", "unassigned"].includes(raw)) {
+    return raw;
+  }
+  if (raw === "remote" || raw === "guest" || raw === "player_remote") return "remote_player";
+  if (raw === "ai" || raw === "companion" || raw === "dm_controlled_companion") return "ai_companion";
+  if (raw === "npc" || raw === "dm") return "npc_dm";
+  return member.type === "player_character" || member.playerRole === "player" || /player/i.test(member.role ?? "")
+    ? "host"
+    : "ai_companion";
+}
+
+function describePartyAgency(member = {}) {
+  const kind = normalizeControllerKind(member);
+  if (kind === "host") return "host_controlled_party_member";
+  if (kind === "remote_player") return "remote_player_controlled_party_member_no_autonomous_speech_or_action";
+  if (kind === "ai_companion") return "ai_companion_may_offer_low_stakes_rp_when_nudged_but_requires_turn_input_for_major_actions";
+  if (kind === "unassigned") return "unassigned_party_member_requires_host_input";
+  return "party_member_requires_controller_input";
 }
 
 function inferActionIntent(value) {

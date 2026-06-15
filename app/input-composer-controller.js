@@ -19,7 +19,7 @@ export function buildInputComposerProjection({
       placeholder: !connected
         ? "Join a hosted LoreKeeper table before sending party-member actions."
         : isGuestCombatTurn
-          ? `Type as ${guestSnapshot?.assignedCharacter?.name ?? "your assigned party member"}. The host submits it to the DM.`
+          ? `Type as ${guestSnapshot?.assignedCharacter?.name ?? "your assigned party member"}. Send to the host table.`
           : `Waiting for ${labelById(activeCombatTurn)}'s combat turn.`,
       buttonText: "Send To Host",
     };

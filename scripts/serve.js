@@ -31,12 +31,14 @@ import {
   clearPendingTurnInputs,
   createGuestSnapshot,
   createHostSnapshot,
+  createJoinPreview,
   createCharacterRequestInvite,
   createInviteForPartyMember,
   denyJoinRequest,
   disconnectGuest,
   firstLanAddress,
   passGuestAction,
+  joinPartyMemberCombat,
   postTableTalk,
   requestJoin,
   returnToAiCompanion,
@@ -167,7 +169,7 @@ const server = createServer(async (request, response) => {
     if (url.pathname === "/api/campaign/new" && request.method === "POST") {
       const body = await readJsonBody(request);
       const payload = await createNewActiveCampaign(projectRoot, {
-        title: body.title ?? "New Campaign Binder",
+        title: body.title,
         premise: body.premise ?? "A new D&D 5e-lite campaign ready to grow through play.",
         openingScene: body.openingScene,
         startingLocation: body.startingLocation,
@@ -337,6 +339,7 @@ const server = createServer(async (request, response) => {
           inviteLink: body.inviteLink,
           playerName: body.playerName,
           clientId: body.clientId,
+          proposedCharacter: body.proposedCharacter,
         });
         return { campaign: joinResult.campaign };
       });
@@ -350,6 +353,12 @@ const server = createServer(async (request, response) => {
           connectionSecret: joinResult.connectionSecret,
         }) : null,
       });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/join-preview" && request.method === "GET") {
+      const { campaign } = await loadActiveCampaign(projectRoot);
+      sendJson(response, 200, createJoinPreview(campaign, url.searchParams.get("inviteLink")));
       return;
     }
 
@@ -424,6 +433,24 @@ const server = createServer(async (request, response) => {
           clientId: body.clientId,
           connectionSecret: body.connectionSecret,
         }),
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/combat/join" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
+        campaign: joinPartyMemberCombat(campaign, body),
+      }));
+      sendJson(response, 200, {
+        ...payload,
+        multiplayer: createHostSnapshot(payload.campaign),
+        snapshot: body.connectionId
+          ? createGuestSnapshot(payload.campaign, body.connectionId, {
+            clientId: body.clientId,
+            connectionSecret: body.connectionSecret,
+          })
+          : null,
       });
       return;
     }
@@ -1013,9 +1040,11 @@ function isProtectedApiPath(pathname, method) {
     return false;
   }
   if (pathname === "/api/multiplayer/join"
+    || pathname === "/api/multiplayer/join-preview"
     || pathname === "/api/multiplayer/guest-snapshot"
     || pathname === "/api/multiplayer/action"
     || pathname === "/api/multiplayer/pass"
+    || pathname === "/api/multiplayer/combat/join"
     || pathname === "/api/multiplayer/table-talk") {
     return false;
   }
@@ -1074,6 +1103,7 @@ function requiresCampaignPin(pathname) {
     "/api/multiplayer/controller/ai",
     "/api/multiplayer/controller/host",
     "/api/multiplayer/pending/clear",
+    "/api/multiplayer/combat/join",
     "/api/multiplayer/table-talk",
     "/api/review/commit",
   ]).has(pathname);
