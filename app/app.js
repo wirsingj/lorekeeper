@@ -1161,9 +1161,13 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   await updatePlayerTurnEchoLifecycle(playerEchoMessageId, runResult);
   if (runResult?.imported && approvedPartyInputs.length) {
     await markApprovedPartyInputsSubmitted(approvedPartyInputs);
+  } else if (!runResult?.imported && approvedPartyInputs.length) {
+    await markApprovedPartyInputsStillStaged(approvedPartyInputs, runResult);
   }
   if (runResult?.imported && stagedRemoteInputs.length) {
     await clearSubmittedRemoteInputs(stagedRemoteInputs);
+  } else if (!runResult?.imported && stagedRemoteInputs.length) {
+    await markRemoteInputsStillStaged(stagedRemoteInputs, runResult);
   }
   if (runResult?.providerReceived && !options.preserveInput) {
     elements.playerInput.value = "";
@@ -1326,6 +1330,57 @@ async function markApprovedPartyInputsSubmitted(inputs) {
       },
     });
   }
+}
+
+async function markApprovedPartyInputsStillStaged(inputs, runResult = {}) {
+  const failureReason = providerFailureReason(runResult);
+  for (const input of inputs) {
+    await patchPlayMessage(input.id, {
+      meta: "Still staged; DM did not resolve it. Retry when ready.",
+      data: {
+        lifecycle: "dm_failed_still_staged",
+        failureReason,
+        lastFailureAt: new Date().toISOString(),
+      },
+    });
+  }
+}
+
+async function markRemoteInputsStillStaged(inputs, runResult = {}) {
+  const failureReason = providerFailureReason(runResult);
+  for (const input of inputs) {
+    const message = state.playMessages.find((item) => item.data?.pendingInputId === input.id);
+    if (!message) {
+      continue;
+    }
+    await patchPlayMessage(message.id, {
+      meta: "Still staged at the host table; DM did not resolve it. Retry when ready.",
+      data: {
+        lifecycle: "dm_failed_still_staged",
+        failureReason,
+        lastFailureAt: new Date().toISOString(),
+      },
+    });
+  }
+}
+
+function providerFailureReason(runResult = {}) {
+  if (runResult?.error instanceof Error) {
+    return runResult.error.message;
+  }
+  if (typeof runResult?.error === "string") {
+    return runResult.error;
+  }
+  if (runResult?.timedOut) {
+    return "The DM response timed out.";
+  }
+  if (runResult?.canceled) {
+    return "The DM response was canceled.";
+  }
+  if (runResult?.needsRepair) {
+    return "The DM response needs review before it can resolve this input.";
+  }
+  return "The DM did not resolve this staged input.";
 }
 
 async function clearSubmittedRemoteInputs(inputs) {
@@ -2913,6 +2968,8 @@ async function resolvePendingInputsWithText(inputs, aggregateText) {
     setCampaignFromPayload(result, "local_table_pending_cleared");
     state.multiplayerSnapshot = result.multiplayer;
     render();
+  } else if (inputs.length && !runResult?.imported) {
+    await markRemoteInputsStillStaged(inputs, runResult);
   }
 }
 
@@ -7610,6 +7667,11 @@ function messageLifecycleForMessage(message) {
         label: "DM failed",
         title: message.data?.failureReason || "The DM response failed. Retry is available.",
         tone: "error",
+      },
+      dm_failed_still_staged: {
+        label: "Still staged",
+        title: message.data?.failureReason || "The DM did not resolve this staged input. It is still available for retry.",
+        tone: "review",
       },
       pending_model_submit: {
         label: message.data?.hostStaged ? "Processing" : "Waiting for host",

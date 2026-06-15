@@ -47,6 +47,7 @@ Status legend:
 23. Fixed - A two-machine first-playtest checklist now exists at `docs/two-machine-playtest-checklist.md`.
 24. Improved - Ollama context tokens are cached per campaign/model/mode as non-canon provider memory, so same-campaign warmth can help without cross-campaign bleed.
 25. Improved - Combat tracker rows now include compact conditions, defeated state, movement remaining, and action-spent hints.
+26. Improved - Failed provider turns now mark approved/remote party inputs as "Still staged" instead of leaving them looking silently consumed or indefinitely processing.
 
 ## Top Immersion Risks Still Open
 
@@ -79,7 +80,7 @@ Status legend:
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
 | The DM continues scenes without forcing options. | Improved | Prompts and choice suppression improved. Needs more social/travel/downtime fixtures. |
 | The DM has a story beyond the current scene. | Improved | Hidden story arcs are sent to the provider and can be updated as `dm_only` quest records. Needs scenario soak testing. |
-| Recovery after provider failure feels understandable. | Open | Timeline helps, but recovery should be table-facing before replay. |
+| Recovery after provider failure feels understandable. | Improved | Player echoes and staged party inputs now show failure/still-staged lifecycle badges. Broader replay decisions still need table-facing recovery flow. |
 | Character creation is consistent across entry points. | Fixed | Shared compact auto-complete and aligned controller defaults are in place. |
 
 ## Current Top 20 Issues To Keep Attacking
@@ -98,7 +99,7 @@ Status legend:
 12. Medium - Clarify enemy HP visibility policy for host and guest views.
 13. Improved - Improve combat tracker density for longer encounters: conditions, defeated state, movement remaining, and action spent now show in compact row metadata. Concentration and richer resource badges remain.
 14. Medium - Make group-hold multiplayer mode explain itself before public use.
-15. Medium - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck.
+15. Improved - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck. Approved and remote party inputs now keep retryable "Still staged" lifecycle badges after provider failure.
 16. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
 17. Medium - Make right-side binder collapsible or context-sensitive during active play.
 18. Low - Replace remaining overly specific placeholder text with neutral table examples.
@@ -209,6 +210,7 @@ Current coverage includes:
 15. App-owned combat resolves dodge state and explicit surrender/de-escalation endings without relying on HP defeat.
 16. Per-campaign Ollama context cache normalization prevents model/mode/campaign context reuse across mismatched runs.
 17. Combat tracker projection covers condition tags, action spent, movement remaining, and defeated state.
+18. Failed provider turn paths preserve approved/remote party inputs visually as retryable staged table actions.
 
 ## Remaining Product Risk
 

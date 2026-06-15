@@ -946,6 +946,14 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     /label:\s*"Invite Player"[\s\S]*?label:\s*"Nudge"[\s\S]*?className:\s*"nudge-action"/,
     "AI companion card actions should place Nudge after Invite Player and use nudge styling",
   );
+  assert.match(appJs, /markApprovedPartyInputsStillStaged/, "failed DM turns should keep approved party inputs visibly staged");
+  assert.match(appJs, /markRemoteInputsStillStaged/, "failed DM turns should keep remote party inputs visibly staged");
+  assert.match(appJs, /dm_failed_still_staged[\s\S]*?label:\s*"Still staged"/, "failed staged inputs should use table-facing retry wording");
+  assert.match(
+    appJs,
+    /else if \(inputs\.length && !runResult\?\.imported\) {\s*await markRemoteInputsStillStaged\(inputs, runResult\);/,
+    "manual and auto-resolved remote inputs should remain visibly staged after provider failure",
+  );
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
