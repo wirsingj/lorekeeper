@@ -5,6 +5,7 @@ import { normalizeCampaign } from "../campaign-state/schema.js";
 import { createStarterCampaign } from "../campaign-state/starter-campaign.js";
 import { ensureInferredPlayerCharacter } from "../campaign-state/player-character-inference.js";
 import {
+  appendCampaignErrorToSqliteFile,
   overwriteCampaignSqliteFile,
   readCampaignFromSqliteFile,
   writeCampaignSqliteFile,
@@ -246,6 +247,20 @@ export async function updateActiveCampaign(projectRoot, updater) {
       bytes: saveResult.bytes,
       campaigns: (await listCampaigns(projectRoot)).campaigns,
     };
+  });
+}
+
+export async function appendActiveCampaignError(projectRoot, errorEvent) {
+  return enqueueCampaignWrite(projectRoot, async () => {
+    const index = await loadCampaignIndex(projectRoot);
+    const sqlitePath = index.activeCampaignPath && existsSync(index.activeCampaignPath)
+      ? index.activeCampaignPath
+      : null;
+    if (!sqlitePath) {
+      return { logged: false, reason: "No active campaign SQLite file." };
+    }
+    await appendCampaignErrorToSqliteFile(sqlitePath, errorEvent);
+    return { logged: true, sqlitePath };
   });
 }
 

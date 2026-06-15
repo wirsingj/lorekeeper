@@ -1,5 +1,6 @@
 import initSqlJs from "sql.js";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +25,9 @@ export async function createSqliteDatabaseForCampaign(campaign) {
 }
 
 export async function writeCampaignSqliteFile(campaign, outputPath) {
+  const preservedErrors = await readCampaignErrorsFromSqliteFile(outputPath, { limit: 500 }).catch(() => []);
   const db = await createSqliteDatabaseForCampaign(campaign);
+  insertErrorRows(db, campaign.id, preservedErrors);
   const bytes = db.export();
   db.close();
   await writeFileAtomically(outputPath, bytes);
@@ -62,6 +65,69 @@ export async function overwriteCampaignSqliteFile(campaign, outputPath) {
   return writeCampaignSqliteFile(campaign, outputPath);
 }
 
+export async function appendCampaignErrorToSqliteFile(sqlitePath, errorEvent = {}) {
+  const SQL = await initSqlJs();
+  const bytes = await readFile(sqlitePath);
+  const db = new SQL.Database(bytes);
+  try {
+    assertSqliteSchema2(db);
+    ensureErrorsTable(db);
+    const campaignId = errorEvent.campaignId || firstRow(db, "SELECT id FROM campaigns LIMIT 1")?.id;
+    if (!campaignId) {
+      throw new Error("SQLite campaign file does not contain a campaign id.");
+    }
+    insertErrorRows(db, campaignId, [normalizeErrorRow(errorEvent, campaignId)]);
+    const nextBytes = db.export();
+    await writeFileAtomically(sqlitePath, nextBytes);
+    return {
+      sqlitePath,
+      bytes: nextBytes.length,
+    };
+  } finally {
+    db.close();
+  }
+}
+
+export async function readCampaignErrorsFromSqliteFile(sqlitePath, { limit = 80 } = {}) {
+  if (!existsLikePath(sqlitePath)) {
+    return [];
+  }
+  const SQL = await initSqlJs();
+  const bytes = await readFile(sqlitePath);
+  const db = new SQL.Database(bytes);
+  try {
+    assertSqliteSchema2(db);
+    if (!tableExists(db, "errors")) {
+      return [];
+    }
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 80, 500));
+    return queryRows(
+      db,
+      `SELECT campaign_id, id, severity, source, event_type, message, stack, session_id, turn_id, request_id, provider_id, model, created_at, data_json
+       FROM errors
+       ORDER BY created_at DESC
+       LIMIT ${safeLimit}`,
+    ).map((row) => ({
+      campaignId: row.campaign_id,
+      id: row.id,
+      severity: row.severity,
+      source: row.source,
+      eventType: row.event_type,
+      message: row.message,
+      stack: row.stack,
+      sessionId: row.session_id,
+      turnId: row.turn_id,
+      requestId: row.request_id,
+      providerId: row.provider_id,
+      model: row.model,
+      createdAt: row.created_at,
+      data: parseJson(row.data_json, {}),
+    }));
+  } finally {
+    db.close();
+  }
+}
+
 async function writeFileAtomically(outputPath, bytes) {
   const directory = path.dirname(outputPath);
   const tempPath = path.join(directory, `.${path.basename(outputPath)}.${process.pid}.${Date.now()}.tmp`);
@@ -90,7 +156,7 @@ export async function readCampaignSqliteSummary(sqlitePath) {
     ]),
   );
   const engineCounts = Object.fromEntries(
-    ["turn_records", "provider_events", "dice_rolls", "state_effects", "combat_actions"]
+    ["turn_records", "provider_events", "errors", "dice_rolls", "state_effects", "combat_actions"]
       .filter((tableName) => tableExists(db, tableName))
       .map((tableName) => [tableName, firstRow(db, `SELECT COUNT(*) AS count FROM ${tableName}`)?.count ?? 0]),
   );
@@ -294,6 +360,87 @@ function insertEngineLogs(db, campaign) {
   }
 }
 
+function insertErrorRows(db, campaignId, errors = []) {
+  ensureErrorsTable(db);
+  for (const error of errors) {
+    const row = normalizeErrorRow(error, campaignId);
+    runInsert(db, "errors", {
+      campaign_id: row.campaignId,
+      id: row.id,
+      severity: row.severity,
+      source: row.source,
+      event_type: row.eventType,
+      message: row.message,
+      stack: row.stack,
+      session_id: row.sessionId,
+      turn_id: row.turnId,
+      request_id: row.requestId,
+      provider_id: row.providerId,
+      model: row.model,
+      created_at: row.createdAt,
+      data_json: JSON.stringify(row.data ?? {}),
+    });
+  }
+}
+
+function normalizeErrorRow(error = {}, campaignId = "") {
+  const createdAt = error.createdAt || error.created_at || new Date().toISOString();
+  const source = compactSqlText(error.source || "app", 80);
+  const eventType = compactSqlText(error.eventType || error.event_type || error.type || "unknown", 120);
+  return {
+    campaignId: error.campaignId || error.campaign_id || campaignId,
+    id: error.id || `err-${Date.parse(createdAt) || Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    severity: normalizeErrorSeverity(error.severity),
+    source,
+    eventType,
+    message: String(error.message || error.error || "Unknown error").slice(0, 4000),
+    stack: String(error.stack || "").slice(0, 12000),
+    sessionId: error.sessionId || error.session_id || null,
+    turnId: error.turnId || error.turn_id || null,
+    requestId: error.requestId || error.request_id || null,
+    providerId: error.providerId || error.provider_id || null,
+    model: error.model || null,
+    createdAt,
+    data: error.data && typeof error.data === "object" ? error.data : {},
+  };
+}
+
+function normalizeErrorSeverity(value) {
+  const severity = String(value || "error").trim().toLowerCase();
+  return ["debug", "info", "warning", "error", "fatal"].includes(severity) ? severity : "error";
+}
+
+function compactSqlText(value, maxLength) {
+  return String(value ?? "").trim().slice(0, maxLength) || "unknown";
+}
+
+function ensureErrorsTable(db) {
+  if (tableExists(db, "errors")) {
+    return;
+  }
+  db.run(`
+    CREATE TABLE errors (
+      campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+      severity TEXT NOT NULL DEFAULT 'error' CHECK (severity IN ('debug', 'info', 'warning', 'error', 'fatal')),
+      source TEXT NOT NULL DEFAULT 'app',
+      event_type TEXT NOT NULL DEFAULT 'unknown',
+      message TEXT NOT NULL DEFAULT '',
+      stack TEXT NOT NULL DEFAULT '',
+      session_id TEXT,
+      turn_id TEXT,
+      request_id TEXT,
+      provider_id TEXT,
+      model TEXT,
+      created_at TEXT NOT NULL,
+      data_json TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (campaign_id, id)
+    )
+  `);
+  db.run("CREATE INDEX idx_errors_campaign_created ON errors (campaign_id, created_at)");
+  db.run("CREATE INDEX idx_errors_campaign_source ON errors (campaign_id, source, event_type, created_at)");
+}
+
 function insertReviewLog(db, campaign) {
   const now = new Date().toISOString();
 
@@ -477,6 +624,18 @@ function queryRows(db, sql) {
 
 function firstRow(db, sql) {
   return queryRows(db, sql)[0] ?? null;
+}
+
+function parseJson(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function existsLikePath(value) {
+  return Boolean(value && existsSync(value));
 }
 
 function tableExists(db, tableName) {

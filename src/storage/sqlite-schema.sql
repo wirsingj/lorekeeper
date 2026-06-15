@@ -161,6 +161,30 @@ CREATE TABLE provider_events (
 CREATE INDEX idx_provider_events_turn
 ON provider_events (campaign_id, turn_id, request_id, created_at);
 
+CREATE TABLE errors (
+  campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  id TEXT NOT NULL CHECK (length(trim(id)) > 0),
+  severity TEXT NOT NULL DEFAULT 'error' CHECK (severity IN ('debug', 'info', 'warning', 'error', 'fatal')),
+  source TEXT NOT NULL DEFAULT 'app',
+  event_type TEXT NOT NULL DEFAULT 'unknown',
+  message TEXT NOT NULL DEFAULT '',
+  stack TEXT NOT NULL DEFAULT '',
+  session_id TEXT,
+  turn_id TEXT,
+  request_id TEXT,
+  provider_id TEXT,
+  model TEXT,
+  created_at TEXT NOT NULL,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (campaign_id, id)
+);
+
+CREATE INDEX idx_errors_campaign_created
+ON errors (campaign_id, created_at);
+
+CREATE INDEX idx_errors_campaign_source
+ON errors (campaign_id, source, event_type, created_at);
+
 CREATE TABLE dice_rolls (
   campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   id TEXT NOT NULL CHECK (length(trim(id)) > 0),

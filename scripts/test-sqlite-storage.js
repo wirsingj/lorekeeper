@@ -10,7 +10,9 @@ import {
   listCampaigns,
 } from "../src/storage/campaign-repository.js";
 import {
+  appendCampaignErrorToSqliteFile,
   readCampaignFromSqliteFile,
+  readCampaignErrorsFromSqliteFile,
   readCampaignSqliteSummary,
   SQLITE_SCHEMA_VERSION,
   SQLITE_USER_VERSION,
@@ -135,6 +137,24 @@ try {
   assert.equal(summary.engineCounts.dice_rolls, 1);
   assert.equal(summary.engineCounts.state_effects, 1);
   assert.equal(summary.engineCounts.combat_actions, 1);
+  assert.equal(summary.engineCounts.errors, 0);
+
+  await appendCampaignErrorToSqliteFile(sqlitePath, {
+    campaignId: campaign.id,
+    severity: "error",
+    source: "provider",
+    eventType: "provider_response_parse_error",
+    message: "Qwen returned an empty table response.",
+    requestId: "request-1",
+    providerId: "ollama",
+    model: "qwen3:14b",
+    data: { rawTextPreview: "{\"narrative\":\"...\"}" },
+  });
+  const errorsAfterAppend = await readCampaignErrorsFromSqliteFile(sqlitePath);
+  assert.equal(errorsAfterAppend.length, 1);
+  assert.equal(errorsAfterAppend[0].eventType, "provider_response_parse_error");
+  assert.equal(errorsAfterAppend[0].model, "qwen3:14b");
+  assert.match(errorsAfterAppend[0].data.rawTextPreview, /narrative/);
 
   const roundTrip = await readCampaignFromSqliteFile(sqlitePath);
   assert.equal(roundTrip.title, campaign.title);
@@ -150,6 +170,13 @@ try {
   assert.equal(roundTrip.stateEffectLog.length, 1);
   assert.equal(roundTrip.combatActionLog.length, 1);
   assert.equal(roundTrip.providerEventLog.length, 1);
+
+  await writeCampaignSqliteFile(campaign, sqlitePath);
+  const errorsAfterRewrite = await readCampaignErrorsFromSqliteFile(sqlitePath);
+  assert.equal(errorsAfterRewrite.length, 1);
+  assert.equal(errorsAfterRewrite[0].message, "Qwen returned an empty table response.");
+  const summaryAfterRewrite = await readCampaignSqliteSummary(sqlitePath);
+  assert.equal(summaryAfterRewrite.engineCounts.errors, 1);
 
   const repoRoot = path.join(tempDir, "campaign-repo");
   const first = await createNewActiveCampaign(repoRoot, {

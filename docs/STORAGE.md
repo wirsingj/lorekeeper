@@ -12,6 +12,7 @@ be useful for cache and extension working state, but the main campaign should li
 - Structured data plus human-readable notes.
 - Review history for proposed and approved canon updates.
 - Recovery path from raw imported responses.
+- Non-canon diagnostics evidence for provider/API failures.
 
 ## Campaign Memory Model
 
@@ -89,6 +90,7 @@ The SQLite database should store:
 - approved canon commits
 - assets and file references
 - imported source documents when applicable
+- local diagnostics errors that survive normal campaign snapshot rewrites
 
 This lets Lorekeeper be the durable framework around provider output. The provider can improvise, but
 the SQLite file is the campaign's source of truth.

@@ -4,6 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  appendActiveCampaignError,
   createNewActiveCampaign,
   deleteCampaign,
   listCampaigns,
@@ -12,6 +13,7 @@ import {
   selectCampaign,
   updateActiveCampaign,
 } from "../src/storage/campaign-repository.js";
+import { readCampaignErrorsFromSqliteFile } from "../src/storage/sqlite-store.js";
 import { addChatMessage } from "../src/campaign-state/chat-history.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { upsertProviderConversation } from "../src/campaign-state/provider-conversations.js";
@@ -635,6 +637,16 @@ async function buildDiagnosticsBundle() {
   const campaign = active.campaign ?? null;
   const recentMessages = (campaign?.sessionLog?.messages ?? []).slice(-40);
   const recentReviews = (campaign?.reviewLog ?? []).slice(-8);
+  const recentErrors = active.sqlitePath
+    ? await readCampaignErrorsFromSqliteFile(active.sqlitePath, { limit: 80 }).catch((error) => [{
+        severity: "error",
+        source: "diagnostics",
+        eventType: "error_log_read_failed",
+        message: error instanceof Error ? error.message : "Unable to read campaign errors.",
+        createdAt: new Date().toISOString(),
+        data: {},
+      }])
+    : [];
   const logFiles = [
     "launcher.log",
     "electron.log",
@@ -678,6 +690,7 @@ async function buildDiagnosticsBundle() {
     },
     recentMessages,
     recentReviews,
+    recentErrors,
     logs: Object.fromEntries(await Promise.all(logFiles.map(async (name) => [
       name,
       await readLogTail(path.join(projectRoot, "data", name)),
@@ -728,7 +741,8 @@ async function readLogTail(logPath, maxChars = 24000) {
 
 async function streamProviderTurn(request, response) {
   const body = await readJsonBody(request);
-  const { campaign } = await loadActiveCampaign(projectRoot);
+  const active = await loadActiveCampaign(projectRoot);
+  const { campaign } = active;
   const settings = getCampaignProviderSettings(campaign);
   const parsedMessage = parsePlayerMessage(body.playerMessage ?? "");
   const contextPack = buildContextPack(campaign, {
@@ -790,7 +804,42 @@ async function streamProviderTurn(request, response) {
         ollamaContextStored = shouldMarkStored;
       } catch (error) {
         console.warn("Unable to store Ollama context cache:", error instanceof Error ? error.message : error);
+        await logCampaignError({
+          campaignId: campaign.id,
+          severity: "warning",
+          source: "provider",
+          eventType: "ollama_context_store_failed",
+          message: error instanceof Error ? error.message : "Unable to store Ollama context cache.",
+          stack: error instanceof Error ? error.stack : "",
+          providerId: result.providerId,
+          model: result.model,
+          data: {
+            requestId: result.requestId,
+            tokenCounts: result.tokenCounts,
+          },
+        });
       }
+    }
+
+    if (result.parseError || result.repairAttempt || /empty table response/i.test(result.text || "")) {
+      await logCampaignError({
+        campaignId: campaign.id,
+        severity: result.parseError ? "error" : "warning",
+        source: "provider",
+        eventType: result.parseError ? "provider_response_parse_error" : "provider_response_repaired_or_suspicious",
+        message: result.parseError || result.repairAttempt?.finalError || "Provider response needed repair or produced suspicious fallback text.",
+        requestId: result.requestId,
+        providerId: result.providerId,
+        model: result.model,
+        data: {
+          validationErrors: result.validationErrors,
+          validationWarnings: result.validationWarnings,
+          repairAttempt: result.repairAttempt,
+          recovery: result.recovery,
+          rawTextPreview: String(result.rawText || "").slice(0, 4000),
+          renderedTextPreview: String(result.text || "").slice(0, 1000),
+        },
+      });
     }
 
     writeNdjson(response, {
@@ -811,6 +860,20 @@ async function streamProviderTurn(request, response) {
       },
     });
   } catch (error) {
+    await logCampaignError({
+      campaignId: campaign.id,
+      severity: "error",
+      source: "provider",
+      eventType: "provider_generation_failed",
+      message: error instanceof Error ? error.message : "Provider generation failed.",
+      stack: error instanceof Error ? error.stack : "",
+      providerId: settings.preferredProvider,
+      model: settings.selectedModel,
+      data: {
+        fastMode: settings.fastMode,
+        timeoutMs: settings.generationTimeoutMs,
+      },
+    });
     writeNdjson(response, {
       type: "error",
       error: error instanceof Error ? error.message : "Provider generation failed.",
@@ -1039,7 +1102,26 @@ function sendError(response, error) {
       ? "Server error"
       : "Request failed";
   console.error(error instanceof Error ? error.stack || error.message : error);
+  logCampaignError({
+    severity: statusCode >= 500 ? "error" : "warning",
+    source: "api",
+    eventType: "http_error",
+    message: error instanceof Error ? error.message : message,
+    stack: error instanceof Error ? error.stack : "",
+    data: {
+      statusCode,
+      publicMessage: message,
+    },
+  });
   sendText(response, statusCode, message);
+}
+
+async function logCampaignError(event) {
+  try {
+    await appendActiveCampaignError(projectRoot, event);
+  } catch (error) {
+    console.warn("Unable to persist campaign error:", error instanceof Error ? error.message : error);
+  }
 }
 
 function isAuthorizedRequest(request, url) {
