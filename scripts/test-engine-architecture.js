@@ -280,6 +280,68 @@ function testCombatEngine() {
   assert.ok(dodged.campaign.party.find((member) => member.id === "thor").conditions.includes("dodging"));
   assert.equal(dodged.campaign.combat.currentTurnId, "sy");
 
+  const checkCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const checked = resolveCombatAction(checkCampaign, {
+    turnId: "combat-check-turn",
+    actorId: "thor",
+    actionType: "check",
+    declaredText: "Kick the table over to create cover.",
+    ability: "STR",
+    modifier: 20,
+    dc: 10,
+    successEffects: [{ type: "position_note", targetId: "thor", note: "Has overturned table cover." }],
+  }, { seed: "combat-check-seed" });
+  assert.equal(checked.actionRecord.rolls.length, 1);
+  assert.equal(checked.actionRecord.rolls[0].label, "STR check");
+  assert.ok(checked.campaign.party.find((member) => member.id === "thor").positionNotes.includes("Has overturned table cover."));
+  assert.equal(checked.campaign.combat.currentTurnId, "sy");
+
+  const skillCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor" ? { ...member, skills: ["Athletics"] } : member),
+  }, {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const skilled = resolveCombatAction(skillCampaign, {
+    turnId: "combat-skill-check-turn",
+    actorId: "thor",
+    actionType: "check",
+    declaredText: "Brace against the door.",
+    skill: "Athletics",
+    dc: 5,
+  }, { seed: "combat-skill-check-seed" });
+  assert.equal(skilled.actionRecord.rolls[0].formula, "1d20+5");
+
+  const contestCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const contested = resolveCombatAction(contestCampaign, {
+    turnId: "combat-contest-turn",
+    actorId: "thor",
+    actionType: "improvise",
+    declaredText: "Shove the miner to the floor.",
+    targetIds: ["miner"],
+    contest: {
+      actorSkill: "Athletics",
+      actorModifier: 20,
+      targetSkill: "Athletics",
+      targetModifier: -5,
+    },
+    successEffects: [{ type: "condition_add", targetId: "miner", condition: "prone", reason: "Shoved prone" }],
+    failureEffects: [{ type: "position_note", targetId: "thor", note: "Failed shove left Thor exposed." }],
+  }, { seed: "combat-contest-seed" });
+  assert.equal(contested.actionRecord.rolls.length, 2);
+  assert.equal(contested.actionRecord.rolls[0].label, "Contest Athletics check");
+  assert.equal(contested.actionRecord.rolls[1].label, "Opposed Athletics check");
+  assert.ok(contested.campaign.combat.enemies.find((enemy) => enemy.id === "miner").conditions.includes("prone"));
+  assert.equal(contested.actionRecord.effects.some((effect) => effect.condition === "prone"), true);
+  assert.equal(contested.campaign.combat.currentTurnId, "sy");
+
   const surrenderCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
     initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },

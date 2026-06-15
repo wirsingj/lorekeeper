@@ -34,6 +34,7 @@ export const combatActionTypes = Object.freeze({
   HELP: "help",
   HIDE: "hide",
   READY: "ready",
+  CHECK: "check",
   IMPROVISE: "improvise",
 });
 

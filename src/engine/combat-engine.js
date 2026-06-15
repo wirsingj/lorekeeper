@@ -65,6 +65,8 @@ export function resolveCombatAction(campaign, action, options = {}) {
 
   const resolved = actionType === combatActionTypes.ATTACK
     ? resolveAttack(normalized, actor, base, action, options)
+    : actionType === combatActionTypes.CHECK || hasCheckResolution(action)
+      ? resolveCombatCheck(normalized, actor, base, action, options)
     : resolveNonAttack(normalized, actor, base, action);
 
   const effectsResult = applyStateEffects(normalized, resolved.effects, { source: "combat_engine", turnId: base.turnId });
@@ -201,6 +203,59 @@ function resolveAttack(campaign, actor, base, action, options) {
   };
 }
 
+function resolveCombatCheck(campaign, actor, base, action, options) {
+  const targetId = base.targetIds[0] ?? action.targetId ?? action.contest?.targetId ?? null;
+  const target = targetId ? findActor(campaign, targetId) : null;
+  const actorAbility = normalizeAbility(action.ability ?? action.check?.ability ?? action.contest?.actorAbility);
+  const actorSkill = normalizeSkill(action.skill ?? action.check?.skill ?? action.contest?.actorSkill);
+  const actorModifier = numberOrNull(action.modifier ?? action.check?.modifier ?? action.contest?.actorModifier)
+    ?? checkModifier(findActor(campaign, actor.id).record, { ability: actorAbility, skill: actorSkill });
+  const actorRoll = rollD20({
+    seed: `${options.seed ?? base.turnId}:check`,
+    modifier: actorModifier,
+    label: action.label || checkLabel({ skill: actorSkill, ability: actorAbility, contest: Boolean(target) }),
+    actorId: actor.id,
+    targetId,
+    advantage: action.advantage,
+    disadvantage: action.disadvantage,
+  });
+  const rolls = [actorRoll];
+  let success = false;
+  let resultText = "";
+
+  if (target) {
+    const targetAbility = normalizeAbility(action.contest?.targetAbility ?? action.targetAbility ?? contestDefaultTargetAbility(actorSkill, actorAbility));
+    const targetSkill = normalizeSkill(action.contest?.targetSkill ?? action.targetSkill);
+    const targetModifier = numberOrNull(action.contest?.targetModifier ?? action.targetModifier)
+      ?? checkModifier(target.record, { ability: targetAbility, skill: targetSkill });
+    const targetRoll = rollD20({
+      seed: `${options.seed ?? base.turnId}:contest:${targetId}`,
+      modifier: targetModifier,
+      label: action.contest?.targetLabel || checkLabel({ skill: targetSkill, ability: targetAbility, contest: true, defender: true }),
+      actorId: targetId,
+      targetId: actor.id,
+      advantage: action.contest?.targetAdvantage,
+      disadvantage: action.contest?.targetDisadvantage,
+    });
+    rolls.push(targetRoll);
+    success = actorRoll.total >= targetRoll.total;
+    resultText = `${actor.name} ${success ? "beats" : "does not beat"} ${target.name}: ${actorRoll.total} vs ${targetRoll.total}.`;
+  } else {
+    const dc = Number(action.dc ?? action.check?.dc ?? 10) || 10;
+    success = actorRoll.total >= dc;
+    resultText = `${actor.name} ${success ? "meets" : "misses"} DC ${dc}: ${actorRoll.total}.`;
+  }
+
+  const effects = normalizeEffects(success ? action.successEffects : action.failureEffects);
+  const outcomeLabel = success ? "success" : "failure";
+  return {
+    rolls,
+    effects,
+    narration: `${actor.name} attempts ${base.declaredText || actorRoll.label || "a combat check"}. ${resultText}`,
+    summary: action.summary || `${actor.name} resolved a combat check with ${outcomeLabel}.`,
+  };
+}
+
 function resolveNonAttack(campaign, actor, base, action) {
   const effects = [];
   if (base.actionType === combatActionTypes.DODGE) {
@@ -225,6 +280,10 @@ function resolveNonAttack(campaign, actor, base, action) {
     endsCombat,
     combatOutcome: outcome,
   };
+}
+
+function hasCheckResolution(action = {}) {
+  return Boolean(action.check || action.contest || action.dc !== undefined || action.skill || action.ability);
 }
 
 function normalizeEffects(effects = []) {
@@ -261,6 +320,175 @@ function findActor(campaign, actorId) {
   const enemy = (campaign.combat?.enemies ?? []).find((item) => item.id === actorId);
   if (enemy) return { type: "enemy", name: enemy.name ?? actorId, record: enemy };
   throw new Error(`Combat target not found: ${actorId}`);
+}
+
+function checkModifier(record = {}, { ability, skill } = {}) {
+  if (skill) {
+    const explicitSkillBonus = explicitSkillModifier(record, skill);
+    if (explicitSkillBonus !== null) {
+      return explicitSkillBonus;
+    }
+  }
+  const score = abilityScore(record, ability || abilityForSkill(skill) || "STR");
+  const base = abilityModifier(score);
+  const skills = normalizedSkillNames(record);
+  const proficient = skill && skills.has(normalizeSkill(skill));
+  return base + (proficient ? proficiencyBonus(record) : 0);
+}
+
+function explicitSkillModifier(record = {}, skill) {
+  const normalized = normalizeSkill(skill);
+  const candidates = [
+    record.skillBonuses,
+    record.skills,
+    record.stats?.skillBonuses,
+    record.stats?.skills,
+  ];
+  for (const source of candidates) {
+    if (!source) continue;
+    if (Array.isArray(source)) {
+      const match = source.find((entry) =>
+        typeof entry === "object" && normalizeSkill(entry.name ?? entry.skill ?? entry.id) === normalized && entry.bonus !== undefined
+      );
+      if (match) return Number(match.bonus) || 0;
+      continue;
+    }
+    if (typeof source === "object") {
+      const value = source[skill] ?? source[normalized] ?? source[normalized.replace(/\s+/g, "_")];
+      if (value !== undefined && value !== null && value !== true) {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+    }
+  }
+  return null;
+}
+
+function normalizedSkillNames(record = {}) {
+  const values = [
+    ...(Array.isArray(record.skills) ? record.skills : []),
+    ...(Array.isArray(record.proficiencies) ? record.proficiencies : []),
+    ...(Array.isArray(record.specialties) ? record.specialties : []),
+    ...(Array.isArray(record.stats?.skills) ? record.stats.skills : []),
+    ...skillMapNames(record.skills),
+    ...skillMapNames(record.proficiencies),
+    ...skillMapNames(record.stats?.skills),
+  ];
+  return new Set(values
+    .map((item) => normalizeSkill(typeof item === "object" ? item.name ?? item.skill ?? item.id : item))
+    .filter(Boolean));
+}
+
+function skillMapNames(value) {
+  if (!value || Array.isArray(value) || typeof value !== "object") {
+    return [];
+  }
+  return Object.entries(value)
+    .filter(([, proficient]) => proficient === true || proficient === "true" || proficient === "proficient")
+    .map(([name]) => name);
+}
+
+function abilityScore(record = {}, ability = "STR") {
+  const label = normalizeAbility(ability);
+  const aliases = [label, label.toLowerCase(), abilityName(label)];
+  for (const source of [record.stats?.abilityScores, record.abilityScores, record.stats?.abilities, record.abilities]) {
+    for (const alias of aliases) {
+      if (source?.[alias] !== undefined && source?.[alias] !== null) {
+        const parsed = Number(source[alias]);
+        return Number.isFinite(parsed) ? parsed : 10;
+      }
+    }
+  }
+  const direct = record[abilityName(label)] ?? record[label.toLowerCase()];
+  const parsed = Number(direct);
+  return Number.isFinite(parsed) ? parsed : 10;
+}
+
+function abilityModifier(score) {
+  return Math.floor((Number(score) - 10) / 2);
+}
+
+function proficiencyBonus(record = {}) {
+  const level = Number(record.level ?? record.stats?.level ?? record.characterLevel ?? 1) || 1;
+  const explicit = Number(record.proficiencyBonus ?? record.stats?.proficiencyBonus);
+  return Number.isFinite(explicit) && explicit > 0 ? explicit : Math.max(2, Math.ceil(level / 4) + 1);
+}
+
+function normalizeAbility(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  const aliases = {
+    STRENGTH: "STR",
+    DEXTERITY: "DEX",
+    CONSTITUTION: "CON",
+    INTELLIGENCE: "INT",
+    WISDOM: "WIS",
+    CHARISMA: "CHA",
+  };
+  return ["STR", "DEX", "CON", "INT", "WIS", "CHA"].includes(normalized) ? normalized : aliases[normalized] || "";
+}
+
+function normalizeSkill(value) {
+  return String(value || "").trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+}
+
+function abilityForSkill(skill) {
+  const normalized = normalizeSkill(skill);
+  return {
+    athletics: "STR",
+    acrobatics: "DEX",
+    stealth: "DEX",
+    "sleight of hand": "DEX",
+    arcana: "INT",
+    history: "INT",
+    investigation: "INT",
+    nature: "INT",
+    religion: "INT",
+    "animal handling": "WIS",
+    insight: "WIS",
+    medicine: "WIS",
+    perception: "WIS",
+    survival: "WIS",
+    deception: "CHA",
+    intimidation: "CHA",
+    performance: "CHA",
+    persuasion: "CHA",
+  }[normalized] || "";
+}
+
+function abilityName(ability) {
+  return {
+    STR: "strength",
+    DEX: "dexterity",
+    CON: "constitution",
+    INT: "intelligence",
+    WIS: "wisdom",
+    CHA: "charisma",
+  }[ability] || "";
+}
+
+function contestDefaultTargetAbility(actorSkill, actorAbility) {
+  if (normalizeSkill(actorSkill) === "athletics") return "STR";
+  if (normalizeSkill(actorSkill) === "intimidation") return "WIS";
+  return actorAbility || "DEX";
+}
+
+function checkLabel({ skill, ability, contest, defender } = {}) {
+  const prefix = defender ? "Opposed " : contest ? "Contest " : "";
+  const detail = skill ? titleCase(skill) : ability || "Check";
+  return `${prefix}${detail} check`;
+}
+
+function numberOrNull(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(" ");
 }
 
 function currentHp(record) {

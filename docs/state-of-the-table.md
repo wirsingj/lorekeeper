@@ -56,6 +56,7 @@ The user should not feel like they are debugging a model, managing queue machine
 10. Grouped enemies can expand into separate combatants and initiative rows.
 11. Guest inputs can drive provider turns through structured `user.playerInputs[]`.
 12. Failed provider turns preserve approved/remote inputs as visibly staged rather than silently consuming them.
+13. CombatEngine can now resolve app-owned DC checks and opposed checks/contests with logged rolls, success/failure effects, and initiative advancement.
 
 ### Still Risky
 
@@ -158,7 +159,8 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Party-member combat turns are input turns, including AI companions.
 - [x] Surrender/de-escalation can end combat without only HP defeat.
 - [ ] Make common combat resolution app-owned.
-- [ ] Add fixtures for attack, save, skill contest, spell, help, disengage, dodge, flee/chase, surrender, de-escalation, enemy turn.
+- [x] Add fixtures for app-owned attack, dodge, surrender, de-escalation, DC check, and opposed skill contest.
+- [ ] Add fixtures for save, spell, help, disengage, hide, flee/chase, richer intimidation/de-escalation contests, and enemy turn.
 - [ ] Make enemy turns app-bounded: provider may choose intent/narrate, app owns state mutation.
 - [ ] Add crisp AI companion combat approval flow.
 - [ ] Ensure initiative never advances by provider phrasing alone.
@@ -288,6 +290,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-15: Qwen3 gives much richer scene prose when run without Ollama JSON mode. Watch for role/agency drift because richer narration can make overreach more tempting.
 - 2026-06-15: The DM should be able to target individual party members or the whole party, and party votes should become an actual table flow with host tie-breaks.
 - 2026-06-15: AI companions should occasionally feel alive with brief unprompted contributions, but not every response cycle and not for major decisions.
+- 2026-06-15: App-owned combat resolution now covers DC checks and opposed contests. Next combat slice should connect these records to actual UI/provider turn intake or add saves/spells/enemy-turn bounding.
 
 ## How To Use This Doc
 
@@ -297,4 +300,3 @@ Use this section for fresh observations before sorting them into the checklist.
 4. When a new issue is noticed during play, add it to New Notes Inbox first.
 5. When fixed or clarified, move it into the appropriate checklist section and update status.
 6. Keep older docs as reference, but let this doc be the current steering wheel.
-
