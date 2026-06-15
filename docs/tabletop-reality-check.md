@@ -1,115 +1,196 @@
 # LoreKeeper Tabletop Reality Check
 
-Date: 2026-06-14
+Original pass: 2026-06-14  
+Updated: 2026-06-15
 
-This pass evaluates LoreKeeper as a tabletop product, not just a codebase. The bar is: would a D&D player believe they are sitting at a live table with a competent DM, or would they immediately feel the machinery?
+This is a product audit for the real goal: LoreKeeper should feel like sitting at a natural D&D 5E table. The party members are the people around the table. The app plus AI provider is the DM. The user should not feel like they are debugging a model, managing queue machinery, or translating app concepts while trying to play.
 
-## Top 20 Immersion-Breaking Issues
+Status legend:
 
-1. Critical - A submitted player action is persisted before provider success; on failure/reload the player bubble can look accepted while the DM is silent.
-2. Critical - Remote-only structured inputs were valid in `createPlayerTurn` but rejected by the local provider runner when `playerMessage` was empty. Fixed in this pass.
-3. Critical - Enemy/DM combat turns can still be provider-led in places, so the app can feel like it is asking the model to be the combat engine.
-4. High - Auto-resume of unresolved player turns is invisible; it can feel like the app is replaying or recombining old messages.
-5. High - Choice panels can still feel over-present when the DM should simply narrate consequences.
-6. High - Provider narration can repeat the player's action instead of reacting to it.
-7. High - DM quality depends heavily on prompt compliance instead of scene/consequence projections being visible and assertive.
-8. High - Repair states use implementation language that reads like software, not table flow.
-9. High - Guest action language was misleading about who submits to the DM. Fixed wording in this pass.
-10. High - Combat still sometimes reads as prose with mechanics appended, rather than a clean D&D resolution beat.
-11. Medium - Meta lines under chat bubbles expose provider plumbing during play.
-12. Medium - Nudge/Retry/Read Latest controls are not framed as table actions.
-13. Medium - Long provider generations can make the table feel frozen unless the status is very clear.
-14. Medium - Party member agency states are visible but still require learning app-specific badges.
-15. Medium - The right-side records panel competes with table state during live play.
-16. Medium - Table talk is useful, but it is still visually secondary and may be missed by guests.
-17. Medium - Scene purpose/tension is not always visible enough for the host to know why the DM is doing something.
-18. Low - Default placeholder text is too specific and can leak an old test tone.
-19. Low - Combat round labels are useful but sparse; they do not yet feel like a full encounter tracker.
-20. Low - Empty states are clean, but they do not always teach the next table action.
+- Fixed: covered by current code and regression tests or browser smoke checks.
+- Improved: materially better, but needs more soak testing.
+- Open: still a product or architecture risk.
+- Watch: acceptable for now, but likely to regress without tests or fixtures.
 
-## Top 20 State/Turn Bugs To Keep Attacking
+## Current Table Model
 
-1. Critical - Pre-provider player echo creates stale accepted-looking player messages after provider failure.
-2. Critical - Remote-only provider turns were rejected by `runPromptThroughLocalProvider`. Fixed.
-3. Critical - app/app.js still owns too many turn, provider, recovery, and automation decisions.
-4. Critical - Auto-resume can replay a prior action without a user-visible "recovering failed turn" affordance.
-5. High - `lastAutoResolved*` guards are runtime-only and can reset across reloads.
-6. High - Post-turn recovery can trigger repair, enemy auto-turn, and remote-input auto-resolve close together.
-7. High - Campaign polling calls `seedPlayLog()` while live UI state is active, so any persistence mismatch can feel like duplication.
-8. High - Repair-required state blocks nudge/send but the recovery path is not table-obvious.
-9. High - Combat prompt repair infers active actor from DM prose; this is a fallback that should remain suspect.
-10. High - Host/client snapshots can lag local actions by polling interval.
-11. Medium - Choice selection state is global renderer state and can be stale-prone.
-12. Medium - Provider response import still auto-commits some implicit changes.
-13. Medium - Local table pending inputs depend on cleanup after successful import.
-14. Medium - Guest reconnect relies on stored connection metadata and host snapshot agreement.
-15. Medium - Message IDs are UI-generated before persistence; conflicts are unlikely but not impossible in long sessions.
-16. Medium - TurnFlow and app-level booleans still coexist in some paths.
-17. Medium - Provider cancellation is locally authoritative, but old provider results still need every caller to respect request IDs.
-18. Medium - Active campaign changes reset TurnFlow but not every app-level helper key.
-19. Low - Diagnostics are present but not yet a first-class "what happened?" table view.
-20. Low - Some status text still compresses distinct states into one label.
+1. The DM voice is app/provider owned. DM narration should describe the world, NPCs, consequences, rules calls, and combat outcomes.
+2. Party members are table voices with agency. Host-controlled and remote-controlled party members must not be spoken for by the DM/provider unless the controller submitted that speech/action.
+3. AI companions are party members, not NPCs. They may make small suggestions or RP beats when nudged or idle, but their major choices and combat turns still need host/controller approval.
+4. Enemies and NPCs are DM actors. They may act on their turns without player input, but combat state should remain structured and visible.
+5. The app owns continuity, turn state, controller state, combat state, and recovery affordances. The provider supplies narration and structured proposals within those rails.
 
-## Top 10 Combat Issues
+## Fixed Since 2026-06-14
 
-1. Critical - Enemy turns still sometimes rely on provider output to advance cleanly.
-2. Critical - Player-facing attack/check/damage records are not always app-owned before narration.
-3. High - Active actor gating is improved but still depends on UI projection correctness.
-4. High - Improvised actions need clearer app-side roll selection and outcome records.
-5. High - Combat end is covered by tests for enemies defeated, but surrender/retreat/de-escalation needs equal treatment.
-6. Medium - HP display exists, but enemy HP visibility policy needs deliberate table settings.
-7. Medium - Mechanics formatting can clean duplicates, but provider can still produce awkward mechanic prose.
-8. Medium - Action option labels depend on sheet quality; malformed sheets need graceful fallbacks.
-9. Medium - AI companion combat actions need a clear host approval policy.
-10. Low - Initiative display is functional but not yet rich enough for long encounters.
+1. Fixed - Remote-only structured inputs are accepted by the local provider path.
+2. Fixed - Guest action wording now says actions go to the host table instead of implying every guest action directly submits to the DM.
+3. Fixed - Submitted player bubbles now carry visible lifecycle state while waiting for DM/provider completion.
+4. Fixed - Diagnostics now include a readable table timeline summary.
+5. Fixed - The provider runner accepts either `playerMessage` or structured `playerInputs`.
+6. Fixed - Host-created campaign characters now use a repeatable additional-character flow instead of a single special joiner.
+7. Fixed - Compact character auto-complete exists across campaign creation, post-start host-created party members, guest join, and ThinLoreKeeper join.
+8. Fixed - The first campaign character is explicitly host-controlled; additional host-created campaign characters default to AI companions.
+9. Fixed - Returning a character from remote player control to AI/host disconnects stale guest controller links so later reconnect cleanup does not reclaim the character.
+10. Fixed - Structured provider rows with a party speaker but mistaken `role: "dm"` are rendered as party speaker lines, allowing the party-message splitter to recover them.
+11. Fixed - Grouped enemies such as `Bandit, count: 5` expand into separate combatants and initiative rows.
+12. Improved - Prompt and model-contract guidance now explicitly tells the provider not to speak, move, signal, scan, or choose for party members without submitted input.
+13. Improved - Combat prompts tell the provider to stop after the current actor's resolved action and not roll the next actor in the same response.
+14. Improved - Choice panels are suppressed more aggressively outside combat, immediate danger, explicit option requests, or real tactical branches.
+15. Improved - Join-as character requests carry more complete character details and host integration notes.
 
-## Top 10 Multiplayer Issues
+## Top Immersion Risks Still Open
 
-1. Critical - Remote-only turns were blocked by local provider runner. Fixed.
-2. High - Host approval off/on is conceptually right, but UI still needs stronger "sent, waiting, resolved" state.
-3. High - Guest agency depends on obvious assignment and join-as feedback.
-4. High - Disconnect/reconnect table state needs extended manual soak testing on two machines.
-5. High - Host authority is mostly clear in code, but guest UI can feel like it is talking to an empty room while waiting.
-6. Medium - Polling-based sync can create visible latency.
-7. Medium - Table talk is independent, but its persistence/sync should be included in multiplayer soak tests.
-8. Medium - Group-hold mode needs stronger explanation before public use.
-9. Medium - Pending input cleanup is success-dependent; failed provider turns leave queued intent.
-10. Low - Invite/join flows are better, but still need one obvious happy-path checklist for nontechnical users.
+1. Open - Combat resolution is still partly provider-led for enemy turns and improvised actions. The app has a combat engine, but not every table combat beat is app-owned before narration.
+2. Open - Auto-resume and recovery states are better surfaced, but the user still needs a clearer "recovering last turn" table affordance before anything is replayed.
+3. Open - Repair/retry/import controls still expose some software-shaped concepts. The labels are friendlier, but the mental model is not yet purely table-shaped.
+4. Open - Meta lines under bubbles still expose provider/model plumbing during play. Useful for debugging, but immersion-breaking for normal sessions.
+5. Open - Scene purpose, current tension, and consequence summaries are present but not yet prominent enough to make DM behavior feel obvious.
+6. Open - AI companion contribution rules are improved, but the UI still relies on badges and buttons that need learning.
+7. Open - Long provider generations can still feel like the table is frozen if the status line is missed.
+8. Open - The right-side binder can compete with live play. It is powerful, but the play surface is not yet fully separated from campaign management.
+9. Open - Table talk exists but can be missed by guests and hosts during active play.
+10. Open - Local multiplayer still needs longer two-machine soak testing across disconnect, reconnect, campaign switch, combat turn, and host approval modes.
+11. Watch - Choice panels can still become a crutch if local models ignore the narration-first policy.
+12. Watch - Provider narration can still restate the player's action instead of showing changed reality.
+13. Watch - Host/client snapshots can lag actions by polling interval.
+14. Watch - Pending input cleanup depends on successful provider import and can leave intent queued after failure.
+15. Watch - Active campaign changes reset TurnFlow, but app-level helper keys still coexist with TurnFlow state.
 
-## Top 10 RP/DM-Quality Issues
+## Real Table Acceptance Matrix
 
-1. High - The provider can still escalate too quickly instead of using consequences.
-2. High - NPC motivations are not always retrieved as active constraints.
-3. High - Relationship state is not visible enough in scene packets.
-4. High - Choices can become a crutch instead of emerging from real pressure.
-5. Medium - Consequences exist, but the UI does not strongly communicate them during play.
-6. Medium - Scene status/tension is mostly behind the scenes.
-7. Medium - Provider sometimes restates the action rather than showing changed reality.
-8. Medium - Downtime/travel scenes need more soak tests than combat currently has.
-9. Low - Prompt text has strong DM philosophy, but local models may still need higher-quality scene packets.
-10. Low - The app needs curated scenario fixtures for social, travel, mystery, and downtime.
+| Table expectation | Current status | Notes |
+| --- | --- | --- |
+| The player can tell whose turn it is. | Improved | Combat tracker and input placeholder are clear for basic cases. Needs richer long-encounter context. |
+| The player can tell who controls each character. | Improved | Badges/actions exist, and controller cleanup improved. Badge language still needs user testing. |
+| The DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, and suppression logic all help. Needs scenario fixtures. |
+| AI companions feel like party members, not DM puppets. | Improved | Nudge flow and creation defaults help. Major-choice approval still needs smoother UI. |
+| Guest players know whether their input was sent, waiting, or resolved. | Improved | Wording and lifecycle states improved. Needs multiplayer soak testing. |
+| Combat has one row per active combatant. | Fixed | Count/quantity expansion covers grouped enemies. |
+| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
+| The DM continues scenes without forcing options. | Improved | Prompts and choice suppression improved. Needs more social/travel/downtime fixtures. |
+| Recovery after provider failure feels understandable. | Open | Timeline helps, but recovery should be table-facing before replay. |
+| Character creation is consistent across entry points. | Fixed | Shared compact auto-complete and aligned controller defaults are in place. |
 
-## Recommended Fixes
+## Current Top 20 Issues To Keep Attacking
 
-1. Make submitted player bubbles explicitly pending until provider import succeeds, then mark accepted or failed.
-2. Continue moving recovery decisions out of `app/app.js` and into TurnEngine/ProviderOrchestrator.
-3. Add a visible "Recovering last turn" state before auto-resume replays anything.
-4. Make combat action resolution app-owned for attack/check/damage before provider narration.
-5. Add multiplayer soak tests for remote-only action, guest disconnect, reconnect, campaign switch, and combat active actor.
-6. Make scene/consequence summaries visible enough that the host understands why the DM is reacting.
-7. Keep choices suppressed by default in RP unless danger, uncertainty, or player indecision justifies them.
-8. Add a table-facing diagnostics drawer that says what the app is waiting for in human terms.
+1. Critical - Make common combat action resolution app-owned before provider narration: attack roll, check/save, damage/healing, HP/resource/condition updates, and initiative advancement.
+2. Critical - Add explicit table-facing recovery before auto-resume or repair retry reuses any prior player action.
+3. Critical - Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, and combat/multiplayer domain modules.
+4. High - Add scenario fixtures that prove the provider cannot speak for host/remote PCs across social, combat, and join-transfer cases.
+5. High - Add a "what the table is waiting for" surface that is always visible and uses table language.
+6. High - Separate debug meta from normal play mode. Keep diagnostics available, but hide provider/model details during ordinary play.
+7. High - Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
+8. High - Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
+9. High - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests.
+10. High - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating.
+11. Medium - Make scene tension/consequence summaries more visible during play.
+12. Medium - Clarify enemy HP visibility policy for host and guest views.
+13. Medium - Improve combat tracker density for longer encounters: conditions, action spent, concentration, and defeated state.
+14. Medium - Make group-hold multiplayer mode explain itself before public use.
+15. Medium - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck.
+16. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
+17. Medium - Make right-side binder collapsible or context-sensitive during active play.
+18. Low - Replace remaining overly specific placeholder text with neutral table examples.
+19. Low - Improve empty states so they teach the next table action.
+20. Low - Add a plain "session health" summary for host troubleshooting.
 
-## Implemented In This Pass
+## Combat Reality Check
 
-1. Fixed local provider generation to accept structured remote-only player inputs.
-2. Changed ThinLoreKeeper input placeholder from "The host submits it to the DM" to "Send to the host table" so it matches both direct-send and host-hold modes.
-3. Added a regression assertion that `app/app.js` keeps accepting remote-only structured player inputs.
+Current direction is correct, but combat is the highest-risk area because D&D table flow has very strong expectations.
 
-## Tests Added
+Fixed or improved:
 
-1. Extended `scripts/test-engine-architecture.js` to guard the remote-only structured input provider path.
+1. Fixed - Initiative can recover missing combatants and expands grouped enemies.
+2. Improved - Party-member turns are treated as input turns, including AI companions.
+3. Improved - Provider instructions forbid resolving the next initiative actor in the same response.
+4. Improved - Combat tracker shows active actor, round, party/enemy rows, and HP labels.
 
-## Remaining Risk
+Still open:
 
-The biggest remaining product risk is not a missing feature. It is the coexistence of table-state recovery, provider-response repair, auto enemy turns, multiplayer polling, and player-message echo inside `app/app.js`. The app can now survive more cases, but when it fails it still sometimes fails in a way that feels supernatural to the player. The next hardening cut should make every pending/recovery state explicit and table-facing.
+1. The app should own the standard resolution loop: declare action, validate/legal option, roll, apply effects, log mechanics, narrate.
+2. Improvised actions need clearer app-side roll selection and outcome records.
+3. Enemy turns should be more app-bounded. The provider can narrate and choose intent, but state mutation should be guarded.
+4. Non-lethal combat endings need equal coverage: surrender, flee, bargain, restrain, intimidate, de-escalate.
+5. AI companion combat turns need a crisp host approval flow: request/suggest, approve, resolve.
+
+## Multiplayer Reality Check
+
+Fixed or improved:
+
+1. Fixed - Remote-only player inputs can drive provider turns.
+2. Fixed - Join-as character creation is richer and standardized.
+3. Fixed - Controller transfer to AI/host clears active stale guest connections.
+4. Improved - Guest wording now describes actions as sent to the host table.
+5. Improved - Host approval and group-hold modes have stronger status hooks.
+
+Still open:
+
+1. Polling latency can still make the table feel quiet or stale.
+2. Guest UI needs a clearer "the host has it" state after submitting.
+3. Host UI needs a stronger "guest is waiting on you" affordance.
+4. Disconnect/reconnect requires real LAN soak testing, not only unit tests.
+5. Campaign switching while guests are connected needs a stricter product rule.
+
+## Character Creation Reality Check
+
+Fixed:
+
+1. Host-created during campaign creation: primary required host character plus `+` for additional AI companions.
+2. Host-created after campaign start: party `+` creates a proper AI-companion character with a 5E-lite sheet.
+3. Guest creation during join flow: same compact fields and auto-complete behavior.
+4. ThinLoreKeeper join flow: same compact fields and auto-complete behavior.
+5. Partial input is preserved. Example: `Thor`, `Dwarf`, `Scout` remains authoritative while missing details are filled.
+
+Open:
+
+1. Auto-complete is deterministic and local. That is fast and safe, but it is not yet campaign-aware beyond basic party names.
+2. Additional campaign characters are AI companions by default. That matches the current design, but the UI should eventually let the host choose host/AI/unassigned per character.
+3. Character sheet quality is good enough for 5E-lite starts, but class/subclass/spell/equipment depth is still shallow.
+4. There is no explicit party-template flow yet for "four dwarf soldiers" or "heist crew" beyond repeated `+` plus auto-complete.
+
+## RP And DM Quality Reality Check
+
+Fixed or improved:
+
+1. Prompt philosophy is stronger: consequences over random escalation, choices only when justified, NPC motives before new threats.
+2. Context packs include controller guidance for host, remote, unassigned, and AI companion party members.
+3. Structured table rows and speaker recovery reduce DM/party role mixups.
+
+Still open:
+
+1. NPC motivation and relationship state need to be more visible and assertive in the active scene packet.
+2. Provider output still needs scenario-based regression tests for social play, travel, mystery, downtime, and recovery.
+3. The app should make consequences visible enough that the host understands why the DM is reacting a certain way.
+4. Local model quality may still need shorter, stronger scene packets and repair prompts.
+
+## Recommended Next Fixes
+
+1. Build a table-facing "Waiting For" strip: DM thinking, waiting for Tilli, waiting for host approval, recovering failed turn, guest action staged, enemy turn resolving.
+2. Move the remaining provider recovery and auto-resume decisions out of `app/app.js`.
+3. Add combat resolution fixtures for attack, save, skill contest, spell, dodge, help, disengage, surrender, flee, and enemy turn.
+4. Add provider-output fixtures that intentionally mislabel speaker roles and verify controlled party agency is preserved.
+5. Add two-machine multiplayer soak checklist and run it before broad playtesting.
+6. Add a play/debug mode toggle so meta provider lines disappear during ordinary play.
+7. Add campaign-aware character auto-complete that can use party theme, campaign premise, and existing characters without overriding supplied fields.
+8. Add a compact encounter tracker upgrade: conditions, defeated state, active resources, action spent.
+9. Add curated scenario fixtures for social negotiation, wilderness travel, investigation, downtime, and combat.
+10. Add a host-facing "session health" panel that explains stuck states in human terms.
+
+## Regression Tests Added Or Updated
+
+Current coverage includes:
+
+1. Remote-only structured provider inputs.
+2. Submitted turn lifecycle markers.
+3. Table timeline diagnostics presence.
+4. New campaign additional-character wiring.
+5. Speaker-role mismatch recovery for party rows.
+6. Grouped enemy expansion into separate combatants and initiative rows.
+7. Remote controller transfer back to AI without stale reconnect reclaiming control.
+8. Join-as character creation during normal and combat flows.
+9. Combat start, turn advance, defeated-enemy end, and combat tracker projection.
+10. SQLite storage round-trip for engine state, turn records, and combat actions.
+
+## Remaining Product Risk
+
+The largest remaining risk is still the same category as yesterday, but narrower now: the app has stronger rails, yet several recovery and combat paths still coexist in `app/app.js` with provider import, repair, multiplayer polling, auto enemy turns, and pending input cleanup. When everything works, the table feels much closer to natural play. When it fails, the next priority is making the failure table-facing: who is waiting, what is staged, what is being retried, and what the host can do next.
