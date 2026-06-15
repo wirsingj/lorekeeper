@@ -271,6 +271,7 @@ const elements = {
   copyDiagnostics: document.querySelector("#copy-diagnostics"),
   diagnosticsOutput: document.querySelector("#diagnostics-output"),
   diagnosticsStatus: document.querySelector("#diagnostics-status"),
+  showDebugMeta: document.querySelector("#show-debug-meta"),
   tableTimelineSummary: document.querySelector("#table-timeline-summary"),
   generationTimeout: document.querySelector("#generation-timeout"),
   outputLimit: document.querySelector("#output-limit"),
@@ -570,6 +571,12 @@ elements.refreshDiagnostics?.addEventListener("click", async () => {
 
 elements.copyDiagnostics?.addEventListener("click", async () => {
   await copyDiagnosticsToClipboard();
+});
+
+elements.showDebugMeta?.addEventListener("change", () => {
+  localStorage.setItem(debugMetaStorageKey, elements.showDebugMeta.checked ? "1" : "0");
+  renderPlayLog();
+  setProviderActivity(elements.showDebugMeta.checked ? "Debug meta visible in play log" : "Debug meta hidden for play", "idle");
 });
 
 elements.cancelGeneration.addEventListener("click", () => {
@@ -4955,7 +4962,15 @@ function render() {
   renderReviewBatch();
   renderCampaignSelector();
   renderProviderControls();
+  renderDebugMetaControl();
   renderMultiplayerPanel();
+}
+
+function renderDebugMetaControl() {
+  if (!elements.showDebugMeta) {
+    return;
+  }
+  elements.showDebugMeta.checked = shouldShowDebugMessageMeta();
 }
 
 function renderSceneIntelligence(campaign) {

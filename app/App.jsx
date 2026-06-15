@@ -85,6 +85,26 @@ export function LorekeeperShell() {
       <main className="play-screen" aria-label="Lorekeeper play screen">
         <div className="screen-bezel">
           <span id="session-label" className="visually-hidden">Campaign Play</span>
+          <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
+            <span id="provider-activity-label">Table ready.</span>
+            <div className="provider-activity-actions">
+              <button id="repair-retry" className="mini-action" type="button" title="Ask the DM to try the failed response again" hidden>
+                Retry
+              </button>
+              <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics and timeline for what happened" hidden>
+                Inspect
+              </button>
+              <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Use this DM response even though it needs review" hidden>
+                Import
+              </button>
+              <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel the DM response in progress" hidden>
+                Cancel
+              </button>
+              <button id="recheck-provider" className="mini-action" type="button" title="Check the latest DM chat response" hidden>
+                Read Latest
+              </button>
+            </div>
+          </div>
           <section id="thin-join-panel" className="thin-join-panel" hidden>
             <div className="thin-join-card">
               <p className="eyebrow">ThinLoreKeeper</p>
@@ -232,26 +252,6 @@ export function LorekeeperShell() {
             <button id="table-talk-send" type="submit">Send</button>
           </form>
         </section>
-        <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
-          <span id="provider-activity-label">Table ready.</span>
-          <div className="provider-activity-actions">
-            <button id="repair-retry" className="mini-action" type="button" title="Ask the DM to try the failed response again" hidden>
-              Retry
-            </button>
-            <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics and timeline for what happened" hidden>
-              Inspect
-            </button>
-            <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Use this DM response even though it needs review" hidden>
-              Import
-            </button>
-            <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel the DM response in progress" hidden>
-              Cancel
-            </button>
-            <button id="recheck-provider" className="mini-action" type="button" title="Check the latest DM chat response" hidden>
-              Read Latest
-            </button>
-          </div>
-        </div>
       </aside>
 
       <footer className="command-deck">
@@ -595,6 +595,10 @@ function SetupDialog() {
             <h3>Diagnostics</h3>
             <span id="diagnostics-status" className="count-pill">Idle</span>
           </div>
+          <label className="check-row" title="Show provider/model metadata under play messages for troubleshooting. Leave this off during normal play.">
+            <input id="show-debug-meta" type="checkbox" />
+            Show debug meta in play log
+          </label>
           <div className="button-stack two-up">
             <button id="refresh-diagnostics" type="button">Refresh Diagnostics</button>
             <button id="copy-diagnostics" type="button">Copy JSON</button>

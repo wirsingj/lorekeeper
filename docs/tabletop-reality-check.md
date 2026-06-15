@@ -41,16 +41,20 @@ Status legend:
 17. Improved - The DM prompt now receives hidden long, mid, and short term story threads so play has private campaign direction beyond the immediate scene.
 18. Fixed - Hidden story threads are stored as `dm_only` story-arc quest records, are auto-committed when proposed by the DM, and are filtered out of visible thread/context lists and multiplayer public snapshots.
 19. Improved - Table status language now translates waiting-for-combat-actor and guest-action states into table-facing wording.
+20. Fixed - The table status strip now lives above the main play log instead of in the side rail, so waiting/recovery state is always in the play surface.
+21. Fixed - Setup diagnostics now includes a visible debug-meta toggle for play/debug mode.
+22. Improved - App-owned combat can now end through nonlethal outcomes such as surrender, retreat, or de-escalation instead of only HP defeat.
+23. Fixed - A two-machine first-playtest checklist now exists at `docs/two-machine-playtest-checklist.md`.
 
 ## Top Immersion Risks Still Open
 
 1. Open - Combat resolution is still partly provider-led for enemy turns and improvised actions. The app has a combat engine, but not every table combat beat is app-owned before narration.
 2. Open - Auto-resume and recovery states are better surfaced, but the user still needs a clearer "recovering last turn" table affordance before anything is replayed.
 3. Open - Repair/retry/import controls still expose some software-shaped concepts. The labels are friendlier, but the mental model is not yet purely table-shaped.
-4. Improved - Meta lines under bubbles are hidden during normal play. A visible play/debug toggle is still needed.
+4. Fixed - Meta lines under bubbles are hidden during normal play, and Setup diagnostics has a visible debug-meta toggle.
 5. Improved - Hidden DM story direction now gives the provider long/mid/short campaign intent. Scene purpose, current tension, and consequence summaries still need stronger visible presentation.
 6. Open - AI companion contribution rules are improved, but the UI still relies on badges and buttons that need learning.
-7. Open - Long provider generations can still feel like the table is frozen if the status line is missed.
+7. Improved - Long provider generations now surface in the main play area. Needs real-session soak testing for whether it is visible enough under pressure.
 8. Open - The right-side binder can compete with live play. It is powerful, but the play surface is not yet fully separated from campaign management.
 9. Open - Table talk exists but can be missed by guests and hosts during active play.
 10. Open - Local multiplayer still needs longer two-machine soak testing across disconnect, reconnect, campaign switch, combat turn, and host approval modes.
@@ -83,11 +87,11 @@ Status legend:
 3. Critical - Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, and combat/multiplayer domain modules.
 4. High - Add scenario fixtures that prove the provider cannot speak for host/remote PCs across social, combat, and join-transfer cases.
 5. High - Continue strengthening the "what the table is waiting for" surface so it is always visible and covers every stuck state.
-6. Improved - Separate debug meta from normal play mode. Raw bubble meta is hidden by default; still add a visible play/debug toggle.
+6. Fixed - Separate debug meta from normal play mode. Raw bubble meta is hidden by default and has a visible Setup diagnostics toggle.
 7. High - Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
 8. High - Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
-9. High - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests.
-10. High - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating.
+9. Improved - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests. Surrender/de-escalation app-owned end-combat fixtures exist; chase and richer intimidation contests remain.
+10. Improved - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating. A first-playtest checklist exists; scripted/disconnect soak remains.
 11. Medium - Make scene tension/consequence summaries and optional hidden-story debug summaries more visible in settings/diagnostics, not live play.
 12. Medium - Clarify enemy HP visibility policy for host and guest views.
 13. Medium - Improve combat tracker density for longer encounters: conditions, action spent, concentration, and defeated state.
@@ -115,7 +119,7 @@ Still open:
 1. The app should own the standard resolution loop: declare action, validate/legal option, roll, apply effects, log mechanics, narrate.
 2. Improvised actions need clearer app-side roll selection and outcome records.
 3. Enemy turns should be more app-bounded. The provider can narrate and choose intent, but state mutation should be guarded.
-4. Non-lethal combat endings need equal coverage: surrender, flee, bargain, restrain, intimidate, de-escalate.
+4. Non-lethal combat endings are started: explicit app-owned surrender/retreat/de-escalation endings exist, but need richer contest and chase coverage.
 5. AI companion combat turns need a crisp host approval flow: request/suggest, approve, resolve.
 
 ## Multiplayer Reality Check
@@ -171,12 +175,12 @@ Still open:
 
 ## Recommended Next Fixes
 
-1. Expand the table-facing "Waiting For" strip: current wording covers DM thinking, combat actor waits, guest action waits, host review, and enemy turns; still needs a stronger always-visible layout.
+1. Fixed - Expand the table-facing "Waiting For" strip: it now lives above the play log and uses table wording for DM thinking, combat actor waits, guest action waits, host review, and enemy turns.
 2. Move the remaining provider recovery and auto-resume decisions out of `app/app.js`.
-3. Add combat resolution fixtures for attack, save, skill contest, spell, dodge, help, disengage, surrender, flee, and enemy turn.
+3. Continue combat resolution fixtures for save, skill contest, spell, help, disengage, chase/flee details, and enemy turn. Attack, dodge, defeat, and explicit surrender/de-escalation coverage exist.
 4. Add provider-output fixtures that intentionally mislabel speaker roles and verify controlled party agency is preserved.
-5. Add two-machine multiplayer soak checklist and run it before broad playtesting.
-6. Add a visible play/debug mode toggle. Raw provider meta is hidden by default now, but the toggle should be discoverable.
+5. Improved - Add two-machine multiplayer soak checklist and run it before broad playtesting. Checklist exists at `docs/two-machine-playtest-checklist.md`; still needs a real two-machine run.
+6. Fixed - Add a visible play/debug mode toggle. Raw provider meta is hidden by default and can be toggled from Setup diagnostics.
 7. Add campaign-aware character auto-complete that can use party theme, campaign premise, and existing characters without overriding supplied fields.
 8. Add a compact encounter tracker upgrade: conditions, defeated state, active resources, action spent.
 9. Add curated scenario fixtures for social negotiation, wilderness travel, investigation, downtime, and combat.
@@ -199,6 +203,8 @@ Current coverage includes:
 11. Hidden DM story threads are included in provider context but filtered from visible context/thread lists.
 12. `dm_only` story-arc quest changes preserve visibility and do not attach secret quest IDs to the visible scene.
 13. Table status vocabulary covers waiting for a named combat actor and waiting for guest/player action.
+14. The table status strip is above the play log and the debug-meta toggle exists in Setup diagnostics.
+15. App-owned combat resolves dodge state and explicit surrender/de-escalation endings without relying on HP defeat.
 
 ## Remaining Product Risk
 

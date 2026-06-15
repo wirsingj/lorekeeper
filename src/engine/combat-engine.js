@@ -68,14 +68,22 @@ export function resolveCombatAction(campaign, action, options = {}) {
     : resolveNonAttack(normalized, actor, base, action);
 
   const effectsResult = applyStateEffects(normalized, resolved.effects, { source: "combat_engine", turnId: base.turnId });
-  let advanced = finishCombatIfResolved(effectsResult.campaign, {
-    resolvedActorId: actor.id,
-    summary: resolved.summary ?? `${actor.name} resolved ${actionType}.`,
-  });
+  const summary = resolved.summary ?? `${actor.name} resolved ${actionType}.`;
+  let advanced = resolved.endsCombat
+    ? endCombat(effectsResult.campaign, {
+      summary,
+      outcome: resolved.combatOutcome,
+      resolvedAt: options.now,
+    })
+    : finishCombatIfResolved(effectsResult.campaign, {
+      resolvedActorId: actor.id,
+      summary,
+      resolvedAt: options.now,
+    });
   if (advanced.combat?.inCombat) {
     advanced = advanceExistingCombatTurn(advanced, {
       fromActorId: actor.id,
-      summary: resolved.summary ?? `${actor.name} resolved ${actionType}.`,
+      summary,
     });
   }
   const actionRecord = {
@@ -120,6 +128,26 @@ export function finishCombatIfResolved(campaign, options = {}) {
     currentTurnId: null,
     lastAction: options.summary ?? next.combat?.lastAction ?? "Combat resolved.",
     lastOutcome: enemiesAlive ? "party_defeated" : "enemies_defeated",
+    resolvedAt: options.resolvedAt ?? new Date().toISOString(),
+  };
+  next.engineState = {
+    ...(next.engineState ?? {}),
+    mode: "rp",
+  };
+  return next;
+}
+
+export function endCombat(campaign, options = {}) {
+  const next = structuredClone(campaign);
+  next.combat = {
+    ...(next.combat ?? {}),
+    inCombat: false,
+    currentTurnId: null,
+    initiative: [],
+    turnOrder: [],
+    turnEconomy: {},
+    lastAction: options.summary ?? next.combat?.lastAction ?? "Combat resolved.",
+    lastOutcome: options.outcome || "combat_resolved",
     resolvedAt: options.resolvedAt ?? new Date().toISOString(),
   };
   next.engineState = {
@@ -177,15 +205,40 @@ function resolveNonAttack(campaign, actor, base, action) {
   const effects = [];
   if (base.actionType === combatActionTypes.DODGE) {
     effects.push({ type: "condition_add", targetId: actor.id, condition: "dodging", reason: "Dodge action until next turn" });
+  } else if (base.actionType === combatActionTypes.HELP) {
+    effects.push({ type: "condition_add", targetId: actor.id, condition: "helping", reason: "Help action declared" });
+  } else if (base.actionType === combatActionTypes.DISENGAGE) {
+    effects.push({ type: "position_note", targetId: actor.id, note: action.positionNote || "Disengaged without provoking immediate pressure." });
   } else if (action.positionNote) {
     effects.push({ type: "position_note", targetId: actor.id, note: action.positionNote });
   }
+  for (const effect of normalizeEffects(action.effects)) {
+    effects.push(effect);
+  }
+  const endsCombat = action.endsCombat === true || Boolean(action.combatOutcome);
+  const outcome = action.combatOutcome || inferNonlethalOutcome(base.declaredText);
   return {
     rolls: [],
     effects,
     narration: `${actor.name} ${base.declaredText || base.actionType}.`,
-    summary: `${actor.name} resolved ${base.actionType}.`,
+    summary: action.summary || `${actor.name} resolved ${base.actionType}.`,
+    endsCombat,
+    combatOutcome: outcome,
   };
+}
+
+function normalizeEffects(effects = []) {
+  return Array.isArray(effects)
+    ? effects.filter((effect) => effect && typeof effect === "object")
+    : [];
+}
+
+function inferNonlethalOutcome(text = "") {
+  const normalized = String(text).toLowerCase();
+  if (/\bsurrender|yield|stand down\b/.test(normalized)) return "enemy_surrendered";
+  if (/\bflee|retreat|run away|escape\b/.test(normalized)) return "enemies_retreat";
+  if (/\bde-?escalat|calm|bargain|parley|negotiate\b/.test(normalized)) return "deescalated";
+  return "combat_resolved";
 }
 
 function findAttackOption(campaign, actorId, action) {

@@ -265,6 +265,40 @@ function testCombatEngine() {
   assert.equal(resolved.campaign.combatActionLog.length, 1, "combat action should be logged to campaign state");
   assert.equal(resolved.campaign.diceLog.length >= 1, true, "combat rolls should be logged to campaign state");
   assert.equal(resolved.campaign.stateEffectLog.length, resolved.actionRecord.effects.length, "applied effects should be logged to campaign state");
+
+  const dodgeCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const dodged = resolveCombatAction(dodgeCampaign, {
+    turnId: "combat-dodge-turn",
+    actorId: "thor",
+    actionType: "dodge",
+    declaredText: "Dodge and keep the miner focused on me.",
+  }, { seed: "dodge-seed" });
+  assert.equal(dodged.actionRecord.rolls.length, 0);
+  assert.ok(dodged.campaign.party.find((member) => member.id === "thor").conditions.includes("dodging"));
+  assert.equal(dodged.campaign.combat.currentTurnId, "sy");
+
+  const surrenderCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const surrendered = resolveCombatAction(surrenderCampaign, {
+    turnId: "combat-surrender-turn",
+    actorId: "thor",
+    actionType: "improvise",
+    declaredText: "Thor lowers the axe and talks the miner into surrendering.",
+    endsCombat: true,
+    combatOutcome: "enemy_surrendered",
+    summary: "Thor de-escalated the brawl and the miner surrendered.",
+  }, { seed: "surrender-seed", now: "2026-01-01T00:00:00.000Z" });
+  assert.equal(surrendered.campaign.combat.inCombat, false);
+  assert.equal(surrendered.campaign.combat.currentTurnId, null);
+  assert.deepEqual(surrendered.campaign.combat.turnOrder, []);
+  assert.equal(surrendered.campaign.combat.lastOutcome, "enemy_surrendered");
+  assert.equal(surrendered.campaign.combat.lastAction, "Thor de-escalated the brawl and the miner surrendered.");
+  assert.equal(surrendered.campaign.engineState.mode, gameModes.RP);
 }
 
 function testCombatEndsWhenSideDrops() {
@@ -897,10 +931,16 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /new-joiner-integration/);
   assert.match(appShell, /new-joiner-host-context/);
   assert.match(appShell, /table-timeline-summary/);
+  assert.ok(
+    appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
+    "table status strip should live above the play log",
+  );
+  assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appJs, /collectWizardAdditionalCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /Additional AI companion party members/);
+  assert.match(appJs, /renderDebugMetaControl/);
 }
 
 testDiceEngine();
