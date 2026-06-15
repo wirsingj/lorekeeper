@@ -19,7 +19,7 @@ The current implementation supports:
 - starting/stopping a local table session from setup
 - generating an invite link for a party member
 - joining from ThinLoreKeeper by pasting the invite link into the front-center join card
-- "join as my character" requests, where a guest proposes a new PC and the host approves it into the party
+- "join as my character" requests, where a guest proposes a new PC with a character pitch and DM integration hook, then the host approves it into the party
 - host approval/denial of join requests
 - temporary remote controller assignment
 - public guest table messages
@@ -62,8 +62,19 @@ The guest workflow should be:
 2. Double-click `ThinLoreKeeper.exe`.
 3. Paste the invite link into the front-center join card.
 4. For a fixed-seat invite, enter a table name and click `Join Table`.
-5. For a Join-As invite, fill in character name/class/backstory, then click `Join Table`.
+5. For a Join-As invite, fill in character name, ancestry/class, table role, appearance, character pitch, and why they join this party, then click `Join Table`.
 6. Wait for host approval.
+
+Join-As is meant to give the guest real first-session agency. The host receives the proposed character as a pending join request, and approval creates a canonical party member plus a system table note the DM/provider can use to weave the new character into the current scene. The proposal stores:
+
+- `name`
+- `ancestry`
+- `characterClass`
+- `level`
+- `roleIntent`
+- `appearance`
+- `backstory`
+- `integrationPrompt`
 
 The portable Thin client does not include campaign saves, SQLite authority, Ollama, or provider controls. It renders host-filtered table state and sends authenticated guest inputs back to the host.
 

@@ -113,19 +113,45 @@ export function LorekeeperShell() {
                 <div className="thin-join-two">
                   <label>
                     <span>Ancestry</span>
-                    <input id="thin-join-character-ancestry" autoComplete="off" placeholder="Human" />
+                    <input id="thin-join-character-ancestry" autoComplete="off" placeholder="Fairy, elf, human..." />
                   </label>
                   <label>
                     <span>Class</span>
-                    <input id="thin-join-character-class" autoComplete="off" placeholder="Ranger" />
+                    <input id="thin-join-character-class" autoComplete="off" placeholder="Ranger, druid, rogue..." />
+                  </label>
+                </div>
+                <div className="thin-join-two">
+                  <label>
+                    <span>Level</span>
+                    <input id="thin-join-character-level" inputMode="numeric" placeholder="1" />
+                  </label>
+                  <label>
+                    <span>Table role</span>
+                    <input id="thin-join-character-role" autoComplete="off" placeholder="Scout, healer, chaotic helper..." />
                   </label>
                 </div>
                 <label>
-                  <span>Backstory</span>
+                  <span>Look / vibe</span>
+                  <textarea
+                    id="thin-join-character-appearance"
+                    rows="3"
+                    placeholder="What do people notice first? Style, demeanor, tells, magic, gear..."
+                  ></textarea>
+                </label>
+                <label>
+                  <span>Character pitch</span>
                   <textarea
                     id="thin-join-character-backstory"
                     rows="4"
-                    placeholder="Who are they, why are they here, and what do they care about?"
+                    placeholder="A short paragraph: who they are, what they care about, and what kind of trouble follows them."
+                  ></textarea>
+                </label>
+                <label>
+                  <span>Why they join this party</span>
+                  <textarea
+                    id="thin-join-character-integration"
+                    rows="4"
+                    placeholder="How should the DM weave them into this scene or the party? Old friend, stranger with a shared goal, hired help, rescued captive..."
                   ></textarea>
                 </label>
               </div>

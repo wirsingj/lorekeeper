@@ -76,7 +76,7 @@ function renderConnectedGuests(container, connections, { labelById, approveGuest
       connections.map((connection) => localTableRow({
         title: connection.displayName || "Guest",
         subtitle: connection.proposedCharacter?.name
-          ? `${connection.status} / wants to join as ${connection.proposedCharacter.name}`
+          ? joinProposalSummary(connection)
           : `${connection.status} / ${labelById(connection.partyMemberId)}`,
         actions: connection.status === "pending"
           ? [
@@ -88,6 +88,18 @@ function renderConnectedGuests(container, connections, { labelById, approveGuest
       "No guests connected.",
     ),
   );
+}
+
+function joinProposalSummary(connection) {
+  const proposal = connection.proposedCharacter ?? {};
+  const ancestryClass = [proposal.ancestry, proposal.characterClass].filter(Boolean).join(" ");
+  const details = [
+    `${connection.status} / wants to join as ${proposal.name}`,
+    ancestryClass,
+    proposal.roleIntent,
+    proposal.integrationPrompt ? `Hook: ${proposal.integrationPrompt}` : "",
+  ].filter(Boolean);
+  return details.join(" / ");
 }
 
 function renderPendingInputs(container, inputs) {
@@ -108,6 +120,7 @@ function localTableRow({ title, subtitle, actions = [] }) {
   row.className = "local-table-row";
   const text = document.createElement("span");
   text.textContent = `${title}: ${subtitle}`;
+  text.title = `${title}: ${subtitle}`;
   row.append(text);
   for (const action of actions) {
     const button = document.createElement("button");

@@ -301,19 +301,33 @@ const characterJoinResult = requestJoin(joinAsCampaign, {
     ancestry: "Human",
     characterClass: "Ranger",
     level: 2,
+    roleIntent: "Road scout and careful ranged support",
+    appearance: "Weathered cloak, travel-worn boots, and a hawk-feather braid.",
     backstory: "A road scout looking for her missing sister.",
+    integrationPrompt: "Mira knows the merchant road and can enter as a hired guide who recognizes the party needs help.",
   },
 });
 joinAsCampaign = characterJoinResult.campaign;
 assert.equal(characterJoinResult.approved, false);
 assert.equal(joinAsCampaign.party.some((member) => member.name === "Mira"), false);
 assert.equal(joinAsCampaign.multiplayer.connections[0].proposedCharacter.name, "Mira");
+assert.match(joinAsCampaign.multiplayer.connections[0].proposedCharacter.integrationPrompt, /hired guide/);
 joinAsCampaign = approveJoinRequest(joinAsCampaign, characterJoinResult.connection.id);
 const mira = joinAsCampaign.party.find((member) => member.name === "Mira");
 assert.ok(mira);
 assert.equal(mira.controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.equal(mira.ancestryClass, "Human Ranger");
+assert.equal(mira.level, 2);
+assert.match(mira.summary, /Road scout/);
+assert.match(mira.appearance, /hawk-feather/);
 assert.match(mira.background, /missing sister/);
+assert.match(mira.dmIntegrationPrompt, /hired guide/);
+assert.equal(mira.notes.some((note) => /DM integration prompt: Mira knows/.test(note)), true);
+assert.equal(joinAsCampaign.sessionLog.messages.some((message) =>
+  message.source === "remote_character_join" &&
+  /Mira has joined the party/.test(message.body) &&
+  /hired guide/.test(message.body)
+), true);
 assert.equal(joinAsCampaign.multiplayer.connections[0].partyMemberId, mira.id);
 
 console.log("Lorekeeper multiplayer tests passed.");

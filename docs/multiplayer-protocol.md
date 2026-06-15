@@ -75,6 +75,30 @@ WebSocket can be added for low-latency table updates and streamed generation whi
 
 The app keeps old top-level fields for compatibility, but new clients should render from `tableState`. The host filters out `dm_only` records/messages before sending. ThinLoreKeeper polls this endpoint every few seconds and can manually resync.
 
+## Join-As Character Request Payload
+
+Open character-request invites let a guest propose a new party member instead of claiming a prebuilt seat. The host remains authoritative: the guest submits a proposal, the host approves or denies it, and approval creates the canonical party member in the host campaign.
+
+```json
+{
+  "inviteLink": "lorekeeper://join?...",
+  "playerName": "Jess",
+  "clientId": "thin-client-id",
+  "proposedCharacter": {
+    "name": "Mira",
+    "ancestry": "Fairy",
+    "characterClass": "Druid",
+    "level": 1,
+    "roleIntent": "Curious healer and mischief scout",
+    "appearance": "Small wings like wet leaves, travel cloak, bright copper eyes.",
+    "backstory": "Mira left her grove after overhearing a warning meant for someone else.",
+    "integrationPrompt": "Mira can enter the current scene as someone who followed the same omen and needs the party's help."
+  }
+}
+```
+
+The host stores the proposal on the pending connection. On approval, LoreKeeper creates a party member from the safe public fields and appends a non-canon system table note for the DM/provider context so the new character can be introduced naturally.
+
 ## Guest Action Payload
 
 ```json

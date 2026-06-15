@@ -354,6 +354,7 @@ export function approveJoinRequest(campaign, connectionId) {
   if (connection.status === "denied") {
     throw new Error("Join request was denied.");
   }
+  let createdMember = null;
   if (!connection.partyMemberId) {
     const member = createPartyMemberFromProposal(connection.proposedCharacter, connection.displayName);
     const existingIds = new Set(next.party.map((item) => item.id));
@@ -362,6 +363,7 @@ export function approveJoinRequest(campaign, connectionId) {
       id: uniqueId(member.id, existingIds),
     };
     next.party = [...next.party, uniqueMember];
+    createdMember = uniqueMember;
     connection.partyMemberId = uniqueMember.id;
     const invite = next.multiplayer.invites.find((item) => item.id === connection.inviteId);
     if (invite) {
@@ -387,6 +389,9 @@ export function approveJoinRequest(campaign, connectionId) {
       : item
   ));
   assignController(next, connection);
+  if (createdMember) {
+    appendCharacterJoinMessage(next, createdMember, connection);
+  }
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "join_approved",
     summary: `${connection.displayName} joined the table${connection.proposedCharacter?.name ? ` as ${connection.proposedCharacter.name}` : ""}.`,
@@ -1366,7 +1371,10 @@ function normalizeCharacterProposal(proposal = {}, playerName = "") {
     ancestry: compactLine(proposal.ancestry || "", 80),
     characterClass: compactLine(proposal.characterClass || proposal.class || "", 80),
     level: clampNumber(proposal.level, 1, 20) || 1,
+    roleIntent: compactLine(proposal.roleIntent || proposal.role || "", 240),
+    appearance: compactLine(proposal.appearance || proposal.vibe || "", 1000),
     backstory: compactLine(proposal.backstory || proposal.background || proposal.concept || "", 1600),
+    integrationPrompt: compactLine(proposal.integrationPrompt || proposal.integration || proposal.partyConnection || "", 1600),
     personality: compactLine(proposal.personality || "", 600),
     goals: compactLine(proposal.goals || "", 600),
   };
@@ -1385,7 +1393,9 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "") {
     ancestryClass,
     level,
     background: character.backstory || `${character.name || "This character"} joined the campaign from a remote player request.`,
-    summary: [ancestryClass, character.personality, character.goals].filter(Boolean).join(" - "),
+    appearance: character.appearance,
+    dmIntegrationPrompt: character.integrationPrompt,
+    summary: [ancestryClass, character.roleIntent, character.personality, character.goals].filter(Boolean).join(" - "),
     stats: {
       hp: {
         current: maxHp,
@@ -1395,7 +1405,10 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "") {
     },
     notes: [
       "Created from a ThinLoreKeeper join-as character request.",
+      character.roleIntent ? `Table role: ${character.roleIntent}` : "",
+      character.appearance ? `Look/vibe: ${character.appearance}` : "",
       character.backstory ? `Backstory: ${character.backstory}` : "",
+      character.integrationPrompt ? `DM integration prompt: ${character.integrationPrompt}` : "",
       character.personality ? `Personality: ${character.personality}` : "",
       character.goals ? `Goals: ${character.goals}` : "",
     ].filter(Boolean),
@@ -1403,6 +1416,56 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "") {
     controllerId: null,
     fallbackControllerKind: controllerKinds.HOST,
     createdAt: nowIso(),
+  };
+}
+
+function appendCharacterJoinMessage(campaign, member, connection) {
+  const sessionLog = campaign.sessionLog ?? { activeSessionId: "session-main", sessions: [], messages: [] };
+  const activeSessionId = sessionLog.activeSessionId || "session-main";
+  if (!Array.isArray(sessionLog.sessions) || !sessionLog.sessions.some((session) => session.id === activeSessionId)) {
+    sessionLog.sessions = [
+      ...(Array.isArray(sessionLog.sessions) ? sessionLog.sessions : []),
+      {
+        id: activeSessionId,
+        title: "Campaign Play",
+        startedAt: nowIso(),
+        endedAt: null,
+        recap: "",
+      },
+    ];
+  }
+
+  const proposal = normalizeCharacterProposal(connection.proposedCharacter, connection.displayName);
+  const body = [
+    `${member.name} has joined the party as ${member.ancestryClass || "an adventurer"}.`,
+    proposal.roleIntent ? `Table role: ${proposal.roleIntent}.` : "",
+    proposal.appearance ? `Look/vibe: ${proposal.appearance}` : "",
+    proposal.backstory ? `Character pitch: ${proposal.backstory}` : "",
+    proposal.integrationPrompt ? `DM integration prompt: ${proposal.integrationPrompt}` : "",
+  ].filter(Boolean).join("\n\n");
+
+  campaign.sessionLog = {
+    ...sessionLog,
+    messages: [
+      ...(Array.isArray(sessionLog.messages) ? sessionLog.messages : []),
+      {
+        id: `msg-join-${member.id}-${randomToken(4)}`,
+        sessionId: activeSessionId,
+        role: "system",
+        title: "LoreKeeper",
+        body,
+        meta: `New remote player character from ${connection.displayName}.`,
+        source: "remote_character_join",
+        providerRunId: null,
+        createdAt: nowIso(),
+        data: {
+          characterId: member.id,
+          playerId: connection.playerId,
+          multiplayer: true,
+          proposedCharacter: publicData(connection.proposedCharacter),
+        },
+      },
+    ],
   };
 }
 
