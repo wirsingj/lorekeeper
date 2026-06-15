@@ -4,6 +4,10 @@ import { createReviewBatch, getCommittableChanges } from "../src/canon-review/pr
 import { OllamaProvider } from "../src/ai/ollama-provider.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "../app/mechanics-formatting.js";
 import { normalizeProviderRuntimeSettings } from "../src/ai/provider-settings.js";
+import {
+  findOllamaContextForCampaign,
+  updateCampaignOllamaContext,
+} from "../src/ai/ollama-context-cache.js";
 import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { createEmptyCampaign, normalizeCampaign } from "../src/campaign-state/schema.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
@@ -305,6 +309,29 @@ assert.equal(validateTurnRequest(consequenceEnvelope).valid, true);
 const emptyCombatDefaults = createEmptyCampaign({ title: "Combat Defaults" }).combat;
 assert.deepEqual(emptyCombatDefaults.turnEconomy, {});
 assert.equal(emptyCombatDefaults.currentTurnId, null);
+
+const ollamaMemorySettings = normalizeProviderRuntimeSettings({
+  preferredProvider: "ollama",
+  selectedModel: "mistral-nemo",
+  fastMode: false,
+});
+const ollamaMemoryCampaign = normalizeCampaign(updateCampaignOllamaContext(createEmptyCampaign({
+  id: "campaign-ollama-memory",
+  title: "Ollama Memory",
+}), {
+  settings: ollamaMemorySettings,
+  context: [1, "2", -3, 4.5, 5],
+  tokenCounts: { prompt: 12, completion: 4 },
+}));
+assert.deepEqual(findOllamaContextForCampaign(ollamaMemoryCampaign, ollamaMemorySettings), [1, 2, 5]);
+assert.equal(
+  findOllamaContextForCampaign(ollamaMemoryCampaign, { ...ollamaMemorySettings, selectedModel: "qwen3:14b" }),
+  null,
+);
+assert.equal(
+  findOllamaContextForCampaign(ollamaMemoryCampaign, { ...ollamaMemorySettings, fastMode: true }),
+  null,
+);
 
 const partialThinCampaign = createEmptyCampaign({
   title: "Partial Thin Snapshot",

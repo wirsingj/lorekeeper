@@ -90,4 +90,6 @@ The app should keep request JSON lean by sending retrieved context sections inst
 
 Ollama uses JSON mode (`format: "json"`) and receives the request as a compact JSON envelope. Browser bridge compatibility remains available, but the target path is provider-independent JSON in and JSON out.
 
+LoreKeeper may store Ollama's returned `/api/generate` context token array as a campaign-scoped, model-scoped hint under campaign provider memory. This is not canon and is not trusted for rules or continuity; every turn still sends the app-owned context pack and validates the JSON response. The cache is only reused when campaign id, selected model, response contract, and generation mode match, preventing cross-campaign or cross-model bleed while preserving a little same-campaign warmth.
+
 The app derives secondary state such as `hasProposedChanges` from the response instead of asking the model to self-report it. Per-change confidence and `warnings` are the preferred way to surface uncertainty.

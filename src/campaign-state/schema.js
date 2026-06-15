@@ -63,6 +63,7 @@ export function createEmptyCampaign(overrides = {}) {
     stateEffectLog: arrayOrEmpty(overrides.stateEffectLog),
     combatActionLog: arrayOrEmpty(overrides.combatActionLog),
     providerEventLog: arrayOrEmpty(overrides.providerEventLog),
+    providerMemory: normalizeProviderMemory(overrides.providerMemory),
     rulesProfile: overrides.rulesProfile ?? createDefaultRulesProfile(),
     style: overrides.style ?? createDefaultStyleRules(),
     promptTemplates: overrides.promptTemplates ?? createDefaultPromptTemplateSettings(),
@@ -204,6 +205,54 @@ function normalizeSessionLog(sessionLog = {}) {
 
 function arrayOrEmpty(value) {
   return Array.isArray(value) ? value : [];
+}
+
+export function createEmptyProviderMemory() {
+  return {
+    ollamaContexts: [],
+  };
+}
+
+function normalizeProviderMemory(providerMemory = {}) {
+  const defaults = createEmptyProviderMemory();
+  const source = providerMemory && typeof providerMemory === "object" ? providerMemory : {};
+  return {
+    ...defaults,
+    ...source,
+    ollamaContexts: arrayOrEmpty(source.ollamaContexts)
+      .map(normalizeOllamaContextCacheEntry)
+      .filter(Boolean)
+      .slice(-8),
+  };
+}
+
+function normalizeOllamaContextCacheEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const context = arrayOrEmpty(entry.context)
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value >= 0);
+  if (!context.length) {
+    return null;
+  }
+  const modelId = String(entry.modelId ?? entry.model ?? "").trim();
+  const campaignId = String(entry.campaignId ?? "").trim();
+  const cacheKey = String(entry.cacheKey ?? "").trim();
+  if (!modelId || !campaignId || !cacheKey) {
+    return null;
+  }
+  return {
+    campaignId,
+    modelId,
+    cacheKey,
+    contractVersion: String(entry.contractVersion ?? "").trim(),
+    context,
+    tokenCount: Number.isFinite(Number(entry.tokenCount)) ? Number(entry.tokenCount) : context.length,
+    promptEvalCount: Number.isFinite(Number(entry.promptEvalCount)) ? Number(entry.promptEvalCount) : null,
+    completionEvalCount: Number.isFinite(Number(entry.completionEvalCount)) ? Number(entry.completionEvalCount) : null,
+    updatedAt: entry.updatedAt || new Date().toISOString(),
+  };
 }
 
 export function createEmptyCombatState() {

@@ -100,6 +100,7 @@ export class OllamaProvider {
       body: JSON.stringify({
         model: model.trim(),
         prompt,
+        context: Array.isArray(options.context) && options.context.length ? options.context : undefined,
         stream: true,
         format: options.format,
         keep_alive: options.keepAlive ?? "10m",
@@ -135,6 +136,7 @@ export class OllamaProvider {
       text,
       durationMs: Math.round(performance.now() - startedAt),
       contextSize: prompt.length,
+      ollamaContext: Array.isArray(finalEvent?.context) ? finalEvent.context : null,
       tokenCounts: {
         prompt: finalEvent?.prompt_eval_count ?? null,
         completion: finalEvent?.eval_count ?? null,

@@ -26,6 +26,7 @@ import {
   updateCampaignProviderSettings,
 } from "../src/ai/provider-service.js";
 import { OllamaProvider } from "../src/ai/ollama-provider.js";
+import { updateCampaignOllamaContext } from "../src/ai/ollama-context-cache.js";
 import {
   approveJoinRequest,
   clearPendingTurnInputs,
@@ -771,6 +772,26 @@ async function streamProviderTurn(request, response) {
       signal: controller.signal,
       onToken: (token) => writeNdjson(response, { type: "token", text: token }),
     });
+    let ollamaContextStored = false;
+    if (Array.isArray(result.ollamaContext) && result.ollamaContext.length) {
+      let shouldMarkStored = false;
+      try {
+        await updateActiveCampaign(projectRoot, (latestCampaign) => {
+          if (latestCampaign.id !== campaign.id) {
+            return latestCampaign;
+          }
+          shouldMarkStored = true;
+          return updateCampaignOllamaContext(latestCampaign, {
+            settings,
+            context: result.ollamaContext,
+            tokenCounts: result.tokenCounts,
+          });
+        });
+        ollamaContextStored = shouldMarkStored;
+      } catch (error) {
+        console.warn("Unable to store Ollama context cache:", error instanceof Error ? error.message : error);
+      }
+    }
 
     writeNdjson(response, {
       type: "done",
@@ -785,6 +806,8 @@ async function streamProviderTurn(request, response) {
         parseError: result.parseError,
         validationErrors: result.validationErrors,
         repairAttempt: result.repairAttempt,
+        ollamaContextUsed: Boolean(result.ollamaContextUsed),
+        ollamaContextStored,
       },
     });
   } catch (error) {

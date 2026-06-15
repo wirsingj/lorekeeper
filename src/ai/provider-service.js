@@ -5,6 +5,7 @@ import {
   renderTurnResponseForImport,
 } from "../model-contract/turn-json-contract.js";
 import { OllamaProvider } from "./ollama-provider.js";
+import { findOllamaContextForCampaign } from "./ollama-context-cache.js";
 import {
   mergeProviderRuntimeSettings,
   normalizeProviderRuntimeSettings,
@@ -99,14 +100,19 @@ export async function generateTurnWithProvider({
     temperature: settings.fastMode ? 0.45 : 0.72,
     format: "json",
   };
+  const cachedOllamaContext = findOllamaContextForCampaign(campaign, settings);
   let result = await provider.generateTurn({
     prompt,
     model: settings.selectedModel,
     signal,
     onToken,
     onEvent,
-    options: generationOptions,
+    options: {
+      ...generationOptions,
+      context: cachedOllamaContext,
+    },
   });
+  const primaryResult = result;
 
   let parsed = parseTurnJsonResponse(result.text, {
     requestId: request.requestId,
@@ -152,6 +158,8 @@ export async function generateTurnWithProvider({
     text: renderTurnResponseForImport(parsed.response),
     structured: parsed.response,
     requestId: request.requestId,
+    ollamaContext: !parsed.error && !repairAttempt ? primaryResult.ollamaContext : null,
+    ollamaContextUsed: Boolean(cachedOllamaContext?.length),
     parseError: parsed.error,
     validationErrors: parsed.error ? parsed.validationErrors : [],
     validationWarnings: parsed.error ? [] : parsed.validationErrors,
