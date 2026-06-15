@@ -12,6 +12,12 @@ LoreKeeper multiplayer is LAN-first and host-authoritative. It is meant for an o
 
 The hosted party member remains campaign canon. The guest is only a temporary controller. If the guest leaves, the character falls back to host or AI companion control.
 
+## Pre-Table Campaign Setup
+
+The new campaign wizard supports one optional `Starting Party / Joiner` card before `Create And Start`. This is for the common same-room case where a second player already knows who they want to be, or the host wants the opening scene to include a future guest character from the first DM beat.
+
+The pre-table joiner is seeded into the campaign as an unassigned party member before the opening provider call. LoreKeeper includes the joiner's character pitch, party integration, and host scene context in the opening prompt so the DM can introduce them naturally instead of bolting them on after the scene starts. The host can later invite a remote player to that party member.
+
 ## Current Vertical Slice
 
 The current implementation supports:

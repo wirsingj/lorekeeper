@@ -317,6 +317,14 @@ const elements = {
   newCharacterLevel: document.querySelector("#new-character-level"),
   newCharacterConcept: document.querySelector("#new-character-concept"),
   newCharacterAutoSheet: document.querySelector("#new-character-auto-sheet"),
+  newJoinerName: document.querySelector("#new-joiner-name"),
+  newJoinerAncestry: document.querySelector("#new-joiner-ancestry"),
+  newJoinerClass: document.querySelector("#new-joiner-class"),
+  newJoinerLevel: document.querySelector("#new-joiner-level"),
+  newJoinerConcept: document.querySelector("#new-joiner-concept"),
+  newJoinerIntegration: document.querySelector("#new-joiner-integration"),
+  newJoinerHostContext: document.querySelector("#new-joiner-host-context"),
+  newJoinerAutoSheet: document.querySelector("#new-joiner-auto-sheet"),
   closeCampaignDialog: document.querySelector("#close-campaign-dialog"),
   confirmDialog: document.querySelector("#confirm-dialog"),
   confirmForm: document.querySelector("#confirm-form"),
@@ -618,6 +626,16 @@ elements.campaignForm.addEventListener("submit", async (event) => {
       level: elements.newCharacterLevel.value,
       concept: elements.newCharacterConcept.value,
       autoSheet: elements.newCharacterAutoSheet.checked,
+    },
+    startingPartyMember: {
+      name: elements.newJoinerName?.value,
+      ancestry: elements.newJoinerAncestry?.value,
+      characterClass: elements.newJoinerClass?.value,
+      level: elements.newJoinerLevel?.value,
+      concept: elements.newJoinerConcept?.value,
+      integrationPrompt: elements.newJoinerIntegration?.value,
+      hostIntegrationPrompt: elements.newJoinerHostContext?.value,
+      autoSheet: elements.newJoinerAutoSheet?.checked,
     },
   });
 });
@@ -1562,23 +1580,26 @@ async function selectCampaignByPath(sqlitePath) {
   }
 }
 
-async function createNewCampaign({ title, premise, startingLocation, tone, playerCharacter }) {
+async function createNewCampaign({ title, premise, startingLocation, tone, playerCharacter, startingPartyMember }) {
   const trimmedTitle = String(title ?? "").trim() || "New Campaign Binder";
   const trimmedPremise = String(premise ?? "").trim() || "Start a new D&D 5e-lite campaign. Ask for missing essentials, then open with a playable scene.";
   const trimmedStartingLocation = String(startingLocation ?? "").trim();
   const trimmedTone = String(tone ?? "").trim();
   const characterSeed = normalizeWizardCharacter(playerCharacter);
+  const joinerSeed = normalizeWizardJoiner(startingPartyMember);
   const openingPrompt = buildCampaignOpeningPrompt({
     title: trimmedTitle,
     premise: trimmedPremise,
     startingLocation: trimmedStartingLocation,
     tone: trimmedTone,
     character: characterSeed,
+    startingPartyMember: joinerSeed,
   });
   const openingScene = buildOpeningSceneSummary({
     premise: trimmedPremise,
     startingLocation: trimmedStartingLocation,
     character: characterSeed,
+    startingPartyMember: joinerSeed,
   });
   try {
     elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
@@ -1609,6 +1630,9 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
 
     if (characterSeed.name) {
       await seedWizardPlayerCharacter(characterSeed);
+    }
+    if (joinerSeed?.name) {
+      await seedWizardStartingPartyMember(joinerSeed);
     }
 
     seedPlayLog();
@@ -1690,6 +1714,16 @@ function resetCampaignWizardDefaults() {
   elements.newCharacterLevel.value = "1";
   elements.newCharacterConcept.value = "";
   elements.newCharacterAutoSheet.checked = true;
+  if (elements.newJoinerName) {
+    elements.newJoinerName.value = "";
+    elements.newJoinerAncestry.value = "";
+    elements.newJoinerClass.value = "";
+    elements.newJoinerLevel.value = "1";
+    elements.newJoinerConcept.value = "";
+    elements.newJoinerIntegration.value = "";
+    elements.newJoinerHostContext.value = "";
+    elements.newJoinerAutoSheet.checked = true;
+  }
 }
 
 function applyDevJumpStartSeed(seed) {
@@ -2511,17 +2545,44 @@ function normalizeWizardCharacter(input = {}) {
   };
 }
 
-function buildOpeningSceneSummary({ premise, startingLocation, character }) {
+function normalizeWizardJoiner(input = {}) {
+  const seed = normalizeWizardCharacter(input);
+  const integrationPrompt = String(input.integrationPrompt ?? "").trim();
+  const hostIntegrationPrompt = String(input.hostIntegrationPrompt ?? "").trim();
+  const hasAnyValue = [
+    seed.name,
+    seed.ancestry,
+    seed.characterClass,
+    seed.concept,
+    integrationPrompt,
+    hostIntegrationPrompt,
+  ].some(Boolean);
+  if (!hasAnyValue) {
+    return null;
+  }
+
+  return {
+    ...seed,
+    name: seed.name || "Starting Party Member",
+    playerRole: "Starting party member / pending player",
+    integrationPrompt,
+    hostIntegrationPrompt,
+  };
+}
+
+function buildOpeningSceneSummary({ premise, startingLocation, character, startingPartyMember }) {
   const details = [
     premise,
     character?.name ? `Player character: ${formatCharacterBasics(character)}.` : "",
+    startingPartyMember?.name ? `Starting party member: ${formatCharacterBasics(startingPartyMember)}.` : "",
+    startingPartyMember?.integrationPrompt ? `Party connection: ${startingPartyMember.integrationPrompt}.` : "",
     startingLocation ? `Starting place: ${startingLocation}.` : "",
   ].filter(Boolean);
 
   return details.join(" ");
 }
 
-function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, character }) {
+function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, character, startingPartyMember }) {
   const lines = [
     `Start campaign: ${title}.`,
     `Campaign seed: ${premise}`,
@@ -2537,6 +2598,16 @@ function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, ch
     lines.push(`Primary player character: ${formatCharacterBasics(character)}.`);
   } else if (character?.concept || character?.characterClass || character?.ancestry) {
     lines.push(`Primary player character draft: ${formatCharacterBasics(character)}. Ask for the missing name when it matters.`);
+  }
+  if (startingPartyMember?.name) {
+    lines.push(`Starting party member / joiner: ${formatCharacterBasics(startingPartyMember)}.`);
+    if (startingPartyMember.integrationPrompt) {
+      lines.push(`Joiner party integration: ${startingPartyMember.integrationPrompt}.`);
+    }
+    if (startingPartyMember.hostIntegrationPrompt) {
+      lines.push(`Host scene context for joiner: ${startingPartyMember.hostIntegrationPrompt}.`);
+    }
+    lines.push("Treat the joiner as already present or immediately introducible in the opening scene; do not contradict their character pitch.");
   }
 
   lines.push(
@@ -2588,6 +2659,51 @@ async function seedWizardPlayerCharacter(character) {
 
   const result = await response.json();
   setCampaignFromPayload(result, "new_campaign_player_character");
+}
+
+async function seedWizardStartingPartyMember(character) {
+  const baseSheet = character.autoSheet
+    ? buildFiveELiteCharacterSeed(character)
+    : {
+        id: `party-${slugify(character.name)}`,
+        name: character.name,
+        type: "player_character",
+        playerRole: character.playerRole || "Starting party member / pending player",
+        ancestryClass: [character.ancestry, character.characterClass].filter(Boolean).join(" ") || "adventurer",
+        level: character.level,
+        background: character.concept,
+        notes: [],
+      };
+  const sheet = {
+    ...baseSheet,
+    playerRole: character.playerRole || "Starting party member / pending player",
+    controllerKind: "unassigned",
+    fallbackControllerKind: "host",
+    integrationPrompt: character.integrationPrompt,
+    hostIntegrationPrompt: character.hostIntegrationPrompt,
+    notes: [
+      ...(Array.isArray(baseSheet.notes) ? baseSheet.notes : []),
+      "Created from the new campaign pre-table joiner setup.",
+      character.integrationPrompt ? `Party integration: ${character.integrationPrompt}` : "",
+      character.hostIntegrationPrompt ? `Host scene context: ${character.hostIntegrationPrompt}` : "",
+    ].filter(Boolean),
+  };
+
+  const response = await fetch(apiCampaignRecordUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      domain: "party",
+      ...sheet,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  const result = await response.json();
+  setCampaignFromPayload(result, "new_campaign_starting_party_member");
 }
 
 function buildFiveELiteCharacterSeed(character) {

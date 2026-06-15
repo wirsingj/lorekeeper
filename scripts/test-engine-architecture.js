@@ -836,6 +836,17 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.equal(/function latestCommittedReviewBatch/.test(appJs), false);
 }
 
+async function testNewCampaignPreTableJoinerWiring() {
+  const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
+  assert.match(appShell, /Starting Party \/ Joiner/);
+  assert.match(appShell, /new-joiner-integration/);
+  assert.match(appShell, /new-joiner-host-context/);
+  assert.match(appJs, /normalizeWizardJoiner/);
+  assert.match(appJs, /seedWizardStartingPartyMember/);
+  assert.match(appJs, /Host scene context for joiner/);
+}
+
 testDiceEngine();
 await testClipboardFallback();
 testDevJumpStartSeed();
@@ -861,5 +872,6 @@ await testCancelAndStaleCompletion();
 testCancelWithoutProviderAbortEventRecoversImmediately();
 testTurnFlowResetCancelsAndIgnoresStaleEvents();
 await testAppJsNoLongerOwnsExtractedStateMachines();
+await testNewCampaignPreTableJoinerWiring();
 
 console.log("engine architecture tests passed");

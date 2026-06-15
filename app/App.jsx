@@ -398,6 +398,59 @@ function CampaignDialog() {
           </label>
         </section>
 
+        <section className="campaign-wizard-section">
+          <div className="wizard-heading">
+            <span>Starting Party / Joiner</span>
+          </div>
+          <p className="setup-note">Optional. Use this when another player should already be present in the opening scene or ready to be invited after creation.</p>
+          <div className="campaign-wizard-grid">
+            <label>
+              <span>Name</span>
+              <input id="new-joiner-name" autoComplete="off" placeholder="Eve, Mira, Tilli..." />
+            </label>
+            <label>
+              <span>Ancestry</span>
+              <input id="new-joiner-ancestry" autoComplete="off" placeholder="Fairy, elf, human..." />
+            </label>
+            <label>
+              <span>Class / role</span>
+              <input id="new-joiner-class" autoComplete="off" placeholder="Druid, rogue, bard..." />
+            </label>
+            <label>
+              <span>Level</span>
+              <input id="new-joiner-level" inputMode="numeric" defaultValue="1" />
+            </label>
+          </div>
+          <label>
+            <span>Character pitch</span>
+            <textarea
+              id="new-joiner-concept"
+              rows="3"
+              placeholder="Who are they, what kind of energy do they bring, and what do they care about?"
+            ></textarea>
+          </label>
+          <label>
+            <span>Why they are with the party</span>
+            <textarea
+              id="new-joiner-integration"
+              rows="3"
+              placeholder="Old friend, hired guide, stranger with the same problem, rescued captive, sibling, rival..."
+            ></textarea>
+          </label>
+          <label>
+            <span>Host note for the DM</span>
+            <textarea
+              id="new-joiner-host-context"
+              rows="3"
+              placeholder="Scene-specific glue for the DM: how to introduce them, what not to contradict, what goal they bring."
+            ></textarea>
+          </label>
+          <label className="check-row">
+            <input id="new-joiner-auto-sheet" type="checkbox" defaultChecked />
+            <span>Auto-fill a 5E-lite sheet for this party member</span>
+          </label>
+        </section>
+
         <footer className="dialog-actions">
           <button type="submit">Create And Start</button>
         </footer>
