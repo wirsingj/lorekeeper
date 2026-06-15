@@ -8,6 +8,7 @@ import { OllamaProvider } from "./ollama-provider.js";
 import { findOllamaContextForCampaign } from "./ollama-context-cache.js";
 import {
   mergeProviderRuntimeSettings,
+  normalizeOllamaModelId,
   normalizeProviderRuntimeSettings,
   providerModes,
 } from "./provider-settings.js";
@@ -95,14 +96,12 @@ export async function generateTurnWithProvider({
   });
 
   const provider = new OllamaProvider({ baseUrl: settings.ollamaBaseUrl });
-  const generationOptions = {
-    outputLimit: settings.fastMode ? Math.min(settings.outputLimit, 550) : settings.outputLimit,
-    temperature: settings.fastMode ? 0.45 : 0.72,
-    format: "json",
-  };
+  const generationConfig = buildOllamaTurnGenerationConfig(settings);
+  const generationOptions = generationConfig.options;
+  const modelPrompt = generationConfig.promptPrefix ? `${generationConfig.promptPrefix}${prompt}` : prompt;
   const cachedOllamaContext = findOllamaContextForCampaign(campaign, settings);
   let result = await provider.generateTurn({
-    prompt,
+    prompt: modelPrompt,
     model: settings.selectedModel,
     signal,
     onToken,
@@ -128,12 +127,12 @@ export async function generateTurnWithProvider({
     };
     const repairPrompt = buildTurnResponseRepairPrompt({
       request,
-      originalPrompt: prompt,
+      originalPrompt: modelPrompt,
       invalidResponse: result.text,
       validationErrors: parsed.validationErrors,
     });
     result = await provider.generateTurn({
-      prompt: repairPrompt,
+      prompt: generationConfig.promptPrefix ? `${generationConfig.promptPrefix}${repairPrompt}` : repairPrompt,
       model: settings.selectedModel,
       signal,
       onToken,
@@ -167,6 +166,24 @@ export async function generateTurnWithProvider({
     repairAttempt,
     rawText: result.text,
   };
+}
+
+export function buildOllamaTurnGenerationConfig(settings = {}) {
+  const normalized = normalizeProviderRuntimeSettings(settings);
+  const usePlainJsonPrompt = shouldUsePlainJsonPromptForOllamaModel(normalized.selectedModel);
+  return {
+    promptPrefix: usePlainJsonPrompt ? "/no_think\n" : "",
+    options: {
+      outputLimit: normalized.fastMode ? Math.min(normalized.outputLimit, 550) : normalized.outputLimit,
+      temperature: normalized.fastMode ? 0.45 : 0.72,
+      format: usePlainJsonPrompt ? undefined : "json",
+    },
+  };
+}
+
+function shouldUsePlainJsonPromptForOllamaModel(modelId) {
+  const normalized = normalizeOllamaModelId(modelId).toLowerCase();
+  return normalized === "qwen3" || normalized.startsWith("qwen3:");
 }
 
 function shouldAutoRepairTurnResponse(validationErrors = []) {

@@ -4,6 +4,7 @@ import { createReviewBatch, getCommittableChanges } from "../src/canon-review/pr
 import { OllamaProvider } from "../src/ai/ollama-provider.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "../app/mechanics-formatting.js";
 import { normalizeProviderRuntimeSettings } from "../src/ai/provider-settings.js";
+import { buildOllamaTurnGenerationConfig } from "../src/ai/provider-service.js";
 import {
   findOllamaContextForCampaign,
   updateCampaignOllamaContext,
@@ -332,6 +333,15 @@ assert.equal(
   findOllamaContextForCampaign(ollamaMemoryCampaign, { ...ollamaMemorySettings, fastMode: true }),
   null,
 );
+const mistralGenerationConfig = buildOllamaTurnGenerationConfig(ollamaMemorySettings);
+assert.equal(mistralGenerationConfig.options.format, "json");
+assert.equal(mistralGenerationConfig.promptPrefix, "");
+const qwenGenerationConfig = buildOllamaTurnGenerationConfig({
+  ...ollamaMemorySettings,
+  selectedModel: "qwen3:14b",
+});
+assert.equal(qwenGenerationConfig.options.format, undefined);
+assert.match(qwenGenerationConfig.promptPrefix, /\/no_think/);
 
 const partialThinCampaign = createEmptyCampaign({
   title: "Partial Thin Snapshot",
