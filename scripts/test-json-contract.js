@@ -573,6 +573,26 @@ const normalizedDefeatedCombat = normalizeCampaign({
 assert.equal(normalizedDefeatedCombat.combat.inCombat, false);
 assert.deepEqual(normalizedDefeatedCombat.combat.turnOrder, []);
 
+const normalizedPartyOnlyCombat = normalizeCampaign({
+  ...rulesCampaignData,
+  combat: {
+    inCombat: true,
+    round: 1,
+    currentTurnId: "mira",
+    turnOrder: [
+      { id: "mira", name: "Mira", type: "party", initiativeScore: 14 },
+      { id: "bram", name: "Bram", type: "party", initiativeScore: 11 },
+    ],
+    initiative: ["mira", "bram"],
+    enemies: [],
+    turnEconomy: { mira: { action: true } },
+  },
+});
+assert.equal(normalizedPartyOnlyCombat.combat.inCombat, false);
+assert.deepEqual(normalizedPartyOnlyCombat.combat.turnOrder, []);
+assert.deepEqual(normalizedPartyOnlyCombat.combat.initiative, []);
+assert.equal(normalizedPartyOnlyCombat.combat.currentTurnId, null);
+
 assert.equal(
   normalizeProviderRuntimeSettings({ ollamaBaseUrl: "https://example.com/ollama" }).ollamaBaseUrl,
   "http://127.0.0.1:11434",

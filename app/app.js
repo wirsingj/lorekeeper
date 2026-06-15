@@ -5344,6 +5344,9 @@ function createImplicitCombatStartChange(tableMessages = [], proposedChanges = [
   }
 
   const enemies = inferCombatEnemies(latestDmText);
+  if (!enemies.length) {
+    return null;
+  }
   const immediateSituation = compactSceneSituation(latestDmText);
   return {
     operation: "update",
@@ -8579,7 +8582,8 @@ function cleanProviderResponseForPlay(text) {
   const withoutUpdates = stripLorekeeperUpdates(text);
   const withoutRolePrefix = stripProviderRolePrefix(withoutUpdates);
   const withoutMarkdownNoise = stripProviderMarkdownNoise(withoutRolePrefix);
-  const withReadableChoices = normalizeChoiceFormattingForPlay(withoutMarkdownNoise);
+  const withoutJsonTail = stripInlineResponseJsonTail(withoutMarkdownNoise);
+  const withReadableChoices = normalizeChoiceFormattingForPlay(withoutJsonTail);
   return stripTrailingStatusBlock(withReadableChoices).trim() || "The DM response was imported for review.";
 }
 
@@ -8596,6 +8600,18 @@ function stripProviderMarkdownNoise(text) {
     .replace(/\*\*([^*\n]{1,80})\*\*/g, "$1")
     .replace(/(?:^|\n)\s*proposedChanges\s*:\s*$/i, "")
     .trim();
+}
+
+function stripInlineResponseJsonTail(text) {
+  const raw = String(text ?? "");
+  const marker = raw.search(
+    /\b(?:sceneStatus|choices|mechanics|flags|warnings|proposedChanges)\s*:\s*(?:\{|\[|true|false|null|"|\d)/i,
+  );
+  if (marker === -1) {
+    return raw;
+  }
+  const before = raw.slice(0, marker).trim();
+  return before || raw;
 }
 
 function stripTrailingStatusBlock(text) {

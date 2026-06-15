@@ -283,6 +283,20 @@ function normalizeCombatState(combat = {}) {
 }
 
 function reconcileCombatState(combat) {
+  if (combat.inCombat && (!Array.isArray(combat.enemies) || !combat.enemies.length)) {
+    return {
+      ...combat,
+      inCombat: false,
+      initiative: [],
+      turnOrder: [],
+      currentTurnId: null,
+      turnEconomy: {},
+      turnResolved: false,
+      advanceTurn: false,
+      lastOutcome: combat.lastOutcome || "Combat cleared: no enemies were recorded.",
+    };
+  }
+
   if (!combat.inCombat || !Array.isArray(combat.enemies) || !combat.enemies.length) {
     return combat;
   }

@@ -921,6 +921,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /turn_waiting_for_dm/, "submitted turns should be visibly marked while waiting for the DM");
   assert.match(appJs, /updatePlayerTurnEchoLifecycle/, "submitted turn bubbles should update after provider completion or failure");
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
+  assert.match(appJs, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
+  assert.match(appJs, /stripInlineResponseJsonTail/, "table narration cleanup should remove inline provider JSON tails");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
