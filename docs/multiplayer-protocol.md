@@ -100,11 +100,14 @@ Guest action approval is host-configurable:
 
 ```json
 {
-  "requireGuestActionApproval": false
+  "requireGuestActionApproval": false,
+  "holdGuestActionsForGroupInput": false
 }
 ```
 
-`requireGuestActionApproval` defaults to `false` for same-room play. When it is off, accepted guest actions are queued for automatic host-side resolution as soon as the turn/provider pipeline is idle. Guests still cannot mutate SQLite or call the provider directly.
+`requireGuestActionApproval` defaults to `false` for same-room play. When it is off, accepted guest actions are queued for host-side resolution as soon as the turn/provider pipeline is idle. By default the host resolves the earliest queued guest action only, preserving a normal party-member -> DM -> party-member -> DM rhythm.
+
+`holdGuestActionsForGroupInput` defaults to `false`. When it is on, guest actions wait until the host resolves the group turn manually. Guests still cannot mutate SQLite or call the provider directly.
 
 ## Model Aggregation
 

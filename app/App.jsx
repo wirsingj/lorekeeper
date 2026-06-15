@@ -519,6 +519,10 @@ function SetupDialog() {
             <input id="require-guest-action-approval" type="checkbox" />
             Require host approval before guest actions reach the DM
           </label>
+          <label className="check-row local-table-option" title="When on, guest actions wait so the host can collect a group turn before the DM responds.">
+            <input id="hold-guest-actions-for-group" type="checkbox" />
+            Hold guest actions for a group turn
+          </label>
           <div className="button-stack two-up">
             <button id="start-local-table" type="button">Start Local Table</button>
             <button id="stop-local-table" type="button">Stop</button>

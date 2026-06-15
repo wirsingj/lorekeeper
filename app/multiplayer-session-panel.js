@@ -19,6 +19,7 @@ export function buildMultiplayerSessionProjection({
       canSyncGuestTable: Boolean(guestSession?.hostBaseUrl),
       canResolvePartyInputs: false,
       requireGuestActionApproval: false,
+      holdGuestActionsForGroupInput: false,
       connectedGuests: [],
       pendingInputs: guestSnapshot?.pendingInput ? [guestSnapshot.pendingInput] : [],
     };
@@ -36,6 +37,7 @@ export function buildMultiplayerSessionProjection({
     canSyncGuestTable: false,
     canResolvePartyInputs: pendingInputs.some((input) => input.ready && !input.passed && input.text),
     requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
+    holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
     connectedGuests: multiplayer.connections ?? [],
     pendingInputs,
   };
@@ -58,6 +60,10 @@ export function renderMultiplayerSessionPanel({
   if (elements.requireGuestActionApproval) {
     elements.requireGuestActionApproval.checked = projection.requireGuestActionApproval;
     elements.requireGuestActionApproval.disabled = projection.mode !== "host";
+  }
+  if (elements.holdGuestActionsForGroup) {
+    elements.holdGuestActionsForGroup.checked = projection.holdGuestActionsForGroupInput;
+    elements.holdGuestActionsForGroup.disabled = projection.mode !== "host" || projection.requireGuestActionApproval;
   }
   elements.resolvePartyInputs.disabled = !projection.canResolvePartyInputs;
   renderConnectedGuests(elements.connectedGuests, projection.connectedGuests, { labelById, approveGuest, denyGuest });

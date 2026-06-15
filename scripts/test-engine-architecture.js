@@ -753,7 +753,7 @@ function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
     localTable: { running: true, lanAddress: "192.168.1.24", port: 7347 },
-    settings: { requireGuestActionApproval: false },
+    settings: { requireGuestActionApproval: false, holdGuestActionsForGroupInput: false },
     connections: [{ id: "conn-1", displayName: "Jess", status: "pending", partyMemberId: "karl" }],
     pendingTurnInputs: [{ characterName: "Karl", text: "Karl scouts.", ready: true, passed: false }],
   };
@@ -761,6 +761,7 @@ function testMultiplayerSessionProjection() {
   assert.equal(hostProjection.mode, "host");
   assert.equal(hostProjection.canResolvePartyInputs, true);
   assert.equal(hostProjection.requireGuestActionApproval, false);
+  assert.equal(hostProjection.holdGuestActionsForGroupInput, false);
   assert.equal(hostProjection.connectedGuests.length, 1);
   assert.match(hostProjection.localTableAddress, /192\.168\.1\.24:7347/);
 
@@ -782,6 +783,11 @@ function testMultiplayerSessionProjection() {
   campaign.multiplayer.settings.requireGuestActionApproval = true;
   const approvalProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
   assert.equal(approvalProjection.requireGuestActionApproval, true);
+
+  campaign.multiplayer.settings.requireGuestActionApproval = false;
+  campaign.multiplayer.settings.holdGuestActionsForGroupInput = true;
+  const holdProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
+  assert.equal(holdProjection.holdGuestActionsForGroupInput, true);
 
   const guestProjection = buildMultiplayerSessionProjection({
     campaign,

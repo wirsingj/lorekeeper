@@ -97,6 +97,7 @@ export function createDefaultMultiplayerState() {
     hostTurnState: "waiting_for_player",
     settings: {
       requireGuestActionApproval: false,
+      holdGuestActionsForGroupInput: false,
     },
     players: [],
     seats: [],
@@ -121,6 +122,7 @@ function normalizeMultiplayerState(multiplayer = {}) {
       ...defaults.settings,
       ...(multiplayer.settings ?? {}),
       requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
+      holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
     },
     players: Array.isArray(multiplayer.players) ? multiplayer.players : [],
     seats: Array.isArray(multiplayer.seats) ? multiplayer.seats : [],

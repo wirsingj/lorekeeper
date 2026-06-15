@@ -30,6 +30,7 @@ const allowedControllerKinds = new Set(Object.values(controllerKinds));
 const allowedTurnStates = new Set(Object.values(hostTurnStates));
 const defaultMultiplayerSettings = Object.freeze({
   requireGuestActionApproval: false,
+  holdGuestActionsForGroupInput: false,
 });
 const tableStateLimits = Object.freeze({
   party: 24,
@@ -111,15 +112,19 @@ export function stopLocalTable(campaign) {
 
 export function updateMultiplayerSettings(campaign, settings = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
+  const current = next.multiplayer.settings;
   next.multiplayer.settings = {
-    ...next.multiplayer.settings,
-    requireGuestActionApproval: Boolean(settings.requireGuestActionApproval),
+    ...current,
+    requireGuestActionApproval: Object.hasOwn(settings, "requireGuestActionApproval")
+      ? Boolean(settings.requireGuestActionApproval)
+      : current.requireGuestActionApproval,
+    holdGuestActionsForGroupInput: Object.hasOwn(settings, "holdGuestActionsForGroupInput")
+      ? Boolean(settings.holdGuestActionsForGroupInput)
+      : current.holdGuestActionsForGroupInput,
   };
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "multiplayer_settings_updated",
-    summary: next.multiplayer.settings.requireGuestActionApproval
-      ? "Remote player actions now require host approval."
-      : "Remote player actions now submit directly when the host table is ready.",
+    summary: multiplayerSettingsSummary(next.multiplayer.settings),
   });
   return touchCampaign(next);
 }
@@ -443,6 +448,7 @@ export function submitGuestAction(campaign, { connectionId, clientId, connection
   next.multiplayer.pendingTurnInputs = upsertById(next.multiplayer.pendingTurnInputs, input);
   appendVisibleRemoteMessage(next, input, {
     requireApproval: next.multiplayer.settings.requireGuestActionApproval,
+    holdForGroup: next.multiplayer.settings.holdGuestActionsForGroupInput,
   });
   next.multiplayer.hostTurnState = hostTurnStates.COLLECTING_PARTY_INPUTS;
   connection.lastSeenAt = nowIso();
@@ -832,6 +838,7 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
       ...defaultMultiplayerSettings,
       ...(multiplayer.settings ?? {}),
       requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
+      holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
     },
     hostTurnState: allowedTurnStates.has(multiplayer.hostTurnState) ? multiplayer.hostTurnState : hostTurnStates.WAITING_FOR_PLAYER,
     players: Array.isArray(multiplayer.players) ? multiplayer.players : [],
@@ -845,6 +852,16 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
     events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
     lastChoices: multiplayer.lastChoices ?? null,
   };
+}
+
+function multiplayerSettingsSummary(settings = {}) {
+  if (settings.requireGuestActionApproval) {
+    return "Remote player actions now require host approval.";
+  }
+  if (settings.holdGuestActionsForGroupInput) {
+    return "Remote player actions now wait for grouped host resolution.";
+  }
+  return "Remote player actions now submit directly one actor at a time when the host table is ready.";
 }
 
 function normalizeTableTalkMessage(message) {
@@ -1259,7 +1276,7 @@ function isHiddenValue(value) {
   );
 }
 
-function appendVisibleRemoteMessage(campaign, input, { requireApproval = false } = {}) {
+function appendVisibleRemoteMessage(campaign, input, { requireApproval = false, holdForGroup = false } = {}) {
   const sessionLog = campaign.sessionLog ?? { activeSessionId: "session-main", sessions: [], messages: [] };
   const activeSessionId = sessionLog.activeSessionId || "session-main";
   if (!Array.isArray(sessionLog.sessions) || !sessionLog.sessions.some((session) => session.id === activeSessionId)) {
@@ -1284,7 +1301,9 @@ function appendVisibleRemoteMessage(campaign, input, { requireApproval = false }
     body: input.text,
     meta: requireApproval
       ? `From ${input.playerName}; waiting for host approval`
-      : `From ${input.playerName}; queued for DM`,
+      : holdForGroup
+        ? `From ${input.playerName}; queued for grouped host turn`
+        : `From ${input.playerName}; queued for DM`,
     source: "remote_player_input_pending",
     providerRunId: null,
     createdAt: existingIndex === -1 ? nowIso() : sessionLog.messages[existingIndex].createdAt,
@@ -1295,6 +1314,7 @@ function appendVisibleRemoteMessage(campaign, input, { requireApproval = false }
       status: "pending_model_submit",
       hostStaged: !requireApproval,
       requiresHostApproval: requireApproval,
+      holdForGroup,
       multiplayer: true,
     },
   };

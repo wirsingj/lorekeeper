@@ -258,6 +258,7 @@ const elements = {
   localTableAddress: document.querySelector("#local-table-address"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
+  holdGuestActionsForGroup: document.querySelector("#hold-guest-actions-for-group"),
   startLocalTable: document.querySelector("#start-local-table"),
   stopLocalTable: document.querySelector("#stop-local-table"),
   copyCharacterInvite: document.querySelector("#copy-character-invite"),
@@ -507,7 +508,11 @@ elements.stopLocalTable.addEventListener("click", async () => {
 });
 
 elements.requireGuestActionApproval?.addEventListener("change", async () => {
-  await saveGuestActionApprovalSetting();
+  await saveGuestActionSettings();
+});
+
+elements.holdGuestActionsForGroup?.addEventListener("change", async () => {
+  await saveGuestActionSettings();
 });
 
 elements.copyCharacterInvite?.addEventListener("click", async () => {
@@ -1123,6 +1128,7 @@ function collectStagedRemoteInputs() {
       characterName: input.characterName,
       text: input.text,
       ready: input.ready,
+      updatedAt: input.updatedAt,
     }));
 }
 
@@ -1472,7 +1478,7 @@ async function maybeAutoResolveCombatRemoteInputs() {
   ) {
     return;
   }
-  const inputs = collectStagedRemoteInputs();
+  const inputs = earliestGuestInputForImmediateResolution(collectStagedRemoteInputs());
   if (!inputs.length) {
     return;
   }
@@ -1738,24 +1744,33 @@ async function stopLocalTableFromUi() {
   }
 }
 
-async function saveGuestActionApprovalSetting() {
-  if (!elements.requireGuestActionApproval) {
+async function saveGuestActionSettings() {
+  if (!elements.requireGuestActionApproval && !elements.holdGuestActionsForGroup) {
     return;
   }
-  const requireGuestActionApproval = Boolean(elements.requireGuestActionApproval.checked);
+  const requireGuestActionApproval = Boolean(elements.requireGuestActionApproval?.checked);
+  const holdGuestActionsForGroupInput = !requireGuestActionApproval && Boolean(elements.holdGuestActionsForGroup?.checked);
   try {
-    const result = await postJson(apiMultiplayerSettingsUrl, { requireGuestActionApproval });
+    const result = await postJson(apiMultiplayerSettingsUrl, {
+      requireGuestActionApproval,
+      holdGuestActionsForGroupInput,
+    });
     setCampaignFromPayload(result, "local_table_settings_updated");
     state.multiplayerSnapshot = result.multiplayer;
     render();
     setProviderActivity(
       requireGuestActionApproval
         ? "Guest actions now wait for host approval"
-        : "Guest actions now submit directly when the host is ready",
+        : holdGuestActionsForGroupInput
+          ? "Guest actions now wait for grouped host resolution"
+          : "Guest actions now submit directly one at a time",
       "idle",
     );
   } catch (error) {
     elements.requireGuestActionApproval.checked = Boolean(state.campaign?.multiplayer?.settings?.requireGuestActionApproval);
+    if (elements.holdGuestActionsForGroup) {
+      elements.holdGuestActionsForGroup.checked = Boolean(state.campaign?.multiplayer?.settings?.holdGuestActionsForGroupInput);
+    }
     setProviderActivity(error instanceof Error ? `Table setting failed: ${error.message}` : "Table setting failed", "error");
   }
 }
@@ -2227,6 +2242,9 @@ function shouldAutoResolveGuestInputs() {
   if (state.campaign.multiplayer?.settings?.requireGuestActionApproval) {
     return false;
   }
+  if (state.campaign.multiplayer?.settings?.holdGuestActionsForGroupInput) {
+    return false;
+  }
   if (state.autoResolvingGuestInputs || turnFlowBlocksNewTurn()) {
     return false;
   }
@@ -2234,6 +2252,12 @@ function shouldAutoResolveGuestInputs() {
     return false;
   }
   return collectStagedRemoteInputs().length > 0;
+}
+
+function earliestGuestInputForImmediateResolution(inputs) {
+  return [...inputs]
+    .sort((a, b) => String(a.updatedAt || "").localeCompare(String(b.updatedAt || "")))
+    .slice(0, 1);
 }
 
 function renderGuestSnapshot(snapshot) {
@@ -3475,6 +3499,9 @@ function applyThinModeChrome() {
   if (elements.requireGuestActionApproval) {
     elements.requireGuestActionApproval.closest(".local-table-option")?.setAttribute("hidden", "");
   }
+  if (elements.holdGuestActionsForGroup) {
+    elements.holdGuestActionsForGroup.closest(".local-table-option")?.setAttribute("hidden", "");
+  }
   elements.resolvePartyInputs.hidden = true;
   elements.joinCampaign.hidden = false;
   if (elements.joinCampaignMain) {
@@ -3516,6 +3543,9 @@ function applyFullModeChrome() {
   }
   if (elements.requireGuestActionApproval) {
     elements.requireGuestActionApproval.closest(".local-table-option")?.removeAttribute("hidden");
+  }
+  if (elements.holdGuestActionsForGroup) {
+    elements.holdGuestActionsForGroup.closest(".local-table-option")?.removeAttribute("hidden");
   }
   elements.resolvePartyInputs.hidden = false;
   elements.joinCampaign.hidden = false;
@@ -6215,7 +6245,7 @@ function renderPlayLog() {
         if (message.data?.hostStaged) {
           const status = document.createElement("span");
           status.className = "message-action-status";
-          status.textContent = "Staged for Send Turn";
+          status.textContent = message.data?.holdForGroup ? "Holding for group turn" : "Queued for DM";
           actionRow.append(status);
         } else {
           const stageButton = document.createElement("button");

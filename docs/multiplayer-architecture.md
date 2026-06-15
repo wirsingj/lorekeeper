@@ -28,9 +28,11 @@ Seat state should support:
 
 Remote player action approval is a host table setting, separate from join approval. It defaults to off.
 
-When `requireGuestActionApproval` is off, an approved guest's action is written as a visible party message and queued for the host turn pipeline. The host still owns SQLite, provider calls, state effects, and turn resolution. The renderer auto-resolves queued guest actions only while the provider/turn engine is idle, no repair is pending, and the host is not composing a message.
+When `requireGuestActionApproval` is off, an approved guest's action is written as a visible party message and queued for the host turn pipeline. The host still owns SQLite, provider calls, state effects, and turn resolution. The renderer auto-resolves the earliest queued guest action only while the provider/turn engine is idle, no repair is pending, and the host is not composing a message. This preserves the normal table cadence: one party member acts, then the DM responds.
 
 When `requireGuestActionApproval` is on, remote inputs wait for the host to stage or resolve them manually.
+
+When `holdGuestActionsForGroupInput` is on, remote inputs do not auto-resolve. The host can collect multiple party-member messages and resolve them as a grouped table turn. This should be a deliberate pacing choice, not the default.
 
 In combat, remote actions still respect active actor rules: a remote combat action resolves only when that remote-controlled actor is the current combatant. Guest clients do not skip initiative or mutate combat state.
 
@@ -40,6 +42,7 @@ In combat, remote actions still respect active actor rules: a remote combat acti
 - Thin client join should be visible on the main view.
 - Host approval should appear next to the relevant party member/seat.
 - "Host approval for guest actions" should remain a clear Local Table option, defaulting off for smoother same-room play.
+- "Hold guest actions for a group turn" should remain host-controlled and default off.
 - The renderer should consume a multiplayer session projection rather than deriving host/guest local-table UI state inline.
 
 ## Current Projection Module
