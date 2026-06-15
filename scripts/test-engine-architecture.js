@@ -858,6 +858,8 @@ function testMultiplayerSessionProjection() {
   assert.equal(hostProjection.holdGuestActionsForGroupInput, false);
   assert.equal(hostProjection.connectedGuests.length, 1);
   assert.match(hostProjection.localTableAddress, /192\.168\.1\.24:7347/);
+  assert.match(hostProjection.flowSummary, /queued/i);
+  assert.match(hostProjection.pendingInputs[0].statusLabel, /Queued for DM/);
 
   const stoppedProjection = buildMultiplayerSessionProjection({
     campaign: {
@@ -877,11 +879,16 @@ function testMultiplayerSessionProjection() {
   campaign.multiplayer.settings.requireGuestActionApproval = true;
   const approvalProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
   assert.equal(approvalProjection.requireGuestActionApproval, true);
+  assert.match(approvalProjection.flowSummary, /host approval/i);
+  assert.match(approvalProjection.pendingInputs[0].statusLabel, /Waiting for host approval/);
 
   campaign.multiplayer.settings.requireGuestActionApproval = false;
   campaign.multiplayer.settings.holdGuestActionsForGroupInput = true;
   const holdProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
   assert.equal(holdProjection.holdGuestActionsForGroupInput, true);
+  assert.equal(holdProjection.resolvePartyInputsLabel, "Resolve Group Turn");
+  assert.match(holdProjection.flowSummary, /grouped host turn/i);
+  assert.match(holdProjection.pendingInputs[0].statusLabel, /Held for group turn/);
 
   const guestProjection = buildMultiplayerSessionProjection({
     campaign,
@@ -893,6 +900,8 @@ function testMultiplayerSessionProjection() {
   assert.equal(guestProjection.canStartLocalTable, false);
   assert.equal(guestProjection.canSyncGuestTable, true);
   assert.equal(guestProjection.pendingInputs.length, 1);
+  assert.match(guestProjection.flowSummary, /host table first/i);
+  assert.match(guestProjection.pendingInputs[0].statusLabel, /Sent to host table/);
 }
 
 function testReviewPanelProjection() {
@@ -964,6 +973,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /new-joiner-integration/);
   assert.match(appShell, /new-joiner-host-context/);
   assert.match(appShell, /table-timeline-summary/);
+  assert.match(appShell, /local-table-guidance/);
   assert.ok(
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
     "table status strip should live above the play log",

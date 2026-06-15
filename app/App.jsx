@@ -629,6 +629,7 @@ function SetupDialog() {
             <input id="hold-guest-actions-for-group" type="checkbox" />
             Hold guest actions for a group turn
           </label>
+          <p id="local-table-guidance" className="setup-note">Guest actions resolve one at a time when the DM is idle.</p>
           <div className="button-stack two-up">
             <button id="start-local-table" type="button">Start Local Table</button>
             <button id="stop-local-table" type="button">Stop</button>

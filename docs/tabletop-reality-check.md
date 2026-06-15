@@ -48,6 +48,7 @@ Status legend:
 24. Improved - Ollama context tokens are cached per campaign/model/mode as non-canon provider memory, so same-campaign warmth can help without cross-campaign bleed.
 25. Improved - Combat tracker rows now include compact conditions, defeated state, movement remaining, and action-spent hints.
 26. Improved - Failed provider turns now mark approved/remote party inputs as "Still staged" instead of leaving them looking silently consumed or indefinitely processing.
+27. Improved - Local table setup now explains whether guest actions auto-resolve, wait for host approval, or are held for a grouped host turn.
 
 ## Top Immersion Risks Still Open
 
@@ -98,7 +99,7 @@ Status legend:
 11. Medium - Make scene tension/consequence summaries and optional hidden-story debug summaries more visible in settings/diagnostics, not live play.
 12. Medium - Clarify enemy HP visibility policy for host and guest views.
 13. Improved - Improve combat tracker density for longer encounters: conditions, defeated state, movement remaining, and action spent now show in compact row metadata. Concentration and richer resource badges remain.
-14. Medium - Make group-hold multiplayer mode explain itself before public use.
+14. Improved - Make group-hold multiplayer mode explain itself before public use. Local Table now shows a live flow note and pending rows say queued, waiting for host approval, or held for group turn.
 15. Improved - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck. Approved and remote party inputs now keep retryable "Still staged" lifecycle badges after provider failure.
 16. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
 17. Medium - Make right-side binder collapsible or context-sensitive during active play.
@@ -133,7 +134,7 @@ Fixed or improved:
 2. Fixed - Join-as character creation is richer and standardized.
 3. Fixed - Controller transfer to AI/host clears active stale guest connections.
 4. Improved - Guest wording now describes actions as sent to the host table.
-5. Improved - Host approval and group-hold modes have stronger status hooks.
+5. Improved - Host approval and group-hold modes have stronger status hooks and visible Local Table flow explanations.
 
 Still open:
 
@@ -211,6 +212,7 @@ Current coverage includes:
 16. Per-campaign Ollama context cache normalization prevents model/mode/campaign context reuse across mismatched runs.
 17. Combat tracker projection covers condition tags, action spent, movement remaining, and defeated state.
 18. Failed provider turn paths preserve approved/remote party inputs visually as retryable staged table actions.
+19. Multiplayer session projection covers auto-resolve, host-approval, group-hold, and guest-sent wording.
 
 ## Remaining Product Risk
 

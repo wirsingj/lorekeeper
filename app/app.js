@@ -279,6 +279,7 @@ const elements = {
   cancelGeneration: document.querySelector("#cancel-generation"),
   localTableState: document.querySelector("#local-table-state"),
   localTableAddress: document.querySelector("#local-table-address"),
+  localTableGuidance: document.querySelector("#local-table-guidance"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
   holdGuestActionsForGroup: document.querySelector("#hold-guest-actions-for-group"),
