@@ -1260,6 +1260,18 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.choice-audience {
+  justify-self: start;
+  width: fit-content;
+  padding: 3px 8px;
+  border: 1px solid rgba(174, 191, 202, 0.18);
+  border-radius: 999px;
+  background: rgba(174, 191, 202, 0.08);
+  color: #cbd8df;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .choice-panel ol {
   display: grid;
   gap: 7px;

@@ -52,14 +52,19 @@ SQLite remains canon. A model response can only propose state changes; LoreKeepe
       },
       "choices": {
         "prompt": "question for the player",
-        "scope": "player|party|character",
+        "scope": "free|party|character|subset|vote|combat_actor",
         "forActorId": "optional character id",
         "forActor": "optional character name",
+        "forActorIds": [],
+        "allowVote": false,
+        "voteTieBreaker": "host",
         "options": [
           {
             "id": "1",
             "actorId": "optional actor id",
             "actor": "optional actor name",
+            "targetActorId": "optional targeted actor id",
+            "targetActor": "optional targeted actor name",
             "text": "clear action option"
           }
         ],
@@ -271,7 +276,7 @@ Allowed table kinds: `narration`, `dialogue`, `action`, `mechanics`, `status`, `
 
 Allowed table visibility values: `table`, `dm_only`, `party`.
 
-`choices` are first-class response data. The model should not bury player or party action options only in narration. Use `choices.scope`, `choices.forActor`, and per-option `actor`/`actorId` when the options are for a party member or NPC.
+`choices` are first-class response data. The model should not bury player or party action options only in narration. Use `choices.scope`, `choices.forActor`/`forActorId`, `choices.forActorIds`, `choices.allowVote`, and per-option `actor`/`actorId` or `targetActor`/`targetActorId` when a prompt is aimed at the whole party, a vote, a specific party member, a subset, or the current combat actor.
 
 Allowed mechanic types: `suggested_check`, `check`, `save`, `attack`, `damage`, `initiative`, `resource_note`, `status`, `none`.
 

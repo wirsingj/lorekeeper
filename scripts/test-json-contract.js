@@ -683,6 +683,43 @@ assert.match(renderedWithSingleChoiceBlock, /The miner lifts his pickaxe and squ
 assert.equal((renderedWithSingleChoiceBlock.match(/A\. Garren: Throw sand in his eyes\./g) ?? []).length, 1);
 assert.equal((renderedWithSingleChoiceBlock.match(/B\. Garren: Ready your stance\./g) ?? []).length, 1);
 
+const targetedChoiceResponse = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  choices: {
+    prompt: "Corin, what do you do?",
+    scope: "targeted",
+    forActorId: "party-corin",
+    forActor: "Corin",
+    options: [
+      { id: "A", targetActorId: "party-corin", targetActor: "Corin", text: "Study the rune before anyone touches the offering." },
+      { id: "B", targetActorId: "party-corin", targetActor: "Corin", text: "Warn Garren away from the shrine." },
+    ],
+    allowOther: true,
+  },
+})));
+assert.equal(targetedChoiceResponse.error, null);
+assert.equal(targetedChoiceResponse.response.choices.scope, "character");
+assert.equal(targetedChoiceResponse.response.choices.forActorId, "party-corin");
+assert.equal(targetedChoiceResponse.response.choices.forActor, "Corin");
+assert.equal(targetedChoiceResponse.response.choices.options[0].targetActorId, "party-corin");
+
+const voteChoiceResponse = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  choices: {
+    prompt: "How does the party approach the shrine?",
+    scope: "vote",
+    allowVote: true,
+    voteTieBreaker: "host",
+    options: [
+      { id: "A", text: "Leave the offering untouched and watch from cover." },
+      { id: "B", text: "Examine the offering with tools instead of bare hands." },
+    ],
+    allowOther: true,
+  },
+})));
+assert.equal(voteChoiceResponse.error, null);
+assert.equal(voteChoiceResponse.response.choices.scope, "vote");
+assert.equal(voteChoiceResponse.response.choices.allowVote, true);
+assert.equal(voteChoiceResponse.response.choices.voteTieBreaker, "host");
+
 const noChanges = parseTurnJsonResponse(JSON.stringify(validTurnResponse({ proposedChanges: [] })));
 assert.equal(noChanges.response.proposedChanges.length, 0);
 

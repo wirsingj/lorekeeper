@@ -956,6 +956,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /sessionHealth: buildSessionHealthSummary\(\)/, "renderer diagnostics should serialize session health");
   assert.match(appJs, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
   assert.match(appJs, /stripInlineResponseJsonTail/, "table narration cleanup should remove inline provider JSON tails");
+  assert.match(appJs, /choiceAudienceLabel/, "structured choice panels should surface party/character/vote audience metadata");
+  assert.match(appJs, /choice-audience/, "choice panels should render the selected audience near the prompt");
   assert.equal(/label:\s*"Play"/.test(appJs), false, "AI companion cards should use Nudge instead of a Play button");
   assert.match(
     appJs,

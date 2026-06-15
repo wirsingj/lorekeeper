@@ -53,7 +53,7 @@ Before introducing new content, the provider request asks the model to answer: w
 
 Scenes are allowed to breathe. Conversation, travel, investigation, planning, recovery, reflection, and social fallout can be complete satisfying turns. Combat should begin because goals or motivations clash, not because the story has gone quiet.
 
-Action options belong in `response.choices`, not loose prose. For options aimed at a specific party member or NPC, the model should include `choices.forActor`/`forActorId` or per-option `actor`/`actorId` so the app can render a clean table choice panel.
+Action options belong in `response.choices`, not loose prose. Choice prompts can target the whole party, one character, a subset, the current combat actor, or a party vote. The model should set `choices.scope` (`party`, `character`, `subset`, `vote`, `combat_actor`, or `free`), `choices.forActor`/`forActorId`, `choices.forActorIds`, `choices.allowVote`, and per-option `actor`/`actorId` or `targetActor`/`targetActorId` so the app can render a clean table choice panel and preserve whose decision is being resolved.
 
 Local multiplayer inputs appear publicly in table chat first. When the host submits one of those visible character messages, LoreKeeper also includes it in `user.playerInputs[]` with `playerId`, `playerName`, `characterId`, `characterName`, and `text`. This gives the model structured source attribution without treating guest messages as hidden state.
 

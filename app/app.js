@@ -872,6 +872,11 @@ function expandChoiceSelection(text) {
     choices,
     optionRecords: selectedIndexes.map((index) => panel.options?.[index] ?? null),
     prompt: panel.prompt,
+    scope: panel.scope || "",
+    forActorId: panel.forActorId ?? null,
+    forActor: panel.forActor || "",
+    forActorIds: Array.isArray(panel.forActorIds) ? panel.forActorIds : [],
+    allowVote: panel.allowVote === true,
     selectedOptionIds: selectedIndexes.map((index) => panel.options?.[index]?.id ?? choiceLabelForIndex(index)),
     inWorldText: `I choose ${labels.join(" + ")}: ${choices.join(" Also, ")}`,
   };
@@ -949,10 +954,28 @@ function choiceSelectionMeta(selection, { actualAction = "" } = {}) {
   const combatInstruction = state.campaign?.combat?.inCombat
     ? " This is a combat action for the active initiative actor; resolve it with visible mechanics, HP/resource updates, and advance the turn. Do not resolve or narrate the next initiative actor's attack/action in this response."
     : "";
+  const audienceInstruction = choiceSelectionAudienceMeta(selection);
   const editedInstruction = actualAction && compactCompareText(actualAction) !== compactCompareText(selection.inWorldText)
     ? " The player edited/expanded the selected option; user.inWorld is the authoritative action and overrides the original option wording."
     : " Resolve the selected choice text, not the bare numbers/letters.";
-  return `(meta: The player selected ${selection.labels.join(", ")} from the latest visible choice panel.${editedInstruction} Preserve concrete player details, props, positioning, dialogue, and intent from user.inWorld. Do not ask the same choice question again unless new information changes the options.${combatInstruction})`;
+  return `(meta: The player selected ${selection.labels.join(", ")} from the latest visible choice panel.${audienceInstruction}${editedInstruction} Preserve concrete player details, props, positioning, dialogue, and intent from user.inWorld. Do not ask the same choice question again unless new information changes the options.${combatInstruction})`;
+}
+
+function choiceSelectionAudienceMeta(selection = {}) {
+  const pieces = [];
+  if (selection.scope) {
+    pieces.push(`choice scope: ${selection.scope}`);
+  }
+  if (selection.forActor) {
+    pieces.push(`targeted actor: ${selection.forActor}`);
+  }
+  if (selection.forActorId) {
+    pieces.push(`targeted actor id: ${selection.forActorId}`);
+  }
+  if (selection.allowVote) {
+    pieces.push("this was a party vote prompt; host breaks ties");
+  }
+  return pieces.length ? ` ${pieces.join("; ")}.` : "";
 }
 
 function latestChoicePanelFromMessages() {
@@ -984,11 +1007,16 @@ function structuredChoicesForMessage(turnResponse) {
     scope: choices.scope || "",
     forActorId: choices.forActorId ?? null,
     forActor: choices.forActor || "",
+    forActorIds: Array.isArray(choices.forActorIds) ? choices.forActorIds : [],
+    allowVote: choices.allowVote === true,
+    voteTieBreaker: choices.voteTieBreaker || "host",
     allowOther: choices.allowOther !== false,
     options: choices.options.map((option, index) => ({
       id: String(option.id || choiceLabelForIndex(index)),
       actorId: option.actorId ?? null,
       actor: option.actor || "",
+      targetActorId: option.targetActorId ?? null,
+      targetActor: option.targetActor || "",
       legalOptionId: option.legalOptionId ?? null,
       text: option.text || option.label || "",
     })).filter((option) => option.text),
@@ -1006,6 +1034,12 @@ function structuredChoiceBlockFromMessageData(data = {}) {
   return {
     type: "choices",
     prompt: choices.prompt || "What do you do?",
+    audienceLabel: choiceAudienceLabel(choices),
+    scope: choices.scope || "",
+    forActorId: choices.forActorId ?? null,
+    forActor: choices.forActor || "",
+    forActorIds: Array.isArray(choices.forActorIds) ? choices.forActorIds : [],
+    allowVote: choices.allowVote === true,
     items: choices.options.map(formatStructuredChoiceOption),
     options: choices.options,
     allowOther: choices.allowOther !== false,
@@ -1014,8 +1048,28 @@ function structuredChoiceBlockFromMessageData(data = {}) {
 }
 
 function formatStructuredChoiceOption(option) {
-  const actor = option.actor ? `${option.actor}: ` : "";
+  const actor = option.actor || option.targetActor ? `${option.actor || option.targetActor}: ` : "";
   return `${actor}${option.text}`;
+}
+
+function choiceAudienceLabel(choices = {}) {
+  const scope = String(choices.scope || "").trim();
+  if (choices.allowVote === true || scope === "vote") {
+    return "Party vote - host breaks ties";
+  }
+  if (scope === "party") {
+    return "For the party";
+  }
+  if (scope === "combat_actor") {
+    return choices.forActor ? `Combat turn: ${choices.forActor}` : "Current combat actor";
+  }
+  if (scope === "character") {
+    return choices.forActor ? `For ${choices.forActor}` : "For one character";
+  }
+  if (scope === "subset") {
+    return choices.forActor ? `For ${choices.forActor}` : "For selected characters";
+  }
+  return "";
 }
 
 function parseChoiceIndexes(text, maxChoices) {
@@ -1061,6 +1115,11 @@ function chooseVisibleOption(block, index) {
     choices: [item],
     optionRecords: [block.options?.[index] ?? null],
     prompt: block.prompt || "",
+    scope: block.scope || "",
+    forActorId: block.forActorId ?? null,
+    forActor: block.forActor || "",
+    forActorIds: Array.isArray(block.forActorIds) ? block.forActorIds : [],
+    allowVote: block.allowVote === true,
     selectedOptionIds: [optionId],
     inWorldText: `I choose ${optionId}: ${item}`,
   };
@@ -8955,6 +9014,12 @@ function messageBodyElements(text, role = "dm", data = {}) {
       title.className = "choice-title";
       title.textContent = block.prompt;
       panel.append(title);
+      if (block.audienceLabel) {
+        const audience = document.createElement("span");
+        audience.className = "choice-audience";
+        audience.textContent = block.audienceLabel;
+        panel.append(audience);
+      }
 
       const list = document.createElement("ol");
       block.items.forEach((itemText, index) => {

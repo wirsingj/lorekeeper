@@ -20,6 +20,7 @@ const allowedTableKinds = new Set(["narration", "dialogue", "action", "mechanics
 const allowedTableVisibility = new Set(["table", "dm_only", "party"]);
 const allowedMechanicTypes = new Set(["suggested_check", "check", "save", "attack", "damage", "initiative", "resource_note", "status", "none"]);
 const allowedMechanicOutcomes = new Set(["success", "failure", "mixed", "pending", "none"]);
+const allowedChoiceScopes = new Set(["", "free", "party", "character", "subset", "vote", "combat_actor"]);
 const allowedOperations = new Set(["add", "update", "remove", "note"]);
 const allowedDomains = new Set([
   "party",
@@ -431,6 +432,9 @@ export function validateTurnResponse(response, options = {}) {
   }
 
   requireObject(response.choices, "choices", errors);
+  if (response.choices?.scope && !allowedChoiceScopes.has(response.choices.scope)) {
+    errors.push(`choices.scope must be one of ${[...allowedChoiceScopes].filter(Boolean).join(", ")}`);
+  }
   validateArray(response.choices?.options, "choices.options", errors);
 
   validateArray(response.mechanics, "mechanics", errors);
@@ -622,10 +626,23 @@ function createResponseFormatSchema() {
       },
       choices: {
         prompt: "",
-        scope: "",
+        scope: "free|party|character|subset|vote|combat_actor",
         forActorId: null,
         forActor: "",
-        options: [],
+        forActorIds: [],
+        allowVote: false,
+        voteTieBreaker: "host",
+        options: [
+          {
+            id: "A",
+            actorId: null,
+            actor: "",
+            targetActorId: null,
+            targetActor: "",
+            legalOptionId: null,
+            text: "clear action option",
+          },
+        ],
         allowOther: true,
       },
       mechanics: [
@@ -674,9 +691,14 @@ function createResponseFormatSchema() {
       "Never answer a new player action by repeating the previous DM question.",
       "Do not force choices for patrols, travel, investigation progress, NPC replies, atmosphere, consequences, or simple scene continuation.",
       "Offer structured choices only when generation.choicePolicy.choicesAllowed is true or this response establishes immediate danger/combat.",
-      "When offering choices, make them separate objects, not a paragraph. Shape: { id: 'A', actorId: null, actor: '', text: 'clear action option', legalOptionId: null }.",
+      "When offering choices, make them separate objects, not a paragraph. Shape: { id: 'A', actorId: null, actor: '', targetActorId: null, targetActor: '', text: 'clear action option', legalOptionId: null }.",
       "Use lettered choices: A, B, C, D. The option id should be the letter.",
       "Use choices.options for every listed option. Do not put action options only in table text.",
+      "Use choices.scope to identify who is being asked: party for everyone, vote when the host should call a table vote, character for one party member, subset for several named members, combat_actor for the current initiative actor, free for open table input.",
+      "If the DM asks one party member directly, set choices.scope to character and set choices.forActorId/forActor to that party member.",
+      "If the DM asks several specific party members, set choices.scope to subset and set choices.forActorIds plus choices.forActor.",
+      "If the DM asks the whole table to decide a direction, set choices.scope to party. If it should be voted on, set choices.scope to vote and allowVote true; the host breaks ties.",
+      "Do not make every prompt a party prompt. A real table alternates between party questions, targeted character spotlights, and occasional companion/NPC interjections.",
       "When context.rulesLedger.actors[].legalOptions exists and a tactical decision is needed, build choices from those options and include legalOptionId.",
       "Narration/dialogue/feelings may be freeform table text. Stats, rolls, choices, lore, history, relationships, inventory, and character facts must be structured data.",
       "Put checks, rolls, DCs, HP/resource notes, and outcomes in mechanics, not only in narration.",
@@ -697,6 +719,7 @@ function createResponseFormatSchema() {
       "Combat proposedChanges may use domain combat data.actorUpdates for party HP/resource/condition changes and data.enemyUpdates for enemy changes.",
       "If combat has multiple similar enemies, represent each combatant separately in data.enemies/turnOrder, or provide a count/quantity field so the app can expand them into separate initiative rows.",
       "When options are for a specific party member or NPC, include choices.forActor/forActorId or option.actor/actorId.",
+      "Any party member may have a visible table post when they submitted input, when their controller/host selected their option, or when an AI companion is nudged/idle for a brief low-stakes contribution.",
       "Never put party-member speech or chosen action in table entries unless it came from user.playerInputs or user.inWorld, or it is clearly labeled as a non-binding suggestion.",
       "Remote/player-controlled party members may be described as present only in neutral staging; do not narrate what they think, notice, scan, say, decide, or do without submitted input.",
       "AI companions may suggest one concise low-stakes contribution outside their own combat turn when nudged or when the table is idle, but their combat turn should still be presented for controller/host input before resolution.",
@@ -1062,11 +1085,14 @@ function normalizeChoices(choices = {}) {
   if (!choices || typeof choices !== "object") {
     choices = {};
   }
+  const forActorIds = normalizeActorIdList(choices.forActorIds ?? choices.actorIds ?? choices.targetActorIds ?? choices.targets);
   const options = Array.isArray(choices.options)
     ? choices.options.map((option, index) => ({
       id: String(option?.id ?? letterForIndex(index)),
       actorId: option?.actorId ?? null,
       actor: compactWhitespace(option?.actor || ""),
+      targetActorId: option?.targetActorId ?? option?.forActorId ?? null,
+      targetActor: compactWhitespace(option?.targetActor || option?.forActor || ""),
       legalOptionId: option?.legalOptionId ?? null,
       text: compactChoiceText(option?.text ?? option?.label ?? option),
     })).filter((option) => option.text)
@@ -1074,12 +1100,64 @@ function normalizeChoices(choices = {}) {
 
   return {
     prompt: compactWhitespace(choices.prompt || "What do you do?"),
-    scope: compactWhitespace(choices.scope || ""),
+    scope: normalizeChoiceScope(choices.scope, choices, forActorIds),
     forActorId: choices.forActorId ?? null,
     forActor: compactWhitespace(choices.forActor || ""),
+    forActorIds,
+    allowVote: choices.allowVote === true || normalizeChoiceScope(choices.scope, choices, forActorIds) === "vote",
+    voteTieBreaker: compactWhitespace(choices.voteTieBreaker || "host"),
     options: options.slice(0, 7),
     allowOther: choices.allowOther !== false,
   };
+}
+
+function normalizeChoiceScope(value, choices = {}, forActorIds = []) {
+  const rawScope = compactWhitespace(value || "");
+  if (allowedChoiceScopes.has(rawScope)) {
+    return rawScope;
+  }
+  const scope = normalizeToken(rawScope);
+  const aliases = {
+    all: "party",
+    everyone: "party",
+    group: "party",
+    table: "party",
+    whole_party: "party",
+    pc: "character",
+    player: "character",
+    actor: "character",
+    target: "character",
+    targeted: "character",
+    few: "subset",
+    several: "subset",
+    multiple: "subset",
+    poll: "vote",
+    voting: "vote",
+    initiative: "combat_actor",
+    current_actor: "combat_actor",
+  };
+  if (aliases[scope]) {
+    return aliases[scope];
+  }
+  if (choices.allowVote === true) {
+    return "vote";
+  }
+  if (choices.forActorId || compactWhitespace(choices.forActor || "")) {
+    return "character";
+  }
+  if (forActorIds.length > 1) {
+    return "subset";
+  }
+  return "";
+}
+
+function normalizeActorIdList(value) {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return values
+    .map((item) => typeof item === "object" ? item?.id ?? item?.actorId ?? item?.targetActorId : item)
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 8);
 }
 
 function applyChoicePolicy(choices, { choicePolicy, sceneStatus, mechanics, flags, warnings } = {}) {

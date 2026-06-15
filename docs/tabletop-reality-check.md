@@ -54,6 +54,7 @@ Status legend:
 30. Improved - Setup diagnostics now includes a plain session health summary for host troubleshooting: provider state, combat turn, staged party inputs, guest approvals, review state, Local Table state, and provider mode.
 31. Improved - Auto-resumed unresolved player actions now mark the original table bubble as "Recovering" before replaying the action, then settle to the normal DM answered/review/failed lifecycle.
 32. Improved - Empty side-panel states now use table-shaped language for contacts, places, things, threads, staged party actions, side chat, and state review.
+33. Improved - Structured choice prompts now carry audience metadata for party, character, subset, vote, and combat-actor prompts. The play log surfaces that audience near the prompt, and selected choices send the targeting/vote context back to the provider.
 
 ## Top Immersion Risks Still Open
 
@@ -72,6 +73,7 @@ Status legend:
 13. Watch - Host/client snapshots can lag actions by polling interval.
 14. Watch - Pending input cleanup depends on successful provider import and can leave intent queued after failure.
 15. Watch - Active campaign changes reset TurnFlow, but app-level helper keys still coexist with TurnFlow state.
+16. Open - Party-vote collection is not yet a real multiplayer flow. The schema/UI can label vote prompts, but guests cannot yet cast separate votes with host tie-break resolution.
 
 ## Real Table Acceptance Matrix
 
@@ -85,6 +87,7 @@ Status legend:
 | Combat has one row per active combatant. | Fixed | Count/quantity expansion covers grouped enemies. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
 | The DM continues scenes without forcing options. | Improved | Prompts and choice suppression improved. Needs more social/travel/downtime fixtures. |
+| The DM can address the party or a specific party member. | Improved | Choice metadata supports party, targeted character, subset, vote, and combat actor audiences, and the play log displays the target. Full vote collection is still open. |
 | The DM has a story beyond the current scene. | Improved | Hidden story arcs are sent to the provider and can be updated as `dm_only` quest records. Needs scenario soak testing. |
 | Recovery after provider failure feels understandable. | Improved | Player echoes and staged party inputs now show failure/still-staged lifecycle badges. Broader replay decisions still need table-facing recovery flow. |
 | Character creation is consistent across entry points. | Fixed | Shared compact auto-complete and aligned controller defaults are in place. |
@@ -98,19 +101,19 @@ Status legend:
 5. High - Continue strengthening the "what the table is waiting for" surface so it is always visible and covers every stuck state.
 6. Fixed - Separate debug meta from normal play mode. Raw bubble meta is hidden by default and has a visible Setup diagnostics toggle.
 7. High - Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
-8. High - Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
-9. Improved - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests. Surrender/de-escalation app-owned end-combat fixtures exist; chase and richer intimidation contests remain.
-10. Improved - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating. A first-playtest checklist exists; scripted/disconnect soak remains.
-11. Medium - Make scene tension/consequence summaries and optional hidden-story debug summaries more visible in settings/diagnostics, not live play.
-12. Improved - Clarify enemy HP visibility policy for host and guest views. Host combat tracker can show exact enemy HP; guest/Thin snapshots redact enemy HP and render an unknown HP badge.
-13. Improved - Improve combat tracker density for longer encounters: conditions, defeated state, movement remaining, and action spent now show in compact row metadata. Concentration and richer resource badges remain.
-14. Improved - Make group-hold multiplayer mode explain itself before public use. Local Table now shows a live flow note and pending rows say queued, waiting for host approval, or held for group turn.
-15. Improved - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck. Approved and remote party inputs now keep retryable "Still staged" lifecycle badges after provider failure.
-16. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
-17. Improved - Make right-side binder collapsible or context-sensitive during active play. The binder now has a persisted collapse toggle that widens the play surface.
-18. Low - Replace remaining overly specific placeholder text with neutral table examples.
-19. Improved - Improve empty states so they teach the next table action. Side-panel and review/local-table empties now describe what will appear there in table terms.
-20. Improved - Add a plain "session health" summary for host troubleshooting. Setup diagnostics now summarizes blockers and table state in human terms.
+8. High - Build the actual party-vote flow: host can call a vote from a party prompt, guests cast votes from ThinLoreKeeper, and the host breaks ties/resolves the winning option.
+9. High - Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
+10. Improved - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests. Surrender/de-escalation app-owned end-combat fixtures exist; chase and richer intimidation contests remain.
+11. Improved - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating. A first-playtest checklist exists; scripted/disconnect soak remains.
+12. Medium - Make scene tension/consequence summaries and optional hidden-story debug summaries more visible in settings/diagnostics, not live play.
+13. Improved - Clarify enemy HP visibility policy for host and guest views. Host combat tracker can show exact enemy HP; guest/Thin snapshots redact enemy HP and render an unknown HP badge.
+14. Improved - Improve combat tracker density for longer encounters: conditions, defeated state, movement remaining, and action spent now show in compact row metadata. Concentration and richer resource badges remain.
+15. Improved - Make group-hold multiplayer mode explain itself before public use. Local Table now shows a live flow note and pending rows say queued, waiting for host approval, or held for group turn.
+16. Improved - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck. Approved and remote party inputs now keep retryable "Still staged" lifecycle badges after provider failure.
+17. Medium - Add curated social, travel, mystery, downtime, and combat campaigns as regression fixtures.
+18. Improved - Make right-side binder collapsible or context-sensitive during active play. The binder now has a persisted collapse toggle that widens the play surface.
+19. Low - Replace remaining overly specific placeholder text with neutral table examples.
+20. Improved - Improve empty states so they teach the next table action. Side-panel and review/local-table empties now describe what will appear there in table terms.
 
 ## Combat Reality Check
 
