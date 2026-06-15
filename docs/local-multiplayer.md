@@ -65,7 +65,7 @@ The guest workflow should be:
 5. For a Join-As invite, fill in character name, ancestry/class, table role, appearance, character pitch, and why they join this party, then click `Join Table`.
 6. Wait for host approval.
 
-Join-As is meant to give the guest real first-session agency. The host receives the proposed character as a pending join request, and approval creates a canonical party member plus a system table note the DM/provider can use to weave the new character into the current scene. The proposal stores:
+Join-As is meant to give the guest real first-session agency. The host receives the proposed character as a pending join request. Before approving, the host can add an optional scene-integration note for the DM, such as "introduce her as the scout who knows the flooded bridge detour." Approval creates a canonical party member plus a system table note the DM/provider can use to weave the new character into the current scene. The proposal stores:
 
 - `name`
 - `ancestry`
@@ -75,6 +75,10 @@ Join-As is meant to give the guest real first-session agency. The host receives 
 - `appearance`
 - `backstory`
 - `integrationPrompt`
+
+Host approval can also attach:
+
+- `hostIntegrationPrompt`
 
 The portable Thin client does not include campaign saves, SQLite authority, Ollama, or provider controls. It renders host-filtered table state and sends authenticated guest inputs back to the host.
 

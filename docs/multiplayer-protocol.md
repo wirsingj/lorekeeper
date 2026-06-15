@@ -99,6 +99,17 @@ Open character-request invites let a guest propose a new party member instead of
 
 The host stores the proposal on the pending connection. On approval, LoreKeeper creates a party member from the safe public fields and appends a non-canon system table note for the DM/provider context so the new character can be introduced naturally.
 
+The approval request may include host-authored scene context:
+
+```json
+{
+  "connectionId": "conn-id",
+  "hostIntegrationPrompt": "Introduce Mira as the scout who knows the flooded bridge detour."
+}
+```
+
+This host note is stored with the created party member as `hostIntegrationPrompt` and included in the DM-facing join note. It is host-authored campaign context, not guest authority.
+
 ## Guest Action Payload
 
 ```json

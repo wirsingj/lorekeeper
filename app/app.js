@@ -2007,9 +2007,12 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
   }
 }
 
-async function approveGuest(connectionId) {
+async function approveGuest(connectionId, hostIntegrationPrompt = "") {
   try {
-    const result = await postJson(apiMultiplayerApproveUrl, { connectionId });
+    const result = await postJson(apiMultiplayerApproveUrl, {
+      connectionId,
+      hostIntegrationPrompt,
+    });
     setCampaignFromPayload(result, "local_table_join_approved");
     state.multiplayerSnapshot = result.multiplayer;
     render();

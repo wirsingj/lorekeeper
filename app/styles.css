@@ -1839,11 +1839,38 @@ textarea::placeholder {
   font-size: 0.72rem;
 }
 
+.local-table-row.join-request-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .local-table-row span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.local-table-join-context {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid rgba(174, 191, 202, 0.16);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: rgba(14, 18, 21, 0.72);
+  color: #edf2f4;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.local-table-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.local-table-row-actions .mini-action {
+  margin: 0;
 }
 
 .setup-dialog .rail-textarea {

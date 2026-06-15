@@ -345,7 +345,7 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId, propos
   };
 }
 
-export function approveJoinRequest(campaign, connectionId) {
+export function approveJoinRequest(campaign, connectionId, options = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
   if (!connection) {
@@ -354,9 +354,13 @@ export function approveJoinRequest(campaign, connectionId) {
   if (connection.status === "denied") {
     throw new Error("Join request was denied.");
   }
+  const hostIntegrationPrompt = compactLine(options.hostIntegrationPrompt || options.hostContext || "", 1600);
+  if (hostIntegrationPrompt) {
+    connection.hostIntegrationPrompt = hostIntegrationPrompt;
+  }
   let createdMember = null;
   if (!connection.partyMemberId) {
-    const member = createPartyMemberFromProposal(connection.proposedCharacter, connection.displayName);
+    const member = createPartyMemberFromProposal(connection.proposedCharacter, connection.displayName, { hostIntegrationPrompt });
     const existingIds = new Set(next.party.map((item) => item.id));
     const uniqueMember = {
       ...member,
@@ -1380,8 +1384,9 @@ function normalizeCharacterProposal(proposal = {}, playerName = "") {
   };
 }
 
-function createPartyMemberFromProposal(proposal = {}, playerName = "") {
+function createPartyMemberFromProposal(proposal = {}, playerName = "", options = {}) {
   const character = normalizeCharacterProposal(proposal, playerName);
+  const hostIntegrationPrompt = compactLine(options.hostIntegrationPrompt || "", 1600);
   const ancestryClass = [character.ancestry, character.characterClass].filter(Boolean).join(" ") || "adventurer";
   const level = character.level || 1;
   const maxHp = Math.max(6, 8 + (level - 1) * 5);
@@ -1395,6 +1400,7 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "") {
     background: character.backstory || `${character.name || "This character"} joined the campaign from a remote player request.`,
     appearance: character.appearance,
     dmIntegrationPrompt: character.integrationPrompt,
+    hostIntegrationPrompt,
     summary: [ancestryClass, character.roleIntent, character.personality, character.goals].filter(Boolean).join(" - "),
     stats: {
       hp: {
@@ -1409,6 +1415,7 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "") {
       character.appearance ? `Look/vibe: ${character.appearance}` : "",
       character.backstory ? `Backstory: ${character.backstory}` : "",
       character.integrationPrompt ? `DM integration prompt: ${character.integrationPrompt}` : "",
+      hostIntegrationPrompt ? `Host scene context: ${hostIntegrationPrompt}` : "",
       character.personality ? `Personality: ${character.personality}` : "",
       character.goals ? `Goals: ${character.goals}` : "",
     ].filter(Boolean),
@@ -1436,12 +1443,14 @@ function appendCharacterJoinMessage(campaign, member, connection) {
   }
 
   const proposal = normalizeCharacterProposal(connection.proposedCharacter, connection.displayName);
+  const hostIntegrationPrompt = compactLine(connection.hostIntegrationPrompt || member.hostIntegrationPrompt || "", 1600);
   const body = [
     `${member.name} has joined the party as ${member.ancestryClass || "an adventurer"}.`,
     proposal.roleIntent ? `Table role: ${proposal.roleIntent}.` : "",
     proposal.appearance ? `Look/vibe: ${proposal.appearance}` : "",
     proposal.backstory ? `Character pitch: ${proposal.backstory}` : "",
     proposal.integrationPrompt ? `DM integration prompt: ${proposal.integrationPrompt}` : "",
+    hostIntegrationPrompt ? `Host scene context: ${hostIntegrationPrompt}` : "",
   ].filter(Boolean).join("\n\n");
 
   campaign.sessionLog = {
@@ -1463,6 +1472,7 @@ function appendCharacterJoinMessage(campaign, member, connection) {
           playerId: connection.playerId,
           multiplayer: true,
           proposedCharacter: publicData(connection.proposedCharacter),
+          hostIntegrationPrompt,
         },
       },
     ],

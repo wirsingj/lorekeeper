@@ -312,7 +312,9 @@ assert.equal(characterJoinResult.approved, false);
 assert.equal(joinAsCampaign.party.some((member) => member.name === "Mira"), false);
 assert.equal(joinAsCampaign.multiplayer.connections[0].proposedCharacter.name, "Mira");
 assert.match(joinAsCampaign.multiplayer.connections[0].proposedCharacter.integrationPrompt, /hired guide/);
-joinAsCampaign = approveJoinRequest(joinAsCampaign, characterJoinResult.connection.id);
+joinAsCampaign = approveJoinRequest(joinAsCampaign, characterJoinResult.connection.id, {
+  hostIntegrationPrompt: "Introduce Mira at the next crossroads as the only scout who knows the flooded bridge detour.",
+});
 const mira = joinAsCampaign.party.find((member) => member.name === "Mira");
 assert.ok(mira);
 assert.equal(mira.controllerKind, controllerKinds.REMOTE_PLAYER);
@@ -322,11 +324,14 @@ assert.match(mira.summary, /Road scout/);
 assert.match(mira.appearance, /hawk-feather/);
 assert.match(mira.background, /missing sister/);
 assert.match(mira.dmIntegrationPrompt, /hired guide/);
+assert.match(mira.hostIntegrationPrompt, /flooded bridge detour/);
 assert.equal(mira.notes.some((note) => /DM integration prompt: Mira knows/.test(note)), true);
+assert.equal(mira.notes.some((note) => /Host scene context: Introduce Mira/.test(note)), true);
 assert.equal(joinAsCampaign.sessionLog.messages.some((message) =>
   message.source === "remote_character_join" &&
   /Mira has joined the party/.test(message.body) &&
-  /hired guide/.test(message.body)
+  /hired guide/.test(message.body) &&
+  /flooded bridge detour/.test(message.body)
 ), true);
 assert.equal(joinAsCampaign.multiplayer.connections[0].partyMemberId, mira.id);
 

@@ -356,7 +356,9 @@ const server = createServer(async (request, response) => {
     if (url.pathname === "/api/multiplayer/join/approve" && request.method === "POST") {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: approveJoinRequest(campaign, body.connectionId),
+        campaign: approveJoinRequest(campaign, body.connectionId, {
+          hostIntegrationPrompt: body.hostIntegrationPrompt,
+        }),
       }));
       sendJson(response, 200, {
         ...payload,

@@ -73,21 +73,52 @@ export function renderMultiplayerSessionPanel({
 function renderConnectedGuests(container, connections, { labelById, approveGuest, denyGuest }) {
   container.replaceChildren(
     ...emptyOrRows(
-      connections.map((connection) => localTableRow({
-        title: connection.displayName || "Guest",
-        subtitle: connection.proposedCharacter?.name
-          ? joinProposalSummary(connection)
-          : `${connection.status} / ${labelById(connection.partyMemberId)}`,
-        actions: connection.status === "pending"
-          ? [
-            { label: "Approve", onClick: () => approveGuest(connection.id) },
-            { label: "Deny", onClick: () => denyGuest(connection.id) },
-          ]
-          : [],
-      })),
+      connections.map((connection) => {
+        if (connection.status === "pending" && connection.proposedCharacter?.name) {
+          return joinRequestRow(connection, { approveGuest, denyGuest });
+        }
+        return localTableRow({
+          title: connection.displayName || "Guest",
+          subtitle: connection.proposedCharacter?.name
+            ? joinProposalSummary(connection)
+            : `${connection.status} / ${labelById(connection.partyMemberId)}`,
+          actions: connection.status === "pending"
+            ? [
+              { label: "Approve", onClick: () => approveGuest(connection.id) },
+              { label: "Deny", onClick: () => denyGuest(connection.id) },
+            ]
+            : [],
+        });
+      }),
       "No guests connected.",
     ),
   );
+}
+
+function joinRequestRow(connection, { approveGuest, denyGuest }) {
+  const row = localTableRow({
+    title: connection.displayName || "Guest",
+    subtitle: joinProposalSummary(connection),
+    actions: [],
+  });
+  row.classList.add("join-request-row");
+
+  const context = document.createElement("textarea");
+  context.className = "local-table-join-context";
+  context.rows = 3;
+  context.maxLength = 1600;
+  context.placeholder = "Optional host note for the DM: how should this character enter the current scene?";
+  context.value = connection.hostIntegrationPrompt || "";
+  row.append(context);
+
+  const actions = document.createElement("div");
+  actions.className = "local-table-row-actions";
+  actions.append(
+    actionButton("Approve", () => approveGuest(connection.id, context.value)),
+    actionButton("Deny", () => denyGuest(connection.id)),
+  );
+  row.append(actions);
+  return row;
 }
 
 function joinProposalSummary(connection) {
@@ -123,14 +154,18 @@ function localTableRow({ title, subtitle, actions = [] }) {
   text.title = `${title}: ${subtitle}`;
   row.append(text);
   for (const action of actions) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "mini-action";
-    button.textContent = action.label;
-    button.addEventListener("click", action.onClick);
-    row.append(button);
+    row.append(actionButton(action.label, action.onClick));
   }
   return row;
+}
+
+function actionButton(label, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "mini-action";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
 }
 
 function emptyOrRows(rows, message) {
