@@ -182,6 +182,9 @@ function normalizeHpValue(value) {
     return null;
   }
   if (typeof value === "object" && !Array.isArray(value)) {
+    if (value.hidden === true || value.redacted === true || value.known === true) {
+      return { current: null, max: null, temporary: 0, hidden: true };
+    }
     const current = numberOrNull(value.current ?? value.value ?? value.hp);
     const max = numberOrNull(value.max ?? value.maximum ?? value.total);
     return current === null && max === null
@@ -203,7 +206,7 @@ function combatHpLabel(hp, options = {}) {
     return "";
   }
   if (options.hidden) {
-    return hp.current !== null ? "HP ?" : "";
+    return "HP ?";
   }
   if (hp.current !== null && hp.max !== null) {
     return `${hp.current}/${hp.max}`;

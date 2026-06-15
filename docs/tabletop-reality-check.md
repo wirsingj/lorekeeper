@@ -49,6 +49,7 @@ Status legend:
 25. Improved - Combat tracker rows now include compact conditions, defeated state, movement remaining, and action-spent hints.
 26. Improved - Failed provider turns now mark approved/remote party inputs as "Still staged" instead of leaving them looking silently consumed or indefinitely processing.
 27. Improved - Local table setup now explains whether guest actions auto-resolve, wait for host approval, or are held for a grouped host turn.
+28. Improved - Enemy HP policy is explicit: host view can show exact HP, while guest/Thin snapshots redact enemy HP and render it as unknown.
 
 ## Top Immersion Risks Still Open
 
@@ -97,7 +98,7 @@ Status legend:
 9. Improved - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests. Surrender/de-escalation app-owned end-combat fixtures exist; chase and richer intimidation contests remain.
 10. Improved - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating. A first-playtest checklist exists; scripted/disconnect soak remains.
 11. Medium - Make scene tension/consequence summaries and optional hidden-story debug summaries more visible in settings/diagnostics, not live play.
-12. Medium - Clarify enemy HP visibility policy for host and guest views.
+12. Improved - Clarify enemy HP visibility policy for host and guest views. Host combat tracker can show exact enemy HP; guest/Thin snapshots redact enemy HP and render an unknown HP badge.
 13. Improved - Improve combat tracker density for longer encounters: conditions, defeated state, movement remaining, and action spent now show in compact row metadata. Concentration and richer resource badges remain.
 14. Improved - Make group-hold multiplayer mode explain itself before public use. Local Table now shows a live flow note and pending rows say queued, waiting for host approval, or held for group turn.
 15. Improved - Ensure failed provider turns keep pending inputs visibly staged rather than silently stuck. Approved and remote party inputs now keep retryable "Still staged" lifecycle badges after provider failure.
@@ -213,6 +214,7 @@ Current coverage includes:
 17. Combat tracker projection covers condition tags, action spent, movement remaining, and defeated state.
 18. Failed provider turn paths preserve approved/remote party inputs visually as retryable staged table actions.
 19. Multiplayer session projection covers auto-resolve, host-approval, group-hold, and guest-sent wording.
+20. Guest multiplayer snapshots redact exact enemy HP while combat tracker projection renders hidden enemy HP as unknown.
 
 ## Remaining Product Risk
 

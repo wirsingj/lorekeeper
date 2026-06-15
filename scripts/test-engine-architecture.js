@@ -350,6 +350,9 @@ function testCombatTrackerView() {
   const defeatedView = buildCombatTrackerView(campaign);
   assert.equal(defeatedView.rows.find((row) => row.id === "miner").defeated, true);
   assert.match(defeatedView.rows.find((row) => row.id === "miner").meta, /Defeated/);
+
+  const guestView = buildCombatTrackerView(campaign, { hideEnemyHp: true });
+  assert.equal(guestView.rows.find((row) => row.id === "miner").hpLabel, "HP ?");
 }
 
 function testSceneAndConsequenceEngines() {

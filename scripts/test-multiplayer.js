@@ -234,6 +234,16 @@ const hostSnapshot = createHostSnapshot(campaign);
 assert.equal(hostSnapshot.connections.some((connection) => "secret" in connection), false);
 assert.equal(hostSnapshot.settings.requireGuestActionApproval, true);
 assert.equal(hostSnapshot.settings.holdGuestActionsForGroupInput, true);
+campaign.combat = {
+  inCombat: true,
+  round: 1,
+  currentTurnId: "kevric",
+  turnOrder: [
+    { id: "kevric", name: "Kevric", type: "party", hp: { current: 12, max: 12 } },
+    { id: "wolf", name: "Wolf", type: "enemy", hp: { current: 7, max: 7 } },
+  ],
+  enemies: [{ id: "wolf", name: "Wolf", hp: { current: 7, max: 7 } }],
+};
 const guestSnapshot = createGuestSnapshot(campaign, connected.id, { clientId: "guest-client", connectionSecret });
 assert.equal(guestSnapshot.assignedCharacter.name, "Kevric");
 assert.ok(guestSnapshot.revision);
@@ -244,6 +254,8 @@ assert.equal(guestSnapshot.tableState.items.find((item) => item.id === "flag").n
 assert.equal(guestSnapshot.tableState.updatedAt, campaign.updatedAt);
 assert.equal(guestSnapshot.tableState.people.some((person) => person.name === "Hidden Handler"), false);
 assert.equal(guestSnapshot.tableState.party.find((member) => member.id === "kevric").notes.some((note) => /secret/i.test(note)), false);
+assert.deepEqual(guestSnapshot.tableState.combat.enemies[0].hp, { hidden: true });
+assert.deepEqual(guestSnapshot.tableState.combat.turnOrder.find((entry) => entry.id === "wolf").hp, { hidden: true });
 
 campaign = postTableTalk(campaign, {
   playerName: "Host",

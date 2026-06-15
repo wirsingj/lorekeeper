@@ -7776,7 +7776,10 @@ function renderCombatTracker(campaign) {
   if (!elements.combatTrackerSection || !elements.combatTurnOrder) {
     return;
   }
-  const view = buildCombatTrackerView(campaign, { controlledActorId: state.guestSession?.partyMemberId });
+  const view = buildCombatTrackerView(campaign, {
+    controlledActorId: state.guestSession?.partyMemberId,
+    hideEnemyHp: Boolean(state.guestSession?.partyMemberId || state.guestSnapshot),
+  });
   elements.combatTrackerSection.hidden = !view.inCombat;
   if (!view.inCombat) {
     elements.combatTurnOrder.replaceChildren();

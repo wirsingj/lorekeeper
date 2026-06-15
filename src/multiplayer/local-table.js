@@ -1367,7 +1367,28 @@ function publicCombat(combat) {
   if (!combat || combat.visibility === "dm_only" || combat.data?.visibility === "dm_only") {
     return null;
   }
-  return publicData(combat);
+  const visible = publicData(combat);
+  return {
+    ...visible,
+    enemies: Array.isArray(visible?.enemies)
+      ? visible.enemies.map(redactEnemyCombatantHp)
+      : visible?.enemies,
+    turnOrder: Array.isArray(visible?.turnOrder)
+      ? visible.turnOrder.map((entry) => entry?.type === "enemy" ? redactEnemyCombatantHp(entry) : entry)
+      : visible?.turnOrder,
+  };
+}
+
+function redactEnemyCombatantHp(combatant) {
+  if (!combatant || typeof combatant !== "object") {
+    return combatant;
+  }
+  const next = { ...combatant };
+  if (next.hp !== undefined || next.hitPoints !== undefined) {
+    next.hp = { hidden: true };
+    delete next.hitPoints;
+  }
+  return next;
 }
 
 function publicData(data) {
