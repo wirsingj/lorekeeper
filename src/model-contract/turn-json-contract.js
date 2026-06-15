@@ -282,7 +282,7 @@ export function renderTurnResponseForImport(turnResponse, options = {}) {
       continue;
     }
 
-    if (speaker.toLowerCase() === "dm" || entry.role === "dm") {
+    if (isDmSpeaker(speaker)) {
       lines.push(text);
     } else {
       lines.push(`${speaker}: ${text}`);
@@ -315,6 +315,11 @@ export function renderTurnResponseForImport(turnResponse, options = {}) {
   ].join("\n"));
 
   return lines.filter(Boolean).join("\n\n").trim();
+}
+
+function isDmSpeaker(speaker = "") {
+  const normalized = compactWhitespace(speaker).toLowerCase();
+  return !normalized || normalized === "dm" || normalized === "dungeon master" || normalized === "narrator";
 }
 
 function stripChoiceEchoFromTableText(text, choices = {}, options = {}) {
@@ -674,6 +679,7 @@ function createResponseFormatSchema() {
       "When a combat actor's submitted action is resolved, include a combat proposedChange with data.turnResolved true, data.advanceTurn true, and data.resolvedActorId.",
       "For resolved combat, propose concrete state updates: party HP/resources/conditions and combat initiative/round/turnEconomy/enemies.",
       "Combat proposedChanges may use domain combat data.actorUpdates for party HP/resource/condition changes and data.enemyUpdates for enemy changes.",
+      "If combat has multiple similar enemies, represent each combatant separately in data.enemies/turnOrder, or provide a count/quantity field so the app can expand them into separate initiative rows.",
       "When options are for a specific party member or NPC, include choices.forActor/forActorId or option.actor/actorId.",
       "Never put party-member speech or chosen action in table entries unless it came from user.playerInputs or user.inWorld, or it is clearly labeled as a non-binding suggestion.",
       "Remote/player-controlled party members may be described as present only in neutral staging; do not narrate what they think, notice, scan, say, decide, or do without submitted input.",

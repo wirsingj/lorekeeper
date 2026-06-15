@@ -378,6 +378,27 @@ assert.deepEqual(
   startedCombat.campaign.combat.turnOrder.map((entry) => entry.id),
 );
 
+const groupedEnemyCombat = applyCanonicalChanges(rulesCampaignData, [
+  {
+    id: "combat-starts-with-bandits",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Five bandits block the road.",
+    data: {
+      inCombat: true,
+      enemies: [{ id: "bandit", name: "Bandit", count: 5, hp: 7, dexMod: 1 }],
+    },
+    confidence: "high",
+    reason: "Grouped enemy count should become separate combatants.",
+  },
+]);
+assert.equal(groupedEnemyCombat.campaign.combat.enemies.length, 5);
+assert.equal(groupedEnemyCombat.campaign.combat.enemies[0].name, "Bandit 1");
+assert.equal(groupedEnemyCombat.campaign.combat.turnOrder.filter((entry) => entry.type === "enemy").length, 5);
+
 const resolvedActorId = startedCombat.campaign.combat.currentTurnId;
 const advancedCombat = applyCanonicalChanges(startedCombat.campaign, [
   {
@@ -580,6 +601,12 @@ const paragraphNarration = parseTurnJsonResponse(JSON.stringify(validTurnRespons
 })));
 assert.equal(paragraphNarration.ok, true);
 assert.match(paragraphNarration.response.table[0].text, /gate\.\n\nBelow/);
+
+const mismatchedPartySpeakerRole = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{ speaker: "Tilli", speakerId: "tilli", role: "dm", kind: "dialogue", visibility: "table", text: "I signal Mira and keep talking." }],
+})));
+const renderedMismatchedPartySpeaker = renderTurnResponseForImport(mismatchedPartySpeakerRole.response);
+assert.match(renderedMismatchedPartySpeaker, /^Tilli: I signal Mira/m);
 
 const narrationFirstChoiceSpam = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Garin continues his patrol. The night air hangs cool and quiet over the wall." }],

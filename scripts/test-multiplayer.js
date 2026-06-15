@@ -13,6 +13,7 @@ import {
   parseInviteLink,
   postTableTalk,
   requestJoin,
+  returnToAiCompanion,
   stopLocalTable,
   startLocalTable,
   submitGuestAction,
@@ -316,6 +317,14 @@ assert.equal(reconnectResult.approved, true);
 assert.equal(reconnectResult.connection.status, "connected");
 assert.equal(campaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.equal(campaign.multiplayer.events.some((event) => event.type === "guest_reconnected"), true);
+
+let aiTransferCampaign = returnToAiCompanion(structuredClone(campaign), "kevric");
+assert.equal(aiTransferCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.AI_COMPANION);
+assert.equal(aiTransferCampaign.multiplayer.connections.find((connection) => connection.id === connected.id).status, "disconnected");
+assert.match(aiTransferCampaign.multiplayer.connections.find((connection) => connection.id === connected.id).disconnectReason, /^controller_/);
+aiTransferCampaign = startLocalTable(aiTransferCampaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+assert.equal(aiTransferCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.AI_COMPANION);
+assert.equal(aiTransferCampaign.multiplayer.connections.find((connection) => connection.id === connected.id).status, "disconnected");
 
 let tableStopCampaign = approveJoinRequest(joinResult.campaign, joinResult.connection.id);
 tableStopCampaign = stopLocalTable(tableStopCampaign);

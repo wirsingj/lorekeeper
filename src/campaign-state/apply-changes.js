@@ -675,23 +675,99 @@ function normalizeStats(record) {
 }
 
 function normalizeCombatants(value) {
-  return normalizeList(value).map((combatant) => {
-    if (combatant && typeof combatant === "object") {
-      return {
-        ...combatant,
-        id: combatant.id ?? uniqueId("enemy", combatant.name || combatant.title || "combatant"),
-        name: combatant.name || combatant.title || combatant.id || "Combatant",
-        hp: combatant.hp ?? null,
-        conditions: normalizeList(combatant.conditions),
-      };
+  return normalizeList(value).flatMap((combatant) => normalizeCombatantGroup(combatant));
+}
+
+function normalizeCombatantGroup(combatant) {
+  if (combatant && typeof combatant === "object") {
+    const baseName = combatant.name || combatant.title || combatant.id || "Combatant";
+    const count = combatantCount(combatant);
+    const base = {
+      ...combatant,
+      id: combatant.id ?? uniqueId("enemy", baseName),
+      name: baseName,
+      hp: combatant.hp ?? null,
+      conditions: normalizeList(combatant.conditions),
+    };
+    if (count <= 1) {
+      return [base];
     }
-    return {
-      id: uniqueId("enemy", combatant),
-      name: String(combatant),
+    const baseId = base.id;
+    const baseSingularName = singularCombatantName(base.name);
+    return Array.from({ length: count }, (_, index) => ({
+      ...base,
+      id: `${baseId}-${index + 1}`,
+      groupId: base.groupId ?? baseId,
+      name: `${baseSingularName} ${index + 1}`,
+      count: undefined,
+      quantity: undefined,
+      number: undefined,
+    }));
+  }
+
+  const parsed = parseCombatantText(combatant);
+  if (parsed.count <= 1) {
+    return [{
+      id: uniqueId("enemy", parsed.name),
+      name: parsed.name,
       hp: null,
       conditions: [],
-    };
-  });
+    }];
+  }
+  const baseId = uniqueId("enemy", parsed.name);
+  const singular = singularCombatantName(parsed.name);
+  return Array.from({ length: parsed.count }, (_, index) => ({
+    id: `${baseId}-${index + 1}`,
+    groupId: baseId,
+    name: `${singular} ${index + 1}`,
+    hp: null,
+    conditions: [],
+  }));
+}
+
+function combatantCount(combatant = {}) {
+  const explicit = Number(combatant.count ?? combatant.quantity ?? combatant.number ?? combatant.qty);
+  if (Number.isFinite(explicit) && explicit > 1) {
+    return Math.min(30, Math.round(explicit));
+  }
+  return parseCombatantText(combatant.name || combatant.title || "").count;
+}
+
+function parseCombatantText(value = "") {
+  const text = String(value ?? "").trim() || "Combatant";
+  const numeric = text.match(/^(\d{1,2})\s+(.+)$/);
+  if (numeric) {
+    return { count: Math.min(30, Number(numeric[1])), name: numeric[2].trim() || "Combatant" };
+  }
+  const word = text.match(/^(two|three|four|five|six|seven|eight|nine|ten|a few|several)\s+(.+)$/i);
+  if (word) {
+    return { count: numberWordToCount(word[1]), name: word[2].trim() || "Combatant" };
+  }
+  return { count: 1, name: text };
+}
+
+function numberWordToCount(value = "") {
+  const normalized = String(value).toLowerCase();
+  return {
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    "a few": 3,
+    several: 4,
+  }[normalized] ?? 1;
+}
+
+function singularCombatantName(value = "") {
+  const text = String(value || "Combatant").trim();
+  if (/ies$/i.test(text)) return text.replace(/ies$/i, "y");
+  if (/s$/i.test(text) && !/ss$/i.test(text)) return text.slice(0, -1);
+  return text;
 }
 
 function normalizeTurnEconomyMap(value) {

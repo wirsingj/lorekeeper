@@ -652,6 +652,9 @@ export function returnToAiCompanion(campaign, partyMemberId) {
       }
       : member
   ));
+  releaseActiveConnectionsForPartyMember(next, partyMemberId, "controller_returned_to_ai");
+  next.multiplayer.pendingTurnInputs = next.multiplayer.pendingTurnInputs
+    .filter((input) => input.characterId !== partyMemberId);
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "controller_ai_companion",
     summary: "Character returned to AI companion control.",
@@ -672,6 +675,9 @@ export function setHostController(campaign, partyMemberId) {
       }
       : member
   ));
+  releaseActiveConnectionsForPartyMember(next, partyMemberId, "controller_assigned_to_host");
+  next.multiplayer.pendingTurnInputs = next.multiplayer.pendingTurnInputs
+    .filter((input) => input.characterId !== partyMemberId);
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "controller_host",
     summary: "Character assigned to host control.",
@@ -1058,6 +1064,9 @@ function reviveApprovedConnections(campaign) {
     if (connection.status !== "disconnected" || !connection.approvedAt) {
       return connection;
     }
+    if (/^controller_/.test(connection.disconnectReason || "")) {
+      return connection;
+    }
     const invite = campaign.multiplayer.invites.find((item) => item.id === connection.inviteId);
     if (!invite || invite.status !== "active" || invite.revokedAt) {
       return connection;
@@ -1086,6 +1095,29 @@ function releaseRemoteController(member) {
     controllerKind: fallback,
     controllerId: fallback === controllerKinds.HOST ? "host" : null,
   };
+}
+
+function releaseActiveConnectionsForPartyMember(campaign, partyMemberId, reason) {
+  campaign.multiplayer.connections = campaign.multiplayer.connections.map((connection) => (
+    connection.partyMemberId === partyMemberId && connection.status === "connected"
+      ? {
+        ...connection,
+        status: "disconnected",
+        disconnectedAt: nowIso(),
+        disconnectReason: reason,
+      }
+      : connection
+  ));
+  campaign.multiplayer.seats = campaign.multiplayer.seats.map((seat) => (
+    seat.partyMemberId === partyMemberId
+      ? {
+        ...seat,
+        controllerKind: controllerKinds.UNASSIGNED,
+        controllerId: null,
+        updatedAt: nowIso(),
+      }
+      : seat
+  ));
 }
 
 function findActiveInvite(campaign, parsed) {

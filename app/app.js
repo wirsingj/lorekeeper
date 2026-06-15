@@ -248,6 +248,7 @@ const elements = {
   thinJoinCharacterAppearance: document.querySelector("#thin-join-character-appearance"),
   thinJoinCharacterBackstory: document.querySelector("#thin-join-character-backstory"),
   thinJoinCharacterIntegration: document.querySelector("#thin-join-character-integration"),
+  thinJoinCharacterAutocomplete: document.querySelector("#thin-join-character-autocomplete"),
   thinJoinSubmit: document.querySelector("#thin-join-submit"),
   thinJoinOpenDialog: document.querySelector("#thin-join-open-dialog"),
   thinJoinStatus: document.querySelector("#thin-join-status"),
@@ -303,6 +304,7 @@ const elements = {
   joinCharacterAppearance: document.querySelector("#join-character-appearance"),
   joinCharacterBackstory: document.querySelector("#join-character-backstory"),
   joinCharacterIntegration: document.querySelector("#join-character-integration"),
+  joinCharacterAutocomplete: document.querySelector("#join-character-autocomplete"),
   joinStatus: document.querySelector("#join-status"),
   newCampaign: document.querySelector("#new-campaign"),
   loadImported: document.querySelector("#load-imported"),
@@ -327,6 +329,7 @@ const elements = {
   recordPath: document.querySelector("#record-path"),
   recordPathRow: document.querySelector("#record-path-row"),
   recordNotes: document.querySelector("#record-notes"),
+  recordCharacterAutocomplete: document.querySelector("#record-character-autocomplete"),
   closeRecordDialog: document.querySelector("#close-record-dialog"),
   campaignDialog: document.querySelector("#campaign-dialog"),
   campaignForm: document.querySelector("#campaign-form"),
@@ -341,6 +344,9 @@ const elements = {
   newCharacterLevel: document.querySelector("#new-character-level"),
   newCharacterConcept: document.querySelector("#new-character-concept"),
   newCharacterAutoSheet: document.querySelector("#new-character-auto-sheet"),
+  newCharacterAutocomplete: document.querySelector("#new-character-autocomplete"),
+  wizardAdditionalCharacters: document.querySelector("#wizard-additional-characters"),
+  addWizardPartyMember: document.querySelector("#add-wizard-party-member"),
   newJoinerName: document.querySelector("#new-joiner-name"),
   newJoinerAncestry: document.querySelector("#new-joiner-ancestry"),
   newJoinerClass: document.querySelector("#new-joiner-class"),
@@ -410,6 +416,39 @@ elements.characterSheetForm.addEventListener("submit", async (event) => {
 
 elements.autoFillCharacterSheet.addEventListener("click", () => {
   autoFillOpenCharacterSheet();
+});
+
+elements.newCharacterAutocomplete?.addEventListener("click", () => {
+  autocompleteCompactCharacterForm(compactCharacterFormRefs("new-character"));
+});
+
+elements.addWizardPartyMember?.addEventListener("click", () => {
+  addWizardPartyMemberCard();
+});
+
+elements.wizardAdditionalCharacters?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-autocomplete-wizard-character]");
+  if (button) {
+    autocompleteCompactCharacterForm(compactCharacterFormRefs("wizard-card", button.closest("[data-wizard-character-card]")));
+    return;
+  }
+  const remove = event.target.closest("[data-remove-wizard-character]");
+  if (remove) {
+    remove.closest("[data-wizard-character-card]")?.remove();
+    renumberWizardPartyMemberCards();
+  }
+});
+
+elements.thinJoinCharacterAutocomplete?.addEventListener("click", () => {
+  autocompleteCompactCharacterForm(compactCharacterFormRefs("thin-join"));
+});
+
+elements.joinCharacterAutocomplete?.addEventListener("click", () => {
+  autocompleteCompactCharacterForm(compactCharacterFormRefs("join-dialog"));
+});
+
+elements.recordCharacterAutocomplete?.addEventListener("click", () => {
+  autocompleteCompactCharacterForm(compactCharacterFormRefs("record-party"));
 });
 
 elements.campaignSelect.addEventListener("change", async () => {
@@ -659,16 +698,7 @@ elements.campaignForm.addEventListener("submit", async (event) => {
       concept: elements.newCharacterConcept.value,
       autoSheet: elements.newCharacterAutoSheet.checked,
     },
-    startingPartyMember: {
-      name: elements.newJoinerName?.value,
-      ancestry: elements.newJoinerAncestry?.value,
-      characterClass: elements.newJoinerClass?.value,
-      level: elements.newJoinerLevel?.value,
-      concept: elements.newJoinerConcept?.value,
-      integrationPrompt: elements.newJoinerIntegration?.value,
-      hostIntegrationPrompt: elements.newJoinerHostContext?.value,
-      autoSheet: elements.newJoinerAutoSheet?.checked,
-    },
+    startingPartyMembers: collectWizardAdditionalCharacters(),
   });
 });
 
@@ -1733,26 +1763,322 @@ async function selectCampaignByPath(sqlitePath) {
   }
 }
 
-async function createNewCampaign({ title, premise, startingLocation, tone, playerCharacter, startingPartyMember }) {
+function compactCharacterFormRefs(kind, root = document) {
+  const bySelector = (selector) => root?.querySelector?.(selector) ?? null;
+  if (kind === "new-character") {
+    return {
+      name: elements.newCharacterName,
+      ancestry: elements.newCharacterAncestry,
+      characterClass: elements.newCharacterClass,
+      level: elements.newCharacterLevel,
+      concept: elements.newCharacterConcept,
+    };
+  }
+  if (kind === "wizard-card") {
+    return {
+      name: bySelector("[data-character-field='name'], #new-joiner-name"),
+      ancestry: bySelector("[data-character-field='ancestry'], #new-joiner-ancestry"),
+      characterClass: bySelector("[data-character-field='class'], #new-joiner-class"),
+      level: bySelector("[data-character-field='level'], #new-joiner-level"),
+      concept: bySelector("[data-character-field='concept'], #new-joiner-concept"),
+      integrationPrompt: bySelector("[data-character-field='integration'], #new-joiner-integration"),
+      hostIntegrationPrompt: bySelector("[data-character-field='hostContext'], #new-joiner-host-context"),
+      autoSheet: bySelector("[data-character-field='autoSheet'], #new-joiner-auto-sheet"),
+    };
+  }
+  if (kind === "thin-join") {
+    return {
+      name: elements.thinJoinCharacterName,
+      ancestry: elements.thinJoinCharacterAncestry,
+      characterClass: elements.thinJoinCharacterClass,
+      level: elements.thinJoinCharacterLevel,
+      roleIntent: elements.thinJoinCharacterRole,
+      appearance: elements.thinJoinCharacterAppearance,
+      backstory: elements.thinJoinCharacterBackstory,
+      integrationPrompt: elements.thinJoinCharacterIntegration,
+    };
+  }
+  if (kind === "join-dialog") {
+    return {
+      name: elements.joinCharacterName,
+      ancestry: elements.joinCharacterAncestry,
+      characterClass: elements.joinCharacterClass,
+      level: elements.joinCharacterLevel,
+      roleIntent: elements.joinCharacterRole,
+      appearance: elements.joinCharacterAppearance,
+      backstory: elements.joinCharacterBackstory,
+      integrationPrompt: elements.joinCharacterIntegration,
+    };
+  }
+  if (kind === "record-party") {
+    const split = splitAncestryClass(elements.recordRole?.value);
+    return {
+      name: elements.recordName,
+      ancestry: virtualFormValue(split.ancestry),
+      characterClass: elements.recordRole,
+      level: virtualFormValue("1"),
+      concept: elements.recordNotes,
+    };
+  }
+  return {};
+}
+
+function autocompleteCompactCharacterForm(refs = {}) {
+  const completed = completeCharacterSeed(compactCharacterSeedFromRefs(refs));
+  setIfBlank(refs.name, completed.name);
+  setIfBlank(refs.ancestry, completed.ancestry);
+  setIfBlank(refs.characterClass, completed.characterClass);
+  setIfBlank(refs.level, String(completed.level || 1));
+  setIfBlank(refs.roleIntent, completed.roleIntent);
+  setIfBlank(refs.appearance, completed.appearance);
+  setIfBlank(refs.backstory, completed.backstory);
+  setIfBlank(refs.concept, completed.backstory);
+  setIfBlank(refs.integrationPrompt, completed.integrationPrompt);
+  setIfBlank(refs.hostIntegrationPrompt, completed.hostIntegrationPrompt);
+  setProviderActivity(`${completed.name} filled out`, "idle");
+}
+
+function compactCharacterSeedFromRefs(refs = {}) {
+  return {
+    name: refs.name?.value,
+    ancestry: refs.ancestry?.value,
+    characterClass: refs.characterClass?.value,
+    level: refs.level?.value,
+    roleIntent: refs.roleIntent?.value,
+    appearance: refs.appearance?.value,
+    backstory: refs.backstory?.value,
+    concept: refs.concept?.value,
+    integrationPrompt: refs.integrationPrompt?.value,
+    hostIntegrationPrompt: refs.hostIntegrationPrompt?.value,
+  };
+}
+
+function completeCharacterSeed(seed = {}) {
+  const text = [
+    seed.name,
+    seed.ancestry,
+    seed.characterClass,
+    seed.roleIntent,
+    seed.appearance,
+    seed.backstory,
+    seed.concept,
+    seed.integrationPrompt,
+  ].filter(Boolean).join(" ");
+  const ancestry = String(seed.ancestry || inferAncestryFromText(text) || "Human").trim();
+  const characterClass = String(seed.characterClass || inferClassFromText(text) || "Adventurer").trim();
+  const name = String(seed.name || suggestCharacterName(ancestry, characterClass)).trim();
+  const roleIntent = String(seed.roleIntent || inferRoleIntent(characterClass, text)).trim();
+  const level = clampLevel(parseOptionalNumber(seed.level) ?? 1);
+  const profile = classifyCharacterProfile(`${characterClass} ${roleIntent} ${seed.backstory || seed.concept || ""}`);
+  const appearance = `${name} is a ${compactAncestryAdjective(ancestry)} ${profile.label} with practical travel-worn gear and a steady, readable presence.`;
+  const backstory = `${name} is a ${ancestry} ${characterClass} known for ${roleIntent.toLowerCase()}. They are dependable under pressure, but carry a personal reason to keep moving with the party.`;
+  const integrationPrompt = seed.integrationPrompt || defaultPartyIntegration(name);
+  const hostIntegrationPrompt = seed.hostIntegrationPrompt || `${name} should support the party's current goal without taking control of the main decision.`;
+
+  return {
+    ...seed,
+    name,
+    ancestry,
+    characterClass,
+    level,
+    roleIntent,
+    appearance: seed.appearance || appearance,
+    backstory: seed.backstory || seed.concept || backstory,
+    concept: seed.concept || seed.backstory || backstory,
+    integrationPrompt,
+    hostIntegrationPrompt,
+  };
+}
+
+function addWizardPartyMemberCard(input = {}) {
+  const container = elements.wizardAdditionalCharacters;
+  if (!container) {
+    return null;
+  }
+  const index = container.querySelectorAll("[data-wizard-character-card]").length;
+  const card = document.createElement("article");
+  card.className = "wizard-character-card";
+  card.dataset.wizardCharacterCard = String(index);
+  card.innerHTML = `
+    <div class="wizard-character-card-heading">
+      <h3>Character ${index + 2}</h3>
+      <div class="wizard-character-actions">
+        <button class="mini-action" type="button" data-autocomplete-wizard-character="${index}">Auto-Complete</button>
+        <button class="icon-action" type="button" title="Remove character" data-remove-wizard-character="${index}">x</button>
+      </div>
+    </div>
+    <div class="campaign-wizard-grid">
+      <label><span>Name</span><input data-character-field="name" autocomplete="off" placeholder="Oskar, Ingrid, Bren..." /></label>
+      <label><span>Ancestry</span><input data-character-field="ancestry" autocomplete="off" placeholder="Dwarf, elf, human..." /></label>
+      <label><span>Class / role</span><input data-character-field="class" autocomplete="off" placeholder="Soldier, scout, cleric..." /></label>
+      <label><span>Level</span><input data-character-field="level" inputmode="numeric" value="1" /></label>
+    </div>
+    <label><span>Character pitch</span><textarea data-character-field="concept" rows="3" placeholder="Who are they, what do they care about, and what do they bring?"></textarea></label>
+    <label><span>Why they are with the party</span><textarea data-character-field="integration" rows="3" placeholder="Old friend, squadmate, hired guide, sibling, rival..."></textarea></label>
+    <label><span>Host note for the DM</span><textarea data-character-field="hostContext" rows="3" placeholder="Scene-specific glue for the DM."></textarea></label>
+    <label class="check-row"><input data-character-field="autoSheet" type="checkbox" checked /><span>Auto-fill a 5E-lite sheet for this party member</span></label>
+  `;
+  container.append(card);
+  const refs = compactCharacterFormRefs("wizard-card", card);
+  setFormValue(refs.name, input.name);
+  setFormValue(refs.ancestry, input.ancestry);
+  setFormValue(refs.characterClass, input.characterClass);
+  setFormValue(refs.level, input.level ?? "1");
+  setFormValue(refs.concept, input.concept);
+  setFormValue(refs.integrationPrompt, input.integrationPrompt);
+  setFormValue(refs.hostIntegrationPrompt, input.hostIntegrationPrompt);
+  refs.name?.focus();
+  return card;
+}
+
+function renumberWizardPartyMemberCards() {
+  [...(elements.wizardAdditionalCharacters?.querySelectorAll("[data-wizard-character-card]") ?? [])].forEach((card, index) => {
+    card.dataset.wizardCharacterCard = String(index);
+    const heading = card.querySelector("h3");
+    if (heading) heading.textContent = `Character ${index + 2}`;
+    card.querySelector("[data-autocomplete-wizard-character]")?.setAttribute("data-autocomplete-wizard-character", String(index));
+    card.querySelector("[data-remove-wizard-character]")?.setAttribute("data-remove-wizard-character", String(index));
+  });
+}
+
+function collectWizardAdditionalCharacters() {
+  return [...(elements.wizardAdditionalCharacters?.querySelectorAll("[data-wizard-character-card]") ?? [])]
+    .map((card) => wizardCharacterInputFromRefs(compactCharacterFormRefs("wizard-card", card)))
+    .filter((input) => [input.name, input.ancestry, input.characterClass, input.concept, input.integrationPrompt, input.hostIntegrationPrompt].some((value) => String(value ?? "").trim()));
+}
+
+function wizardCharacterInputFromRefs(refs = {}) {
+  return {
+    name: refs.name?.value,
+    ancestry: refs.ancestry?.value,
+    characterClass: refs.characterClass?.value,
+    level: refs.level?.value,
+    concept: refs.concept?.value,
+    integrationPrompt: refs.integrationPrompt?.value,
+    hostIntegrationPrompt: refs.hostIntegrationPrompt?.value,
+    autoSheet: refs.autoSheet?.checked ?? true,
+  };
+}
+
+function setIfBlank(input, value) {
+  if (!input || String(input.value ?? "").trim() || value === undefined || value === null) {
+    return;
+  }
+  input.value = String(value);
+}
+
+function setFormValue(input, value) {
+  if (!input || value === undefined || value === null) {
+    return;
+  }
+  input.value = String(value);
+}
+
+function virtualFormValue(value = "") {
+  return { value: String(value ?? "") };
+}
+
+function inferAncestryFromText(text = "") {
+  const match = String(text).match(/\b(dwarf|dwarven|elf|elven|human|halfling|gnome|orc|half-orc|tiefling|dragonborn|fairy|fae)\b/i);
+  if (!match) return "";
+  return {
+    dwarven: "Dwarf",
+    elven: "Elf",
+    fae: "Fairy",
+  }[match[1].toLowerCase()] || titleCase(match[1]);
+}
+
+function inferClassFromText(text = "") {
+  const value = String(text);
+  const matches = [
+    [/scout|archer|tracker|hunter|ranger/i, "Scout"],
+    [/soldier|guard|fighter|warrior|knight/i, "Soldier"],
+    [/cleric|priest|healer|paladin/i, "Cleric"],
+    [/rogue|thief|burglar|spy/i, "Rogue"],
+    [/wizard|mage|arcane|scholar/i, "Wizard"],
+    [/druid|warden|nature/i, "Druid"],
+    [/bard|performer|envoy/i, "Bard"],
+  ].find(([regex]) => regex.test(value));
+  return matches?.[1] || "";
+}
+
+function inferRoleIntent(characterClass = "", text = "") {
+  const value = `${characterClass} ${text}`;
+  if (/scout|ranger|tracker|hunter/i.test(value)) return "Scout and pathfinder";
+  if (/soldier|fighter|warrior|guard|knight/i.test(value)) return "Front-line soldier";
+  if (/cleric|healer|priest|paladin/i.test(value)) return "Healer and steady counsel";
+  if (/rogue|thief|spy|burglar/i.test(value)) return "Quiet problem-solver";
+  if (/wizard|mage|arcane|scholar/i.test(value)) return "Arcane specialist";
+  if (/bard|performer|envoy/i.test(value)) return "Face and morale";
+  return "Reliable adventuring support";
+}
+
+function suggestCharacterName(ancestry = "", characterClass = "") {
+  const key = `${ancestry} ${characterClass}`.toLowerCase();
+  if (/dwarf/.test(key)) {
+    return ["Oskar", "Bram", "Tilli", "Ingrid"][Math.floor(Math.random() * 4)];
+  }
+  if (/elf|fairy|fae/.test(key)) {
+    return ["Mira", "Elaris", "Thistle", "Liora"][Math.floor(Math.random() * 4)];
+  }
+  return ["Rowan", "Jarin", "Evelynn", "Corin"][Math.floor(Math.random() * 4)];
+}
+
+function compactAncestryAdjective(ancestry = "") {
+  return String(ancestry || "adventuring").toLowerCase();
+}
+
+function defaultPartyIntegration(name = "This character") {
+  const partyNames = (state.campaign?.party ?? []).map((member) => member.name).filter(Boolean).slice(0, 3);
+  if (partyNames.length) {
+    return `${name} already has a practical reason to trust ${partyNames.join(", ")} and backs them up without taking over the scene.`;
+  }
+  return `${name} begins in the same immediate situation as the primary character and has a reason to stay with the group.`;
+}
+
+function splitAncestryClass(value = "") {
+  const words = String(value ?? "").trim().split(/\s+/).filter(Boolean);
+  const ancestryIndex = words.findIndex((word) => /\b(dwarf|dwarven|elf|elven|human|halfling|gnome|orc|tiefling|dragonborn|fairy|fae)\b/i.test(word));
+  if (ancestryIndex === -1) {
+    return { ancestry: "", characterClass: words.join(" ") };
+  }
+  const ancestry = inferAncestryFromText(words[ancestryIndex]);
+  const characterClass = words.filter((_, index) => index !== ancestryIndex).join(" ");
+  return { ancestry, characterClass };
+}
+
+function titleCase(value = "") {
+  const text = String(value);
+  return text ? `${text.slice(0, 1).toUpperCase()}${text.slice(1).toLowerCase()}` : "";
+}
+
+function normalizeList(value) {
+  if (Array.isArray(value)) {
+    return value.filter((entry) => entry !== undefined && entry !== null);
+  }
+  return value === undefined || value === null ? [] : [value];
+}
+
+async function createNewCampaign({ title, premise, startingLocation, tone, playerCharacter, startingPartyMember, startingPartyMembers }) {
   const trimmedTitle = String(title ?? "").trim() || "Untitled Campaign";
   const trimmedPremise = String(premise ?? "").trim() || "Start a new D&D 5e-lite campaign. Ask for missing essentials, then open with a playable scene.";
   const trimmedStartingLocation = String(startingLocation ?? "").trim();
   const trimmedTone = String(tone ?? "").trim();
   const characterSeed = normalizeWizardCharacter(playerCharacter);
-  const joinerSeed = normalizeWizardJoiner(startingPartyMember);
+  const joinerSeeds = normalizeWizardJoiners(startingPartyMembers ?? [startingPartyMember]);
   const openingPrompt = buildCampaignOpeningPrompt({
     title: trimmedTitle,
     premise: trimmedPremise,
     startingLocation: trimmedStartingLocation,
     tone: trimmedTone,
     character: characterSeed,
-    startingPartyMember: joinerSeed,
+    startingPartyMembers: joinerSeeds,
   });
   const openingScene = buildOpeningSceneSummary({
     premise: trimmedPremise,
     startingLocation: trimmedStartingLocation,
     character: characterSeed,
-    startingPartyMember: joinerSeed,
+    startingPartyMembers: joinerSeeds,
   });
   try {
     elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
@@ -1784,7 +2110,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     if (characterSeed.name) {
       await seedWizardPlayerCharacter(characterSeed);
     }
-    if (joinerSeed?.name) {
+    for (const joinerSeed of joinerSeeds) {
       await seedWizardStartingPartyMember(joinerSeed);
     }
 
@@ -1868,6 +2194,10 @@ function resetCampaignWizardDefaults() {
   elements.newCharacterConcept.value = "";
   elements.newCharacterAutoSheet.checked = true;
   if (elements.newJoinerName) {
+    [...(elements.wizardAdditionalCharacters?.querySelectorAll("[data-wizard-character-card]") ?? [])]
+      .slice(1)
+      .forEach((card) => card.remove());
+    renumberWizardPartyMemberCards();
     elements.newJoinerName.value = "";
     elements.newJoinerAncestry.value = "";
     elements.newJoinerClass.value = "";
@@ -2923,29 +3253,42 @@ function normalizeWizardJoiner(input = {}) {
   if (!hasAnyValue) {
     return null;
   }
+  const completed = completeCharacterSeed({
+    ...seed,
+    integrationPrompt,
+    hostIntegrationPrompt,
+  });
 
   return {
     ...seed,
-    name: seed.name || "Starting Party Member",
-    playerRole: "Starting party member / pending player",
-    integrationPrompt,
-    hostIntegrationPrompt,
+    ...completed,
+    playerRole: "AI party companion",
+    integrationPrompt: completed.integrationPrompt,
+    hostIntegrationPrompt: completed.hostIntegrationPrompt,
   };
 }
 
-function buildOpeningSceneSummary({ premise, startingLocation, character, startingPartyMember }) {
+function normalizeWizardJoiners(inputs = []) {
+  return normalizeList(inputs)
+    .map((input) => normalizeWizardJoiner(input))
+    .filter(Boolean);
+}
+
+function buildOpeningSceneSummary({ premise, startingLocation, character, startingPartyMembers = [] }) {
+  const joiners = normalizeList(startingPartyMembers);
   const details = [
     premise,
     character?.name ? `Player character: ${formatCharacterBasics(character)}.` : "",
-    startingPartyMember?.name ? `Starting party member: ${formatCharacterBasics(startingPartyMember)}.` : "",
-    startingPartyMember?.integrationPrompt ? `Party connection: ${startingPartyMember.integrationPrompt}.` : "",
+    joiners.length ? `Additional party: ${joiners.map(formatCharacterBasics).join("; ")}.` : "",
+    ...joiners.map((member) => member.integrationPrompt ? `Party connection for ${member.name}: ${member.integrationPrompt}.` : "").filter(Boolean),
     startingLocation ? `Starting place: ${startingLocation}.` : "",
   ].filter(Boolean);
 
   return details.join(" ");
 }
 
-function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, character, startingPartyMember }) {
+function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, character, startingPartyMembers = [] }) {
+  const joiners = normalizeList(startingPartyMembers);
   const lines = [
     `Start campaign: ${title}.`,
     `Campaign seed: ${premise}`,
@@ -2962,15 +3305,17 @@ function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, ch
   } else if (character?.concept || character?.characterClass || character?.ancestry) {
     lines.push(`Primary player character draft: ${formatCharacterBasics(character)}. Ask for the missing name when it matters.`);
   }
-  if (startingPartyMember?.name) {
-    lines.push(`Starting party member / joiner: ${formatCharacterBasics(startingPartyMember)}.`);
-    if (startingPartyMember.integrationPrompt) {
-      lines.push(`Joiner party integration: ${startingPartyMember.integrationPrompt}.`);
+  if (joiners.length) {
+    lines.push(`Additional AI companion party members: ${joiners.map(formatCharacterBasics).join("; ")}.`);
+    for (const member of joiners) {
+      if (member.integrationPrompt) {
+        lines.push(`${member.name} party integration: ${member.integrationPrompt}.`);
+      }
+      if (member.hostIntegrationPrompt) {
+        lines.push(`${member.name} host scene context: ${member.hostIntegrationPrompt}.`);
+      }
     }
-    if (startingPartyMember.hostIntegrationPrompt) {
-      lines.push(`Host scene context for joiner: ${startingPartyMember.hostIntegrationPrompt}.`);
-    }
-    lines.push("Treat the joiner as already present or immediately introducible in the opening scene; do not contradict their character pitch.");
+    lines.push("Treat these additional party members as already present or immediately introducible AI companions; they may contribute briefly when nudged, but the primary host character keeps player agency.");
   }
 
   lines.push(
@@ -2994,7 +3339,7 @@ function formatCharacterBasics(character) {
 }
 
 async function seedWizardPlayerCharacter(character) {
-  const sheet = character.autoSheet
+  const baseSheet = character.autoSheet
     ? buildFiveELiteCharacterSeed(character)
     : {
         id: `party-${slugify(character.name)}`,
@@ -3006,6 +3351,13 @@ async function seedWizardPlayerCharacter(character) {
         background: character.concept,
         notes: ["Created from the new campaign wizard."],
       };
+  const sheet = {
+    ...baseSheet,
+    playerRole: "Player character",
+    controllerKind: "host",
+    controllerId: "host",
+    fallbackControllerKind: "host",
+  };
 
   const response = await fetch(apiCampaignRecordUrl, {
     method: "POST",
@@ -3039,14 +3391,15 @@ async function seedWizardStartingPartyMember(character) {
       };
   const sheet = {
     ...baseSheet,
-    playerRole: character.playerRole || "Starting party member / pending player",
-    controllerKind: "unassigned",
-    fallbackControllerKind: "host",
+    playerRole: character.playerRole || "AI party companion",
+    controllerKind: "ai_companion",
+    controllerId: null,
+    fallbackControllerKind: "ai_companion",
     integrationPrompt: character.integrationPrompt,
     hostIntegrationPrompt: character.hostIntegrationPrompt,
     notes: [
       ...(Array.isArray(baseSheet.notes) ? baseSheet.notes : []),
-      "Created from the new campaign pre-table joiner setup.",
+      "Created from the new campaign wizard as an AI companion.",
       character.integrationPrompt ? `Party integration: ${character.integrationPrompt}` : "",
       character.hostIntegrationPrompt ? `Host scene context: ${character.hostIntegrationPrompt}` : "",
     ].filter(Boolean),
@@ -4326,7 +4679,7 @@ function formatBytes(value) {
 }
 
 async function saveRecordFromDialog() {
-  const payload = {
+  let payload = {
     domain: elements.recordDomain.value,
     id: state.editingRecord?.id || undefined,
     name: elements.recordName.value.trim(),
@@ -4339,6 +4692,33 @@ async function saveRecordFromDialog() {
     notes: elements.recordNotes.value.trim(),
     path: elements.recordPath.value.trim(),
   };
+
+  if (payload.domain === "party" && !state.editingRecord) {
+    const split = splitAncestryClass(payload.role);
+    const seed = completeCharacterSeed({
+      name: payload.name,
+      ancestry: split.ancestry,
+      characterClass: split.characterClass || payload.role,
+      concept: payload.summary,
+    });
+    const sheet = buildFiveELiteCharacterSeed(seed);
+    payload = {
+      ...payload,
+      ...sheet,
+      role: "AI party companion",
+      playerRole: "AI party companion",
+      ancestryClass: [seed.ancestry, seed.characterClass].filter(Boolean).join(" "),
+      background: seed.backstory,
+      controllerKind: "ai_companion",
+      controllerId: null,
+      fallbackControllerKind: "ai_companion",
+      notes: [
+        ...(Array.isArray(sheet.notes) ? sheet.notes : []),
+        "Created from the party character creator after campaign start.",
+        seed.integrationPrompt ? `Party integration: ${seed.integrationPrompt}` : "",
+      ].filter(Boolean),
+    };
+  }
 
   if (!payload.name) {
     elements.bridgeStatus.textContent = "Name is required";
@@ -4382,6 +4762,9 @@ function openRecordDialog(domain, record = null) {
   elements.recordRole.placeholder = config.rolePlaceholder;
   elements.recordNotes.placeholder = config.notesPlaceholder;
   elements.recordPathRow.hidden = domain !== "assets";
+  if (elements.recordCharacterAutocomplete) {
+    elements.recordCharacterAutocomplete.hidden = domain !== "party";
+  }
   elements.recordForm.reset();
   elements.recordDomain.value = domain;
   if (record) {

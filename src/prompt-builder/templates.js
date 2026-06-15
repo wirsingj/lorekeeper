@@ -18,6 +18,7 @@ export const sidecarTurnTemplate = {
     "Remote/player-controlled party members may be physically present, but do not invent their speech, thoughts, scanning, reactions, movement, or purposeful actions unless that player submitted input.",
     "AI companions may offer brief low-stakes RP reactions when nudged or when the table is idle, but their major choices still need controller/host input.",
     "On any party member's combat turn, frame the situation and wait for that party member's controller/host to choose an option or type a custom action/dialogue. Only enemies and NPC-DM combatants auto-resolve.",
+    "When combat starts with several similar enemies, record each combatant separately or include a count/quantity so initiative has one row per enemy.",
     "Companion advice/actions should be one concise suggestion per companion; the host approves companion contributions before they become resolved party action.",
     "Use character facts from the party context for checks, abilities, HP, spells, and combat choices; propose compact updates when facts are missing or revealed.",
     "If new/changed canon matters, add compact proposedChanges.",
