@@ -761,6 +761,13 @@ assert.equal(qwenNestedNarrative.ok, true);
 assert.match(renderTurnResponseForImport(qwenNestedNarrative.response), /shrine stones hum softly/);
 assert.doesNotMatch(renderTurnResponseForImport(qwenNestedNarrative.response), /empty table response/);
 
+const emptyObjectResponse = parseTurnJsonResponse("{}", {
+  requestId: requestEnvelope.requestId,
+});
+assert.equal(emptyObjectResponse.ok, false);
+assert.match(emptyObjectResponse.error, /table must contain at least one entry/);
+assert.equal(emptyObjectResponse.response.table.length, 0);
+
 const partialStructured = parseTurnJsonResponse('{"type":"lorekeeper.turn.response","schemaVersion":1,"requestId":"oops"');
 assert.equal(partialStructured.ok, false);
 assert.equal(partialStructured.response.proposedChanges.length, 0);

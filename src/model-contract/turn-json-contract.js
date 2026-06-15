@@ -768,12 +768,17 @@ function normalizeTurnResponse(response, options = {}) {
     flags,
     warnings,
   });
+  const fallbackText = fallbackNarration(unwrapped);
 
   return {
     type: unwrapped.type || RESPONSE_TYPE,
     schemaVersion: Number(unwrapped.schemaVersion) || SCHEMA_VERSION,
     requestId: unwrapped.requestId || options.expectedRequestId || "",
-    table: table.length ? table : [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: fallbackNarration(unwrapped) }],
+    table: table.length
+      ? table
+      : fallbackText
+        ? [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: fallbackText }]
+        : [],
     sceneStatus,
     choices,
     mechanics,
@@ -1363,7 +1368,7 @@ function fallbackNarration(response) {
     response.message ||
     response.responseText ||
     response.response_text ||
-    "The local model returned an empty table response.";
+    "";
   return compactWhitespace(typeof value === "object" ? tableTextFromObject(value) : value);
 }
 
