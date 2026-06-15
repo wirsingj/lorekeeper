@@ -7874,10 +7874,17 @@ function partyControllerActions(member, pendingConnection = null) {
   }
   if (kind === "ai_companion") {
     actions.push({
-      label: "Play",
-      title: `Ask ${member.name} for a brief AI companion RP contribution`,
+      label: "Invite Player",
+      title: `Invite a player to control ${member.name}`,
+      onClick: () => createInviteForMember(member),
+    });
+    actions.push({
+      label: "Nudge",
+      title: `Nudge ${member.name} for a brief AI companion RP contribution`,
+      className: "nudge-action",
       onClick: () => nudgeAiPartyMember(member),
     });
+    return actions;
   }
   actions.push({
     label: "Invite Player",
@@ -8562,7 +8569,7 @@ function recordElement({ title, body, badge, actions = [], onEdit }) {
     actionRow.className = "record-actions";
     for (const action of actions) {
       const button = document.createElement("button");
-      button.className = "mini-action";
+      button.className = ["mini-action", action.className].filter(Boolean).join(" ");
       button.type = "button";
       button.textContent = action.label;
       button.title = action.title || action.label;

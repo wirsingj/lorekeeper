@@ -923,6 +923,12 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
   assert.match(appJs, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
   assert.match(appJs, /stripInlineResponseJsonTail/, "table narration cleanup should remove inline provider JSON tails");
+  assert.equal(/label:\s*"Play"/.test(appJs), false, "AI companion cards should use Nudge instead of a Play button");
+  assert.match(
+    appJs,
+    /label:\s*"Invite Player"[\s\S]*?label:\s*"Nudge"[\s\S]*?className:\s*"nudge-action"/,
+    "AI companion card actions should place Nudge after Invite Player and use nudge styling",
+  );
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
