@@ -760,6 +760,10 @@ elements.closeCampaignDialog.addEventListener("click", () => {
   elements.campaignDialog.close();
 });
 
+elements.campaignDialog?.addEventListener("close", () => {
+  closeCampaignWizardWorkspace();
+});
+
 elements.devJumpStartCampaign?.addEventListener("click", () => {
   applyDevJumpStartSeed(randomDevJumpStart());
 });
@@ -778,6 +782,7 @@ elements.campaignForm.addEventListener("submit", async (event) => {
       level: elements.newCharacterLevel.value,
       concept: elements.newCharacterConcept.value,
       autoSheet: elements.newCharacterAutoSheet.checked,
+      controllerKind: selectedRadioValue("new-character-controller", "host"),
     },
     startingPartyMembers: collectWizardAdditionalCharacters(),
   });
@@ -1998,6 +2003,7 @@ function compactCharacterFormRefs(kind, root = document) {
       integrationPrompt: bySelector("[data-character-field='integration'], #new-joiner-integration"),
       hostIntegrationPrompt: bySelector("[data-character-field='hostContext'], #new-joiner-host-context"),
       autoSheet: bySelector("[data-character-field='autoSheet'], #new-joiner-auto-sheet"),
+      controllerKind: selectedRadioValueFromRoot(root, "[data-character-field='controllerKind']", "ai_companion"),
     };
   }
   if (kind === "thin-join") {
@@ -2064,6 +2070,7 @@ function compactCharacterSeedFromRefs(refs = {}) {
     concept: refs.concept?.value,
     integrationPrompt: refs.integrationPrompt?.value,
     hostIntegrationPrompt: refs.hostIntegrationPrompt?.value,
+    controllerKind: typeof refs.controllerKind === "string" ? refs.controllerKind : refs.controllerKind?.value,
   };
 }
 
@@ -2121,6 +2128,11 @@ function addWizardPartyMemberCard(input = {}) {
         <button class="icon-action" type="button" title="Remove character" data-remove-wizard-character="${index}">x</button>
       </div>
     </div>
+    <div class="controller-choice-row" aria-label="Character ${index + 2} controller">
+      <label><input type="radio" name="wizard-character-controller-${index}" value="ai_companion" data-character-field="controllerKind" checked /><span>AI</span></label>
+      <label><input type="radio" name="wizard-character-controller-${index}" value="host" data-character-field="controllerKind" /><span>Host</span></label>
+      <label><input type="radio" name="wizard-character-controller-${index}" value="remote_invite" data-character-field="controllerKind" /><span>Remote Invite</span></label>
+    </div>
     <div class="campaign-wizard-grid">
       <label><span>Name</span><input data-character-field="name" autocomplete="off" placeholder="Oskar, Ingrid, Bren..." /></label>
       <label><span>Ancestry</span><input data-character-field="ancestry" autocomplete="off" placeholder="Dwarf, elf, human..." /></label>
@@ -2141,6 +2153,7 @@ function addWizardPartyMemberCard(input = {}) {
   setFormValue(refs.concept, input.concept);
   setFormValue(refs.integrationPrompt, input.integrationPrompt);
   setFormValue(refs.hostIntegrationPrompt, input.hostIntegrationPrompt);
+  setWizardControllerKind(card, input.controllerKind || "ai_companion");
   refs.name?.focus();
   return card;
 }
@@ -2150,6 +2163,10 @@ function renumberWizardPartyMemberCards() {
     card.dataset.wizardCharacterCard = String(index);
     const heading = card.querySelector("h3");
     if (heading) heading.textContent = `Character ${index + 2}`;
+    card.querySelector(".controller-choice-row")?.setAttribute("aria-label", `Character ${index + 2} controller`);
+    card.querySelectorAll("[data-character-field='controllerKind']").forEach((input) => {
+      input.name = `wizard-character-controller-${index}`;
+    });
     card.querySelector("[data-autocomplete-wizard-character]")?.setAttribute("data-autocomplete-wizard-character", String(index));
     card.querySelector("[data-remove-wizard-character]")?.setAttribute("data-remove-wizard-character", String(index));
   });
@@ -2171,7 +2188,38 @@ function wizardCharacterInputFromRefs(refs = {}) {
     integrationPrompt: refs.integrationPrompt?.value,
     hostIntegrationPrompt: refs.hostIntegrationPrompt?.value,
     autoSheet: refs.autoSheet?.checked ?? true,
+    controllerKind: normalizeWizardControllerKind(refs.controllerKind),
   };
+}
+
+function selectedRadioValue(name, fallback = "") {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value || fallback;
+}
+
+function selectedRadioValueFromRoot(root = document, selector, fallback = "") {
+  return root?.querySelector?.(`${selector}:checked`)?.value || fallback;
+}
+
+function setRadioValue(name, value) {
+  const target = document.querySelector(`input[name="${name}"][value="${value}"]`);
+  if (target) {
+    target.checked = true;
+  }
+}
+
+function setWizardControllerKind(card, value) {
+  const normalized = normalizeWizardControllerKind(value);
+  const target = card?.querySelector?.(`[data-character-field='controllerKind'][value="${normalized}"]`);
+  if (target) {
+    target.checked = true;
+  }
+}
+
+function normalizeWizardControllerKind(value) {
+  const normalized = String(value || "").trim();
+  return ["host", "ai_companion", "remote_invite", "unassigned"].includes(normalized)
+    ? normalized
+    : "ai_companion";
 }
 
 function setIfBlank(input, value) {
@@ -2391,9 +2439,18 @@ function providerSettingsForNewCampaign() {
 
 function openCampaignDialog() {
   resetCampaignWizardDefaults();
+  openCampaignWizardWorkspace();
   elements.campaignDialog.showModal();
   elements.newCampaignTitle.focus();
   elements.newCampaignTitle.select();
+}
+
+function openCampaignWizardWorkspace() {
+  elements.app?.classList.add("campaign-wizard-mode");
+}
+
+function closeCampaignWizardWorkspace() {
+  elements.app?.classList.remove("campaign-wizard-mode");
 }
 
 function resetCampaignWizardDefaults() {
@@ -2407,6 +2464,7 @@ function resetCampaignWizardDefaults() {
   elements.newCharacterLevel.value = "1";
   elements.newCharacterConcept.value = "";
   elements.newCharacterAutoSheet.checked = true;
+  setRadioValue("new-character-controller", "host");
   if (elements.newJoinerName) {
     [...(elements.wizardAdditionalCharacters?.querySelectorAll("[data-wizard-character-card]") ?? [])]
       .slice(1)
@@ -2420,6 +2478,7 @@ function resetCampaignWizardDefaults() {
     elements.newJoinerIntegration.value = "";
     elements.newJoinerHostContext.value = "";
     elements.newJoinerAutoSheet.checked = true;
+    setWizardControllerKind(elements.wizardAdditionalCharacters?.querySelector("[data-wizard-character-card]"), "ai_companion");
   }
 }
 
@@ -2434,6 +2493,7 @@ function applyDevJumpStartSeed(seed) {
   elements.newCharacterLevel.value = seed.playerCharacter.level;
   elements.newCharacterConcept.value = seed.playerCharacter.concept;
   elements.newCharacterAutoSheet.checked = seed.playerCharacter.autoSheet !== false;
+  setRadioValue("new-character-controller", seed.playerCharacter.controllerKind || "host");
   setProviderActivity("Dev jump start filled; review or Create And Start", "idle");
   elements.newCampaignTitle.focus();
   elements.newCampaignTitle.select();
@@ -3329,6 +3389,9 @@ function renderMultiplayerPanel() {
 }
 
 function controllerLabel(member) {
+  if (member.inviteIntent === "remote_player" && member.controllerKind === "unassigned") {
+    return "Invite";
+  }
   const kind = member.controllerKind || (member.type === "player_character" ? "host" : "ai_companion");
   return {
     host: "Host",
@@ -3336,6 +3399,22 @@ function controllerLabel(member) {
     ai_companion: "AI",
     unassigned: "Open",
   }[kind] || "AI";
+}
+
+function partyControllerDetail(member) {
+  if (member.inviteIntent === "remote_player" && member.controllerKind === "unassigned") {
+    return "Waiting for an invited player.";
+  }
+  if (member.controllerKind === "host") {
+    return "Host controlled.";
+  }
+  if (member.controllerKind === "remote_player") {
+    return "Remote player controlled.";
+  }
+  if (member.controllerKind === "ai_companion") {
+    return "AI companion.";
+  }
+  return "";
 }
 
 async function postJson(url, body) {
@@ -3466,6 +3545,7 @@ function normalizeWizardCharacter(input = {}) {
     level,
     concept,
     autoSheet: input.autoSheet !== false,
+    controllerKind: input.controllerKind ? normalizeWizardControllerKind(input.controllerKind) : "",
   };
 }
 
@@ -3489,11 +3569,13 @@ function normalizeWizardJoiner(input = {}) {
     integrationPrompt,
     hostIntegrationPrompt,
   });
+  const controllerKind = normalizeWizardControllerKind(input.controllerKind || seed.controllerKind || "ai_companion");
 
   return {
     ...seed,
     ...completed,
-    playerRole: "AI party companion",
+    controllerKind,
+    playerRole: wizardPlayerRoleForController(controllerKind),
     integrationPrompt: completed.integrationPrompt,
     hostIntegrationPrompt: completed.hostIntegrationPrompt,
   };
@@ -3532,12 +3614,12 @@ function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, ch
     lines.push(`Tone/style: ${tone}.`);
   }
   if (character?.name) {
-    lines.push(`Primary player character: ${formatCharacterBasics(character)}.`);
+    lines.push(`Primary party character: ${formatCharacterBasics(character)}.`);
   } else if (character?.concept || character?.characterClass || character?.ancestry) {
-    lines.push(`Primary player character draft: ${formatCharacterBasics(character)}. Ask for the missing name when it matters.`);
+    lines.push(`Primary party character draft: ${formatCharacterBasics(character)}. Ask for the missing name when it matters.`);
   }
   if (joiners.length) {
-    lines.push(`Additional AI companion party members: ${joiners.map(formatCharacterBasics).join("; ")}.`);
+    lines.push(`Additional starting party members: ${joiners.map(formatCharacterBasics).join("; ")}.`);
     for (const member of joiners) {
       if (member.integrationPrompt) {
         lines.push(`${member.name} party integration: ${member.integrationPrompt}.`);
@@ -3546,7 +3628,7 @@ function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, ch
         lines.push(`${member.name} host scene context: ${member.hostIntegrationPrompt}.`);
       }
     }
-    lines.push("Treat these additional party members as already present or immediately introducible AI companions; they may contribute briefly when nudged, but the primary host character keeps player agency.");
+    lines.push("Treat starting party members as already present or immediately introducible. Respect controller intent: host and remote-invite characters keep player agency; AI companions may contribute briefly when nudged or during low-stakes table beats.");
   }
 
   lines.push(
@@ -3584,10 +3666,7 @@ async function seedWizardPlayerCharacter(character) {
       };
   const sheet = {
     ...baseSheet,
-    playerRole: "Player character",
-    controllerKind: "host",
-    controllerId: "host",
-    fallbackControllerKind: "host",
+    ...wizardControllerSheetFields(character.controllerKind || "host", { primary: true }),
   };
 
   const response = await fetch(apiCampaignRecordUrl, {
@@ -3622,15 +3701,12 @@ async function seedWizardStartingPartyMember(character) {
       };
   const sheet = {
     ...baseSheet,
-    playerRole: character.playerRole || "AI party companion",
-    controllerKind: "ai_companion",
-    controllerId: null,
-    fallbackControllerKind: "ai_companion",
+    ...wizardControllerSheetFields(character.controllerKind || "ai_companion"),
     integrationPrompt: character.integrationPrompt,
     hostIntegrationPrompt: character.hostIntegrationPrompt,
     notes: [
       ...(Array.isArray(baseSheet.notes) ? baseSheet.notes : []),
-      "Created from the new campaign wizard as an AI companion.",
+      `Created from the new campaign wizard as ${wizardPlayerRoleForController(character.controllerKind || "ai_companion").toLowerCase()}.`,
       character.integrationPrompt ? `Party integration: ${character.integrationPrompt}` : "",
       character.hostIntegrationPrompt ? `Host scene context: ${character.hostIntegrationPrompt}` : "",
     ].filter(Boolean),
@@ -3651,6 +3727,44 @@ async function seedWizardStartingPartyMember(character) {
 
   const result = await response.json();
   setCampaignFromPayload(result, "new_campaign_starting_party_member");
+}
+
+function wizardControllerSheetFields(controllerKind, { primary = false } = {}) {
+  const normalized = normalizeWizardControllerKind(controllerKind || (primary ? "host" : "ai_companion"));
+  if (normalized === "host") {
+    return {
+      playerRole: primary ? "Host player character" : "Host-controlled party member",
+      controllerKind: "host",
+      controllerId: "host",
+      fallbackControllerKind: "host",
+    };
+  }
+  if (normalized === "remote_invite") {
+    return {
+      playerRole: "Remote invite seat",
+      controllerKind: "unassigned",
+      controllerId: null,
+      fallbackControllerKind: "ai_companion",
+      inviteIntent: "remote_player",
+    };
+  }
+  return {
+    playerRole: primary ? "AI party companion" : "AI party companion",
+    controllerKind: "ai_companion",
+    controllerId: null,
+    fallbackControllerKind: "ai_companion",
+  };
+}
+
+function wizardPlayerRoleForController(controllerKind) {
+  const normalized = normalizeWizardControllerKind(controllerKind);
+  if (normalized === "host") {
+    return "Host-controlled party member";
+  }
+  if (normalized === "remote_invite") {
+    return "Remote invite seat";
+  }
+  return "AI party companion";
 }
 
 function buildFiveELiteCharacterSeed(character) {
@@ -8190,6 +8304,7 @@ function renderParty(campaign) {
       const pendingConnection = pendingJoinConnectionForMember(campaign, member.id);
       const details = [
         `${member.ancestryClass || "unknown role"}${formatHp(member.stats?.hp)}`,
+        partyControllerDetail(member),
         firstVisibleNote(member),
         pendingConnection ? `Join request: ${pendingConnection.displayName || "Guest"} waiting for approval.` : "",
       ].filter(Boolean).join(" - ");

@@ -414,137 +414,169 @@ function CampaignDialog() {
           <button id="close-campaign-dialog" className="icon-action" type="button" title="Close">x</button>
         </header>
 
-        <section className="campaign-wizard-section">
-          <div className="wizard-heading">
-            <span>Campaign Seed</span>
-            <button id="dev-jump-start-campaign" className="mini-action" type="button">Dev Jump Start</button>
-          </div>
-          <div className="campaign-wizard-grid">
+        <div className="campaign-wizard-layout">
+          <section className="campaign-wizard-section campaign-seed-section">
+            <div className="wizard-heading">
+              <span>Campaign Seed</span>
+              <button id="dev-jump-start-campaign" className="mini-action" type="button">Dev Jump Start</button>
+            </div>
+            <div className="campaign-wizard-grid">
+              <label>
+                <span>Campaign name</span>
+                <input id="new-campaign-title" autoComplete="off" required placeholder="Campaign name" />
+              </label>
+              <label>
+                <span>Starting place</span>
+                <input id="new-campaign-starting-location" autoComplete="off" placeholder="Tavern, forest road, ruined keep..." />
+              </label>
+            </div>
             <label>
-              <span>Campaign name</span>
-              <input id="new-campaign-title" autoComplete="off" required placeholder="Campaign name" />
+              <span>Opening prompt</span>
+              <textarea
+                id="new-campaign-premise"
+                rows="7"
+                placeholder="Describe the adventure you want to start. This becomes the first prompt LoreKeeper sends to the DM."
+              ></textarea>
             </label>
             <label>
-              <span>Starting place</span>
-              <input id="new-campaign-starting-location" autoComplete="off" placeholder="Tavern, forest road, ruined keep..." />
+              <span>Tone / style</span>
+              <input
+                id="new-campaign-tone"
+                autoComplete="off"
+                placeholder="tense heist fantasy, cozy exploration, political intrigue..."
+              />
             </label>
-          </div>
-          <label>
-            <span>Opening prompt</span>
-            <textarea
-              id="new-campaign-premise"
-              rows="5"
-              placeholder="Describe the adventure you want to start. This becomes the first prompt LoreKeeper sends to the DM."
-            ></textarea>
-          </label>
-          <label>
-            <span>Tone / style</span>
-            <input
-              id="new-campaign-tone"
-              autoComplete="off"
-              placeholder="tense heist fantasy, cozy exploration, political intrigue..."
-            />
-          </label>
-        </section>
+          </section>
 
-        <section className="campaign-wizard-section">
-          <div className="wizard-heading">
-            <span>Player Character</span>
-            <button id="new-character-autocomplete" className="mini-action" type="button">Auto-Complete</button>
-          </div>
-          <div className="campaign-wizard-grid">
+          <section className="campaign-wizard-section primary-character-section">
+            <div className="wizard-heading">
+              <span>Player Character</span>
+              <button id="new-character-autocomplete" className="mini-action" type="button">Auto-Complete</button>
+            </div>
+            <div className="controller-choice-row" aria-label="Player character controller">
+              <label>
+                <input type="radio" name="new-character-controller" value="host" defaultChecked />
+                <span>Host</span>
+              </label>
+              <label>
+                <input type="radio" name="new-character-controller" value="ai_companion" />
+                <span>AI</span>
+              </label>
+              <label>
+                <input type="radio" name="new-character-controller" value="remote_invite" />
+                <span>Remote Invite</span>
+              </label>
+            </div>
+            <div className="campaign-wizard-grid">
+              <label>
+                <span>Name</span>
+                <input id="new-character-name" autoComplete="off" placeholder="Evelynn, Jarin, Rowan..." />
+              </label>
+              <label>
+                <span>Ancestry</span>
+                <input id="new-character-ancestry" autoComplete="off" placeholder="Elf, human, dwarf..." />
+              </label>
+              <label>
+                <span>Class / role</span>
+                <input id="new-character-class" autoComplete="off" placeholder="Druid, thief, ranger, fighter..." />
+              </label>
+              <label>
+                <span>Level</span>
+                <input id="new-character-level" inputMode="numeric" defaultValue="1" />
+              </label>
+            </div>
             <label>
-              <span>Name</span>
-              <input id="new-character-name" autoComplete="off" placeholder="Evelynn, Jarin, Rowan..." />
+              <span>Concept</span>
+              <textarea
+                id="new-character-concept"
+                rows="4"
+                placeholder="A quick background, goal, personality hook, or secret."
+              ></textarea>
             </label>
-            <label>
-              <span>Ancestry</span>
-              <input id="new-character-ancestry" autoComplete="off" placeholder="Elf, human, dwarf..." />
+            <label className="check-row">
+              <input id="new-character-auto-sheet" type="checkbox" defaultChecked />
+              <span>Auto-fill a 5E-lite sheet from these basics</span>
             </label>
-            <label>
-              <span>Class / role</span>
-              <input id="new-character-class" autoComplete="off" placeholder="Druid, thief, ranger, fighter..." />
-            </label>
-            <label>
-              <span>Level</span>
-              <input id="new-character-level" inputMode="numeric" defaultValue="1" />
-            </label>
-          </div>
-          <label>
-            <span>Concept</span>
-            <textarea
-              id="new-character-concept"
-              rows="3"
-              placeholder="A quick background, goal, personality hook, or secret."
-            ></textarea>
-          </label>
-          <label className="check-row">
-            <input id="new-character-auto-sheet" type="checkbox" defaultChecked />
-            <span>Auto-fill a 5E-lite sheet from these basics</span>
-          </label>
-        </section>
+          </section>
 
-        <section className="campaign-wizard-section">
-          <div className="wizard-heading">
-            <span>Additional Characters</span>
-            <button id="add-wizard-party-member" className="icon-action" type="button" title="Add character">+</button>
-          </div>
-          <p className="setup-note">Optional. Host-created additional characters enter as AI companions and can be claimed or invited later.</p>
-          <div id="wizard-additional-characters" className="wizard-additional-characters">
-            <article className="wizard-character-card" data-wizard-character-card="0">
-              <div className="wizard-character-card-heading">
-                <h3>Character 2</h3>
-                <button className="mini-action" type="button" data-autocomplete-wizard-character="0">Auto-Complete</button>
+          <section className="campaign-wizard-section additional-characters-section">
+            <div className="wizard-heading">
+              <div>
+                <span>Additional Characters</span>
+                <p>Build the pre-table party. Host and AI seats are ready immediately; Remote Invite seats are held open for a player.</p>
               </div>
-              <div className="campaign-wizard-grid">
+              <button id="add-wizard-party-member" className="icon-action" type="button" title="Add character">+</button>
+            </div>
+            <div id="wizard-additional-characters" className="wizard-additional-characters">
+              <article className="wizard-character-card" data-wizard-character-card="0">
+                <div className="wizard-character-card-heading">
+                  <h3>Character 2</h3>
+                  <button className="mini-action" type="button" data-autocomplete-wizard-character="0">Auto-Complete</button>
+                </div>
+                <div className="controller-choice-row" aria-label="Character 2 controller">
+                  <label>
+                    <input type="radio" name="wizard-character-controller-0" value="ai_companion" data-character-field="controllerKind" defaultChecked />
+                    <span>AI</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="wizard-character-controller-0" value="host" data-character-field="controllerKind" />
+                    <span>Host</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="wizard-character-controller-0" value="remote_invite" data-character-field="controllerKind" />
+                    <span>Remote Invite</span>
+                  </label>
+                </div>
+                <div className="campaign-wizard-grid">
+                  <label>
+                    <span>Name</span>
+                    <input id="new-joiner-name" autoComplete="off" placeholder="Eve, Mira, Tilli..." />
+                  </label>
+                  <label>
+                    <span>Ancestry</span>
+                    <input id="new-joiner-ancestry" autoComplete="off" placeholder="Fairy, elf, human..." />
+                  </label>
+                  <label>
+                    <span>Class / role</span>
+                    <input id="new-joiner-class" autoComplete="off" placeholder="Druid, rogue, bard..." />
+                  </label>
+                  <label>
+                    <span>Level</span>
+                    <input id="new-joiner-level" inputMode="numeric" defaultValue="1" />
+                  </label>
+                </div>
                 <label>
-                  <span>Name</span>
-                  <input id="new-joiner-name" autoComplete="off" placeholder="Eve, Mira, Tilli..." />
+                  <span>Character pitch</span>
+                  <textarea
+                    id="new-joiner-concept"
+                    rows="3"
+                    placeholder="Who are they, what kind of energy do they bring, and what do they care about?"
+                  ></textarea>
                 </label>
                 <label>
-                  <span>Ancestry</span>
-                  <input id="new-joiner-ancestry" autoComplete="off" placeholder="Fairy, elf, human..." />
+                  <span>Why they are with the party</span>
+                  <textarea
+                    id="new-joiner-integration"
+                    rows="3"
+                    placeholder="Old friend, hired guide, stranger with the same problem, rescued captive, sibling, rival..."
+                  ></textarea>
                 </label>
                 <label>
-                  <span>Class / role</span>
-                  <input id="new-joiner-class" autoComplete="off" placeholder="Druid, rogue, bard..." />
+                  <span>Host note for the DM</span>
+                  <textarea
+                    id="new-joiner-host-context"
+                    rows="3"
+                    placeholder="Scene-specific glue for the DM: how to introduce them, what not to contradict, what goal they bring."
+                  ></textarea>
                 </label>
-                <label>
-                  <span>Level</span>
-                  <input id="new-joiner-level" inputMode="numeric" defaultValue="1" />
+                <label className="check-row">
+                  <input id="new-joiner-auto-sheet" type="checkbox" defaultChecked />
+                  <span>Auto-fill a 5E-lite sheet for this party member</span>
                 </label>
-              </div>
-              <label>
-                <span>Character pitch</span>
-                <textarea
-                  id="new-joiner-concept"
-                  rows="3"
-                  placeholder="Who are they, what kind of energy do they bring, and what do they care about?"
-                ></textarea>
-              </label>
-              <label>
-                <span>Why they are with the party</span>
-                <textarea
-                  id="new-joiner-integration"
-                  rows="3"
-                  placeholder="Old friend, hired guide, stranger with the same problem, rescued captive, sibling, rival..."
-                ></textarea>
-              </label>
-              <label>
-                <span>Host note for the DM</span>
-                <textarea
-                  id="new-joiner-host-context"
-                  rows="3"
-                  placeholder="Scene-specific glue for the DM: how to introduce them, what not to contradict, what goal they bring."
-                ></textarea>
-              </label>
-              <label className="check-row">
-                <input id="new-joiner-auto-sheet" type="checkbox" defaultChecked />
-                <span>Auto-fill a 5E-lite sheet for this party member</span>
-              </label>
-            </article>
-          </div>
-        </section>
+              </article>
+            </div>
+          </section>
+        </div>
 
         <footer className="dialog-actions">
           <button type="submit">Create And Start</button>

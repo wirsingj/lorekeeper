@@ -94,6 +94,17 @@ summary,
   visibility: hidden;
 }
 
+.handheld-shell.campaign-wizard-mode .left-panel,
+.handheld-shell.campaign-wizard-mode .right-panel,
+.handheld-shell.campaign-wizard-mode .command-deck {
+  visibility: hidden;
+}
+
+.handheld-shell.campaign-wizard-mode .provider-activity,
+.handheld-shell.campaign-wizard-mode .play-log {
+  opacity: 0;
+}
+
 .panel-rail,
 .screen-bezel,
 .command-deck {
@@ -2031,7 +2042,24 @@ textarea::placeholder {
 }
 
 .campaign-dialog {
-  width: min(760px, calc(100vw - 32px));
+  width: min(1360px, calc(100vw - 40px));
+  height: min(860px, calc(100vh - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+}
+
+.campaign-dialog::backdrop {
+  background:
+    linear-gradient(135deg, rgba(17, 21, 24, 0.98), rgba(26, 31, 35, 0.96)),
+    rgba(17, 21, 26, 0.98);
+}
+
+.campaign-dialog form {
+  height: 100%;
+  max-height: calc(100vh - 40px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
 .join-dialog {
@@ -2187,6 +2215,37 @@ textarea::placeholder {
     rgba(10, 13, 15, 0.26);
 }
 
+.campaign-wizard-layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1fr) minmax(420px, 1.25fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  overflow: hidden;
+}
+
+.campaign-wizard-layout > .campaign-wizard-section {
+  min-height: 0;
+  align-content: start;
+  overflow: auto;
+}
+
+.additional-characters-section {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.additional-characters-section .wizard-heading {
+  align-items: start;
+}
+
+.additional-characters-section .wizard-heading p {
+  margin: 3px 0 0;
+  max-width: 58ch;
+  color: #b8c6ce;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .wizard-heading {
   display: flex;
   align-items: center;
@@ -2207,9 +2266,55 @@ textarea::placeholder {
   gap: 10px;
 }
 
+.campaign-wizard-section label {
+  display: grid;
+  gap: 5px;
+}
+
+.campaign-wizard-section label > span {
+  color: #edf2f4;
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.controller-choice-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.controller-choice-row label {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid rgba(174, 191, 202, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #dce6ea;
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.controller-choice-row input {
+  width: auto;
+}
+
+.controller-choice-row label:has(input:checked) {
+  border-color: rgba(125, 213, 201, 0.36);
+  background: rgba(125, 213, 201, 0.12);
+  color: #effbf7;
+}
+
 .wizard-additional-characters {
+  min-height: 0;
   display: grid;
   gap: 12px;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .wizard-character-card {
@@ -2246,6 +2351,18 @@ textarea::placeholder {
   min-height: 30px;
   padding: 0 10px;
   font-size: 0.72rem;
+}
+
+@media (max-width: 1280px) {
+  .campaign-wizard-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: auto;
+  }
+
+  .additional-characters-section {
+    grid-column: 1 / -1;
+    min-height: 360px;
+  }
 }
 
 .sheet-subtitle {

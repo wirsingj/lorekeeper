@@ -65,6 +65,7 @@ The user should not feel like they are debugging a model, managing queue machine
 19. Guest action lifecycle now uses clearer sent/waiting/queued/resolved language on both guest and host surfaces.
 20. Session health now names the waiting party member and distinguishes host approval, grouped turns, queued DM actions, passes, and guest sent state.
 21. Table Talk now gets a subtle unread cue when new side-chat messages arrive.
+22. Host New is becoming a real pre-table setup workspace with party controller intent instead of a small modal over the last table.
 
 ### Still Risky
 
@@ -81,6 +82,7 @@ The user should not feel like they are debugging a model, managing queue machine
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Context retrieval is still coarse and recent-message heavy compared with the desired actor/place/consequence/thread retrieval.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
+14. Pre-table guest lobby is not built yet: invited players should see the same setup state as the host, with only their own character editable.
 
 ## Live Acceptance Matrix
 
@@ -129,9 +131,10 @@ The user should not feel like they are debugging a model, managing queue machine
 ### Low
 
 17. Replace remaining overly specific placeholder text with neutral table examples.
-18. Add campaign-aware character auto-complete that uses party theme/premise/existing characters without overriding supplied fields.
-19. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
-20. Add backup/export/recycle affordances before destructive delete in release builds.
+18. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
+19. Add campaign-aware character auto-complete that uses party theme/premise/existing characters without overriding supplied fields.
+20. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
+21. Add backup/export/recycle affordances before destructive delete in release builds.
 
 ## Working Checklist
 
@@ -208,9 +211,12 @@ The user should not feel like they are debugging a model, managing queue machine
 
 - [x] Campaign creation requires one host character.
 - [x] Campaign creation supports `+` additional characters.
+- [x] Host New hides the previous table and uses a full setup workspace.
+- [x] Campaign creation can mark seats as Host, AI, or Remote Invite.
 - [x] Post-start host-created character flow uses same compact creator.
 - [x] Guest join and LoreKeeper Join use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
+- [ ] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character.
 - [ ] Make auto-complete campaign-aware without overriding user facts.
 - [ ] Add party-template flow for repeated related companions.
 - [ ] Improve class/spell/equipment depth beyond shallow 5E-lite starts.
