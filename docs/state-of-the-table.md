@@ -118,6 +118,7 @@ Every table surface should answer the same practical questions a real table answ
 67. Manual review/use-anyway live copy now avoids JSON/contract/import wording and frames failures as table checks, with raw details kept in diagnostics.
 68. Turn repair display/use-anyway policy is extracted into a small recovery controller with direct tests instead of living only as renderer string handling.
 69. Narration-first prompt policy now explicitly tells local models to leave `choices.options` empty on ordinary scene turns, while preserving combat/immediate-danger choices.
+70. Multiplayer regression coverage now proves a guest snapshot with a previous local-table session id is rejected after host table restart.
 
 ### Still Risky
 
@@ -284,6 +285,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Make host "guest waiting" state harder to miss.
 - [x] Add explicit host tie-break/confirm flow for party votes. Current state: vote counters, tie/leader language, and "Draft leading choice" action exist; final confirmation remains the normal Send Turn path.
 - [x] Show party-choice vote counters and let guests switch their vote.
+- [x] Add stale-session reconnect regression for guest snapshots after host table restart.
 - [ ] Add disconnect/reconnect/campaign-switch soak tests.
 - [ ] Consider WebSocket/broadcast later after polling semantics are solid.
 

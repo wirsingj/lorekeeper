@@ -601,7 +601,19 @@ const stoppedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connec
 assert.equal(stoppedSnapshot.tableStopped, true);
 assert.equal(stoppedSnapshot.awaitingApproval, false);
 assert.match(stoppedSnapshot.scene.immediateSituation, /host local table is off/i);
+const stoppedSessionId = tableStopCampaign.multiplayer.localTable.sessionId;
 tableStopCampaign = startLocalTable(tableStopCampaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+assert.notEqual(tableStopCampaign.multiplayer.localTable.sessionId, stoppedSessionId);
+assert.throws(
+  () => createGuestSnapshot(tableStopCampaign, joinResult.connection.id, {
+    clientId: "guest-client",
+    connectionSecret,
+    campaignId: tableStopCampaign.id,
+    tableId: tableStopCampaign.multiplayer.localTable.tableId,
+    sessionId: stoppedSessionId,
+  }),
+  /session is no longer active/i,
+);
 const revivedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client", connectionSecret });
 assert.equal(revivedSnapshot.connection.status, "connected");
 assert.equal(revivedSnapshot.assignedCharacter.name, "Kevric");
