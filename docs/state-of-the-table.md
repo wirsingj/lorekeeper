@@ -140,11 +140,12 @@ Every table surface should answer the same practical questions a real table answ
 89. Provider review auto-commit policy now lives in `provider-import-controller.js`, including hidden story-arc auto-approval and major/invalid/rejected change blocking.
 90. Agency validation now catches subtle remote-PC resolve/body-language overreach from play logs, including "doesn't back down" and eyes/grip locking into action without submitted input.
 91. The left rail now explicitly contains dense party/combat content so long card text and button clusters wrap or truncate instead of forcing horizontal scroll.
+92. Staged-input failure wording now lives with the staged recovery controller, so retry/keep-staged language is tested outside `app.js`.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches are now rejected.
-2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions, provider import outcome copy, and latest-response import gating are now extracted.
+2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, and provider review auto-commit policy are now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, and host review summary, but the underlying manual review textarea still exists as a fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
@@ -245,7 +246,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Diagnostics include table timeline and session health summary.
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions, provider import outcome copy, latest-response import gating, and provider review auto-commit policy are extracted; broader provider/import orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, and provider review auto-commit policy are extracted; broader provider/import orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.

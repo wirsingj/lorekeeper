@@ -25,6 +25,25 @@ export function buildStagedInputRecoveryPlan({
   };
 }
 
+export function providerFailureReason(runResult = {}) {
+  if (runResult?.error instanceof Error) {
+    return runResult.error.message;
+  }
+  if (typeof runResult?.error === "string") {
+    return runResult.error;
+  }
+  if (runResult?.timedOut) {
+    return "The DM response timed out.";
+  }
+  if (runResult?.canceled) {
+    return "The DM response was canceled.";
+  }
+  if (runResult?.needsRepair) {
+    return "The DM response needs review before it can resolve this input.";
+  }
+  return "The DM did not resolve this staged input.";
+}
+
 function groupPlan(inputs, action) {
   const list = Array.isArray(inputs) ? inputs.filter(Boolean) : [];
   return {

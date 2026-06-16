@@ -25,7 +25,7 @@ import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
-import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
+import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 import { turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "./turn-repair-controller.js";
@@ -1709,25 +1709,6 @@ async function markRemoteInputsStillStaged(inputs, runResult = {}) {
       },
     });
   }
-}
-
-function providerFailureReason(runResult = {}) {
-  if (runResult?.error instanceof Error) {
-    return runResult.error.message;
-  }
-  if (typeof runResult?.error === "string") {
-    return runResult.error;
-  }
-  if (runResult?.timedOut) {
-    return "The DM response timed out.";
-  }
-  if (runResult?.canceled) {
-    return "The DM response was canceled.";
-  }
-  if (runResult?.needsRepair) {
-    return "The DM response needs review before it can resolve this input.";
-  }
-  return "The DM did not resolve this staged input.";
 }
 
 async function clearSubmittedRemoteInputs(inputs) {

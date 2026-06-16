@@ -14,7 +14,7 @@ import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-pa
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
-import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
+import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { tableRepairReason, turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "../app/turn-repair-controller.js";
@@ -1565,6 +1565,13 @@ function testStagedInputRecoveryController() {
   assert.equal(failed.approvedParty.action, stagedInputRecoveryActions.KEEP_STAGED);
   assert.equal(failed.stagedRemote.action, stagedInputRecoveryActions.KEEP_STAGED);
   assert.equal(failed.pendingRemote.action, stagedInputRecoveryActions.KEEP_STAGED);
+
+  assert.equal(providerFailureReason({ error: new Error("model exploded") }), "model exploded");
+  assert.equal(providerFailureReason({ error: "bad json" }), "bad json");
+  assert.equal(providerFailureReason({ timedOut: true }), "The DM response timed out.");
+  assert.equal(providerFailureReason({ canceled: true }), "The DM response was canceled.");
+  assert.equal(providerFailureReason({ needsRepair: true }), "The DM response needs review before it can resolve this input.");
+  assert.equal(providerFailureReason({}), "The DM did not resolve this staged input.");
 }
 
 function testHostResponseReviewProjection() {
@@ -1892,6 +1899,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /Remove this staged guest action without sending it to the DM/);
   assert.match(appJs, /buildStagedInputRecoveryPlan/, "staged input recovery policy should be outside the renderer turn body");
   assert.match(appJs, /applyStagedInputRecoveryPlan/, "renderer should execute the staged input recovery plan");
+  assert.doesNotMatch(appJs, /function providerFailureReason/, "staged input failure wording should live outside app.js");
   assert.doesNotMatch(appJs, /else if \(inputs\.length && !runResult\?\.imported\)/, "pending input recovery branching should live in staged-input-recovery-controller");
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
