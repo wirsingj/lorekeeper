@@ -131,6 +131,7 @@ Every table surface should answer the same practical questions a real table answ
 80. Raw diagnostics are now tucked behind a Raw Details disclosure so table-facing health/review summaries are the first thing hosts see.
 81. Latest-provider-response empty/unchanged/duplicate/import decisions now live in `provider-import-controller.js` with direct tests instead of branching inside `app.js`.
 82. SQLite schema validation now goes through a versioned migration module; current schema passes as `current`, and unsupported old/new versions fail loudly with a migration-path error.
+83. Imported bundle assets are copied into `data/assets/<campaign>/...` when loaded, and campaign asset records point at the app-owned copy while preserving the original source path.
 
 ### Still Risky
 
@@ -351,7 +352,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [x] Add migration modules before public release. Current state: versioned runner exists and unsupported schema/user_version combinations fail loudly; future schema changes still need explicit migration entries.
 - [x] Add backup/export/recycle story before destructive delete in release builds. Current state: delete recycles SQLite files to `data/campaigns/.deleted`; restore UI remains future polish.
-- [ ] Move imported assets into app-owned portable asset storage.
+- [x] Move imported assets into app-owned portable asset storage. Current state: imported bundle assets are copied into `data/assets/<campaign>/...`; broader export/restore asset packaging remains future polish.
 
 ## Two-Machine Playtest Checklist
 

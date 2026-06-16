@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -10,7 +10,9 @@ import {
   createNewActiveCampaign,
   deleteCampaign,
   listCampaigns,
+  loadImportedCampaign,
 } from "../src/storage/campaign-repository.js";
+import { createCampaignBundle, serializeCampaignBundle } from "../src/storage/campaign-bundle.js";
 import {
   appendCampaignErrorToSqliteFile,
   readCampaignFromSqliteFile,
@@ -283,6 +285,32 @@ try {
   const index = JSON.parse(await readFile(indexPath, "utf8"));
   assert.equal(index.campaigns.some((entry) => path.resolve(entry.sqlitePath) === path.resolve(second.sqlitePath)), false);
   assert.equal(index.hiddenCampaignPaths.some((sqlitePath) => path.resolve(sqlitePath) === path.resolve(second.sqlitePath)), false);
+
+  const assetSourceDir = path.join(tempDir, "source-assets");
+  await mkdir(assetSourceDir, { recursive: true });
+  const sourceAssetPath = path.join(assetSourceDir, "map.png");
+  await writeFile(sourceAssetPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  const importedCampaign = createStarterCampaign({
+    title: "Imported Asset Campaign",
+    premise: "This campaign should copy imported assets.",
+  });
+  importedCampaign.assets.push({
+    id: "asset-map",
+    name: "Forest Map.png",
+    path: sourceAssetPath,
+    kind: "image",
+    mediaType: "image/png",
+    notes: [],
+  });
+  const importedBundlePath = path.join(repoRoot, "data", "imports", "veil-of-the-towers.bundle.json");
+  await mkdir(path.dirname(importedBundlePath), { recursive: true });
+  await writeFile(importedBundlePath, serializeCampaignBundle(createCampaignBundle(importedCampaign)), "utf8");
+  const imported = await loadImportedCampaign(repoRoot);
+  const importedAsset = imported.campaign.assets[0];
+  assert.ok(importedAsset.path.includes(`${path.sep}data${path.sep}assets${path.sep}`));
+  assert.equal(path.resolve(importedAsset.originalPath), path.resolve(sourceAssetPath));
+  assert.equal(importedAsset.storage, "app");
+  assert.ok(existsSync(importedAsset.path));
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

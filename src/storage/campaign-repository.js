@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeCampaign } from "../campaign-state/schema.js";
 import { createStarterCampaign } from "../campaign-state/starter-campaign.js";
@@ -320,7 +320,7 @@ export async function loadImportedCampaign(projectRoot) {
   }
 
   const bundle = JSON.parse(await readFile(importedPath, "utf8"));
-  const campaign = normalizeCampaign(bundle.campaign);
+  const campaign = await materializeImportedAssets(projectRoot, normalizeCampaign(bundle.campaign));
   const sqlitePath = campaignFilePath(projectRoot, campaign.title);
   await mkdir(path.dirname(sqlitePath), { recursive: true });
   await writeCampaignSqliteFile(campaign, sqlitePath);
@@ -336,6 +336,49 @@ export async function loadImportedCampaign(projectRoot) {
     source: "imported_bundle",
     campaigns: (await listCampaigns(projectRoot)).campaigns,
   };
+}
+
+async function materializeImportedAssets(projectRoot, campaign) {
+  if (!Array.isArray(campaign.assets) || campaign.assets.length === 0) {
+    return campaign;
+  }
+
+  const assetDir = path.join(projectRoot, "data", "assets", slugify(campaign.id || campaign.title || "campaign"));
+  const assets = [];
+  let copiedCount = 0;
+  for (const asset of campaign.assets) {
+    const sourcePath = asset?.path ? path.resolve(asset.path) : "";
+    if (!sourcePath || !existsSync(sourcePath)) {
+      assets.push(asset);
+      continue;
+    }
+
+    const extension = path.extname(asset.name || sourcePath) || path.extname(sourcePath);
+    const safeBaseName = slugify(path.basename(asset.name || asset.id || sourcePath, extension)) || "asset";
+    const safeFileName = `${slugify(asset.id || safeBaseName) || safeBaseName}-${safeBaseName}${extension.toLowerCase()}`;
+    const targetPath = path.join(assetDir, safeFileName);
+    if (path.resolve(sourcePath) !== path.resolve(targetPath)) {
+      await mkdir(assetDir, { recursive: true });
+      await copyFile(sourcePath, targetPath);
+      copiedCount += 1;
+    }
+    assets.push({
+      ...asset,
+      path: targetPath,
+      originalPath: asset.originalPath || sourcePath,
+      storage: "app",
+    });
+  }
+
+  if (copiedCount === 0) {
+    return campaign;
+  }
+
+  return normalizeCampaign({
+    ...campaign,
+    assets,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 async function loadSeedCampaign(projectRoot) {
