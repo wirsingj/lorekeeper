@@ -770,13 +770,16 @@ function SetupDialog() {
           <div id="table-timeline-summary" className="table-timeline-summary" aria-live="polite">
             <p>No table timeline yet.</p>
           </div>
-          <textarea
-            id="diagnostics-output"
-            className="rail-textarea diagnostics-output"
-            spellCheck="false"
-            readOnly
-            placeholder="Open this after a weird turn to review table health, recent messages, DM response issues, combat state, and logs."
-          ></textarea>
+          <details className="raw-diagnostics-details">
+            <summary>Raw Details</summary>
+            <textarea
+              id="diagnostics-output"
+              className="rail-textarea diagnostics-output"
+              spellCheck="false"
+              readOnly
+              placeholder="Open this after a weird turn to review table health, recent messages, DM response issues, combat state, and logs."
+            ></textarea>
+          </details>
         </section>
 
         <section className="setup-section local-table-section">

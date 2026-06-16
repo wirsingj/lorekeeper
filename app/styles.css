@@ -2376,6 +2376,26 @@ textarea::placeholder {
   white-space: pre;
 }
 
+.raw-diagnostics-details {
+  border: 1px solid rgba(174, 191, 202, 0.14);
+  border-radius: 8px;
+  background: rgba(13, 17, 20, 0.28);
+}
+
+.raw-diagnostics-details summary {
+  cursor: pointer;
+  padding: 8px;
+  color: #cbd6db;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.raw-diagnostics-details .diagnostics-output {
+  border: 0;
+  border-top: 1px solid rgba(174, 191, 202, 0.12);
+  border-radius: 0 0 8px 8px;
+}
+
 .session-health-summary,
 .table-timeline-summary,
 .host-response-review {

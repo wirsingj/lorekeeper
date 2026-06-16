@@ -1813,6 +1813,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Review DM Response/);
   assert.match(appShell, /host-response-review/);
   assert.match(appShell, /No DM Response Waiting/);
+  assert.match(appShell, /raw-diagnostics-details/);
+  assert.match(appShell, /Raw Details/);
   assert.doesNotMatch(appShell, /raw provider JSON/);
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appJs, /renderRightRailState/);
@@ -1871,6 +1873,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /host-response-review-controller\.js/, "host response review guidance should live outside the main app renderer");
   assert.match(appJs, /buildHostResponseReviewProjection/, "review summary should come from a small projection");
   assert.match(styles, /\.host-response-review/);
+  assert.match(styles, /\.raw-diagnostics-details/);
   assert.match(turnRepairController, /the DM response did not pass LoreKeeper's table checks/, "technical repair reasons should be softened for live play");
   assert.match(appJs, /Opening scene needs review; use Try Again or Details before starting play\./);
   assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);

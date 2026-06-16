@@ -128,6 +128,7 @@ Every table surface should answer the same practical questions a real table answ
 77. The Review DM Response section now starts with a host-facing table-check summary projection before the paste/use controls, so repair state is framed as a table decision instead of raw diagnostics first.
 78. Campaign delete now removes the campaign from LoreKeeper but recycles the SQLite/WAL/SHM files into `data/campaigns/.deleted/...` for manual recovery.
 79. Provider import outcome copy now comes from a small controller instead of branching inside `app.js`, keeping another recovery/import decision out of the renderer.
+80. Raw diagnostics are now tucked behind a Raw Details disclosure so table-facing health/review summaries are the first thing hosts see.
 
 ### Still Risky
 
@@ -331,7 +332,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.
-- [ ] Keep debug/repair tools tucked away unless action is required.
+- [x] Keep debug/repair tools tucked away unless action is required.
 - [ ] Consider context-sensitive note sections or tabs after playtest.
 - [x] Persist Player Notes to campaign SQLite or an explicit per-user notes store before relying on them for long campaigns.
 - [x] Make Table Talk harder to miss without making it noisy.
