@@ -1380,6 +1380,14 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /updatePlayerTurnEchoLifecycle/, "submitted turn bubbles should update after provider completion or failure");
   assert.match(appJs, /markPendingPlayerTurnRecovering/, "auto-resumed player turns should get a visible recovery lifecycle before replay");
   assert.match(appJs, /turn_recovering[\s\S]*?label:\s*"Recovering"/, "recovering player turns should use table-facing lifecycle wording");
+  assert.match(appJs, /markRepairTurnRetrying/, "Try Again should mark the original player action as retrying");
+  assert.match(appJs, /findPlayerTurnMessageForRepair/, "Try Again should find the original action by repair turn id");
+  assert.match(appJs, /turn_retrying[\s\S]*?label:\s*"Trying again"/, "repair retry bubbles should use table-facing lifecycle wording");
+  assert.match(
+    appJs,
+    /const runResult = await runPromptThroughLocalProvider\(repair\.turn\);[\s\S]*?await updatePlayerTurnEchoLifecycle\(retryMessage\.id/,
+    "Try Again should update the original player action after the retry result",
+  );
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
   assert.match(appJs, /buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
   assert.match(appJs, /sessionHealth: buildSessionHealthSummary\(\)/, "renderer diagnostics should serialize session health");

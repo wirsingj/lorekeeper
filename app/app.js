@@ -7849,11 +7849,48 @@ async function retryTurnRepair() {
     setProviderActivity("No DM response is available to try again", "error");
     return;
   }
+  const retryMessage = await markRepairTurnRetrying(repair);
   setProviderActivity("DM is reconsidering the response...", "working");
   state.turnFlow.retryLastTurn();
   updateTurnRepairControls();
   updateNudgeAvailability();
-  await runPromptThroughLocalProvider(repair.turn);
+  const runResult = await runPromptThroughLocalProvider(repair.turn);
+  if (retryMessage?.id) {
+    await updatePlayerTurnEchoLifecycle(retryMessage.id, {
+      ...runResult,
+      recovered: true,
+    });
+  }
+}
+
+async function markRepairTurnRetrying(repair) {
+  const message = findPlayerTurnMessageForRepair(repair);
+  if (!message?.id) {
+    return null;
+  }
+  await patchPlayMessage(message.id, {
+    data: {
+      status: "turn_retrying",
+      lifecycle: "retrying",
+      repairReason: repair.reason || "",
+      repairRetryStartedAt: new Date().toISOString(),
+    },
+  });
+  return message;
+}
+
+function findPlayerTurnMessageForRepair(repair) {
+  const turnId = repair?.turn?.turnId || repair?.turn?.id || "";
+  if (!turnId) {
+    return null;
+  }
+  for (let index = state.playMessages.length - 1; index >= 0; index -= 1) {
+    const message = state.playMessages[index];
+    if (message.role === "player" && message.data?.turnId === turnId) {
+      return message;
+    }
+  }
+  return null;
 }
 
 async function inspectTurnRepair() {
@@ -9209,6 +9246,16 @@ function messageLifecycleForMessage(message) {
       turn_recovering: {
         label: "Recovering",
         title: "The app is replaying this unresolved action so the DM can answer it.",
+        tone: "waiting",
+      },
+      retrying: {
+        label: "Trying again",
+        title: "The host asked the DM to try this response again.",
+        tone: "waiting",
+      },
+      turn_retrying: {
+        label: "Trying again",
+        title: "The host asked the DM to try this response again.",
         tone: "waiting",
       },
       resolved: {

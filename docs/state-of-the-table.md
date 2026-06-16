@@ -111,12 +111,13 @@ Every table surface should answer the same practical questions a real table answ
 60. Context packs now start with a Scene Focus section and scene retrieval includes current-place/thread/consequence-linked relationships and timeline events, not only recent chat or explicit participants.
 61. Hidden-story fixtures now reject visible narration/choice text that directly leaks private DM story phrases while allowing subtle public clues plus `dm_only` story updates.
 62. AI companion combat nudges now work only on that companion's active initiative turn and request a host-approved suggestion rather than resolving mechanics.
+63. Try Again now marks the original player action as "Trying again" and updates that same bubble after the retry result lands.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
-3. Recovery is more table-shaped in the live status strip and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
+3. Recovery is more table-shaped in the live status strip, retry lifecycle, and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
@@ -146,7 +147,7 @@ Every table surface should answer the same practical questions a real table answ
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression and rich full-turn fixtures now cover social, travel, mystery, downtime, combat, and recovery. Needs real-model soak for repeated turns. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist, are private, and have non-leakage fixtures. Still needs pacing/adaptation scenario testing over longer sessions. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
-| Recovery after provider failure is understandable. | Improved | Player echoes, staged inputs, table-facing labels, and session `Next:` guidance show lifecycle. Repair/retry still needs table-shaped flow. |
+| Recovery after provider failure is understandable. | Improved | Player echoes, staged inputs, retry bubbles, table-facing labels, and session `Next:` guidance show lifecycle. Manual review still needs a less developer-shaped surface. |
 | Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place. |
 
 ## Priority Queue
@@ -161,7 +162,7 @@ Every table surface should answer the same practical questions a real table answ
 
 4. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
 5. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-6. Make repair retry lifecycle as table-shaped as auto-resume.
+6. Make manual review/use-anyway lifecycle less developer-shaped after retry flow improvements.
 7. Run the two-machine playtest checklist and log every friction point.
 8. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 9. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -209,7 +210,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Failed provider turns keep approved/remote inputs visibly staged.
 - [x] Diagnostics include table timeline and session health summary.
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
-- [ ] Make repair retry lifecycle as table-shaped as auto-resume.
+- [x] Make repair retry lifecycle as table-shaped as auto-resume.
 - [ ] Move remaining recovery/import decisions out of `app/app.js`.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
