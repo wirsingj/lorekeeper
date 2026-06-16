@@ -1,7 +1,7 @@
 # LoreKeeper Tabletop Reality Check
 
 Original pass: 2026-06-14  
-Updated: 2026-06-15
+Updated: 2026-06-16
 
 This is a product audit for the real goal: LoreKeeper should feel like sitting at a natural D&D 5E table. The party members are the people around the table. The app plus AI provider is the DM. The user should not feel like they are debugging a model, managing queue machinery, or translating app concepts while trying to play.
 
@@ -55,6 +55,8 @@ Status legend:
 31. Improved - Auto-resumed unresolved player actions now mark the original table bubble as "Recovering" before replaying the action, then settle to the normal DM answered/review/failed lifecycle.
 32. Improved - Empty side-panel states now use table-shaped language for contacts, places, things, threads, staged party actions, side chat, and state review.
 33. Improved - Structured choice prompts now carry audience metadata for party, character, subset, vote, and combat-actor prompts. The play log surfaces that audience near the prompt, and selected choices send the targeting/vote context back to the provider.
+34. Improved - Remote guests can vote on party-scoped choices without drafting locked action text; the host sees vote counters and a summary before choosing the table's final action.
+35. Fixed - Guest Leave notifies the host, releases the vacated remote seat back to Host control, and keeps that seat requestable for reconnect.
 
 ## Top Immersion Risks Still Open
 
@@ -73,7 +75,7 @@ Status legend:
 13. Watch - Host/client snapshots can lag actions by polling interval.
 14. Watch - Pending input cleanup depends on successful provider import and can leave intent queued after failure.
 15. Watch - Active campaign changes reset TurnFlow, but app-level helper keys still coexist with TurnFlow state.
-16. Open - Party-vote collection is not yet a real multiplayer flow. The schema/UI can label vote prompts, but guests cannot yet cast separate votes with host tie-break resolution.
+16. Improved - Party-vote collection exists for remote guests, but host tie-break and final confirmation still need a more explicit table-shaped affordance.
 
 ## Real Table Acceptance Matrix
 
@@ -87,7 +89,7 @@ Status legend:
 | Combat has one row per active combatant. | Fixed | Count/quantity expansion covers grouped enemies. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
 | The DM continues scenes without forcing options. | Improved | Prompts and choice suppression improved. Needs more social/travel/downtime fixtures. |
-| The DM can address the party or a specific party member. | Improved | Choice metadata supports party, targeted character, subset, vote, and combat actor audiences, and the play log displays the target. Full vote collection is still open. |
+| The DM can address the party or a specific party member. | Improved | Choice metadata supports party, targeted character, subset, vote, and combat actor audiences. Remote votes and counters exist; explicit host tie-break/confirm polish remains. |
 | The DM has a story beyond the current scene. | Improved | Hidden story arcs are sent to the provider and can be updated as `dm_only` quest records. Needs scenario soak testing. |
 | Recovery after provider failure feels understandable. | Improved | Player echoes and staged party inputs now show failure/still-staged lifecycle badges. Broader replay decisions still need table-facing recovery flow. |
 | Character creation is consistent across entry points. | Fixed | Shared compact auto-complete and aligned controller defaults are in place. |
@@ -101,7 +103,7 @@ Status legend:
 5. High - Continue strengthening the "what the table is waiting for" surface so it is always visible and covers every stuck state.
 6. Fixed - Separate debug meta from normal play mode. Raw bubble meta is hidden by default and has a visible Setup diagnostics toggle.
 7. High - Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
-8. High - Build the actual party-vote flow: host can call a vote from a party prompt, guests cast votes from ThinLoreKeeper, and the host breaks ties/resolves the winning option.
+8. High - Finish party-vote host resolution: guests can vote from LoreKeeper Join, and the host can see the table's leaning, but ties and final confirmation should feel like a clear table beat.
 9. High - Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
 10. Improved - Add surrender, retreat, intimidation, de-escalation, and chase endings to combat tests. Surrender/de-escalation app-owned end-combat fixtures exist; chase and richer intimidation contests remain.
 11. Improved - Add two-machine multiplayer soak scripts/checklists for guest join-as, assigned seat, disconnect, reconnect, and combat turn gating. A first-playtest checklist exists; scripted/disconnect soak remains.

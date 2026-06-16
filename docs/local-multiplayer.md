@@ -36,7 +36,8 @@ The current implementation supports:
 - host "Submit" action on a visible guest message
 - guest polling of visible Table State every few seconds
 - structured `user.playerInputs[]` in the next model request
-- disconnect fallback to AI companion control
+- guest Leave/disconnect releases the remote controller back to Host control and makes the seat requestable again
+- remote votes on party-scoped choice prompts, with host-visible vote counters before the host sends the final table decision
 
 This deliberately keeps multiplayer out of the primary solo UI until needed.
 
@@ -122,6 +123,7 @@ Table State currently includes:
 - factions, lore, and relationships when visible
 - combat state when visible
 - current choices
+- current party-choice votes
 - the guest's pending input state
 
 The host remains authoritative. ThinLoreKeeper polls this state every few seconds and can request a manual resync. If a guest had an older pending connection id, the host can recover by returning the approved sibling connection for the same invite/client.

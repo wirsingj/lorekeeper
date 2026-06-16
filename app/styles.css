@@ -1723,6 +1723,11 @@ button:disabled {
   background: rgba(125, 213, 201, 0.2);
 }
 
+.choice-vote-summary {
+  color: #c6d8d1;
+  font-size: 0.74rem;
+}
+
 .choice-option:hover,
 .choice-option:focus-visible {
   color: #f5fbf7;

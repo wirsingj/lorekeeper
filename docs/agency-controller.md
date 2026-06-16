@@ -18,7 +18,8 @@ type ControllerKind =
 - NPCs and enemies are DM/provider controlled, subject to app validation.
 - The provider cannot decide the primary player character's major action.
 - The host can override any AI companion or NPC proposal.
-- A disconnected remote seat falls back to configured controller behavior.
+- Guest Leave/disconnect releases that remote controller back to Host control so the seat is safe and requestable again.
+- Explicit host/controller reassignment can still return a character to AI companion or another configured controller.
 
 ## UI Requirements
 

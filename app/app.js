@@ -1272,6 +1272,32 @@ function choiceVoteCounts(block = {}) {
   return counts;
 }
 
+function choiceVoteSummaryText(block = {}) {
+  if (!isPartyVoteChoiceBlock(block)) {
+    return "";
+  }
+  const counts = choiceVoteCounts(block);
+  const entries = (block.items ?? [])
+    .map((_, index) => {
+      const optionId = choiceOptionId(block, index);
+      return {
+        label: choiceLabelForIndex(index),
+        count: counts.get(optionId) || 0,
+      };
+    })
+    .filter((entry) => entry.count > 0);
+  if (!entries.length) {
+    return "";
+  }
+  const maxCount = Math.max(...entries.map((entry) => entry.count));
+  const leaders = entries.filter((entry) => entry.count === maxCount);
+  const votesText = entries.map((entry) => `${entry.label}: ${entry.count}`).join(", ");
+  if (leaders.length > 1) {
+    return `Votes - ${votesText}. Tie: host chooses.`;
+  }
+  return `Votes - ${votesText}. Leading: ${leaders[0].label}.`;
+}
+
 function currentGuestVoteForChoice(block = {}) {
   const playerId = state.guestSession?.playerId || state.guestSnapshot?.connection?.playerId || "";
   const characterId = state.guestSession?.partyMemberId || state.guestSnapshot?.connection?.partyMemberId || "";
@@ -1310,7 +1336,9 @@ function chooseVisibleOption(block, index) {
   };
   elements.playerInput.value = `I choose ${label}: ${item}`;
   elements.playerInput.focus();
-  setProviderActivity(`Selected choice ${label}; edit or send`, "idle");
+  const voteCount = choiceVoteCounts(block).get(optionId) || 0;
+  const voteText = voteCount ? ` with ${voteCount} ${voteCount === 1 ? "vote" : "votes"}` : "";
+  setProviderActivity(`Selected choice ${label}${voteText}; edit or send`, "idle");
 }
 
 async function submitPlayerTurnFromInput(originalInput, options = {}) {
@@ -10314,6 +10342,14 @@ function messageBodyElements(text, role = "dm", data = {}) {
         list.append(item);
       });
       panel.append(list);
+
+      const voteSummaryText = choiceVoteSummaryText(block);
+      if (voteSummaryText) {
+        const voteSummary = document.createElement("small");
+        voteSummary.className = "choice-vote-summary";
+        voteSummary.textContent = voteSummaryText;
+        panel.append(voteSummary);
+      }
 
       const hint = document.createElement("small");
       hint.className = "choice-hint";
