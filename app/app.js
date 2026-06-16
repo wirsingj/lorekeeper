@@ -22,7 +22,7 @@ import { buildInputComposerProjection, applyInputComposerProjection } from "./in
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
-import { buildProviderImportOutcome } from "./provider-import-controller.js";
+import { buildProviderImportOutcome, decideLatestProviderImport } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
@@ -7994,29 +7994,24 @@ async function importLatestProviderResponse({
   const latest = await readLatestCompanionResponse();
   const latestText = latest?.text?.trim() ?? "";
 
-  if (!latestText) {
-    elements.bridgeStatus.textContent = "No DM response found";
-    setProviderActivity("No DM response found", "idle");
-    return { imported: false, reason: "empty" };
-  }
+  const decision = decideLatestProviderImport({
+    latestText,
+    newerThanText,
+    lastImportedProviderText: state.bridge.lastImportedProviderText || "",
+    requireNewerThanLastImport,
+  });
 
-  if (newerThanText && latestText === newerThanText.trim()) {
-    if (!quietIfUnchanged) {
-      elements.bridgeStatus.textContent = "Latest DM response has not changed";
-      setProviderActivity("Latest DM response has not changed", "idle");
+  if (decision.action === "skip") {
+    if (!(quietIfUnchanged && decision.reason === "unchanged")) {
+      elements.bridgeStatus.textContent = decision.bridgeStatus;
+      setProviderActivity(decision.activityText, decision.activityState);
     }
-    return { imported: false, reason: "unchanged" };
+    return { imported: false, reason: decision.reason };
   }
 
-  if (requireNewerThanLastImport && latestText === state.bridge.lastImportedProviderText?.trim()) {
-    elements.bridgeStatus.textContent = "Latest DM response is already in the table";
-    setProviderActivity("Latest DM response is already in the table", "idle");
-    return { imported: false, reason: "duplicate" };
-  }
-
-  elements.bridgeStatus.textContent = "Adding latest DM response...";
-  setProviderActivity("Adding latest DM response...", "working");
-  await importProviderResponse(latestText);
+  elements.bridgeStatus.textContent = decision.bridgeStatus;
+  setProviderActivity(decision.activityText, decision.activityState);
+  await importProviderResponse(decision.text);
   return { imported: true, response: latest };
 }
 

@@ -35,3 +35,50 @@ export function buildProviderImportOutcome({
     activityState: "idle",
   };
 }
+
+export function decideLatestProviderImport({
+  latestText = "",
+  newerThanText = "",
+  lastImportedProviderText = "",
+  requireNewerThanLastImport = false,
+} = {}) {
+  const trimmedLatest = latestText.trim();
+  if (!trimmedLatest) {
+    return {
+      action: "skip",
+      reason: "empty",
+      bridgeStatus: "No DM response found",
+      activityText: "No DM response found",
+      activityState: "idle",
+    };
+  }
+
+  if (newerThanText && trimmedLatest === newerThanText.trim()) {
+    return {
+      action: "skip",
+      reason: "unchanged",
+      bridgeStatus: "Latest DM response has not changed",
+      activityText: "Latest DM response has not changed",
+      activityState: "idle",
+    };
+  }
+
+  if (requireNewerThanLastImport && trimmedLatest === lastImportedProviderText.trim()) {
+    return {
+      action: "skip",
+      reason: "duplicate",
+      bridgeStatus: "Latest DM response is already in the table",
+      activityText: "Latest DM response is already in the table",
+      activityState: "idle",
+    };
+  }
+
+  return {
+    action: "import",
+    reason: "new",
+    bridgeStatus: "Adding latest DM response...",
+    activityText: "Adding latest DM response...",
+    activityState: "working",
+    text: trimmedLatest,
+  };
+}

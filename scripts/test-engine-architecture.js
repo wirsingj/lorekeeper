@@ -11,7 +11,7 @@ import { buildHostResponseReviewProjection } from "../app/host-response-review-c
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
-import { buildProviderImportOutcome } from "../app/provider-import-controller.js";
+import { buildProviderImportOutcome, decideLatestProviderImport } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
@@ -1587,6 +1587,36 @@ function testProviderImportOutcomeProjection() {
   const imported = buildProviderImportOutcome();
   assert.equal(imported.state, "imported");
   assert.equal(imported.activityState, "idle");
+
+  const emptyLatest = decideLatestProviderImport({ latestText: "   " });
+  assert.equal(emptyLatest.action, "skip");
+  assert.equal(emptyLatest.reason, "empty");
+  assert.match(emptyLatest.bridgeStatus, /No DM response/);
+
+  const unchangedLatest = decideLatestProviderImport({
+    latestText: "same answer",
+    newerThanText: " same answer ",
+  });
+  assert.equal(unchangedLatest.action, "skip");
+  assert.equal(unchangedLatest.reason, "unchanged");
+
+  const duplicateLatest = decideLatestProviderImport({
+    latestText: "already imported",
+    lastImportedProviderText: "already imported",
+    requireNewerThanLastImport: true,
+  });
+  assert.equal(duplicateLatest.action, "skip");
+  assert.equal(duplicateLatest.reason, "duplicate");
+
+  const newLatest = decideLatestProviderImport({
+    latestText: "  new answer  ",
+    newerThanText: "old answer",
+    lastImportedProviderText: "old imported answer",
+    requireNewerThanLastImport: true,
+  });
+  assert.equal(newLatest.action, "import");
+  assert.equal(newLatest.text, "new answer");
+  assert.equal(newLatest.activityState, "working");
 }
 
 function testMultiplayerSessionProjection() {
