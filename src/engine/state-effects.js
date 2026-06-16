@@ -74,7 +74,15 @@ function applyEffect(campaign, effect) {
   } else if (effect.type === "resource_delta") {
     const record = findActorRecord(campaign, effect.targetId).record;
     record.resources = record.resources ?? {};
-    record.resources[effect.resource] = Number(record.resources[effect.resource] ?? 0) + Number(effect.amount);
+    if (String(effect.resource).startsWith("spellSlots.") && !record.resources.spellSlots && record.stats?.spellSlots) {
+      record.resources.spellSlots = structuredClone(record.stats.spellSlots);
+    }
+    applyResourceDelta(record.resources, effect.resource, Number(effect.amount));
+    record.stats = {
+      ...(record.stats ?? {}),
+      resources: record.resources,
+      spellSlots: record.resources.spellSlots ?? record.stats?.spellSlots ?? null,
+    };
   } else if (effect.type === "position_note") {
     const record = findActorRecord(campaign, effect.targetId).record;
     record.positionNotes = [...(record.positionNotes ?? []), effect.note].filter(Boolean).slice(-10);
@@ -86,6 +94,26 @@ function applyEffect(campaign, effect) {
       quest.notes = [...(quest.notes ?? []), effect.note].filter(Boolean);
     }
   }
+}
+
+function applyResourceDelta(resources, path, amount) {
+  const parts = String(path || "").split(".").map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) {
+    return;
+  }
+  if (parts.length === 1) {
+    resources[parts[0]] = Number(resources[parts[0]] ?? 0) + amount;
+    return;
+  }
+  let cursor = resources;
+  for (const part of parts.slice(0, -1)) {
+    if (!cursor[part] || typeof cursor[part] !== "object") {
+      cursor[part] = {};
+    }
+    cursor = cursor[part];
+  }
+  const last = parts.at(-1);
+  cursor[last] = Number(cursor[last] ?? 0) + amount;
 }
 
 function applyHpDelta(campaign, effect) {

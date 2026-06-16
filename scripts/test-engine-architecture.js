@@ -236,6 +236,34 @@ function testStateEffects() {
   assert.equal(result.campaign.party[0].stats.hp.current, 8);
   assert.deepEqual(result.campaign.party[0].conditions, ["dodging"]);
   assert.equal(result.proposedChanges.length, 1);
+
+  const resourceCampaign = {
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor"
+      ? { ...member, resources: { spellSlots: { 1: { max: 2, used: 0 } } } }
+      : member),
+  };
+  const resourceResult = applyStateEffects(resourceCampaign, [
+    { type: "resource_delta", targetId: "thor", resource: "spellSlots.1.used", amount: 1, reason: "spell slot spent" },
+  ]);
+  const thorAfterResource = resourceResult.campaign.party.find((member) => member.id === "thor");
+  assert.equal(thorAfterResource.resources.spellSlots[1].used, 1);
+  assert.equal(thorAfterResource.stats.spellSlots[1].used, 1);
+
+  const statsOnlyResourceCampaign = {
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor"
+      ? { ...member, stats: { ...member.stats, spellSlots: { 1: { max: 2, used: 0 } } } }
+      : member),
+  };
+  const statsOnlyResourceResult = applyStateEffects(statsOnlyResourceCampaign, [
+    { type: "resource_delta", targetId: "thor", resource: "spellSlots.1.used", amount: 1, reason: "spell slot spent" },
+  ]);
+  const thorAfterStatsOnlyResource = statsOnlyResourceResult.campaign.party.find((member) => member.id === "thor");
+  assert.equal(thorAfterStatsOnlyResource.resources.spellSlots[1].max, 2);
+  assert.equal(thorAfterStatsOnlyResource.resources.spellSlots[1].used, 1);
+  assert.equal(thorAfterStatsOnlyResource.stats.spellSlots[1].max, 2);
+  assert.equal(thorAfterStatsOnlyResource.stats.spellSlots[1].used, 1);
 }
 
 function testCombatEngine() {
@@ -341,6 +369,59 @@ function testCombatEngine() {
   assert.ok(contested.campaign.combat.enemies.find((enemy) => enemy.id === "miner").conditions.includes("prone"));
   assert.equal(contested.actionRecord.effects.some((effect) => effect.condition === "prone"), true);
   assert.equal(contested.campaign.combat.currentTurnId, "sy");
+
+  const spellCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor"
+      ? {
+        ...member,
+        ancestryClass: "Dwarf Cleric",
+        resources: { spellSlots: { 1: { max: 2, used: 0 } } },
+        stats: {
+          ...member.stats,
+          spellSaveDc: 13,
+          abilityScores: { ...member.stats.abilityScores, WIS: 16 },
+        },
+        spells: [{
+          name: "Entangle",
+          level: 1,
+          roll: {
+            save: {
+              ability: "STR",
+              dc: 30,
+              conditionOnFail: "restrained",
+            },
+          },
+        }],
+      }
+      : member),
+  }, {
+    enemies: [{
+      id: "miner",
+      name: "Drunk miner",
+      hp: { current: 12, max: 12 },
+      armorClass: 10,
+      stats: { abilityScores: { STR: 8 } },
+    }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const entangled = resolveCombatAction(spellCampaign, {
+    turnId: "combat-spell-save-turn",
+    actorId: "thor",
+    actionType: "spell",
+    spellName: "Entangle",
+    slotLevel: 1,
+    targetIds: ["miner"],
+    save: { ability: "STR", dc: 30, conditionOnFail: "restrained" },
+    successEffects: [{ type: "condition_add", targetId: "miner", condition: "blessed_by_mistake" }],
+  }, { seed: "combat-spell-save-seed" });
+  assert.equal(entangled.actionRecord.rolls[0].label, "STR save");
+  assert.ok(entangled.campaign.combat.enemies.find((enemy) => enemy.id === "miner").conditions.includes("restrained"));
+  assert.equal(entangled.campaign.combat.enemies.find((enemy) => enemy.id === "miner").conditions.includes("blessed_by_mistake"), false);
+  const thorAfterSpell = entangled.campaign.party.find((member) => member.id === "thor");
+  assert.equal(thorAfterSpell.resources.spellSlots[1].used, 1);
+  assert.equal(thorAfterSpell.stats.spellSlots[1].used, 1);
+  assert.equal(entangled.campaign.combat.currentTurnId, "sy");
 
   const surrenderCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],

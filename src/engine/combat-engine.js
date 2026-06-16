@@ -65,6 +65,8 @@ export function resolveCombatAction(campaign, action, options = {}) {
 
   const resolved = actionType === combatActionTypes.ATTACK
     ? resolveAttack(normalized, actor, base, action, options)
+    : actionType === combatActionTypes.SPELL
+      ? resolveSpell(normalized, actor, base, action, options)
     : actionType === combatActionTypes.CHECK || hasCheckResolution(action)
       ? resolveCombatCheck(normalized, actor, base, action, options)
     : resolveNonAttack(normalized, actor, base, action);
@@ -256,6 +258,101 @@ function resolveCombatCheck(campaign, actor, base, action, options) {
   };
 }
 
+function resolveSpell(campaign, actor, base, action, options) {
+  const spell = findSpellOption(campaign, actor.id, action);
+  const spellName = action.spellName || spellNameFromOption(spell) || base.declaredText || "spell";
+  const targetIds = base.targetIds.length ? base.targetIds : [firstHostileTargetId(campaign, actor)].filter(Boolean);
+  const rolls = [];
+  const effects = [];
+  const resourceEffects = spellResourceEffects(actor.id, spell, action);
+  effects.push(...resourceEffects);
+
+  if (!targetIds.length && !action.effects?.length && !action.successEffects?.length) {
+    return {
+      rolls,
+      effects,
+      narration: `${actor.name} casts ${spellName}.`,
+      summary: `${actor.name} cast ${spellName}.`,
+    };
+  }
+
+  const spellSave = action.save || action.savingThrow || spell?.roll?.save || null;
+  const damageFormula = action.damageFormula ?? action.damage ?? spell?.roll?.damage ?? spell?.damage ?? null;
+  const healingFormula = action.healingFormula ?? action.healing ?? spell?.roll?.healing ?? null;
+  const dc = Number(action.dc ?? spellSave?.dc ?? spell?.roll?.dc ?? spellSaveDc(findActor(campaign, actor.id).record)) || 10;
+  const saveAbility = normalizeAbility(spellSave?.ability ?? action.saveAbility ?? "DEX") || "DEX";
+  const affected = [];
+
+  for (const targetId of targetIds) {
+    const target = findActor(campaign, targetId);
+    let failedSave = true;
+    if (spellSave || action.saveAbility || action.dc !== undefined) {
+      const targetModifier = numberOrNull(action.targetSaveModifier ?? spellSave?.modifier)
+        ?? checkModifier(target.record, { ability: saveAbility });
+      const saveRoll = rollD20({
+        seed: `${options.seed ?? base.turnId}:save:${targetId}`,
+        modifier: targetModifier,
+        label: `${saveAbility} save`,
+        actorId: targetId,
+        targetId: actor.id,
+        advantage: spellSave?.advantage,
+        disadvantage: spellSave?.disadvantage,
+      });
+      rolls.push(saveRoll);
+      failedSave = saveRoll.total < dc;
+      affected.push(`${target.name} ${failedSave ? "fails" : "succeeds"} ${saveAbility} save ${saveRoll.total} vs DC ${dc}`);
+    }
+
+    const condition = action.conditionOnFail ?? spellSave?.conditionOnFail ?? action.condition;
+    if (failedSave && condition) {
+      effects.push({ type: "condition_add", targetId, condition, reason: `${spellName} failed save` });
+    }
+    if (!failedSave && action.conditionOnSuccess) {
+      effects.push({ type: "condition_add", targetId, condition: action.conditionOnSuccess, reason: `${spellName} successful save` });
+    }
+    if (damageFormula) {
+      const damageRoll = rollFormula(extractFirstRollFormula(damageFormula, "1d6"), {
+        seed: `${options.seed ?? base.turnId}:spell-damage:${targetId}`,
+        label: `${spellName} damage`,
+        actorId: actor.id,
+        targetId,
+      });
+      rolls.push(damageRoll);
+      const multiplier = !failedSave && action.halfDamageOnSave === true ? 0.5 : failedSave ? 1 : 0;
+      const amount = Math.floor(damageRoll.total * multiplier);
+      if (amount > 0) {
+        effects.push({ type: "hp_delta", targetId, amount: -amount, reason: `${spellName} damage` });
+      }
+    }
+    if (healingFormula) {
+      const healingRoll = rollFormula(extractFirstRollFormula(healingFormula, "1d4"), {
+        seed: `${options.seed ?? base.turnId}:spell-healing:${targetId}`,
+        label: `${spellName} healing`,
+        actorId: actor.id,
+        targetId,
+      });
+      rolls.push(healingRoll);
+      effects.push({ type: "hp_delta", targetId, amount: healingRoll.total, reason: `${spellName} healing` });
+    }
+  }
+
+  for (const effect of normalizeEffects(action.effects)) {
+    effects.push(effect);
+  }
+  if (!spellSave && !action.saveAbility && action.dc === undefined) {
+    for (const effect of normalizeEffects(action.successEffects)) {
+      effects.push(effect);
+    }
+  }
+
+  return {
+    rolls,
+    effects,
+    narration: `${actor.name} casts ${spellName}.${affected.length ? ` ${affected.join("; ")}.` : ""}`,
+    summary: action.summary || `${actor.name} cast ${spellName}.`,
+  };
+}
+
 function resolveNonAttack(campaign, actor, base, action) {
   const effects = [];
   if (base.actionType === combatActionTypes.DODGE) {
@@ -305,6 +402,45 @@ function findAttackOption(campaign, actorId, action) {
   return actions.find((option) => option.id === action.optionId) ??
     actions.find((option) => option.type === combatActionTypes.ATTACK && String(action.declaredText ?? "").toLowerCase().includes(String(option.label ?? "").toLowerCase())) ??
     actions.find((option) => option.type === combatActionTypes.ATTACK);
+}
+
+function findSpellOption(campaign, actorId, action) {
+  const actions = legalActionsForActor(campaign, actorId);
+  const desiredName = normalizeSkill(action.spellName || action.label || action.declaredText || "");
+  return actions.find((option) => option.id === action.optionId) ??
+    actions.find((option) => option.type === combatActionTypes.SPELL && desiredName && normalizeSkill(option.label || "").includes(desiredName)) ??
+    actions.find((option) => option.type === combatActionTypes.SPELL);
+}
+
+function spellNameFromOption(option) {
+  return String(option?.label || "").replace(/^cast\s+/i, "").trim();
+}
+
+function spellResourceEffects(actorId, spell, action) {
+  const slotLevel = action.slotLevel ?? action.spellSlotLevel ?? spell?.cost?.spellSlot ?? null;
+  if (!slotLevel || Number(slotLevel) <= 0) {
+    return [];
+  }
+  return [{
+    type: "resource_delta",
+    targetId: actorId,
+    resource: `spellSlots.${slotLevel}.used`,
+    amount: 1,
+    reason: `${action.spellName || spellNameFromOption(spell) || "Spell"} slot spent`,
+  }];
+}
+
+function spellSaveDc(record = {}) {
+  const explicit = Number(record.spellSaveDc ?? record.stats?.spellSaveDc ?? record.stats?.spellcasting?.saveDc);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return explicit;
+  }
+  const ancestryClass = String(record.ancestryClass || record.class || record.role || "").toLowerCase();
+  const ability = /\b(wizard|artificer|arcane)\b/.test(ancestryClass) ? "INT"
+    : /\b(bard|sorcerer|warlock|paladin)\b/.test(ancestryClass) ? "CHA"
+      : /\b(cleric|druid|ranger)\b/.test(ancestryClass) ? "WIS"
+        : "WIS";
+  return 8 + proficiencyBonus(record) + abilityModifier(abilityScore(record, ability));
 }
 
 function firstHostileTargetId(campaign, actor) {

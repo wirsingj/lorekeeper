@@ -61,7 +61,7 @@ Every table surface should answer the same practical questions a real table answ
 10. Grouped enemies can expand into separate combatants and initiative rows.
 11. Guest inputs can drive provider turns through structured `user.playerInputs[]`.
 12. Failed provider turns preserve approved/remote inputs as visibly staged rather than silently consuming them.
-13. CombatEngine can now resolve app-owned DC checks and opposed checks/contests with logged rolls, success/failure effects, and initiative advancement.
+13. CombatEngine can now resolve app-owned attacks, DC checks, opposed checks/contests, simple spell saves, spell-slot spending, conditions, logged rolls/effects, and initiative advancement.
 14. The unified front door now treats Host, Join, and Provider Setup as first-class app-level flows.
 15. The app starts in a neutral lobby mode instead of visibly sitting at the last active table.
 16. Join before connection is now a lobby flow with a Back control, not an in-campaign table view.
@@ -112,7 +112,7 @@ Every table surface should answer the same practical questions a real table answ
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Full vote flow is open. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
-| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
+| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, checks, contests, and simple spell saves have coverage. Enemy turns and richer spell/effect rules are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression improved. Needs social/travel/downtime fixtures. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist and are private. Needs scenario testing for adaptation, pacing, and non-leakage. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are not yet portable/canonical. |
@@ -123,7 +123,7 @@ Every table surface should answer the same practical questions a real table answ
 
 ### Critical
 
-1. Make common combat action resolution app-owned before provider narration: action validation, roll, check/save, damage/healing, HP/resource/condition updates, and initiative advancement.
+1. Continue making common combat action resolution app-owned before provider narration: broader action validation, enemy turns, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
 3. Continue expanding scenario fixtures proving the provider cannot speak for host/remote/unassigned PCs across combat, join-transfer, and AI-companion cases.
 
@@ -192,7 +192,8 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Surrender/de-escalation can end combat without only HP defeat.
 - [ ] Make common combat resolution app-owned.
 - [x] Add fixtures for app-owned attack, dodge, surrender, de-escalation, DC check, and opposed skill contest.
-- [ ] Add fixtures for save, spell, help, disengage, hide, flee/chase, richer intimidation/de-escalation contests, and enemy turn.
+- [x] Add fixtures for app-owned simple spell save, spell-slot spending, and save-gated conditions.
+- [ ] Add fixtures for help, disengage, hide, flee/chase, richer intimidation/de-escalation contests, enemy turn, reactions, concentration, and richer spell/effect cases.
 - [ ] Make enemy turns app-bounded: provider may choose intent/narrate, app owns state mutation.
 - [ ] Add crisp AI companion combat approval flow.
 - [ ] Ensure initiative never advances by provider phrasing alone.
