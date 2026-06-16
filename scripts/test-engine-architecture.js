@@ -1074,7 +1074,13 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /local-table-guest-link/);
   assert.match(appShell, /copy-guest-link/);
   assert.match(appShell, /seat-waiting-guest/);
-  assert.match(appShell, /id="right-rail-toggle"/);
+  assert.match(appShell, /id="campaign-notes-panel"/);
+  assert.match(appShell, /id="player-notes-panel"/);
+  assert.match(appShell, /id="player-notes-scratch"/);
+  assert.ok(
+    appShell.indexOf('id="player-notes-panel"') < appShell.indexOf('className="rail-section table-talk-section"'),
+    "table talk should remain at the bottom of the right rail after campaign and player notes",
+  );
   assert.match(appShell, /guest-waiting-room-panel/);
   assert.match(appShell, /Ask To Join/);
   assert.match(appShell, /home-campaign-select/);
@@ -1085,8 +1091,9 @@ async function testNewCampaignPreTableJoinerWiring() {
     "table status strip should live above the play log",
   );
   assert.match(appShell, /id="show-debug-meta"/);
-  assert.match(appJs, /rightRailCollapsedStorageKey/);
   assert.match(appJs, /renderRightRailState/);
+  assert.match(appJs, /playerNotesStoragePrefix/);
+  assert.match(appJs, /savePlayerNotesFromUi/);
   assert.match(appJs, /collectWizardAdditionalCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);
   assert.match(appJs, /seedWizardStartingPartyMember/);

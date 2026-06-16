@@ -76,7 +76,7 @@ const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
 const guestWaitingRoomStorageKey = "lorekeeper.guestWaitingRoomSession";
 const waitingGuestHeartbeatTimeoutMs = 20000;
 const debugMetaStorageKey = "lorekeeper.showDebugMeta";
-const rightRailCollapsedStorageKey = "lorekeeper.rightRailCollapsed";
+const playerNotesStoragePrefix = "lorekeeper.playerNotes";
 const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -129,7 +129,7 @@ const state = {
   lastTableTalkCount: null,
   lastWaitingGuestSignature: "",
   unreadTableTalkCount: 0,
-  rightRailCollapsed: loadRightRailCollapsed(),
+  playerNotesCampaignId: "",
   homeFlow: clientMode ? "join" : "",
   campaignWizardReturnHome: false,
 };
@@ -244,7 +244,6 @@ const elements = {
   autoFillCharacterSheet: document.querySelector("#auto-fill-character-sheet"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
-  rightRailToggle: document.querySelector("#right-rail-toggle"),
   combatTrackerSection: document.querySelector("#combat-tracker-section"),
   combatRound: document.querySelector("#combat-round"),
   combatActiveActor: document.querySelector("#combat-active-actor"),
@@ -257,6 +256,10 @@ const elements = {
   thingCount: document.querySelector("#thing-count"),
   questList: document.querySelector("#quest-list"),
   questCount: document.querySelector("#quest-count"),
+  playerNotesPeople: document.querySelector("#player-notes-people"),
+  playerNotesPlaces: document.querySelector("#player-notes-places"),
+  playerNotesThings: document.querySelector("#player-notes-things"),
+  playerNotesScratch: document.querySelector("#player-notes-scratch"),
   tableTalkLog: document.querySelector("#table-talk-log"),
   tableTalkCount: document.querySelector("#table-talk-count"),
   tableTalkForm: document.querySelector("#table-talk-form"),
@@ -469,11 +472,9 @@ elements.nudgeDm?.addEventListener("click", async () => {
   await nudgeDm();
 });
 
-elements.rightRailToggle?.addEventListener("click", () => {
-  state.rightRailCollapsed = !state.rightRailCollapsed;
-  localStorage.setItem(rightRailCollapsedStorageKey, state.rightRailCollapsed ? "1" : "0");
-  renderRightRailState();
-});
+for (const input of playerNoteInputs()) {
+  input?.addEventListener("input", savePlayerNotesFromUi);
+}
 
 elements.closeSetup.addEventListener("click", () => {
   elements.setupDialog.close();
@@ -3843,10 +3844,6 @@ function loadWaitingRoomSession() {
   }
 }
 
-function loadRightRailCollapsed() {
-  return localStorage.getItem(rightRailCollapsedStorageKey) === "1";
-}
-
 function saveGuestSession(session) {
   localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
   rememberGuestSession(session);
@@ -5667,6 +5664,7 @@ function render() {
   renderPlaces(campaign);
   renderThings(campaign);
   renderQuests(campaign);
+  renderPlayerNotes(campaign);
   renderTableTalk();
   renderPrompt(state.prompt);
   renderReviewBatch();
@@ -5834,14 +5832,6 @@ function renderLobbyChrome({ homeVisible = null, joinVisible = null } = {}) {
 }
 
 function renderRightRailState() {
-  elements.app?.classList.toggle("binder-collapsed", state.rightRailCollapsed);
-  if (!elements.rightRailToggle) {
-    return;
-  }
-  const label = state.rightRailCollapsed ? "Show binder" : "Hide binder";
-  elements.rightRailToggle.title = label;
-  elements.rightRailToggle.setAttribute("aria-label", label);
-  elements.rightRailToggle.setAttribute("aria-expanded", String(!state.rightRailCollapsed));
 }
 
 function renderDebugMetaControl() {
@@ -9490,6 +9480,66 @@ function renderQuests(campaign) {
       "Open quests and unresolved story threads will appear here.",
     ),
   );
+}
+
+function renderPlayerNotes(campaign) {
+  const campaignId = campaign?.id || "default";
+  if (state.playerNotesCampaignId === campaignId) {
+    return;
+  }
+  state.playerNotesCampaignId = campaignId;
+  const notes = loadPlayerNotes(campaignId);
+  if (elements.playerNotesPeople) {
+    elements.playerNotesPeople.value = notes.people || "";
+  }
+  if (elements.playerNotesPlaces) {
+    elements.playerNotesPlaces.value = notes.places || "";
+  }
+  if (elements.playerNotesThings) {
+    elements.playerNotesThings.value = notes.things || "";
+  }
+  if (elements.playerNotesScratch) {
+    elements.playerNotesScratch.value = notes.scratch || "";
+  }
+}
+
+function playerNoteInputs() {
+  return [
+    elements.playerNotesPeople,
+    elements.playerNotesPlaces,
+    elements.playerNotesThings,
+    elements.playerNotesScratch,
+  ];
+}
+
+function savePlayerNotesFromUi() {
+  if (!state.campaign?.id) {
+    return;
+  }
+  const notes = {
+    people: elements.playerNotesPeople?.value || "",
+    places: elements.playerNotesPlaces?.value || "",
+    things: elements.playerNotesThings?.value || "",
+    scratch: elements.playerNotesScratch?.value || "",
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    localStorage.setItem(playerNotesStorageKey(state.campaign.id), JSON.stringify(notes));
+  } catch {
+    // Player notes are a local convenience; failed persistence should not block play.
+  }
+}
+
+function loadPlayerNotes(campaignId) {
+  try {
+    return JSON.parse(localStorage.getItem(playerNotesStorageKey(campaignId)) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function playerNotesStorageKey(campaignId) {
+  return `${playerNotesStoragePrefix}.${campaignId || "default"}`;
 }
 
 function renderTableTalk() {

@@ -57,7 +57,7 @@ summary,
 .handheld-shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: 260px minmax(520px, 1fr) 320px;
+  grid-template-columns: 300px minmax(520px, 1fr) 340px;
   grid-template-rows: minmax(0, 1fr) var(--command-deck-height);
   grid-template-areas:
     "left screen right"
@@ -205,7 +205,8 @@ h3 {
   align-content: start;
   gap: 10px;
   padding: 10px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 34%),
     linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
@@ -241,61 +242,8 @@ h3 {
   display: flex;
   flex-direction: column;
   position: relative;
-  padding-bottom: 76px;
-}
-
-.right-rail-header {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(174, 191, 202, 0.12);
-  border-radius: 10px;
-  background: rgba(16, 19, 21, 0.42);
-}
-
-.right-rail-heading {
-  min-width: 0;
-}
-
-.right-rail-heading h2 {
+  padding-bottom: 10px;
   overflow: hidden;
-  color: #eef3f5;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.right-rail-toggle svg {
-  transition: transform 160ms ease;
-}
-
-.handheld-shell.binder-collapsed {
-  grid-template-columns: 260px minmax(640px, 1fr) 48px;
-}
-
-.handheld-shell.binder-collapsed .right-panel {
-  align-items: center;
-  overflow: hidden;
-  padding: 8px;
-  padding-bottom: 8px;
-}
-
-.handheld-shell.binder-collapsed .right-rail-header {
-  padding: 0;
-  border-color: transparent;
-  background: transparent;
-}
-
-.handheld-shell.binder-collapsed .right-rail-heading,
-.handheld-shell.binder-collapsed .right-panel .binder-section,
-.handheld-shell.binder-collapsed .right-panel .table-talk-section {
-  display: none;
-}
-
-.handheld-shell.binder-collapsed .right-rail-toggle svg {
-  transform: rotate(180deg);
 }
 
 .rail-section {
@@ -337,17 +285,131 @@ h3 {
   gap: 8px;
 }
 
+.notes-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.notes-panel[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.notes-panel:not([open]) {
+  flex: 0 0 auto;
+}
+
+.notes-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.notes-panel-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.notes-panel-summary span {
+  min-width: 0;
+}
+
+.notes-panel-summary h2 {
+  overflow: hidden;
+  color: #eef3f5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-panel-summary::after {
+  content: "+";
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(174, 191, 202, 0.14);
+  border-radius: 8px;
+  background: rgba(143, 166, 184, 0.16);
+  color: #e8edf0;
+  font-weight: 900;
+}
+
+.notes-panel[open] .notes-panel-summary::after {
+  content: "-";
+}
+
+.notes-panel-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 10px 10px;
+}
+
+.campaign-notes-grid {
+  display: grid;
+  gap: 8px;
+}
+
 .binder-section {
   gap: 8px;
   padding: 10px;
+  border: 1px solid rgba(174, 191, 202, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .binder-list {
   display: grid;
   gap: 7px;
-  max-height: 136px;
+  max-height: 124px;
   overflow: auto;
   padding-right: 2px;
+}
+
+.player-notes-panel {
+  flex: 0 1 318px;
+}
+
+.player-notes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.player-notes-grid label {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.player-notes-grid span {
+  color: #cbd8de;
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.player-notes-grid textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 70px;
+  resize: vertical;
+  border: 1px solid rgba(174, 191, 202, 0.16);
+  border-radius: 8px;
+  background: rgba(10, 13, 15, 0.38);
+  color: #eef3f5;
+  padding: 8px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.player-notes-wide {
+  grid-column: 1 / -1;
 }
 
 .binder-record {
@@ -439,11 +501,12 @@ h3 {
 }
 
 .table-talk-section {
-  flex: 0 0 252px;
+  flex: 0 0 220px;
   min-height: 220px;
-  max-height: 292px;
+  max-height: 260px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  margin-top: auto;
   margin-bottom: 4px;
 }
 
@@ -2715,10 +2778,6 @@ textarea::placeholder {
       "screen"
       "right"
       "bottom";
-  }
-
-  .handheld-shell.binder-collapsed {
-    grid-template-columns: 1fr;
   }
 
   .command-deck,

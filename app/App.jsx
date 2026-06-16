@@ -276,61 +276,86 @@ export function LorekeeperShell() {
       </main>
 
       <aside className="right-panel panel-rail">
-        <section className="right-rail-header" aria-label="Campaign binder controls">
-          <div className="right-rail-heading">
-            <p className="eyebrow">Binder</p>
-            <h2>Campaign Notes</h2>
-          </div>
-          <button id="right-rail-toggle" className="icon-action right-rail-toggle" type="button" title="Hide binder" aria-label="Hide binder">
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M9 18l6-6l-6-6"></path>
-            </svg>
-          </button>
-        </section>
+        <details id="campaign-notes-panel" className="rail-section notes-panel campaign-notes-panel" open>
+          <summary className="notes-panel-summary">
+            <span>
+              <p className="eyebrow">Campaign Notes</p>
+              <h2>World, Clues, And Threads</h2>
+            </span>
+          </summary>
+          <div className="notes-panel-body campaign-notes-grid">
+            <section className="binder-section">
+              <div className="section-title">
+                <h3>People</h3>
+                <div className="title-actions">
+                  <button className="icon-action" data-add-domain="people" type="button" title="Add person">+</button>
+                  <span id="people-count" className="count-pill">0</span>
+                </div>
+              </div>
+              <div id="people-list" className="binder-list"></div>
+            </section>
 
-        <section className="rail-section binder-section">
-          <div className="section-title">
-            <h2>People</h2>
-            <div className="title-actions">
-              <button className="icon-action" data-add-domain="people" type="button" title="Add person">+</button>
-              <span id="people-count" className="count-pill">0</span>
-            </div>
-          </div>
-          <div id="people-list" className="binder-list"></div>
-        </section>
+            <section className="binder-section">
+              <div className="section-title">
+                <h3>Places</h3>
+                <div className="title-actions">
+                  <button className="icon-action" data-add-domain="places" type="button" title="Add place">+</button>
+                  <span id="place-count" className="count-pill">0</span>
+                </div>
+              </div>
+              <div id="place-list" className="binder-list"></div>
+            </section>
 
-        <section className="rail-section binder-section">
-          <div className="section-title">
-            <h2>Places</h2>
-            <div className="title-actions">
-              <button className="icon-action" data-add-domain="places" type="button" title="Add place">+</button>
-              <span id="place-count" className="count-pill">0</span>
-            </div>
-          </div>
-          <div id="place-list" className="binder-list"></div>
-        </section>
+            <section className="binder-section">
+              <div className="section-title">
+                <h3>Things</h3>
+                <div className="title-actions">
+                  <button className="icon-action" data-add-domain="items" type="button" title="Add thing">+</button>
+                  <span id="thing-count" className="count-pill">0</span>
+                </div>
+              </div>
+              <div id="thing-list" className="binder-list"></div>
+            </section>
 
-        <section className="rail-section binder-section">
-          <div className="section-title">
-            <h2>Things</h2>
-            <div className="title-actions">
-              <button className="icon-action" data-add-domain="items" type="button" title="Add thing">+</button>
-              <span id="thing-count" className="count-pill">0</span>
-            </div>
+            <section className="binder-section">
+              <div className="section-title">
+                <h3>Threads</h3>
+                <div className="title-actions">
+                  <button className="icon-action" data-add-domain="quests" type="button" title="Add thread">+</button>
+                  <span id="quest-count" className="count-pill">0</span>
+                </div>
+              </div>
+              <div id="quest-list" className="binder-list"></div>
+            </section>
           </div>
-          <div id="thing-list" className="binder-list"></div>
-        </section>
+        </details>
 
-        <section className="rail-section binder-section">
-          <div className="section-title">
-            <h2>Threads</h2>
-            <div className="title-actions">
-              <button className="icon-action" data-add-domain="quests" type="button" title="Add thread">+</button>
-              <span id="quest-count" className="count-pill">0</span>
-            </div>
+        <details id="player-notes-panel" className="rail-section notes-panel player-notes-panel" open>
+          <summary className="notes-panel-summary">
+            <span>
+              <p className="eyebrow">Player Notes</p>
+              <h2>Your Table Notes</h2>
+            </span>
+          </summary>
+          <div className="notes-panel-body player-notes-grid">
+            <label>
+              <span>People</span>
+              <textarea id="player-notes-people" rows="3" placeholder="Names, suspicions, promises, grudges..."></textarea>
+            </label>
+            <label>
+              <span>Places</span>
+              <textarea id="player-notes-places" rows="3" placeholder="Routes, safe spots, strange rooms..."></textarea>
+            </label>
+            <label>
+              <span>Things</span>
+              <textarea id="player-notes-things" rows="3" placeholder="Loot, clues, symbols, debts..."></textarea>
+            </label>
+            <label className="player-notes-wide">
+              <span>Scratch</span>
+              <textarea id="player-notes-scratch" rows="4" placeholder="Plans, theories, questions for the party..."></textarea>
+            </label>
           </div>
-          <div id="quest-list" className="binder-list"></div>
-        </section>
+        </details>
 
         <section className="rail-section table-talk-section" aria-label="Table talk side chat">
           <div className="section-title">
