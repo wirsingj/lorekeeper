@@ -1531,10 +1531,11 @@ function markSubmittedMessages(campaign, clearedIds) {
     }
     return {
       ...message,
-      meta: String(message.meta || "").replace(/;?\s*(?:waiting for host submit|staged for next Send Turn)/i, "").trim() || "Submitted to DM",
+      meta: "Resolved by DM",
       data: {
         ...(message.data ?? {}),
         status: "submitted_to_model",
+        lifecycle: "resolved",
         hostStaged: false,
         submittedAt: nowIso(),
       },

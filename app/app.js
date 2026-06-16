@@ -2972,6 +2972,10 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
       setProviderActivity("Host local table is off. Ask the host to start it, then sync.", "waiting");
     } else if (snapshot.awaitingApproval) {
       setProviderActivity("Waiting for host approval", "waiting");
+    } else if (snapshot.pendingInput?.passed) {
+      setProviderActivity("Passed for this turn. Waiting for the host table.", "waiting");
+    } else if (snapshot.pendingInput?.text) {
+      setProviderActivity("Action sent. Waiting for the host table to resolve it.", "waiting");
     } else if (snapshot.connection?.status === "connected") {
       setProviderActivity(`Connected as ${snapshot.assignedCharacter?.name ?? snapshot.connection.displayName}`, "idle");
     } else {
@@ -3020,7 +3024,14 @@ async function submitGuestActionFromUi({ pass = false } = {}) {
     if (!pass) {
       elements.playerInput.value = "";
     }
-    setProviderActivity(pass ? "Passed for this turn" : "Action sent to host", "idle");
+    const pendingInput = result.snapshot?.pendingInput;
+    if (pass || pendingInput?.passed) {
+      setProviderActivity("Passed for this turn. Waiting for the host table.", "waiting");
+    } else if (pendingInput?.text) {
+      setProviderActivity("Action sent. Waiting for the host table to resolve it.", "waiting");
+    } else {
+      setProviderActivity("Action sent to host", "waiting");
+    }
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Guest action failed: ${error.message}` : "Guest action failed", "error");
   }
@@ -8017,11 +8028,14 @@ function messageLifecycleForMessage(message) {
         tone: "review",
       },
       pending_model_submit: {
-        label: message.data?.hostStaged ? "Processing" : "Waiting for host",
-        title: message.data?.hostStaged
-          ? "This action was sent to the host table and is queued for the DM/provider."
-          : "This guest action is waiting for the host to stage it.",
+        label: remotePendingInputLabel(message),
+        title: remotePendingInputTitle(message),
         tone: "waiting",
+      },
+      submitted_to_model: {
+        label: "DM answered",
+        title: "The host table resolved this guest action with the DM.",
+        tone: "done",
       },
       submitted_to_dm: {
         label: "Submitted to DM",
@@ -8032,6 +8046,26 @@ function messageLifecycleForMessage(message) {
     return labels[key] || null;
   }
   return null;
+}
+
+function remotePendingInputLabel(message) {
+  if (!message.data?.hostStaged) {
+    return "Waiting for host";
+  }
+  if (message.data?.holdForGroup) {
+    return "Waiting for group turn";
+  }
+  return "Queued for DM";
+}
+
+function remotePendingInputTitle(message) {
+  if (!message.data?.hostStaged) {
+    return "This guest action reached the host table and is waiting for host approval.";
+  }
+  if (message.data?.holdForGroup) {
+    return "This guest action reached the host table and is waiting for the grouped table turn.";
+  }
+  return "This guest action reached the host table and is queued for the DM.";
 }
 
 function isLocalControllerMessage(message) {

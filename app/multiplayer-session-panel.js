@@ -30,6 +30,7 @@ export function buildMultiplayerSessionProjection({
   }
 
   const pendingInputs = multiplayer.pendingTurnInputs ?? [];
+  const readyInputs = pendingInputs.filter((input) => input.ready && !input.passed && input.text);
   const settings = {
     requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
     holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
@@ -43,9 +44,9 @@ export function buildMultiplayerSessionProjection({
     canStartLocalTable: true,
     canStopLocalTable: Boolean(table.running),
     canSyncGuestTable: false,
-    canResolvePartyInputs: pendingInputs.some((input) => input.ready && !input.passed && input.text),
+    canResolvePartyInputs: readyInputs.length > 0,
     flowSummary: hostFlowSummary({ table, settings, pendingInputs }),
-    resolvePartyInputsLabel: settings.holdGuestActionsForGroupInput ? "Resolve Group Turn" : "Resolve Inputs",
+    resolvePartyInputsLabel: resolvePartyInputsLabel({ readyInputs, settings }),
     requireGuestActionApproval: settings.requireGuestActionApproval,
     holdGuestActionsForGroupInput: settings.holdGuestActionsForGroupInput,
     connectedGuests: multiplayer.connections ?? [],
@@ -165,19 +166,38 @@ function hostFlowSummary({ table = {}, settings = {}, pendingInputs = [] } = {})
     return "Start a LAN table when someone is joining from LoreKeeper.";
   }
   const readyCount = pendingInputs.filter((input) => input.ready && !input.passed && input.text).length;
+  const names = pendingInputs
+    .filter((input) => input.ready && !input.passed && input.text)
+    .map((input) => input.characterName || "A guest")
+    .slice(0, 3)
+    .join(", ");
+  const namedCount = names || `${readyCount} guest action${readyCount === 1 ? "" : "s"}`;
   if (settings.requireGuestActionApproval) {
     return readyCount
-      ? `${readyCount} guest action${readyCount === 1 ? "" : "s"} waiting for host approval before the DM sees them.`
+      ? `${namedCount} waiting for host approval before the DM sees ${readyCount === 1 ? "it" : "them"}.`
       : "Guest actions wait for host approval before the DM sees them.";
   }
   if (settings.holdGuestActionsForGroupInput) {
     return readyCount
-      ? `${readyCount} guest action${readyCount === 1 ? "" : "s"} held for a grouped host turn.`
+      ? `${namedCount} held for the grouped host turn.`
       : "Guest actions wait here until the host resolves a grouped table turn.";
   }
   return readyCount
-    ? `${readyCount} guest action${readyCount === 1 ? "" : "s"} queued; LoreKeeper resolves one when the DM is idle.`
+    ? `${namedCount} queued and ready; LoreKeeper resolves ${readyCount === 1 ? "that action" : "those actions"} when the DM is idle.`
     : "Guest actions resolve one at a time when the DM is idle.";
+}
+
+function resolvePartyInputsLabel({ readyInputs = [], settings = {} } = {}) {
+  if (!readyInputs.length) {
+    return settings.holdGuestActionsForGroupInput ? "Resolve Group Turn" : "Resolve Inputs";
+  }
+  if (settings.requireGuestActionApproval) {
+    return readyInputs.length === 1 ? "Approve For DM" : `Approve ${readyInputs.length} For DM`;
+  }
+  if (settings.holdGuestActionsForGroupInput) {
+    return readyInputs.length === 1 ? "Resolve Group Turn" : `Resolve ${readyInputs.length} Inputs`;
+  }
+  return readyInputs.length === 1 ? "Resolve Guest Action" : `Resolve ${readyInputs.length} Actions`;
 }
 
 function decoratePendingInput(input = {}, { settings = {}, mode = "host" } = {}) {
@@ -186,18 +206,18 @@ function decoratePendingInput(input = {}, { settings = {}, mode = "host" } = {})
     return { ...input, statusLabel: "Passed this turn." };
   }
   if (mode === "guest" && input.text) {
-    return { ...input, statusLabel: `Sent to host table: ${text}` };
+    return { ...input, statusLabel: `Sent to host table; waiting for host to resolve: ${text}` };
   }
   if (!input.ready || !input.text) {
     return { ...input, statusLabel: "Not ready yet." };
   }
   if (settings.requireGuestActionApproval) {
-    return { ...input, statusLabel: `Waiting for host approval: ${text}` };
+    return { ...input, statusLabel: `Waiting for host approval; guest is waiting on host: ${text}` };
   }
   if (settings.holdGuestActionsForGroupInput) {
-    return { ...input, statusLabel: `Held for group turn: ${text}` };
+    return { ...input, statusLabel: `Held for group turn; guest is waiting for the host: ${text}` };
   }
-  return { ...input, statusLabel: `Queued for DM: ${text}` };
+  return { ...input, statusLabel: `Guest action received; Queued for DM: ${text}` };
 }
 
 function localTableRow({ title, subtitle, actions = [] }) {

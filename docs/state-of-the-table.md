@@ -62,6 +62,7 @@ The user should not feel like they are debugging a model, managing queue machine
 16. Join before connection is now a lobby flow with a Back control, not an in-campaign table view.
 17. Provider/App Settings open from the lobby without implicitly entering the last campaign.
 18. Host/table mode has a Main Menu return control so the front door is reachable after entering a campaign.
+19. Guest action lifecycle now uses clearer sent/waiting/queued/resolved language on both guest and host surfaces.
 
 ### Still Risky
 
@@ -71,7 +72,7 @@ The user should not feel like they are debugging a model, managing queue machine
 4. AI companion approval is still a button/badge flow, not yet a smooth table beat.
 5. Party-vote collection is only schema/UI-labeled. Guests cannot yet cast separate votes with host tie-break resolution.
 6. Local multiplayer still needs longer two-machine soak testing.
-7. Guest "sent / host received / resolving / resolved" state needs to be clearer.
+7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
 8. Table Talk can be missed during active play.
 9. Provider narration can still restate the player's action or lean on option panels too much.
 10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
@@ -88,7 +89,7 @@ The user should not feel like they are debugging a model, managing queue machine
 | DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, and suppression help. Needs scenario fixtures. |
 | AI companions feel like party members. | Improved | Nudge flow and creation defaults help. Approval flow still needs polish. |
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Full vote flow is open. |
-| Guest players know whether input was sent/waiting/resolved. | Improved | Wording/lifecycle improved. Needs two-machine soak. |
+| Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression improved. Needs social/travel/downtime fixtures. |
@@ -111,8 +112,8 @@ The user should not feel like they are debugging a model, managing queue machine
 6. Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
 7. Strengthen the "what the table is waiting for" surface so it covers every stuck state.
 8. Run the two-machine playtest checklist and log every friction point.
-9. Make guest-side "sent / host received / resolving / resolved" state unmistakable.
-10. Make host-side "guest is waiting on you" affordance stronger.
+9. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
+10. Soak-test host-side "guest is waiting on you" affordance on two machines.
 
 ### Medium
 
@@ -194,8 +195,8 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
 - [x] Provider Setup is reachable as a first-class front-door flow.
 - [ ] Run first real two-machine playtest.
-- [ ] Make guest sent/received/resolving/resolved states clearer.
-- [ ] Make host "guest waiting" state harder to miss.
+- [x] Make guest sent/received/resolving/resolved states clearer.
+- [x] Make host "guest waiting" state harder to miss.
 - [ ] Add actual party-vote collection and host tie-break flow.
 - [ ] Add disconnect/reconnect/campaign-switch soak tests.
 - [ ] Consider WebSocket/broadcast later after polling semantics are solid.
