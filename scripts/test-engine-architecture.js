@@ -1238,6 +1238,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /applyLaunchInviteLink/);
   assert.match(appJs, /clearGuestSession\(\{\s*keepRecent:\s*false\s*\}\)/);
   assert.match(appJs, /Invite loaded\. Enter your name/);
+  assert.match(appJs, /Enter the name the host should see at the table/);
   assert.match(electronMain, /findJoinLinkArg\(process\.argv\)/);
   assert.match(electronMain, /setAsDefaultProtocolClient\("lorekeeper"\)/);
   assert.match(electronMain, /query\.inviteLink = pendingJoinLink/);

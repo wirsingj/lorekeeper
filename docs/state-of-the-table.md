@@ -85,6 +85,7 @@ Every table surface should answer the same practical questions a real table answ
 34. Enemy combat resolution glue is extracted from `app/app.js` into a focused combat-resolution controller with tests.
 35. Provider combat validation now rejects resolved combat changes whose `resolvedActorId` is not the active initiative actor.
 36. Desktop `lorekeeper://join` links now open Join mode with the invite preloaded, replacing stale saved guest sessions from prior tables.
+37. Fixed-seat guest joins now require a table-visible name instead of silently falling back to "Guest Player."
 
 ### Still Risky
 
@@ -227,6 +228,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Guest snapshots redact hidden DM notes and enemy HP.
 - [x] Remote-to-AI/host controller transfer clears stale guest links.
 - [x] Desktop protocol invite links preload the Join screen and clear stale saved sessions for different invites.
+- [x] Fixed-seat invite joins require a table-visible guest name.
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
 - [x] Provider Setup is reachable as a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.

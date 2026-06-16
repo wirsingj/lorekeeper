@@ -3268,6 +3268,9 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
       : parsed.seat === "new-character"
         ? { name: trimmedPlayerName }
         : null;
+    if (!trimmedPlayerName && !String(normalizedProposal?.name ?? "").trim()) {
+      throw new Error("Enter the name the host should see at the table.");
+    }
     const clientId = guestClientId();
     if (submitButton) {
       submitButton.disabled = true;
