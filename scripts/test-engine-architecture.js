@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
+import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
@@ -446,6 +447,17 @@ function testCombatEngine() {
   assert.equal(enemyResolved.actionRecord.rolls[1].label, "Damage roll");
   assert.ok(enemyResolved.campaign.party.find((member) => member.id === "thor").stats.hp.current < 12);
   assert.equal(enemyResolved.campaign.combat.currentTurnId, "thor");
+
+  const controllerResolved = resolveEnemyCombatTurn(enemyTurnCampaign, { id: "miner", name: "Drunk miner" }, "1:miner");
+  const controllerChange = engineCombatResolutionChange(enemyTurnCampaign, controllerResolved);
+  assert.equal(controllerChange.domain, "combat");
+  assert.equal(controllerChange.data.actorUpdates[0].actorId, "thor");
+  assert.equal(controllerChange.data.combatActionLog[0].actorId, "miner");
+  assert.equal(controllerChange.data.diceLog.length >= 1, true);
+  assert.equal(controllerChange.data.stateEffectLog.length >= 1, true);
+  const controllerMessage = combatResolutionMessage(controllerResolved);
+  assert.equal(controllerMessage.role, "dm");
+  assert.equal(controllerMessage.data.kind, "combat_engine_resolution");
 
   const surrenderCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],

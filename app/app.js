@@ -12,9 +12,9 @@ import { renderTurnResponseForImport } from "../src/model-contract/turn-json-con
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
-import { resolveCombatAction } from "../src/engine/combat-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
+import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
 import { randomDevJumpStart } from "./dev-jump-start.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
@@ -1750,29 +1750,13 @@ async function maybeAutoResolveEnemyCombatTurn() {
   state.autoResolvingEnemyTurn = true;
   try {
     setProviderActivity(`Resolving ${current.name}'s enemy turn`, "working");
-    const resolution = resolveCombatAction(state.campaign, {
-      turnId: `enemy-turn-${turnKey.replace(/[^a-z0-9_-]+/gi, "-")}`,
-      actorId: current.id,
-      actionType: "attack",
-      declaredText: `${current.name} takes their combat turn.`,
-    }, { seed: `enemy-turn:${state.campaign.id}:${turnKey}` });
+    const resolution = resolveEnemyCombatTurn(state.campaign, current, turnKey);
     const result = await commitEngineCombatResolution(resolution, {
       source: "combat_engine_enemy_turn",
       summary: resolution.actionRecord.summary || `${current.name} completed their combat turn.`,
     });
     if (result?.applied?.length) {
-      await appendPlayMessage({
-        role: "dm",
-        title: "DM",
-        body: resolution.actionRecord.narration,
-        source: "combat_engine",
-        meta: "Mechanics resolved by LoreKeeper.",
-        data: {
-          kind: "combat_engine_resolution",
-          actionRecord: resolution.actionRecord,
-          nextActorId: resolution.nextActorId,
-        },
-      });
+      await appendPlayMessage(combatResolutionMessage(resolution));
       state.lastAutoResolvedEnemyKey = turnKey;
       setProviderActivity("Enemy turn resolved", "idle");
     }
@@ -1800,56 +1784,6 @@ async function commitEngineCombatResolution(resolution, options = {}) {
     status: proposedChange.validation?.valid ? "approved" : proposedChange.status,
   }));
   return commitExtractedChanges(reviewBatch);
-}
-
-function engineCombatResolutionChange(previousCampaign, resolution, options = {}) {
-  const nextCampaign = resolution.campaign;
-  return {
-    operation: "update",
-    domain: "combat",
-    targetId: null,
-    importance: "normal",
-    visibility: "player_visible",
-    summary: options.summary || resolution.actionRecord?.summary || "Combat turn resolved by LoreKeeper.",
-    data: {
-      ...(nextCampaign.combat ?? {}),
-      actorUpdates: changedPartyActorUpdates(previousCampaign, nextCampaign),
-      combatActionLog: [resolution.actionRecord].filter(Boolean),
-      diceLog: resolution.actionRecord?.rolls ?? [],
-      stateEffectLog: resolution.actionRecord?.effects ?? [],
-      lastAction: resolution.actionRecord?.summary || nextCampaign.combat?.lastAction || "Combat turn resolved by LoreKeeper.",
-    },
-    confidence: "high",
-    reason: "LoreKeeper resolved the active combat actor with app-owned rules before narration.",
-  };
-}
-
-function changedPartyActorUpdates(previousCampaign, nextCampaign) {
-  const previousById = new Map((previousCampaign?.party ?? []).map((member) => [member.id, member]));
-  return (nextCampaign?.party ?? []).flatMap((member) => {
-    const previous = previousById.get(member.id);
-    if (!previous) {
-      return [];
-    }
-    const update = { actorId: member.id };
-    const previousHp = JSON.stringify(previous.stats?.hp ?? previous.hp ?? null);
-    const nextHp = JSON.stringify(member.stats?.hp ?? member.hp ?? null);
-    const previousResources = JSON.stringify(previous.resources ?? previous.stats?.resources ?? null);
-    const nextResources = JSON.stringify(member.resources ?? member.stats?.resources ?? null);
-    const previousConditions = JSON.stringify(previous.conditions ?? previous.stats?.conditions ?? []);
-    const nextConditions = JSON.stringify(member.conditions ?? member.stats?.conditions ?? []);
-    if (previousHp !== nextHp) {
-      update.hp = member.stats?.hp ?? member.hp;
-    }
-    if (previousResources !== nextResources) {
-      update.resources = member.resources ?? member.stats?.resources;
-      update.spellSlots = member.resources?.spellSlots ?? member.stats?.spellSlots;
-    }
-    if (previousConditions !== nextConditions) {
-      update.conditions = member.conditions ?? member.stats?.conditions ?? [];
-    }
-    return Object.keys(update).length > 1 ? [update] : [];
-  });
 }
 
 function schedulePendingPlayerTurnResume(reason = "unknown") {

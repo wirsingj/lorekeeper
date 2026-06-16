@@ -82,6 +82,7 @@ Every table surface should answer the same practical questions a real table answ
 31. Controlled-party agency validation now rejects obvious model output that speaks or acts for a host/remote/unassigned party member without submitted controller input.
 32. Route classification tests now cover the guest-public vs host-protected API boundary.
 33. Auto-resolved enemy combat turns now run through CombatEngine and commit app-owned rolls/effects/initiative before narration.
+34. Enemy combat resolution glue is extracted from `app/app.js` into a focused combat-resolution controller with tests.
 
 ### Still Risky
 
