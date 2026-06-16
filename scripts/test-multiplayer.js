@@ -29,6 +29,7 @@ import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-pa
 let campaign = testCampaign();
 campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
 assert.equal(campaign.multiplayer.localTable.running, true);
+assert.ok(campaign.multiplayer.localTable.tableId);
 assert.ok(campaign.multiplayer.localTable.sessionId);
 assert.equal(campaign.multiplayer.settings.requireGuestActionApproval, false);
 assert.equal(campaign.multiplayer.settings.holdGuestActionsForGroupInput, false);
@@ -62,6 +63,8 @@ assert.throws(
 waitingResult = registerWaitingGuest(campaign, {
   playerName: "Nora",
   clientId: "waiting-client",
+  campaignId: campaign.id,
+  tableId: campaign.multiplayer.localTable.tableId,
   tableSessionId: campaign.multiplayer.localTable.sessionId,
 });
 campaign = waitingResult.campaign;
@@ -69,15 +72,38 @@ assert.throws(
   () => registerWaitingGuest(campaign, {
     playerName: "Wrong Table",
     clientId: "wrong-table-client",
-    tableSessionId: "table-stale",
+    tableId: "table-stale",
+    sessionId: campaign.multiplayer.localTable.sessionId,
   }),
   /different table/i,
+);
+assert.throws(
+  () => registerWaitingGuest(campaign, {
+    playerName: "Wrong Campaign",
+    clientId: "wrong-campaign-client",
+    campaignId: "campaign-other",
+    tableId: campaign.multiplayer.localTable.tableId,
+    sessionId: campaign.multiplayer.localTable.sessionId,
+  }),
+  /different campaign/i,
+);
+assert.throws(
+  () => registerWaitingGuest(campaign, {
+    playerName: "Wrong Session",
+    clientId: "wrong-session-client",
+    campaignId: campaign.id,
+    tableId: campaign.multiplayer.localTable.tableId,
+    sessionId: "session-stale",
+  }),
+  /session is no longer active/i,
 );
 assert.equal(createHostSnapshot(campaign).waitingGuests.length, 1);
 const heartbeatResult = heartbeatWaitingGuest(campaign, {
   waitingGuestId: waitingResult.waitingGuest.id,
   clientId: "waiting-client",
   waitingSecret: waitingResult.waitingSecret,
+  campaignId: campaign.id,
+  tableId: campaign.multiplayer.localTable.tableId,
   tableSessionId: campaign.multiplayer.localTable.sessionId,
 });
 campaign = heartbeatResult.campaign;
@@ -115,6 +141,9 @@ const parsedInvite = parseInviteLink(inviteResult.inviteLink);
 assert.equal(parsedInvite.valid, true);
 assert.equal(parsedInvite.seat, "kevric");
 assert.equal(parsedInvite.port, 7347);
+assert.equal(parsedInvite.campaign, campaign.id);
+assert.equal(parsedInvite.tableId, campaign.multiplayer.localTable.tableId);
+assert.equal(parsedInvite.sessionId, campaign.multiplayer.localTable.sessionId);
 assert.equal(
   parseInviteLink("lorekeeper://join?host=example.com&port=7347&campaign=campaign-mp&seat=kevric&token=abc").valid,
   false,
@@ -161,8 +190,36 @@ const connected = campaign.multiplayer.connections.find((connection) => connecti
 const connectionSecret = joinResult.connectionSecret;
 const kevric = campaign.party.find((member) => member.id === "kevric");
 assert.equal(connected.status, "connected");
+assert.equal(connected.campaignId, campaign.id);
+assert.equal(connected.tableId, campaign.multiplayer.localTable.tableId);
+assert.equal(connected.sessionId, campaign.multiplayer.localTable.sessionId);
 assert.equal(kevric.controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.equal(kevric.controllerId, connected.playerId);
+
+assert.throws(
+  () => createGuestSnapshot(campaign, connected.id, {
+    clientId: "guest-client",
+    connectionSecret,
+    campaignId: campaign.id,
+    tableId: "table-wrong",
+    sessionId: campaign.multiplayer.localTable.sessionId,
+  }),
+  /different table/i,
+);
+
+assert.throws(
+  () => submitGuestAction(campaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
+    characterId: "kevric",
+    text: "Kevric acts from an old session.",
+    campaignId: campaign.id,
+    tableId: campaign.multiplayer.localTable.tableId,
+    sessionId: "session-wrong",
+  }),
+  /session is no longer active/i,
+);
 
 const driftedCampaign = JSON.parse(JSON.stringify(campaign));
 driftedCampaign.party = driftedCampaign.party.map((member) => member.id === "kevric"
@@ -244,8 +301,13 @@ campaign = submitGuestAction(campaign, {
   connectionSecret,
   characterId: "kevric",
   text: "Kevric ducks behind the nearest tree and watches Jarin's blind side.",
+  campaignId: campaign.id,
+  tableId: campaign.multiplayer.localTable.tableId,
+  sessionId: campaign.multiplayer.localTable.sessionId,
 });
 assert.equal(campaign.multiplayer.pendingTurnInputs.length, 1);
+assert.equal(campaign.multiplayer.pendingTurnInputs[0].tableId, campaign.multiplayer.localTable.tableId);
+assert.equal(campaign.multiplayer.pendingTurnInputs[0].sessionId, campaign.multiplayer.localTable.sessionId);
 
 const publicMessage = campaign.sessionLog.messages.find((message) => message.data?.pendingInputId === campaign.multiplayer.pendingTurnInputs[0].id);
 assert.equal(publicMessage.role, "party");

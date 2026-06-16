@@ -276,9 +276,11 @@ const server = createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/multiplayer/stop" && request.method === "POST") {
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: stopLocalTable(campaign),
-      }));
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: stopLocalTable(campaign) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -290,6 +292,7 @@ const server = createServer(async (request, response) => {
       const body = await readJsonBody(request);
       let inviteResult = null;
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
         inviteResult = createInviteForPartyMember(campaign, {
           partyMemberId: body.partyMemberId,
           host: body.host,
@@ -310,6 +313,7 @@ const server = createServer(async (request, response) => {
       const body = await readJsonBody(request);
       let inviteResult = null;
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
         inviteResult = createCharacterRequestInvite(campaign, {
           host: body.host,
           port: body.port || port,
@@ -327,9 +331,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/invite/revoke" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: revokeInvite(campaign, body.inviteId),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: revokeInvite(campaign, body.inviteId) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -375,6 +380,9 @@ const server = createServer(async (request, response) => {
         waitingResult = registerWaitingGuest(campaign, {
           playerName: body.playerName,
           clientId: body.clientId,
+          campaignId: body.campaignId,
+          tableId: body.tableId,
+          sessionId: body.sessionId,
           tableSessionId: body.tableSessionId,
         });
         return { campaign: waitingResult.campaign };
@@ -387,6 +395,8 @@ const server = createServer(async (request, response) => {
         },
         waitingSecret: waitingResult.waitingSecret,
         campaignTitle: payload.campaign?.title ?? "",
+        campaignId: payload.campaign?.id ?? "",
+        localTable: payload.campaign?.multiplayer?.localTable ?? null,
       });
       return;
     }
@@ -398,6 +408,9 @@ const server = createServer(async (request, response) => {
           waitingGuestId: url.searchParams.get("waitingGuestId"),
           clientId: url.searchParams.get("clientId"),
           waitingSecret: url.searchParams.get("waitingSecret"),
+          campaignId: url.searchParams.get("campaignId"),
+          tableId: url.searchParams.get("tableId"),
+          sessionId: url.searchParams.get("sessionId"),
           tableSessionId: url.searchParams.get("tableSessionId"),
         });
         return { campaign: heartbeatResult.campaign };
@@ -408,12 +421,13 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/waiting-room/seat" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: seatWaitingGuest(campaign, {
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: seatWaitingGuest(campaign, {
           waitingGuestId: body.waitingGuestId,
           partyMemberId: body.partyMemberId,
-        }),
-      }));
+        }) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -423,11 +437,12 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/join/approve" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: approveJoinRequest(campaign, body.connectionId, {
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: approveJoinRequest(campaign, body.connectionId, {
           hostIntegrationPrompt: body.hostIntegrationPrompt,
-        }),
-      }));
+        }) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -437,9 +452,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/join/deny" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: denyJoinRequest(campaign, body.connectionId),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: denyJoinRequest(campaign, body.connectionId) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -452,15 +468,19 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, createGuestSnapshot(campaign, url.searchParams.get("connectionId"), {
         clientId: url.searchParams.get("clientId"),
         connectionSecret: url.searchParams.get("connectionSecret"),
+        campaignId: url.searchParams.get("campaignId"),
+        tableId: url.searchParams.get("tableId"),
+        sessionId: url.searchParams.get("sessionId"),
       }));
       return;
     }
 
     if (url.pathname === "/api/multiplayer/settings" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: updateMultiplayerSettings(campaign, body),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: updateMultiplayerSettings(campaign, body) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -477,6 +497,9 @@ const server = createServer(async (request, response) => {
         snapshot: createGuestSnapshot(payload.campaign, body.connectionId, {
           clientId: body.clientId,
           connectionSecret: body.connectionSecret,
+          campaignId: body.campaignId,
+          tableId: body.tableId,
+          sessionId: body.sessionId,
         }),
       });
       return;
@@ -491,6 +514,9 @@ const server = createServer(async (request, response) => {
         snapshot: createGuestSnapshot(payload.campaign, body.connectionId, {
           clientId: body.clientId,
           connectionSecret: body.connectionSecret,
+          campaignId: body.campaignId,
+          tableId: body.tableId,
+          sessionId: body.sessionId,
         }),
       });
       return;
@@ -508,6 +534,9 @@ const server = createServer(async (request, response) => {
           ? createGuestSnapshot(payload.campaign, body.connectionId, {
             clientId: body.clientId,
             connectionSecret: body.connectionSecret,
+            campaignId: body.campaignId,
+            tableId: body.tableId,
+            sessionId: body.sessionId,
           })
           : null,
       });
@@ -520,9 +549,10 @@ const server = createServer(async (request, response) => {
         sendText(response, 401, "Host table talk requires local app authorization.");
         return;
       }
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: postTableTalk(campaign, body),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: postTableTalk(campaign, body) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -530,6 +560,9 @@ const server = createServer(async (request, response) => {
           ? createGuestSnapshot(payload.campaign, body.connectionId, {
             clientId: body.clientId,
             connectionSecret: body.connectionSecret,
+            campaignId: body.campaignId,
+            tableId: body.tableId,
+            sessionId: body.sessionId,
           })
           : null,
       });
@@ -538,9 +571,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/disconnect" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: disconnectGuest(campaign, body.connectionId),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: disconnectGuest(campaign, body.connectionId) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -550,9 +584,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/controller/revoke" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: revokeController(campaign, body.partyMemberId),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: revokeController(campaign, body.partyMemberId) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -562,9 +597,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/controller/ai" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: returnToAiCompanion(campaign, body.partyMemberId),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: returnToAiCompanion(campaign, body.partyMemberId) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -574,9 +610,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/controller/host" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: setHostController(campaign, body.partyMemberId),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: setHostController(campaign, body.partyMemberId) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -586,9 +623,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/pending/clear" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
-        campaign: clearPendingTurnInputs(campaign, body.inputIds),
-      }));
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: clearPendingTurnInputs(campaign, body.inputIds) };
+      });
       sendJson(response, 200, {
         ...payload,
         multiplayer: createHostSnapshot(payload.campaign),
@@ -1271,6 +1309,35 @@ function requiresCampaignPin(pathname) {
     "/api/multiplayer/table-talk",
     "/api/review/commit",
   ]).has(pathname);
+}
+
+function assertRequestOwnsActiveTable(campaign, identity = {}) {
+  const expectedCampaignId = compactIdentity(identity.campaignId);
+  if (expectedCampaignId && expectedCampaignId !== campaign.id) {
+    throwPublicRouteError("That request belongs to a different campaign. Reload the table and try again.", 409);
+  }
+
+  const localTable = campaign.multiplayer?.localTable ?? {};
+  const expectedTableId = compactIdentity(identity.tableId);
+  if (expectedTableId && expectedTableId !== compactIdentity(localTable.tableId)) {
+    throwPublicRouteError("That request belongs to a different table. Reload the table and try again.", 409);
+  }
+
+  const expectedSessionId = compactIdentity(identity.sessionId || identity.tableSessionId);
+  if (expectedSessionId && expectedSessionId !== compactIdentity(localTable.sessionId)) {
+    throwPublicRouteError("That table session is no longer active. Ask the host for a fresh link.", 409);
+  }
+}
+
+function compactIdentity(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function throwPublicRouteError(message, statusCode = 400) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.publicMessage = message;
+  throw error;
 }
 
 async function readJsonBody(request) {

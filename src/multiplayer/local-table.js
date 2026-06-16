@@ -73,9 +73,11 @@ export function startLocalTable(campaign, options = {}) {
   const port = Number(options.port) || 4173;
   const lanAddress = options.lanAddress || firstLanAddress() || "127.0.0.1";
   const next = normalizeMultiplayerCampaign(campaign);
+  const tableId = options.tableId || next.multiplayer.localTable?.tableId || defaultTableId(next);
   const sessionId = options.sessionId || `table-${randomToken(12)}`;
   next.multiplayer.localTable = {
     running: true,
+    tableId,
     sessionId,
     host: options.host || "0.0.0.0",
     port,
@@ -153,6 +155,8 @@ export function createInviteForPartyMember(campaign, { partyMemberId, host, port
     id: `invite-${randomToken(8)}`,
     token: randomToken(18),
     campaignId: next.id,
+    tableId: table.tableId || defaultTableId(next),
+    sessionId: table.sessionId || "",
     kind: inviteKinds.PARTY_MEMBER,
     seatId: member.id,
     partyMemberId: member.id,
@@ -166,6 +170,8 @@ export function createInviteForPartyMember(campaign, { partyMemberId, host, port
     host: host || table.lanAddress || "127.0.0.1",
     port: port || table.port || 4173,
     campaign: next.id,
+    table: invite.tableId,
+    session: invite.sessionId,
     seat: member.id,
     token: invite.token,
   });
@@ -204,6 +210,8 @@ export function createCharacterRequestInvite(campaign, { host, port } = {}) {
     id: `invite-${randomToken(8)}`,
     token: randomToken(18),
     campaignId: next.id,
+    tableId: table.tableId || defaultTableId(next),
+    sessionId: table.sessionId || "",
     kind: inviteKinds.CHARACTER_REQUEST,
     seatId: "new-character",
     partyMemberId: null,
@@ -217,6 +225,8 @@ export function createCharacterRequestInvite(campaign, { host, port } = {}) {
     host: host || table.lanAddress || "127.0.0.1",
     port: port || table.port || 4173,
     campaign: next.id,
+    table: invite.tableId,
+    session: invite.sessionId,
     seat: invite.seatId,
     token: invite.token,
   });
@@ -234,12 +244,12 @@ export function createCharacterRequestInvite(campaign, { host, port } = {}) {
   };
 }
 
-export function registerWaitingGuest(campaign, { playerName, clientId, tableSessionId } = {}) {
+export function registerWaitingGuest(campaign, { playerName, clientId, campaignId, tableId, sessionId, tableSessionId } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   if (!next.multiplayer.localTable?.running) {
     throw publicMultiplayerError("The host local table is not open yet.", 409);
   }
-  assertLocalTableSession(next, tableSessionId);
+  assertTableAuthority(next, { campaignId, tableId, sessionId: sessionId || tableSessionId });
   const normalizedClientId = compactLine(clientId || "", 120);
   const displayName = compactLine(playerName || "Guest Player", 80);
   const existing = normalizedClientId
@@ -263,6 +273,9 @@ export function registerWaitingGuest(campaign, { playerName, clientId, tableSess
 
   const waitingGuest = {
     id: `wait-${randomToken(10)}`,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     displayName,
     clientId: normalizedClientId,
     status: "waiting",
@@ -287,8 +300,9 @@ export function registerWaitingGuest(campaign, { playerName, clientId, tableSess
   };
 }
 
-export function createWaitingGuestSnapshot(campaign, { waitingGuestId, clientId, waitingSecret } = {}) {
+export function createWaitingGuestSnapshot(campaign, { waitingGuestId, clientId, waitingSecret, campaignId, tableId, sessionId, tableSessionId } = {}) {
   const normalized = normalizeMultiplayerCampaign(campaign);
+  assertTableAuthority(normalized, { campaignId, tableId, sessionId: sessionId || tableSessionId });
   const waitingGuest = normalized.multiplayer.waitingGuests.find((guest) => guest.id === waitingGuestId);
   if (!waitingGuest) {
     throw publicMultiplayerError("Waiting guest not found. Ask the host for the table address again.", 404);
@@ -324,7 +338,11 @@ export function createWaitingGuestSnapshot(campaign, { waitingGuestId, clientId,
 
 export function heartbeatWaitingGuest(campaign, options = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
-  assertLocalTableSession(next, options.tableSessionId);
+  assertTableAuthority(next, {
+    campaignId: options.campaignId,
+    tableId: options.tableId,
+    sessionId: options.sessionId || options.tableSessionId,
+  });
   const waitingGuest = next.multiplayer.waitingGuests.find((guest) => guest.id === options.waitingGuestId);
   if (!waitingGuest) {
     throw publicMultiplayerError("Waiting room session expired. Ask the host for the guest link, then click Ask To Join again.", 404);
@@ -364,6 +382,8 @@ export function seatWaitingGuest(campaign, { waitingGuestId, partyMemberId } = {
     id: `invite-${randomToken(8)}`,
     token: randomToken(18),
     campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     kind: inviteKinds.PARTY_MEMBER,
     seatId: member.id,
     partyMemberId: member.id,
@@ -376,6 +396,9 @@ export function seatWaitingGuest(campaign, { waitingGuestId, partyMemberId } = {
   };
   const player = {
     id: playerId,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     displayName: waitingGuest.displayName || "Guest Player",
     kind: "remote_player",
     clientId: waitingGuest.clientId,
@@ -384,6 +407,9 @@ export function seatWaitingGuest(campaign, { waitingGuestId, partyMemberId } = {
   };
   const connection = {
     id: connectionId,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     playerId,
     displayName: player.displayName,
     inviteId: invite.id,
@@ -453,6 +479,11 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId, propos
   if (parsed.campaign !== next.id) {
     throw publicMultiplayerError("Invite is for a different campaign. Ask the host for a fresh invite link.", 409);
   }
+  assertTableAuthority(next, {
+    campaignId: parsed.campaign,
+    tableId: parsed.tableId,
+    sessionId: parsed.sessionId,
+  });
   const invite = findActiveInvite(next, parsed);
   const requestedNewCharacter = hasCharacterProposal(proposedCharacter);
   const isCharacterRequest = invite.kind === inviteKinds.CHARACTER_REQUEST || !invite.partyMemberId || requestedNewCharacter;
@@ -514,6 +545,9 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId, propos
   const connectionId = `conn-${randomToken(10)}`;
   const player = {
     id: playerId,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     displayName: compactLine(playerName || "Guest Player", 80),
     kind: "remote_player",
     clientId: compactLine(clientId || "", 120),
@@ -522,6 +556,9 @@ export function requestJoin(campaign, { inviteLink, playerName, clientId, propos
   };
   const connection = {
     id: connectionId,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     playerId,
     displayName: player.displayName,
     inviteId: invite.id,
@@ -624,8 +661,9 @@ export function approveJoinRequest(campaign, connectionId, options = {}) {
   return touchCampaign(next);
 }
 
-export function joinPartyMemberCombat(campaign, { partyMemberId, connectionId = "", clientId = "", connectionSecret = "" } = {}) {
+export function joinPartyMemberCombat(campaign, { partyMemberId, connectionId = "", clientId = "", connectionSecret = "", campaignId = "", tableId = "", sessionId = "" } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
+  assertTableAuthority(next, { campaignId, tableId, sessionId });
   const member = next.party.find((item) => item.id === partyMemberId);
   if (!member) {
     throw new Error("Party member not found.");
@@ -675,8 +713,9 @@ export function denyJoinRequest(campaign, connectionId) {
   return touchCampaign(next);
 }
 
-export function submitGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId, text, ready = true } = {}) {
+export function submitGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId, text, ready = true, campaignId = "", tableId = "", sessionId = "" } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
+  assertTableAuthority(next, { campaignId, tableId, sessionId });
   const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
   if (!connection || connection.status !== "connected") {
     throw new Error("Connection is not approved.");
@@ -697,6 +736,9 @@ export function submitGuestAction(campaign, { connectionId, clientId, connection
 
   const input = {
     id: `input-${connection.playerId}-${characterId}`,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     type: "player_action",
     playerId: connection.playerId,
     playerName: connection.displayName,
@@ -723,8 +765,9 @@ export function submitGuestAction(campaign, { connectionId, clientId, connection
   return touchCampaign(next);
 }
 
-export function passGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId } = {}) {
+export function passGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId, campaignId = "", tableId = "", sessionId = "" } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
+  assertTableAuthority(next, { campaignId, tableId, sessionId });
   const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
   if (!connection || connection.status !== "connected") {
     throw new Error("Connection is not approved.");
@@ -740,6 +783,9 @@ export function passGuestAction(campaign, { connectionId, clientId, connectionSe
   }
   const input = {
     id: `input-${connection.playerId}-${characterId}`,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     type: "player_action",
     playerId: connection.playerId,
     playerName: connection.displayName,
@@ -760,8 +806,9 @@ export function passGuestAction(campaign, { connectionId, clientId, connectionSe
   return touchCampaign(next);
 }
 
-export function postTableTalk(campaign, { connectionId, clientId, connectionSecret, playerName, text } = {}) {
+export function postTableTalk(campaign, { connectionId, clientId, connectionSecret, playerName, text, campaignId = "", tableId = "", sessionId = "" } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
+  assertTableAuthority(next, { campaignId, tableId, sessionId });
   const trimmedText = compactLine(text, 800);
   if (!trimmedText) {
     throw new Error("Table talk text is required.");
@@ -785,6 +832,9 @@ export function postTableTalk(campaign, { connectionId, clientId, connectionSecr
 
   const message = {
     id: `talk-${randomToken(8)}`,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
     playerId: connection?.playerId ?? "host",
     playerName: compactLine(connection?.displayName || playerName || "Host", 80),
     role: connection ? "guest" : "host",
@@ -911,7 +961,10 @@ export function createHostSnapshot(campaign) {
     revision,
     campaignId: normalized.id,
     campaignTitle: normalized.title,
-    localTable: normalized.multiplayer.localTable,
+    localTable: {
+      ...normalized.multiplayer.localTable,
+      campaignId: normalized.id,
+    },
     settings: normalized.multiplayer.settings,
     hostTurnState: normalized.multiplayer.hostTurnState,
     party: normalized.party.map((member) => ({
@@ -948,18 +1001,54 @@ function isFreshWaitingGuest(guest, nowMs = Date.now()) {
 }
 
 function assertLocalTableSession(campaign, tableSessionId) {
-  const expected = compactLine(tableSessionId || "", 120);
-  if (!expected) {
-    return;
+  assertTableAuthority(campaign, { sessionId: tableSessionId });
+}
+
+function assertTableAuthority(campaign, { campaignId = "", tableId = "", sessionId = "" } = {}) {
+  const expectedCampaignId = compactLine(campaignId || "", 160);
+  if (expectedCampaignId && expectedCampaignId !== campaign.id) {
+    throw publicMultiplayerError("That request belongs to a different campaign. Ask the host for a fresh table link.", 409);
   }
-  const actual = campaign.multiplayer?.localTable?.sessionId || "";
-  if (actual !== expected) {
-    throw publicMultiplayerError("That guest link belongs to a different table. Ask the host for a fresh Guest Link.", 409);
+
+  const expectedTableId = compactLine(tableId || "", 160);
+  if (expectedTableId && expectedTableId !== currentTableId(campaign)) {
+    throw publicMultiplayerError("That request belongs to a different table. Ask the host for a fresh table link.", 409);
   }
+
+  const expectedSessionId = compactLine(sessionId || "", 160);
+  if (expectedSessionId && expectedSessionId !== currentSessionId(campaign)) {
+    throw publicMultiplayerError("That table session is no longer active. Ask the host for a fresh table link.", 409);
+  }
+}
+
+function normalizeOwnedRecord(record = {}, campaign = {}, multiplayer = {}) {
+  return {
+    ...record,
+    campaignId: record.campaignId || campaign.id || "",
+    tableId: record.tableId || multiplayer.localTable?.tableId || defaultTableId(campaign),
+    sessionId: record.sessionId || multiplayer.localTable?.sessionId || "",
+  };
+}
+
+function currentTableId(campaign) {
+  return campaign.multiplayer?.localTable?.tableId || defaultTableId(campaign);
+}
+
+function currentSessionId(campaign) {
+  return campaign.multiplayer?.localTable?.sessionId || "";
+}
+
+function defaultTableId(campaign = {}) {
+  return `table-${slugify(campaign.id || campaign.title || "campaign")}`;
 }
 
 export function createGuestSnapshot(campaign, connectionId, options = {}) {
   const normalized = normalizeMultiplayerCampaign(campaign);
+  assertTableAuthority(normalized, {
+    campaignId: options.campaignId,
+    tableId: options.tableId,
+    sessionId: options.sessionId,
+  });
   const revision = tableRevision(normalized);
   const requestedConnection = normalized.multiplayer.connections.find((item) => item.id === connectionId);
   const connection =
@@ -1067,6 +1156,11 @@ export function createJoinPreview(campaign, inviteLink) {
   if (parsed.campaign !== normalized.id) {
     throw publicMultiplayerError("Invite is for a different campaign. Ask the host for a fresh invite link.", 409);
   }
+  assertTableAuthority(normalized, {
+    campaignId: parsed.campaign,
+    tableId: parsed.tableId,
+    sessionId: parsed.sessionId,
+  });
   const invite = findActiveInvite(normalized, parsed);
   const scene = publicData(normalized.scene) ?? {};
   const recentMessages = (normalized.sessionLog?.messages ?? [])
@@ -1107,6 +1201,8 @@ export function parseInviteLink(value) {
     const host = url.searchParams.get("host") || "";
     const port = Number(url.searchParams.get("port"));
     const campaign = url.searchParams.get("campaign") || "";
+    const tableId = url.searchParams.get("table") || "";
+    const sessionId = url.searchParams.get("session") || "";
     const seat = url.searchParams.get("seat") || "";
     const token = url.searchParams.get("token") || "";
     if (!host || !Number.isInteger(port) || port < 1 || port > 65535 || !campaign || !seat || !token) {
@@ -1120,6 +1216,8 @@ export function parseInviteLink(value) {
       host,
       port,
       campaign,
+      tableId,
+      sessionId,
       seat,
       token,
     };
@@ -1128,11 +1226,13 @@ export function parseInviteLink(value) {
   }
 }
 
-export function buildInviteLink({ host, port, campaign, seat, token }) {
+export function buildInviteLink({ host, port, campaign, table, session, seat, token }) {
   const params = new URLSearchParams({
     host: String(host || "127.0.0.1"),
     port: String(port || 4173),
     campaign: String(campaign || ""),
+    table: String(table || ""),
+    session: String(session || ""),
     seat: String(seat || ""),
     token: String(token || ""),
   });
@@ -1155,6 +1255,7 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
     protocolVersion: Number(multiplayer.protocolVersion) || multiplayerProtocolVersion,
     localTable: {
       running: Boolean(multiplayer.localTable?.running),
+      tableId: multiplayer.localTable?.tableId || defaultTableId(campaign),
       sessionId: multiplayer.localTable?.sessionId || "",
       host: multiplayer.localTable?.host || "",
       port: multiplayer.localTable?.port ?? null,
@@ -1169,12 +1270,12 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
       holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
     },
     hostTurnState: allowedTurnStates.has(multiplayer.hostTurnState) ? multiplayer.hostTurnState : hostTurnStates.WAITING_FOR_PLAYER,
-    players: Array.isArray(multiplayer.players) ? multiplayer.players : [],
+    players: Array.isArray(multiplayer.players) ? multiplayer.players.map((player) => normalizeOwnedRecord(player, campaign, multiplayer)) : [],
     seats: normalizeSeats(multiplayer.seats, campaign.party ?? []),
-    invites: Array.isArray(multiplayer.invites) ? multiplayer.invites : [],
-    connections: Array.isArray(multiplayer.connections) ? multiplayer.connections : [],
-    waitingGuests: Array.isArray(multiplayer.waitingGuests) ? multiplayer.waitingGuests : [],
-    pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs : [],
+    invites: Array.isArray(multiplayer.invites) ? multiplayer.invites.map((invite) => normalizeOwnedRecord(invite, campaign, multiplayer)) : [],
+    connections: Array.isArray(multiplayer.connections) ? multiplayer.connections.map((connection) => normalizeOwnedRecord(connection, campaign, multiplayer)) : [],
+    waitingGuests: Array.isArray(multiplayer.waitingGuests) ? multiplayer.waitingGuests.map((guest) => normalizeOwnedRecord(guest, campaign, multiplayer)) : [],
+    pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs.map((input) => normalizeOwnedRecord(input, campaign, multiplayer)) : [],
     tableTalk: Array.isArray(multiplayer.tableTalk)
       ? multiplayer.tableTalk.slice(-tableStateLimits.tableTalk).map(normalizeTableTalkMessage).filter(Boolean)
       : [],
@@ -1351,6 +1452,8 @@ function findActiveInvite(campaign, parsed) {
     item.status === "active" &&
     item.token === parsed.token &&
     item.campaignId === parsed.campaign &&
+    (!parsed.tableId || !item.tableId || item.tableId === parsed.tableId) &&
+    (!parsed.sessionId || !item.sessionId || item.sessionId === parsed.sessionId) &&
     (item.partyMemberId === parsed.seat || item.seatId === parsed.seat)
   );
   if (!invite) {
@@ -1522,6 +1625,9 @@ function publicRecords(records = [], limit = tableStateLimits.people) {
 function publicConnection(connection) {
   return {
     id: connection.id,
+    campaignId: connection.campaignId ?? null,
+    tableId: connection.tableId ?? null,
+    sessionId: connection.sessionId ?? null,
     playerId: connection.playerId,
     displayName: connection.displayName,
     status: connection.status,
@@ -1537,6 +1643,9 @@ function publicConnection(connection) {
 function publicTableTalkMessage(message) {
   return {
     id: message.id,
+    campaignId: message.campaignId ?? null,
+    tableId: message.tableId ?? null,
+    sessionId: message.sessionId ?? null,
     playerId: message.playerId,
     playerName: message.playerName,
     role: message.role,
@@ -1548,6 +1657,9 @@ function publicTableTalkMessage(message) {
 function publicWaitingGuest(waitingGuest) {
   return {
     id: waitingGuest.id,
+    campaignId: waitingGuest.campaignId ?? null,
+    tableId: waitingGuest.tableId ?? null,
+    sessionId: waitingGuest.sessionId ?? null,
     displayName: waitingGuest.displayName,
     clientId: waitingGuest.clientId,
     status: waitingGuest.status,

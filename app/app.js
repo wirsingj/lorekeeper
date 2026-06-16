@@ -1567,6 +1567,7 @@ async function clearSubmittedRemoteInputs(inputs) {
   }
   const result = await postJson(apiMultiplayerClearPendingUrl, {
     inputIds: inputs.map((input) => input.id),
+    ...localTableAuthorityPayload(),
   });
   setCampaignFromPayload(result, "local_table_pending_cleared");
   state.multiplayerSnapshot = result.multiplayer;
@@ -2610,7 +2611,7 @@ async function startLocalTableFromUi() {
 async function stopLocalTableFromUi() {
   try {
     setProviderActivity("Stopping local table...", "working");
-    const result = await postJson(apiMultiplayerStopUrl, {});
+    const result = await postJson(apiMultiplayerStopUrl, localTableAuthorityPayload());
     setCampaignFromPayload(result, "local_table_stopped");
     state.multiplayerSnapshot = result.multiplayer;
     render();
@@ -2630,6 +2631,7 @@ async function saveGuestActionSettings() {
     const result = await postJson(apiMultiplayerSettingsUrl, {
       requireGuestActionApproval,
       holdGuestActionsForGroupInput,
+      ...localTableAuthorityPayload(),
     });
     setCampaignFromPayload(result, "local_table_settings_updated");
     state.multiplayerSnapshot = result.multiplayer;
@@ -2658,6 +2660,7 @@ async function createInviteForMember(member) {
     }
     const result = await postJson(apiMultiplayerInviteUrl, {
       partyMemberId: member.id,
+      ...localTableAuthorityPayload(),
     });
     setCampaignFromPayload(result, "local_table_invite_created");
     state.multiplayerSnapshot = result.multiplayer;
@@ -2676,7 +2679,7 @@ async function createCharacterRequestInviteFromUi() {
     if (!state.campaign?.multiplayer?.localTable?.running) {
       await startLocalTableFromUi();
     }
-    const result = await postJson(apiMultiplayerInviteCharacterUrl, {});
+    const result = await postJson(apiMultiplayerInviteCharacterUrl, localTableAuthorityPayload());
     setCampaignFromPayload(result, "local_table_character_invite_created");
     state.multiplayerSnapshot = result.multiplayer;
     render();
@@ -2728,8 +2731,33 @@ function currentLocalGuestLink() {
     return base;
   }
   const url = new URL(base);
-  url.searchParams.set("table", table.sessionId);
+  if (state.campaign?.id) {
+    url.searchParams.set("campaign", state.campaign.id);
+  }
+  if (table.tableId) {
+    url.searchParams.set("table", table.tableId);
+  }
+  url.searchParams.set("session", table.sessionId);
   return url.toString();
+}
+
+function localTableAuthorityPayload(overrides = {}) {
+  const table = state.campaign?.multiplayer?.localTable ?? state.multiplayerSnapshot?.localTable ?? {};
+  return {
+    campaignId: state.campaign?.id || state.multiplayerSnapshot?.campaignId || "",
+    tableId: table.tableId || "",
+    sessionId: table.sessionId || "",
+    ...overrides,
+  };
+}
+
+function guestTableAuthorityPayload(overrides = {}) {
+  return {
+    campaignId: state.guestSession?.campaignId || state.waitingRoomSession?.campaignId || "",
+    tableId: state.guestSession?.tableId || state.waitingRoomSession?.tableId || "",
+    sessionId: state.guestSession?.sessionId || state.waitingRoomSession?.sessionId || "",
+    ...overrides,
+  };
 }
 
 function showGuestLink(link) {
@@ -2832,6 +2860,7 @@ async function setPartyMemberController(member, controllerKind) {
     setProviderActivity(`Updating ${member.name} controller...`, "working");
     const result = await postJson(url, {
       partyMemberId: member.id,
+      ...localTableAuthorityPayload(),
     });
     setCampaignFromPayload(result, `controller_${controllerKind}`);
     state.multiplayerSnapshot = result.multiplayer;
@@ -2903,18 +2932,25 @@ async function registerGuestWaitingRoom() {
     }
     const clientId = guestClientId();
     const hostBaseUrl = window.location.origin;
-    const tableSessionId = launchParams.get("table") || "";
+    const campaignId = launchParams.get("campaign") || "";
+    const hasExplicitSession = launchParams.has("session");
+    const tableId = hasExplicitSession ? launchParams.get("table") || "" : "";
+    const sessionId = hasExplicitSession ? launchParams.get("session") || "" : launchParams.get("table") || "";
     const result = await postJson(`${hostBaseUrl}${apiMultiplayerWaitingRegisterUrl}`, {
       playerName,
       clientId,
-      tableSessionId,
+      campaignId,
+      tableId,
+      sessionId,
     });
     saveWaitingRoomSession({
       hostBaseUrl,
       clientId,
       waitingGuestId: result.waitingGuest?.id,
       waitingSecret: result.waitingSecret || "",
-      tableSessionId,
+      campaignId: result.campaignId || campaignId,
+      tableId: result.localTable?.tableId || tableId,
+      sessionId: result.localTable?.sessionId || sessionId,
       playerName,
       campaignTitle: result.campaignTitle || "",
       status: "waiting",
@@ -2946,8 +2982,14 @@ async function refreshWaitingRoomStatus({ explicit = false } = {}) {
   url.searchParams.set("waitingGuestId", session.waitingGuestId);
   url.searchParams.set("clientId", session.clientId || guestClientId());
   url.searchParams.set("waitingSecret", session.waitingSecret || "");
-  if (session.tableSessionId) {
-    url.searchParams.set("tableSessionId", session.tableSessionId);
+  if (session.campaignId) {
+    url.searchParams.set("campaignId", session.campaignId);
+  }
+  if (session.tableId) {
+    url.searchParams.set("tableId", session.tableId);
+  }
+  if (session.sessionId) {
+    url.searchParams.set("sessionId", session.sessionId);
   }
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
@@ -3185,6 +3227,8 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
       playerName: result.player.displayName,
       partyMemberId: result.connection.partyMemberId,
       campaignId: parsed.campaign,
+      tableId: parsed.tableId || result.connection.tableId || result.snapshot?.localTable?.tableId || "",
+      sessionId: parsed.sessionId || result.connection.sessionId || result.snapshot?.localTable?.sessionId || "",
       status: result.connection.status,
       lastRevision: result.snapshot?.revision ?? result.snapshot?.tableState?.revision ?? "",
     };
@@ -3229,6 +3273,7 @@ async function approveGuest(connectionId, hostIntegrationPrompt = "") {
     const result = await postJson(apiMultiplayerApproveUrl, {
       connectionId,
       hostIntegrationPrompt,
+      ...localTableAuthorityPayload(),
     });
     setCampaignFromPayload(result, "local_table_join_approved");
     state.multiplayerSnapshot = result.multiplayer;
@@ -3241,7 +3286,10 @@ async function approveGuest(connectionId, hostIntegrationPrompt = "") {
 
 async function denyGuest(connectionId) {
   try {
-    const result = await postJson(apiMultiplayerDenyUrl, { connectionId });
+    const result = await postJson(apiMultiplayerDenyUrl, {
+      connectionId,
+      ...localTableAuthorityPayload(),
+    });
     setCampaignFromPayload(result, "local_table_join_denied");
     state.multiplayerSnapshot = result.multiplayer;
     render();
@@ -3256,6 +3304,7 @@ async function seatWaitingGuestAtTable(waitingGuestId, partyMemberId) {
     const result = await postJson(apiMultiplayerWaitingSeatUrl, {
       waitingGuestId,
       partyMemberId,
+      ...localTableAuthorityPayload(),
     });
     setCampaignFromPayload(result, "local_table_waiting_guest_seated");
     state.multiplayerSnapshot = result.multiplayer;
@@ -3283,6 +3332,15 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
     const url = new URL(`${state.guestSession.hostBaseUrl}${apiMultiplayerGuestSnapshotUrl}`);
     url.searchParams.set("connectionId", state.guestSession.connectionId);
     url.searchParams.set("clientId", state.guestSession.clientId || guestClientId());
+    if (state.guestSession.campaignId) {
+      url.searchParams.set("campaignId", state.guestSession.campaignId);
+    }
+    if (state.guestSession.tableId) {
+      url.searchParams.set("tableId", state.guestSession.tableId);
+    }
+    if (state.guestSession.sessionId) {
+      url.searchParams.set("sessionId", state.guestSession.sessionId);
+    }
     if (state.guestSession.connectionSecret) {
       url.searchParams.set("connectionSecret", state.guestSession.connectionSecret);
     }
@@ -3352,6 +3410,7 @@ async function submitGuestActionFromUi({ pass = false } = {}) {
       characterId: state.guestSession.partyMemberId,
       text: elements.playerInput.value.trim(),
       ready: true,
+      ...guestTableAuthorityPayload(),
     });
     renderGuestSnapshot(result.snapshot);
     if (!pass) {
@@ -3386,6 +3445,7 @@ async function sendTableTalkFromUi() {
         clientId: state.guestSession.clientId || guestClientId(),
         connectionSecret: state.guestSession.connectionSecret || "",
         text,
+        ...guestTableAuthorityPayload(),
       });
       if (result.snapshot) {
         renderGuestSnapshot(result.snapshot);
@@ -3400,6 +3460,7 @@ async function sendTableTalkFromUi() {
     const result = await postJson(apiMultiplayerTableTalkUrl, {
       playerName: "Host",
       text,
+      ...localTableAuthorityPayload(),
     });
     setCampaignFromPayload(result, "table_talk");
     state.multiplayerSnapshot = result.multiplayer;
@@ -3452,6 +3513,7 @@ async function resolvePendingInputsWithText(inputs, aggregateText) {
   if (inputs.length && runResult?.imported) {
     const result = await postJson(apiMultiplayerClearPendingUrl, {
       inputIds: inputs.map((input) => input.id),
+      ...localTableAuthorityPayload(),
     });
     setCampaignFromPayload(result, "local_table_pending_cleared");
     state.multiplayerSnapshot = result.multiplayer;
@@ -3727,6 +3789,8 @@ function parseInviteLinkForClient(value) {
     const host = url.searchParams.get("host") || "";
     const port = Number(url.searchParams.get("port"));
     const campaign = url.searchParams.get("campaign") || "";
+    const tableId = url.searchParams.get("table") || "";
+    const sessionId = url.searchParams.get("session") || "";
     const seat = url.searchParams.get("seat") || "";
     const token = url.searchParams.get("token") || "";
     if (url.protocol !== "lorekeeper:" || url.hostname !== "join") {
@@ -3738,7 +3802,7 @@ function parseInviteLinkForClient(value) {
     if (!isAllowedInviteHost(host)) {
       return { valid: false, error: "Invite host must be a local or private LAN address." };
     }
-    return { valid: true, host, port, campaign, seat, token };
+    return { valid: true, host, port, campaign, tableId, sessionId, seat, token };
   } catch {
     return { valid: false, error: "Invite link is not valid." };
   }

@@ -185,7 +185,7 @@ Current tests cover important engines and regressions, but the weakest area is i
 Implemented in this pass:
 
 - Local table sessions now receive a generated `sessionId`.
-- Generated Guest Links include `?table=<sessionId>`.
+- Generated Guest Links include `campaign`, `table`, and `session` identity.
 - Guest waiting-room registration sends the table session key.
 - Guest waiting-room heartbeat/status sends the table session key.
 - Host-side waiting registration rejects stale or wrong-table links with a clear public error.

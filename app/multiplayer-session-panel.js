@@ -39,7 +39,7 @@ export function buildMultiplayerSessionProjection({
     requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
     holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
   };
-  const guestLink = localGuestLink(table, locationPort);
+  const guestLink = localGuestLink(table, locationPort, { campaignId: multiplayer.campaignId || campaign?.id || "" });
   return {
     mode: "host",
     localTableState: table.running ? "On" : "Off",
@@ -105,7 +105,7 @@ export function renderMultiplayerSessionPanel({
   renderPendingInputs(elements.pendingInputs, projection.pendingInputs);
 }
 
-function localGuestLink(table = {}, locationPort = "") {
+function localGuestLink(table = {}, locationPort = "", { campaignId = "" } = {}) {
   if (!table.running) {
     return "";
   }
@@ -116,7 +116,14 @@ function localGuestLink(table = {}, locationPort = "") {
     return base;
   }
   const url = new URL(base);
-  url.searchParams.set("table", table.sessionId);
+  const scopedCampaignId = table.campaignId || campaignId;
+  if (scopedCampaignId) {
+    url.searchParams.set("campaign", scopedCampaignId);
+  }
+  if (table.tableId) {
+    url.searchParams.set("table", table.tableId);
+  }
+  url.searchParams.set("session", table.sessionId);
   return url.toString();
 }
 
