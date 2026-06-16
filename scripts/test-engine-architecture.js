@@ -1050,6 +1050,31 @@ function testLargeCampaignContextPackStaysBounded() {
   assert.equal(contextPack.sections.some((section) => section.entries.length > 20), false, "sections should remain bounded");
 }
 
+function testContextPackFormatsStructuredSheetDetails() {
+  const campaign = campaignFixture();
+  campaign.party[0] = {
+    ...campaign.party[0],
+    ancestryClass: "Dwarf Cleric",
+    spells: [
+      { name: "Guidance", level: 0, effect: "Help on an ability check." },
+      { name: "Healing Word", level: 1, castingTime: "bonus_action", effect: "Ranged healing." },
+    ],
+    equipment: {
+      armor: "Scale mail",
+      weapons: ["Mace", "Shield"],
+    },
+    inventory: ["Holy symbol", "Healer's kit"],
+  };
+  const contextPack = buildContextPack(campaign);
+  const partyText = contextPack.sections
+    .filter((section) => section.kind === "active_party")
+    .flatMap((section) => section.entries)
+    .join("\n");
+  assert.match(partyText, /Guidance/);
+  assert.match(partyText, /Healing Word/);
+  assert.doesNotMatch(partyText, /\[object Object\]/);
+}
+
 function testSceneIntentDiscouragesRandomEscalationAfterSmallFight() {
   const base = campaignFixture();
   base.people.push({ id: "merchant-zean", name: "Zean", role: "protected merchant", notes: ["Garren protected him on the mining road."] });
@@ -1916,6 +1941,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /addPartyTemplateCharactersToWizard/);
   assert.match(appJs, /buildPartyTemplateCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);
+  assert.match(appJs, /equipmentForProfile/);
+  assert.match(appJs, /inventory:\s*equipment\.inventory/);
+  assert.match(appJs, /function spell\(name, level/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /Additional starting party members/);
   assert.match(appJs, /wizardControllerSheetFields/);
@@ -2003,6 +2031,7 @@ testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
 testLargeCampaignContextPackStaysBounded();
+testContextPackFormatsStructuredSheetDetails();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();
 testProviderBoundary();
 testStructuredInputsDoNotMergeIntoHostMessage();

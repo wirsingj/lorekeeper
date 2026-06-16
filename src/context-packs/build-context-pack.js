@@ -452,17 +452,24 @@ function formatCompactList(value, limit = 4) {
   }
 
   if (Array.isArray(value)) {
-    return value.slice(0, limit).map((entry) => compactText(entry, 80)).filter(Boolean).join(", ");
+    return value.slice(0, limit).map((entry) => compactText(compactListEntry(entry), 80)).filter(Boolean).join(", ");
   }
 
   if (typeof value === "object") {
     return Object.entries(value)
       .slice(0, limit)
-      .map(([key, entry]) => `${key} ${entry}`)
+      .map(([key, entry]) => `${key} ${compactListEntry(entry)}`)
       .join(", ");
   }
 
   return compactText(value, 120);
+}
+
+function compactListEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    return entry;
+  }
+  return entry.name || entry.title || entry.label || entry.summary || JSON.stringify(entry);
 }
 
 function formatAbilityScores(value) {

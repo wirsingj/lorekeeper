@@ -4503,6 +4503,8 @@ function buildFiveELiteCharacterSeed(character) {
     spellSlots: spellSlotsForProfile(profile, level),
     uses: usesForProfile(profile, level),
   };
+  const attacks = attacksForProfile(profile, abilityScores, proficiencyBonus);
+  const equipment = equipmentForProfile(profile, character);
 
   return {
     id: `party-${slugify(character.name)}`,
@@ -4526,11 +4528,13 @@ function buildFiveELiteCharacterSeed(character) {
     },
     speedFt: 30,
     resources,
-    attacks: attacksForProfile(profile, abilityScores, proficiencyBonus),
+    attacks,
     conditions: [],
     skills: skillsForProfile(profile, character),
     abilities: abilitiesForProfile(profile, character),
     spells,
+    inventory: equipment.inventory,
+    equipment,
     notes: ["Created from the new campaign wizard with a 5E-lite standard array."],
   };
 }
@@ -4618,19 +4622,50 @@ function spellsForProfile(profile, character) {
   const value = `${character.characterClass} ${character.concept}`;
   if (profile.key === "druid") {
     return /frost/i.test(value)
-      ? ["Frostbite", "Druidcraft", "Entangle", "Goodberry"]
-      : ["Druidcraft", "Entangle", "Goodberry"];
+      ? [
+        spell("Frostbite", 0, { castingTime: "action", roll: { save: { ability: "CON" }, damage: "1d6" }, effect: "Cold cantrip that can sap a target's next weapon attack." }),
+        spell("Druidcraft", 0, { castingTime: "action", effect: "Small primal omen, sensory, or nature effect." }),
+        spell("Entangle", 1, { castingTime: "action", roll: { save: { ability: "STR" }, conditionOnFail: "restrained" }, effect: "Plants restrain creatures in a small area on a failed save." }),
+        spell("Goodberry", 1, { castingTime: "action", effect: "Creates simple magical food and minor healing." }),
+      ]
+      : [
+        spell("Druidcraft", 0, { castingTime: "action", effect: "Small primal omen, sensory, or nature effect." }),
+        spell("Entangle", 1, { castingTime: "action", roll: { save: { ability: "STR" }, conditionOnFail: "restrained" }, effect: "Plants restrain creatures in a small area on a failed save." }),
+        spell("Goodberry", 1, { castingTime: "action", effect: "Creates simple magical food and minor healing." }),
+      ];
   }
   if (profile.key === "wizard") {
-    return ["Mage Hand", "Detect Magic", "Magic Missile"];
+    return [
+      spell("Mage Hand", 0, { castingTime: "action", effect: "Spectral hand manipulates small objects at range." }),
+      spell("Detect Magic", 1, { castingTime: "action", effect: "Reveals nearby magical auras with concentration." }),
+      spell("Magic Missile", 1, { castingTime: "action", roll: { damage: "3d4+3" }, effect: "Automatic force darts against visible targets." }),
+    ];
   }
   if (profile.key === "cleric") {
-    return ["Guidance", "Bless", "Healing Word"];
+    return [
+      spell("Guidance", 0, { castingTime: "action", effect: "Brief divine help on an ability check." }),
+      spell("Bless", 1, { castingTime: "action", effect: "Allies add a small divine bonus to attacks and saves." }),
+      spell("Healing Word", 1, { castingTime: "bonus_action", roll: { healing: "1d4+3" }, effect: "Ranged minor healing as a bonus action." }),
+    ];
   }
   if (profile.key === "bard") {
-    return ["Vicious Mockery", "Charm Person", "Healing Word"];
+    return [
+      spell("Vicious Mockery", 0, { castingTime: "action", roll: { save: { ability: "WIS" }, damage: "1d4" }, effect: "Psychic insult that can hinder a target's next attack." }),
+      spell("Charm Person", 1, { castingTime: "action", roll: { save: { ability: "WIS" } }, effect: "Social magic that makes one humanoid friendly for a while." }),
+      spell("Healing Word", 1, { castingTime: "bonus_action", roll: { healing: "1d4+3" }, effect: "Ranged minor healing as a bonus action." }),
+    ];
   }
   return [];
+}
+
+function spell(name, level, details = {}) {
+  return {
+    name,
+    level,
+    castingTime: details.castingTime || "action",
+    roll: details.roll ?? null,
+    effect: details.effect || "",
+  };
 }
 
 function spellSlotsForProfile(profile, level) {
@@ -4719,6 +4754,62 @@ function attacksForProfile(profile, abilityScores, proficiencyBonus) {
   };
 
   return attacks[profile.key] ?? attacks.balanced;
+}
+
+function equipmentForProfile(profile, character = {}) {
+  const ancestryClass = `${character.ancestry || ""} ${character.characterClass || ""} ${character.concept || ""}`;
+  const common = ["Bedroll", "Rations", "Waterskin", "Tinderbox"];
+  const kits = {
+    druid: {
+      armor: "Leather armor",
+      weapons: ["Quarterstaff", "Sling"],
+      tools: ["Herbalism kit"],
+      inventory: ["Druidic focus", "Herbalism kit", ...common],
+    },
+    rogue: {
+      armor: "Leather armor",
+      weapons: ["Shortsword", "Shortbow", "Dagger"],
+      tools: ["Thieves' tools", "Disguise kit"],
+      inventory: ["Thieves' tools", "Disguise kit", "50 ft rope", ...common],
+    },
+    ranger: {
+      armor: "Leather armor",
+      weapons: ["Longbow", "Shortsword", "Dagger"],
+      tools: ["Hunting trap"],
+      inventory: ["Quiver of arrows", "Hunting trap", "50 ft rope", ...common],
+    },
+    fighter: {
+      armor: /dwarf|soldier|guard|knight/i.test(ancestryClass) ? "Chain mail" : "Scale mail",
+      weapons: ["Longsword", "Javelin", "Shield"],
+      tools: ["Gaming set or soldier's kit"],
+      inventory: ["Shield", "Javelins", "Whetstone", ...common],
+    },
+    wizard: {
+      armor: "No armor",
+      weapons: ["Dagger", "Quarterstaff"],
+      tools: ["Spellbook", "Arcane focus"],
+      inventory: ["Spellbook", "Arcane focus", "Ink and quill", ...common],
+    },
+    cleric: {
+      armor: "Scale mail",
+      weapons: ["Mace", "Light crossbow", "Shield"],
+      tools: ["Holy symbol", "Healer's kit"],
+      inventory: ["Holy symbol", "Healer's kit", "Shield", ...common],
+    },
+    bard: {
+      armor: "Leather armor",
+      weapons: ["Rapier", "Dagger", "Light crossbow"],
+      tools: ["Musical instrument"],
+      inventory: ["Musical instrument", "Diplomat's pack", ...common],
+    },
+    balanced: {
+      armor: "Traveling leathers",
+      weapons: ["Simple weapon", "Dagger"],
+      tools: ["Adventuring kit"],
+      inventory: ["Adventuring kit", ...common],
+    },
+  };
+  return kits[profile.key] ?? kits.balanced;
 }
 
 function formatModifier(value) {
@@ -9937,7 +10028,13 @@ function uniqueTextList(values) {
       }
       return String(value).split(/[,;\n]+/);
     })
-    .map((value) => String(value).trim())
+    .map((value) => {
+      if (value && typeof value === "object") {
+        return String(value.name || value.title || value.label || Object.entries(value).map(([key, entry]) => `${key}: ${entry}`).join(", "));
+      }
+      return String(value);
+    })
+    .map((value) => value.trim())
     .filter((value) => {
       if (!value || seen.has(value.toLowerCase())) {
         return false;

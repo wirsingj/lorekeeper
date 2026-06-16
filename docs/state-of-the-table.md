@@ -136,6 +136,7 @@ Every table surface should answer the same practical questions a real table answ
 85. Local multiplayer regression coverage now includes stale guest snapshot/action rejection after host campaign switch, in addition to disconnect, reconnect, stale table, and stale session cases.
 86. Character auto-complete now lives in a small controller and uses explicit campaign/draft party context, preserving user-supplied facts while filling missing details from party theme.
 87. Host New now has an Add Party Set action that creates three related AI companion cards from the primary character/draft party theme for quick "four dwarf soldiers" style setup.
+88. Generated 5E-lite sheets now include class-appropriate equipment/inventory and structured spell metadata, while context packs and sheet text areas render those details as readable names.
 
 ### Still Risky
 
@@ -324,7 +325,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Let Host New remote-invite slots seat waiting-room guests before campaign start.
 - [x] Make auto-complete campaign-aware without overriding user facts.
 - [x] Add party-template flow for repeated related companions.
-- [ ] Improve class/spell/equipment depth beyond shallow 5E-lite starts.
+- [x] Improve class/spell/equipment depth beyond shallow 5E-lite starts.
 
 ### UI Comfort
 
