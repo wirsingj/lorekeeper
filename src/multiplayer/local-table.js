@@ -244,7 +244,7 @@ export function createCharacterRequestInvite(campaign, { host, port } = {}) {
   };
 }
 
-export function registerWaitingGuest(campaign, { playerName, clientId, campaignId, tableId, sessionId, tableSessionId } = {}) {
+export function registerWaitingGuest(campaign, { playerName, clientId, campaignId, tableId, sessionId, tableSessionId, preferredPartyMemberId } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   if (!next.multiplayer.localTable?.running) {
     throw publicMultiplayerError("The host local table is not open yet.", 409);
@@ -252,6 +252,7 @@ export function registerWaitingGuest(campaign, { playerName, clientId, campaignI
   assertTableAuthority(next, { campaignId, tableId, sessionId: sessionId || tableSessionId });
   const normalizedClientId = compactLine(clientId || "", 120);
   const displayName = compactLine(playerName || "Guest Player", 80);
+  const preferredSeatId = normalizePreferredSeatId(next, preferredPartyMemberId);
   const existing = normalizedClientId
     ? next.multiplayer.waitingGuests.find((guest) =>
       guest.clientId === normalizedClientId &&
@@ -261,6 +262,7 @@ export function registerWaitingGuest(campaign, { playerName, clientId, campaignI
   if (existing) {
     existing.displayName = displayName || existing.displayName;
     existing.lastSeenAt = nowIso();
+    existing.preferredPartyMemberId = preferredSeatId || existing.preferredPartyMemberId || null;
     if (!existing.secret) {
       existing.secret = randomToken(24);
     }
@@ -285,13 +287,17 @@ export function registerWaitingGuest(campaign, { playerName, clientId, campaignI
     seatedAt: null,
     connectionId: null,
     partyMemberId: null,
+    preferredPartyMemberId: preferredSeatId,
     deniedAt: null,
   };
   next.multiplayer.waitingGuests = upsertById(next.multiplayer.waitingGuests, waitingGuest);
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "guest_waiting",
-    summary: `${waitingGuest.displayName || "Guest"} is waiting for a table seat.`,
+    summary: waitingGuest.preferredPartyMemberId
+      ? `${waitingGuest.displayName || "Guest"} requested ${seatLabel(next, waitingGuest.preferredPartyMemberId)}.`
+      : `${waitingGuest.displayName || "Guest"} is waiting for a table seat.`,
     waitingGuestId: waitingGuest.id,
+    partyMemberId: waitingGuest.preferredPartyMemberId || null,
   });
   return {
     campaign: touchCampaign(next),
@@ -1000,6 +1006,30 @@ function isFreshWaitingGuest(guest, nowMs = Date.now()) {
   return nowMs - seenAt <= waitingGuestHeartbeatTimeoutMs;
 }
 
+function isJoinableGuestSeat(member) {
+  const normalized = normalizeControllerFields(member);
+  if (normalized.controllerKind === controllerKinds.REMOTE_PLAYER) {
+    return false;
+  }
+  if (normalized.controllerKind === controllerKinds.HOST && member.inviteIntent !== "remote_player") {
+    return false;
+  }
+  return true;
+}
+
+function normalizePreferredSeatId(campaign, preferredPartyMemberId) {
+  const requested = compactLine(preferredPartyMemberId || "", 160);
+  if (!requested) {
+    return null;
+  }
+  const joinable = new Set(joinableGuestSeats(campaign).map((seat) => seat.id));
+  return joinable.has(requested) ? requested : null;
+}
+
+function seatLabel(campaign, partyMemberId) {
+  return campaign.party?.find((member) => member.id === partyMemberId)?.name || "a party seat";
+}
+
 function assertLocalTableSession(campaign, tableSessionId) {
   assertTableAuthority(campaign, { sessionId: tableSessionId });
 }
@@ -1147,8 +1177,56 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
   };
 }
 
-export function createJoinPreview(campaign, inviteLink) {
-  const parsed = typeof inviteLink === "string" ? parseInviteLink(inviteLink) : inviteLink;
+export function createGuestLobbyPreview(campaign, options = {}) {
+  const normalized = normalizeMultiplayerCampaign(campaign);
+  if (!normalized.multiplayer.localTable?.running) {
+    throw publicMultiplayerError("The host local table is not open yet.", 409);
+  }
+  assertTableAuthority(normalized, {
+    campaignId: options.campaignId,
+    tableId: options.tableId,
+    sessionId: options.sessionId || options.tableSessionId,
+  });
+  const scene = publicData(normalized.scene) ?? {};
+  const recentMessages = (normalized.sessionLog?.messages ?? [])
+    .filter((message) => message.data?.visibility !== "dm_only")
+    .slice(-6)
+    .map(publicMessage);
+  return {
+    protocolVersion: multiplayerProtocolVersion,
+    revision: tableRevision(normalized),
+    campaignId: normalized.id,
+    campaignTitle: normalized.title,
+    campaignSummary: compactLine(normalized.summary || normalized.description || "", 1200),
+    localTable: {
+      ...normalized.multiplayer.localTable,
+      campaignId: normalized.id,
+    },
+    invite: null,
+    scene,
+    party: normalized.party.slice(-tableStateLimits.party).map(publicPartyMember),
+    joinableSeats: joinableGuestSeats(normalized),
+    people: publicRecords(normalized.people, 8),
+    places: publicRecords(normalized.places, 8),
+    quests: publicRecords(normalized.quests, 8),
+    recentMessages,
+  };
+}
+
+export function joinableGuestSeats(campaign) {
+  const normalized = normalizeMultiplayerCampaign(campaign);
+  return normalized.party
+    .filter(isJoinableGuestSeat)
+    .slice(-tableStateLimits.party)
+    .map(publicGuestSeat);
+}
+
+export function createJoinPreview(campaign, inviteLink, options = {}) {
+  const rawInvite = typeof inviteLink === "string" ? inviteLink.trim() : inviteLink;
+  if (!rawInvite) {
+    return createGuestLobbyPreview(campaign, options);
+  }
+  const parsed = typeof rawInvite === "string" ? parseInviteLink(rawInvite) : rawInvite;
   if (!parsed.valid) {
     throw publicMultiplayerError(parsed.error || "Invalid invite link.", 400);
   }
@@ -1668,6 +1746,22 @@ function publicWaitingGuest(waitingGuest) {
     seatedAt: waitingGuest.seatedAt ?? null,
     connectionId: waitingGuest.connectionId ?? null,
     partyMemberId: waitingGuest.partyMemberId ?? null,
+    preferredPartyMemberId: waitingGuest.preferredPartyMemberId ?? null,
+  };
+}
+
+function publicGuestSeat(member) {
+  return {
+    id: member.id,
+    name: member.name,
+    role: member.role,
+    ancestryClass: member.ancestryClass,
+    playerRole: member.playerRole,
+    controllerKind: member.controllerKind,
+    fallbackControllerKind: member.fallbackControllerKind,
+    summary: member.summary,
+    background: member.background,
+    level: member.level,
   };
 }
 

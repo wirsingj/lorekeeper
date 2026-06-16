@@ -183,6 +183,10 @@ export function LorekeeperShell() {
               </div>
               <p id="thin-join-copy" className="thin-join-copy">Paste the invite link from the host, add your table name, and request a seat.</p>
               <section id="guest-waiting-room-panel" className="guest-waiting-room-panel" hidden>
+                <section id="guest-table-preview" className="join-preview-card guest-table-preview" hidden>
+                  <p className="join-preview-empty">Looking for the host table...</p>
+                </section>
+                <section id="guest-seat-list" className="guest-seat-list" aria-label="Available table seats" hidden></section>
                 <label>
                   <span>Your table name</span>
                   <input id="guest-waiting-player-name" autoComplete="name" placeholder="Name" />

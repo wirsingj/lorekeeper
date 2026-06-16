@@ -232,12 +232,13 @@ Every table surface should answer the same practical questions a real table answ
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
 - [x] Provider Setup is reachable as a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
+- [x] Browser `/guest` previews the active host table and lets guests request an available non-host character seat.
 - [x] Host can copy a same-network Guest Link from Local Table.
-- [x] Waiting-room guests are visible to the host without digging through diagnostics.
+- [x] Waiting-room guests are visible to the host without digging through diagnostics, including requested character seat.
 - [x] Stale waiting-room guests expire instead of lingering as broken seat buttons.
 - [x] Generated Guest Links carry campaign/table/session identity to reject stale/wrong-table joins.
 - [x] Guest snapshots and staged actions reject wrong campaign/table/session identity when supplied.
-- [ ] Run first real two-machine playtest.
+- [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
 - [ ] Add actual party-vote collection and host tie-break flow.
@@ -303,18 +304,18 @@ Every table surface should answer the same practical questions a real table answ
 7. Add AI companions before invite if desired.
 8. Start Local Table.
 9. Copy the Guest Link and send it to the guest.
-10. Copy a Join-As link or specific character invite only when you want to bypass the waiting-room seating flow.
+10. Use Join-As links only as an advanced bypass when you intentionally want a one-click fixed seat.
 
 ### Guest Join Flow
 
-1. Open LoreKeeper on the guest machine and choose Join.
-2. Paste invite link.
-3. Confirm preview shows campaign, party, and public situation without hidden DM notes.
-4. Guest enters table name and character details.
-5. Use Auto-Complete if helpful.
-6. Submit join request.
-7. Host approves.
-8. Confirm guest sees table and can identify their character.
+1. Guest opens the shared `http://host:port/guest` link.
+2. Confirm the waiting room shows the active table, public situation, and available non-host seats.
+3. Guest selects the character seat they want and enters their table name.
+4. Guest clicks Ask To Join.
+5. Host sees the waiting guest and requested seat.
+6. Host seats the guest.
+7. Confirm guest sees table and can identify their character.
+8. Use a fixed Join-As link only if bypassing the waiting room is intentional.
 
 ### First Five-Minute Table Script
 

@@ -1200,6 +1200,8 @@ async function testNewCampaignPreTableJoinerWiring() {
     "table talk should remain at the bottom of the right rail after campaign and player notes",
   );
   assert.match(appShell, /guest-waiting-room-panel/);
+  assert.match(appShell, /guest-table-preview/);
+  assert.match(appShell, /guest-seat-list/);
   assert.match(appShell, /Ask To Join/);
   assert.match(appShell, /home-campaign-select/);
   assert.match(appShell, /Existing Campaign/);
@@ -1224,6 +1226,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /openSelectedHomeCampaign/);
   assert.match(appJs, /renderHomeCampaignPicker/);
   assert.match(appJs, /guestWaitingRoomMode/);
+  assert.match(appJs, /refreshGuestLobbyPreview/);
+  assert.match(appJs, /preferredPartyMemberId/);
   assert.match(appJs, /apiMultiplayerWaitingRegisterUrl/);
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderWaitingGuestCue/);

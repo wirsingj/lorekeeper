@@ -12,6 +12,7 @@ import {
   createWaitingGuestSnapshot,
   disconnectGuest,
   heartbeatWaitingGuest,
+  joinableGuestSeats,
   parseInviteLink,
   postTableTalk,
   registerWaitingGuest,
@@ -37,13 +38,20 @@ assert.equal(campaign.multiplayer.settings.holdGuestActionsForGroupInput, false)
 let waitingResult = registerWaitingGuest(campaign, {
   playerName: "Nora",
   clientId: "waiting-client",
+  preferredPartyMemberId: "lysa",
 });
 campaign = waitingResult.campaign;
 assert.ok(waitingResult.waitingSecret);
 let waitingHostSnapshot = createHostSnapshot(campaign);
 assert.equal(waitingHostSnapshot.waitingGuests.length, 1);
 assert.equal(waitingHostSnapshot.waitingGuests[0].displayName, "Nora");
+assert.equal(waitingHostSnapshot.waitingGuests[0].preferredPartyMemberId, "lysa");
 assert.equal("secret" in waitingHostSnapshot.waitingGuests[0], false);
+const lobbyPreview = createJoinPreview(campaign, "");
+assert.equal(lobbyPreview.invite, null);
+assert.equal(lobbyPreview.joinableSeats.some((seat) => seat.id === "lysa"), true);
+assert.equal(lobbyPreview.joinableSeats.some((seat) => seat.id === "jarin"), false);
+assert.equal(joinableGuestSeats(campaign).some((seat) => seat.id === "lysa"), true);
 const waitingGuestSnapshot = createWaitingGuestSnapshot(campaign, {
   waitingGuestId: waitingResult.waitingGuest.id,
   clientId: "waiting-client",
@@ -110,7 +118,7 @@ campaign = heartbeatResult.campaign;
 assert.equal(heartbeatResult.snapshot.waitingGuest.displayName, "Nora");
 campaign = seatWaitingGuest(campaign, {
   waitingGuestId: waitingResult.waitingGuest.id,
-  partyMemberId: "jarin",
+  partyMemberId: "lysa",
 });
 waitingHostSnapshot = createHostSnapshot(campaign);
 assert.equal(waitingHostSnapshot.waitingGuests.length, 0);
@@ -120,8 +128,8 @@ const seatedStatus = createWaitingGuestSnapshot(campaign, {
   waitingSecret: waitingResult.waitingSecret,
 });
 assert.equal(seatedStatus.seated, true);
-assert.equal(seatedStatus.snapshot.assignedCharacter.id, "jarin");
-assert.equal(campaign.party.find((member) => member.id === "jarin").controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(seatedStatus.snapshot.assignedCharacter.id, "lysa");
+assert.equal(campaign.party.find((member) => member.id === "lysa").controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.throws(
   () => createWaitingGuestSnapshot(campaign, {
     waitingGuestId: waitingResult.waitingGuest.id,
@@ -674,6 +682,12 @@ function testCampaign() {
           "Loyal training partner.",
           { visibility: "dm_only", text: "Secret handler reports on Kevric." },
         ],
+      },
+      {
+        id: "lysa",
+        name: "Lysa",
+        type: "companion",
+        playerRole: "scout",
       },
     ],
     people: [

@@ -131,18 +131,26 @@ function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWa
   if (!container) {
     return;
   }
-  const openParty = party.filter((member) => member.controllerKind !== "remote_player");
+  const openParty = party.filter((member) =>
+    member.controllerKind !== "remote_player" &&
+    member.controllerKind !== "host"
+  );
   container.replaceChildren(
     ...emptyOrRows(
       waitingGuests.map((guest) => {
-        const actions = openParty.slice(0, 3).map((member) => ({
-          label: `Seat as ${member.name}`,
-          onClick: () => seatWaitingGuest?.(guest.id, member.id),
-        }));
+        const preferred = guest.preferredPartyMemberId
+          ? openParty.find((member) => member.id === guest.preferredPartyMemberId)
+          : null;
+        const orderedParty = preferred
+          ? [preferred, ...openParty.filter((member) => member.id !== preferred.id)]
+          : openParty;
         return localTableRow({
           title: guest.displayName || "Guest",
-          subtitle: "waiting for a character seat",
-          actions,
+          subtitle: preferred ? `requested ${preferred.name}` : "waiting for a character seat",
+          actions: orderedParty.slice(0, 3).map((member) => ({
+            label: `Seat as ${member.name}`,
+            onClick: () => seatWaitingGuest?.(guest.id, member.id),
+          })),
         });
       }),
       "No players waiting for seats.",

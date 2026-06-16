@@ -116,6 +116,8 @@ const state = {
   recentGuestSession: loadRecentGuestSession(),
   waitingRoomSession: loadWaitingRoomSession(),
   guestSnapshot: null,
+  guestLobbyPreview: null,
+  selectedGuestSeatId: "",
   guestPollInFlight: false,
   joinPreviewTimer: null,
   autoResolvingCombatInput: false,
@@ -277,6 +279,8 @@ const elements = {
   thinJoinCopy: document.querySelector("#thin-join-copy"),
   guestInvitePanel: document.querySelector("#guest-invite-panel"),
   guestWaitingRoomPanel: document.querySelector("#guest-waiting-room-panel"),
+  guestTablePreview: document.querySelector("#guest-table-preview"),
+  guestSeatList: document.querySelector("#guest-seat-list"),
   guestWaitingPlayerName: document.querySelector("#guest-waiting-player-name"),
   guestWaitingRegister: document.querySelector("#guest-waiting-register"),
   guestWaitingStatus: document.querySelector("#guest-waiting-status"),
@@ -708,6 +712,22 @@ elements.thinJoinSubmit?.addEventListener("click", async () => {
 
 elements.guestWaitingRegister?.addEventListener("click", async () => {
   await registerGuestWaitingRoom();
+});
+
+elements.guestSeatList?.addEventListener("click", (event) => {
+  const button = event.target instanceof Element ? event.target.closest("[data-guest-seat-id]") : null;
+  if (!button) {
+    return;
+  }
+  state.selectedGuestSeatId = button.dataset.guestSeatId || "";
+  renderGuestLobbyPreview();
+  if (elements.guestWaitingStatus) {
+    const seat = state.guestLobbyPreview?.joinableSeats?.find((item) => item.id === state.selectedGuestSeatId);
+    elements.guestWaitingStatus.textContent = seat?.name
+      ? `Requesting a seat as ${seat.name}. Enter your name, then ask to join.`
+      : "Enter your name and ask to join.";
+  }
+  elements.guestWaitingPlayerName?.focus();
 });
 
 elements.thinJoinInviteLink?.addEventListener("input", () => {
@@ -1643,6 +1663,9 @@ async function bootClientMode() {
       loadedInvite ? "waiting" : "idle",
     );
   }
+  if (guestWaitingRoomMode) {
+    await refreshGuestLobbyPreview({ quiet: true }).catch(() => {});
+  }
 
   if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
     try {
@@ -1660,6 +1683,7 @@ async function bootClientMode() {
     await refreshWaitingRoomStatus({ explicit: false }).catch(() => {
       setProviderActivity("Waiting room session expired. Ask to join again.", "waiting");
       clearWaitingRoomSession();
+      render();
     });
     return;
   }
@@ -1715,6 +1739,10 @@ function startMultiplayerPolling() {
       }
       if (guestWaitingRoomMode && state.waitingRoomSession?.waitingGuestId) {
         await refreshWaitingRoomStatus({ explicit: false });
+        return;
+      }
+      if (guestWaitingRoomMode) {
+        await refreshGuestLobbyPreview({ quiet: true }).catch(() => {});
         return;
       }
       if (state.campaign?.multiplayer?.localTable?.running) {
@@ -2983,6 +3011,100 @@ async function requestJoinFromThinPanel() {
   });
 }
 
+async function refreshGuestLobbyPreview({ quiet = false } = {}) {
+  if (!guestWaitingRoomMode) {
+    return null;
+  }
+  try {
+    const hostBaseUrl = window.location.origin;
+    const url = new URL(`${hostBaseUrl}${apiMultiplayerJoinPreviewUrl}`);
+    const campaignId = launchParams.get("campaign") || "";
+    const hasExplicitSession = launchParams.has("session");
+    const tableId = hasExplicitSession ? launchParams.get("table") || "" : "";
+    const sessionId = hasExplicitSession ? launchParams.get("session") || "" : launchParams.get("table") || "";
+    if (campaignId) {
+      url.searchParams.set("campaignId", campaignId);
+    }
+    if (tableId) {
+      url.searchParams.set("tableId", tableId);
+    }
+    if (sessionId) {
+      url.searchParams.set("sessionId", sessionId);
+    }
+    const preview = await fetchJson(url.toString());
+    state.guestLobbyPreview = preview;
+    const seats = preview.joinableSeats ?? [];
+    if (state.selectedGuestSeatId && !seats.some((seat) => seat.id === state.selectedGuestSeatId)) {
+      state.selectedGuestSeatId = "";
+    }
+    renderGuestLobbyPreview();
+    return preview;
+  } catch (error) {
+    state.guestLobbyPreview = {
+      error: error instanceof Error ? error.message : "Could not read the host table.",
+    };
+    renderGuestLobbyPreview();
+    if (!quiet) {
+      setProviderActivity(state.guestLobbyPreview.error, "error");
+    }
+    return null;
+  }
+}
+
+function renderGuestLobbyPreview() {
+  if (!guestWaitingRoomMode) {
+    return;
+  }
+  if (elements.guestTablePreview) {
+    renderJoinPreview(state.guestLobbyPreview, elements.guestTablePreview, {
+      emptyText: "Looking for the host table...",
+      seatHint: false,
+    });
+  }
+  if (!elements.guestSeatList) {
+    return;
+  }
+  const preview = state.guestLobbyPreview;
+  const seats = Array.isArray(preview?.joinableSeats) ? preview.joinableSeats : [];
+  elements.guestSeatList.hidden = false;
+  if (preview?.error) {
+    elements.guestSeatList.replaceChildren();
+    return;
+  }
+  const heading = document.createElement("div");
+  heading.className = "guest-seat-list-heading";
+  heading.textContent = seats.length ? "Choose a character seat to request" : "No open character seats right now";
+  const rows = seats.map((seat) => guestSeatButton(seat));
+  const hint = document.createElement("p");
+  hint.className = "guest-seat-list-hint";
+  hint.textContent = seats.length
+    ? "The host will approve the final seat assignment."
+    : "Ask the host to mark an AI or invite character as available.";
+  elements.guestSeatList.replaceChildren(heading, ...rows, hint);
+}
+
+function guestSeatButton(seat) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "guest-seat-button";
+  button.dataset.guestSeatId = seat.id;
+  button.classList.toggle("selected", state.selectedGuestSeatId === seat.id);
+
+  const title = document.createElement("span");
+  title.className = "guest-seat-name";
+  title.textContent = seat.name || "Unnamed character";
+  const detail = document.createElement("span");
+  detail.className = "guest-seat-detail";
+  detail.textContent = [
+    seat.ancestryClass,
+    seat.playerRole,
+    seat.role,
+    seat.level ? `Level ${seat.level}` : "",
+  ].filter(Boolean).join(" / ") || "Available party member";
+  button.replaceChildren(title, detail);
+  return button;
+}
+
 async function registerGuestWaitingRoom() {
   const playerName = String(elements.guestWaitingPlayerName?.value ?? "").trim();
   if (!playerName) {
@@ -3007,6 +3129,7 @@ async function registerGuestWaitingRoom() {
       campaignId,
       tableId,
       sessionId,
+      preferredPartyMemberId: state.selectedGuestSeatId || "",
     });
     saveWaitingRoomSession({
       hostBaseUrl,
@@ -3016,6 +3139,7 @@ async function registerGuestWaitingRoom() {
       campaignId: result.campaignId || campaignId,
       tableId: result.localTable?.tableId || tableId,
       sessionId: result.localTable?.sessionId || sessionId,
+      preferredPartyMemberId: result.waitingGuest?.preferredPartyMemberId || state.selectedGuestSeatId || "",
       playerName,
       campaignTitle: result.campaignTitle || "",
       status: "waiting",
@@ -3176,7 +3300,7 @@ async function refreshJoinPreview(inviteLink, target = "thin") {
   }
 }
 
-function renderJoinPreview(preview, container) {
+function renderJoinPreview(preview, container, options = {}) {
   if (!container) {
     return;
   }
@@ -3184,7 +3308,7 @@ function renderJoinPreview(preview, container) {
   if (!preview) {
     const empty = document.createElement("p");
     empty.className = "join-preview-empty";
-    empty.textContent = "Paste a host invite link to preview the table.";
+    empty.textContent = options.emptyText || "Paste a host invite link to preview the table.";
     container.replaceChildren(empty);
     return;
   }
@@ -3242,7 +3366,11 @@ function renderJoinPreview(preview, container) {
     ? `Use this to explain how your character knows ${partyNames[0]} or why they are present in this scene.`
     : "Use this context to write why your character is already connected to this situation.";
 
-  container.replaceChildren(title, copy, facts, hint);
+  const children = [title, copy, facts];
+  if (options.seatHint !== false) {
+    children.push(hint);
+  }
+  container.replaceChildren(...children);
 }
 
 function joinPreviewPill(text) {
@@ -5827,10 +5955,24 @@ function chooseHomeFlow(flow) {
 }
 
 function returnToMainMenu() {
+  const wasGuest = Boolean(clientMode || state.guestSession?.hostBaseUrl || state.waitingRoomSession?.waitingGuestId);
+  if (wasGuest) {
+    clearGuestSession({ keepRecent: false });
+    clearWaitingRoomSession();
+    state.guestLobbyPreview = null;
+    state.selectedGuestSeatId = "";
+    state.launchInviteError = "";
+    if (elements.guestWaitingPlayerName) {
+      elements.guestWaitingPlayerName.value = "";
+    }
+  }
   state.homeFlow = "";
   renderHomePanel();
   renderThinJoinPanel();
-  setProviderActivity("Choose Host, Join, or Provider Setup.", "idle");
+  setProviderActivity(
+    wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Host, Join, or Provider Setup.",
+    "idle",
+  );
 }
 
 function renderHomePanel() {
@@ -5941,7 +6083,7 @@ function renderThinJoinPanel() {
     return;
   }
   const connected = state.guestSession?.status === "connected" || state.guestSnapshot?.connection?.status === "connected";
-  const joinFlowActive = clientMode || state.homeFlow === "join";
+  const joinFlowActive = state.homeFlow === "join" || (clientMode && state.homeFlow !== "");
   const show = joinFlowActive && !connected;
   elements.thinJoinPanel.hidden = !show;
   elements.playLog.classList.toggle("play-log-with-join-panel", show);
@@ -5955,13 +6097,18 @@ function renderThinJoinPanel() {
     elements.thinJoinTitle.textContent = guestWaitingRoomMode ? "Guest Waiting Room" : "Join A Hosted Table";
   }
   if (elements.joinBackHome) {
-    elements.joinBackHome.hidden = guestWaitingRoomMode;
+    elements.joinBackHome.hidden = false;
+    elements.joinBackHome.querySelector("span")?.replaceChildren(document.createTextNode(guestWaitingRoomMode ? "Leave" : "Back"));
+    elements.joinBackHome.title = guestWaitingRoomMode ? "Leave this waiting room" : "Back to main menu";
   }
   if (elements.guestWaitingRoomPanel) {
     elements.guestWaitingRoomPanel.hidden = !guestWaitingRoomMode;
   }
   if (elements.guestInvitePanel) {
     elements.guestInvitePanel.hidden = guestWaitingRoomMode;
+  }
+  if (guestWaitingRoomMode) {
+    renderGuestLobbyPreview();
   }
   document.querySelector(".thin-join-character")?.toggleAttribute("hidden", guestWaitingRoomMode);
   document.querySelector(".thin-join-actions")?.toggleAttribute("hidden", guestWaitingRoomMode);
@@ -5971,9 +6118,12 @@ function renderThinJoinPanel() {
       : "Paste the invite link from the host, add your table name, and request a seat.";
   }
   if (elements.guestWaitingStatus && guestWaitingRoomMode) {
+    const selectedSeat = state.guestLobbyPreview?.joinableSeats?.find((seat) => seat.id === state.selectedGuestSeatId);
     elements.guestWaitingStatus.textContent = state.waitingRoomSession?.waitingGuestId
-      ? `Waiting as ${state.waitingRoomSession.playerName || "Guest"}. The host can seat you now.`
-      : "Enter your name and ask to join.";
+      ? `Waiting as ${state.waitingRoomSession.playerName || "Guest"}${selectedSeat?.name ? ` for ${selectedSeat.name}` : ""}. The host can seat you now.`
+      : selectedSeat?.name
+        ? `Requesting a seat as ${selectedSeat.name}. Enter your name, then ask to join.`
+        : "Choose a seat if one is available, then enter your name and ask to join.";
   }
   if (elements.thinJoinStatus) {
     elements.thinJoinStatus.hidden = guestWaitingRoomMode;
@@ -9030,12 +9180,17 @@ function partyControllerActions(member, pendingConnection = null) {
 
   const kind = member.controllerKind || (member.type === "player_character" ? "host" : "ai_companion");
   const actions = [];
-  for (const guest of waitingGuestsForSeating().slice(0, 2)) {
-    actions.push({
-      label: `Seat ${guest.displayName || "Guest"}`,
-      title: `Seat ${guest.displayName || "Guest"} as ${member.name}`,
-      onClick: () => seatWaitingGuestAtTable(guest.id, member.id),
-    });
+  if (kind !== "host") {
+    const waitingGuests = waitingGuestsForSeating()
+      .filter((guest) => !guest.preferredPartyMemberId || guest.preferredPartyMemberId === member.id)
+      .sort((left, right) => Number(right.preferredPartyMemberId === member.id) - Number(left.preferredPartyMemberId === member.id));
+    for (const guest of waitingGuests.slice(0, 2)) {
+      actions.push({
+        label: `Seat ${guest.displayName || "Guest"}`,
+        title: `Seat ${guest.displayName || "Guest"} as ${member.name}`,
+        onClick: () => seatWaitingGuestAtTable(guest.id, member.id),
+      });
+    }
   }
   if (pendingConnection) {
     actions.push({

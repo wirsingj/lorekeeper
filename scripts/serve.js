@@ -371,7 +371,11 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/join-preview" && request.method === "GET") {
       const { campaign } = await loadActiveCampaign(projectRoot);
-      sendJson(response, 200, createJoinPreview(campaign, url.searchParams.get("inviteLink")));
+      sendJson(response, 200, createJoinPreview(campaign, url.searchParams.get("inviteLink"), {
+        campaignId: url.searchParams.get("campaignId") || url.searchParams.get("campaign") || "",
+        tableId: url.searchParams.get("tableId") || url.searchParams.get("table") || "",
+        sessionId: url.searchParams.get("sessionId") || url.searchParams.get("session") || "",
+      }));
       return;
     }
 
@@ -386,6 +390,7 @@ const server = createServer(async (request, response) => {
           tableId: body.tableId,
           sessionId: body.sessionId,
           tableSessionId: body.tableSessionId,
+          preferredPartyMemberId: body.preferredPartyMemberId,
         });
         return { campaign: waitingResult.campaign };
       });
@@ -394,6 +399,7 @@ const server = createServer(async (request, response) => {
           id: waitingResult.waitingGuest.id,
           displayName: waitingResult.waitingGuest.displayName,
           status: waitingResult.waitingGuest.status,
+          preferredPartyMemberId: waitingResult.waitingGuest.preferredPartyMemberId ?? null,
         },
         waitingSecret: waitingResult.waitingSecret,
         campaignTitle: payload.campaign?.title ?? "",
