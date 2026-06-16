@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
+import { createImplicitCombatAdvanceChange, hasResolvedMechanics, submittedCombatTurnText } from "../app/combat-import-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "../app/combat-prompt-repair-controller.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
@@ -889,6 +890,60 @@ function testCombatPromptRepairController() {
     { role: "party", body: "Thor waits." },
     { role: "dm", body: "Latest prompt." },
   ]), "Latest prompt.");
+}
+
+function testCombatImportController() {
+  const campaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  assert.equal(campaign.combat.currentTurnId, "thor");
+
+  const submittedTurn = {
+    playerMessage: "Thor attacks the miner with his axe.",
+    playerInputs: [{ characterId: "thor", text: "Thor attacks the miner with his axe." }],
+  };
+  const resolvedResponse = {
+    sceneStatus: { mode: "combat", awaitingPlayer: false },
+    mechanics: [{ type: "attack", outcome: "hit", roll: "17", damage: "8 slashing damage" }],
+  };
+  assert.equal(submittedCombatTurnText(submittedTurn), "Thor attacks the miner with his axe.\nThor attacks the miner with his axe.");
+  assert.equal(hasResolvedMechanics(resolvedResponse), true);
+
+  const change = createImplicitCombatAdvanceChange({
+    campaign,
+    submittedTurn,
+    turnResponse: resolvedResponse,
+    labelForActor: (_campaign, id) => id === "thor" ? "Thor" : id,
+  });
+  assert.equal(change.data.advanceTurn, true);
+  assert.equal(change.data.resolvedActorId, "thor");
+  assert.equal(change.confidence, "high");
+
+  const narrationOnly = createImplicitCombatAdvanceChange({
+    campaign,
+    submittedTurn,
+    turnResponse: { sceneStatus: { mode: "combat" }, mechanics: [] },
+  });
+  assert.equal(narrationOnly, null, "provider narration alone must not advance initiative");
+
+  const wrongActor = createImplicitCombatAdvanceChange({
+    campaign,
+    submittedTurn: {
+      playerMessage: "Sy attacks.",
+      playerInputs: [{ characterId: "sy", text: "Sy attacks." }],
+    },
+    turnResponse: resolvedResponse,
+  });
+  assert.equal(wrongActor, null, "submitted action must belong to the active combat actor");
+
+  const existingCombatAdvance = createImplicitCombatAdvanceChange({
+    campaign,
+    proposedChanges: [{ domain: "combat", data: { advanceTurn: true, resolvedActorId: "thor" } }],
+    submittedTurn,
+    turnResponse: resolvedResponse,
+  });
+  assert.equal(existingCombatAdvance, null, "implicit advance should not duplicate an explicit combat change");
 }
 
 function testCombatTrackerView() {
@@ -2242,6 +2297,7 @@ function testReviewPanelProjection() {
 
 async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
@@ -2313,6 +2369,10 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /combat-prompt-repair-controller\.js/, "combat prompt repair policy should live outside the main app renderer");
   assert.match(combatPromptRepairController, /promptedCombatActorIdFromTurnResponse/, "combat prompt repair controller should own actor prompt detection");
   assert.doesNotMatch(appJs, /function promptedCombatActorIdFromTurnResponse/, "renderer should not own combat prompt actor detection");
+  assert.match(appJs, /combat-import-controller\.js/, "combat import initiative policy should live outside the main app renderer");
+  assert.match(combatImportController, /function createImplicitCombatAdvanceChange/, "combat import controller should own implicit initiative advancement");
+  assert.match(combatImportController, /!hasResolvedMechanics\(turnResponse\)[\s\S]*return null;/, "implicit combat advancement must require resolved mechanics");
+  assert.doesNotMatch(appJs, /function createImplicitCombatAdvanceChange/, "renderer should not own implicit combat advancement policy");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
@@ -2408,11 +2468,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /choice-vote-action/);
   assert.match(appJs, /Draft leading choice \$\{leadingVote\.label\}/);
   assert.match(appJs, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
-  assert.match(
-    appJs,
-    /function createImplicitCombatAdvanceChange[\s\S]*!hasResolvedMechanics\(turnResponse\)[\s\S]*return null;/,
-    "implicit combat turn advancement must require resolved mechanics, not provider phrasing alone",
-  );
+  assert.match(appJs, /createImplicitCombatAdvanceChange\(\{[\s\S]*campaign: state\.campaign/, "renderer should call the extracted combat import policy with explicit campaign context");
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderWaitingGuestCue/);
   assert.match(appJs, /announceWaitingGuestsIfNeeded/);
@@ -2465,6 +2521,7 @@ testStateEffects();
 testCombatEngine();
 testCombatEndsWhenSideDrops();
 testCombatPromptRepairController();
+testCombatImportController();
 testCombatTrackerView();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();

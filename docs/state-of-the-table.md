@@ -143,11 +143,12 @@ Every table surface should answer the same practical questions a real table answ
 104. Stale combat-prompt repair policy now lives in `combat-prompt-repair-controller.js`, with tests proving DM prompts cannot silently hand initiative to the wrong party actor unless the persisted combat turn is stale and non-party-owned.
 105. RelationshipEngine now normalizes and applies relationship state transitions, so reviewed changes can durably shift relationships through states like neutral, respectful, friendly, loyal, distrustful, fearful, and hostile.
 106. WorldMemoryEngine now normalizes durable faction beliefs/memory and location scars/history, with canonical-change integration so reviewed DM proposals become retrievable world facts.
+107. Implicit combat-turn advancement during provider import now lives in `combat-import-controller.js`, with direct tests proving provider narration alone cannot advance initiative without resolved mechanics for the active actor.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
-2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, provider review auto-commit policy, and stale combat-prompt repair policy are now extracted.
+2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, and implicit combat-advance import policy are now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, and host review summary, but the underlying manual review textarea still exists as a fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
@@ -257,7 +258,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, provider review auto-commit policy, and stale combat-prompt repair policy are extracted; broader provider/import orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, and implicit combat-advance import policy are extracted; broader provider/import orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.

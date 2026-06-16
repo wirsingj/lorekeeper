@@ -16,6 +16,7 @@ import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
+import { createImplicitCombatAdvanceChange } from "./combat-import-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "./combat-prompt-repair-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
@@ -6563,7 +6564,13 @@ async function importProviderResponse(responseText, options = {}) {
     ? createImplicitCombatEnemySyncChange(tableMessages, combatContextChanges, options.data?.turnResponse)
     : null;
   const implicitCombatAdvanceChange = options.autoCommit
-    ? createImplicitCombatAdvanceChange(extraction.proposedChanges, options.data?.turnResponse, options.data?.turn)
+    ? createImplicitCombatAdvanceChange({
+      campaign: state.campaign,
+      proposedChanges: extraction.proposedChanges,
+      turnResponse: options.data?.turnResponse,
+      submittedTurn: options.data?.turn,
+      labelForActor: labelById,
+    })
     : null;
   const actorPromptContextChanges = [
     ...extraction.proposedChanges,
@@ -6799,109 +6806,6 @@ function createImplicitCombatEnemySyncChange(tableMessages = [], proposedChanges
     confidence: hasStructuredCombatSignal(turnResponse) ? "high" : "medium",
     reason: "Keeps the 5E initiative tracker populated when the DM narration names an active hostile but the model omits it from combat state.",
   };
-}
-
-function createImplicitCombatAdvanceChange(proposedChanges = [], turnResponse = null, submittedTurn = null) {
-  const combat = state.campaign?.combat ?? {};
-  if (!combat.inCombat || !combat.currentTurnId) {
-    return null;
-  }
-  const currentTurn = submittedTurn ?? state.currentTurn;
-  const rawTurn = submittedCombatTurnText(currentTurn);
-  if (!rawTurn || isNonResolvingCombatInput(rawTurn)) {
-    return null;
-  }
-  if (!hasResolvedMechanics(turnResponse)) {
-    return null;
-  }
-  const combatChanges = proposedChanges.filter((change) => normalizeChangeDomain(change.domain) === "combat");
-  if (combatChanges.some((change) =>
-    change.data?.advanceTurn ||
-    change.data?.turnResolved ||
-    (change.data?.currentTurnId && change.data.currentTurnId !== combat.currentTurnId) ||
-    (change.data?.activeActorId && change.data.activeActorId !== combat.currentTurnId)
-  )) {
-    return null;
-  }
-  const actorId =
-    currentTurn?.playerInputs?.find((input) => input.characterId)?.characterId ||
-    combat.currentTurnId;
-  if (!actorId || actorId !== combat.currentTurnId) {
-    return null;
-  }
-  if (!isTurnEndingCombatInput(rawTurn, turnResponse)) {
-    return null;
-  }
-  return {
-    operation: "update",
-    domain: "combat",
-    targetId: null,
-    importance: "normal",
-    visibility: "player_visible",
-    summary: `${labelById(state.campaign, actorId)} completed their combat turn.`,
-    data: {
-      inCombat: true,
-      turnResolved: true,
-      advanceTurn: true,
-      resolvedActorId: actorId,
-      lastAction: `${labelById(state.campaign, actorId)}'s combat turn resolved.`,
-    },
-    confidence: turnResponse?.sceneStatus?.mode === "combat" ? "high" : "medium",
-    reason: "Advances the persisted 5E initiative tracker after the active actor's action resolves.",
-  };
-}
-
-function submittedCombatTurnText(turn = {}) {
-  const direct = String(turn?.playerMessage || "").trim();
-  const structured = (turn?.playerInputs ?? [])
-    .map((input) => input?.text)
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  return [direct, structured].filter(Boolean).join("\n").trim();
-}
-
-function isNonResolvingCombatInput(text = "") {
-  const trimmed = String(text ?? "").trim();
-  if (!trimmed) {
-    return true;
-  }
-  if (/^\(DM nudge:/i.test(trimmed) || /^\(?\s*meta\s*:/i.test(trimmed)) {
-    return true;
-  }
-  const words = trimmed.split(/\s+/).filter(Boolean);
-  if (words.length <= 3 && !/\b(attack|attacks|shoot|shot|fire|stab|strike|cast|dash|dodge|disengage|hide|help|ready|release|loose|swing|slash|thrust|charge|flee|retreat)\b/i.test(trimmed)) {
-    return true;
-  }
-  return false;
-}
-
-function isTurnEndingCombatInput(text = "", turnResponse = null) {
-  const normalized = String(text ?? "").toLowerCase();
-  if (/\b(wait|hold|pause|ask|say|tell|call|shout|yell|look|listen|inspect|what|where|why|who|ready\s+to|prepare\s+to)\b/.test(normalized) &&
-      !/\b(attack|attacks|shoot|shot|fire|fires|stab|strike|cast|dash|dodge|disengage|hide|help|release|loose|swing|slash|thrust|charge|grapple|shove|flee|retreat)\b/.test(normalized)) {
-    return false;
-  }
-  if (turnResponse?.sceneStatus?.awaitingPlayer === true && !hasResolvedMechanics(turnResponse)) {
-    return false;
-  }
-  return /\b(attack|attacks|shoot|shot|fire|fires|firing|stab|stabs|strike|strikes|cast|casts|dash|dodge|disengage|hide|help|release|loose|swing|slash|thrust|charge|grapple|shove|heal|drink|use|throw|hurl|flee|retreat)\b/i.test(text) ||
-    hasResolvedMechanics(turnResponse);
-}
-
-function hasResolvedMechanics(turnResponse = null) {
-  return (turnResponse?.mechanics ?? []).some((mechanic) =>
-    mechanic &&
-    mechanic.type !== "none" &&
-    mechanic.outcome !== "pending" &&
-    /\d|roll|damage|healing|hp|hit|miss|success|failure|resource|condition/i.test([
-      mechanic.text,
-      mechanic.roll,
-      mechanic.damage,
-      mechanic.reason,
-      mechanic.outcome,
-    ].filter(Boolean).join(" "))
-  );
 }
 
 function hasStructuredCombatSignal(turnResponse = null) {
