@@ -74,6 +74,7 @@ const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
 const guestWaitingRoomStorageKey = "lorekeeper.guestWaitingRoomSession";
+const waitingGuestHeartbeatTimeoutMs = 20000;
 const debugMetaStorageKey = "lorekeeper.showDebugMeta";
 const rightRailCollapsedStorageKey = "lorekeeper.rightRailCollapsed";
 const defaultCompanionOptions = {
@@ -8914,10 +8915,18 @@ function effectiveMultiplayerState() {
 
 function effectiveWaitingGuests() {
   const snapshotGuests = state.multiplayerSnapshot?.waitingGuests;
-  if (Array.isArray(snapshotGuests)) {
-    return snapshotGuests;
+  const guests = Array.isArray(snapshotGuests)
+    ? snapshotGuests
+    : state.campaign?.multiplayer?.waitingGuests ?? [];
+  return guests.filter(isFreshWaitingGuest);
+}
+
+function isFreshWaitingGuest(guest) {
+  const seenAt = Date.parse(guest?.lastSeenAt || guest?.requestedAt || "");
+  if (!Number.isFinite(seenAt)) {
+    return false;
   }
-  return state.campaign?.multiplayer?.waitingGuests ?? [];
+  return Date.now() - seenAt <= waitingGuestHeartbeatTimeoutMs;
 }
 
 function openCharacterSheet(member) {

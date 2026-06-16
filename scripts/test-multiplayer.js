@@ -11,6 +11,7 @@ import {
   createJoinPreview,
   createWaitingGuestSnapshot,
   disconnectGuest,
+  heartbeatWaitingGuest,
   parseInviteLink,
   postTableTalk,
   registerWaitingGuest,
@@ -21,6 +22,7 @@ import {
   startLocalTable,
   submitGuestAction,
   updateMultiplayerSettings,
+  waitingGuestHeartbeatTimeoutMs,
 } from "../src/multiplayer/local-table.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 
@@ -47,6 +49,28 @@ const waitingGuestSnapshot = createWaitingGuestSnapshot(campaign, {
 });
 assert.equal(waitingGuestSnapshot.seated, false);
 assert.equal(waitingGuestSnapshot.snapshot, null);
+campaign.multiplayer.waitingGuests[0].lastSeenAt = new Date(Date.now() - waitingGuestHeartbeatTimeoutMs - 1000).toISOString();
+assert.equal(createHostSnapshot(campaign).waitingGuests.length, 0);
+assert.throws(
+  () => seatWaitingGuest(campaign, {
+    waitingGuestId: waitingResult.waitingGuest.id,
+    partyMemberId: "jarin",
+  }),
+  /no longer connected/i,
+);
+waitingResult = registerWaitingGuest(campaign, {
+  playerName: "Nora",
+  clientId: "waiting-client",
+});
+campaign = waitingResult.campaign;
+assert.equal(createHostSnapshot(campaign).waitingGuests.length, 1);
+const heartbeatResult = heartbeatWaitingGuest(campaign, {
+  waitingGuestId: waitingResult.waitingGuest.id,
+  clientId: "waiting-client",
+  waitingSecret: waitingResult.waitingSecret,
+});
+campaign = heartbeatResult.campaign;
+assert.equal(heartbeatResult.snapshot.waitingGuest.displayName, "Nora");
 campaign = seatWaitingGuest(campaign, {
   waitingGuestId: waitingResult.waitingGuest.id,
   partyMemberId: "jarin",

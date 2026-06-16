@@ -33,6 +33,7 @@ const defaultMultiplayerSettings = Object.freeze({
   requireGuestActionApproval: false,
   holdGuestActionsForGroupInput: false,
 });
+export const waitingGuestHeartbeatTimeoutMs = 20000;
 const tableStateLimits = Object.freeze({
   party: 24,
   people: 80,
@@ -318,11 +319,36 @@ export function createWaitingGuestSnapshot(campaign, { waitingGuestId, clientId,
   };
 }
 
+export function heartbeatWaitingGuest(campaign, options = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  const waitingGuest = next.multiplayer.waitingGuests.find((guest) => guest.id === options.waitingGuestId);
+  if (!waitingGuest) {
+    throw publicMultiplayerError("Waiting room session expired. Ask the host for the guest link, then click Ask To Join again.", 404);
+  }
+  assertWaitingGuestSecret(waitingGuest, options.waitingSecret);
+  const normalizedClientId = compactLine(options.clientId || "", 120);
+  if (waitingGuest.clientId && normalizedClientId && waitingGuest.clientId !== normalizedClientId) {
+    throw publicMultiplayerError("This waiting room session belongs to a different device.", 403);
+  }
+  if (waitingGuest.status !== "waiting" && waitingGuest.status !== "seated") {
+    throw publicMultiplayerError("This waiting room seat is no longer active. Click Ask To Join again if you still need a seat.", 409);
+  }
+  waitingGuest.lastSeenAt = nowIso();
+  const campaignWithHeartbeat = touchCampaign(next);
+  return {
+    campaign: campaignWithHeartbeat,
+    snapshot: createWaitingGuestSnapshot(campaignWithHeartbeat, options),
+  };
+}
+
 export function seatWaitingGuest(campaign, { waitingGuestId, partyMemberId } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   const waitingGuest = next.multiplayer.waitingGuests.find((guest) => guest.id === waitingGuestId);
   if (!waitingGuest || waitingGuest.status !== "waiting") {
-    throw new Error("Waiting guest not found.");
+    throw publicMultiplayerError("That guest is no longer waiting. Ask them to click Ask To Join again.", 409);
+  }
+  if (!isFreshWaitingGuest(waitingGuest)) {
+    throw publicMultiplayerError(`${waitingGuest.displayName || "That guest"} is no longer connected to the waiting room. Ask them to click Ask To Join again.`, 409);
   }
   const member = next.party.find((item) => item.id === partyMemberId);
   if (!member) {
@@ -901,11 +927,20 @@ export function createHostSnapshot(campaign) {
     connections: normalized.multiplayer.connections.map(publicConnection),
     waitingGuests: normalized.multiplayer.waitingGuests
       .filter((guest) => guest.status === "waiting")
+      .filter((guest) => isFreshWaitingGuest(guest))
       .map(publicWaitingGuest),
     pendingTurnInputs: normalized.multiplayer.pendingTurnInputs,
     tableTalk: normalized.multiplayer.tableTalk.map(publicTableTalkMessage),
     events: normalized.multiplayer.events.slice(-20),
   };
+}
+
+function isFreshWaitingGuest(guest, nowMs = Date.now()) {
+  const seenAt = Date.parse(guest?.lastSeenAt || guest?.requestedAt || "");
+  if (!Number.isFinite(seenAt)) {
+    return false;
+  }
+  return nowMs - seenAt <= waitingGuestHeartbeatTimeoutMs;
 }
 
 export function createGuestSnapshot(campaign, connectionId, options = {}) {

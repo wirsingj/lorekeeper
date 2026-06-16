@@ -279,8 +279,13 @@ function localTableRow({ title, subtitle, actions = [] }) {
   text.textContent = `${title}: ${subtitle}`;
   text.title = `${title}: ${subtitle}`;
   row.append(text);
-  for (const action of actions) {
-    row.append(actionButton(action.label, action.onClick));
+  if (actions.length) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "local-table-row-actions";
+    for (const action of actions) {
+      actionRow.append(actionButton(action.label, action.onClick));
+    }
+    row.append(actionRow);
   }
   return row;
 }

@@ -37,10 +37,10 @@ import {
   createJoinPreview,
   createCharacterRequestInvite,
   createInviteForPartyMember,
-  createWaitingGuestSnapshot,
   denyJoinRequest,
   disconnectGuest,
   firstLanAddress,
+  heartbeatWaitingGuest,
   passGuestAction,
   joinPartyMemberCombat,
   postTableTalk,
@@ -391,12 +391,16 @@ const server = createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/multiplayer/waiting-room/status" && request.method === "GET") {
-      const { campaign } = await loadActiveCampaign(projectRoot);
-      sendJson(response, 200, createWaitingGuestSnapshot(campaign, {
-        waitingGuestId: url.searchParams.get("waitingGuestId"),
-        clientId: url.searchParams.get("clientId"),
-        waitingSecret: url.searchParams.get("waitingSecret"),
-      }));
+      let heartbeatResult = null;
+      await updateActiveCampaign(projectRoot, (campaign) => {
+        heartbeatResult = heartbeatWaitingGuest(campaign, {
+          waitingGuestId: url.searchParams.get("waitingGuestId"),
+          clientId: url.searchParams.get("clientId"),
+          waitingSecret: url.searchParams.get("waitingSecret"),
+        });
+        return { campaign: heartbeatResult.campaign };
+      });
+      sendJson(response, 200, heartbeatResult.snapshot);
       return;
     }
 

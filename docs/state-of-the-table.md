@@ -69,6 +69,7 @@ The user should not feel like they are debugging a model, managing queue machine
 23. Browser guests can open `/guest`, enter a waiting room, and be seated by the host without a packaged client or pasted invite link.
 24. Host Local Table now exposes a copyable Guest Link built from the detected LAN IP and port.
 25. Waiting-room guests now surface from the live host snapshot in Local Table, party seating actions, session health, and the table status strip.
+26. Waiting-room presence now uses guest heartbeat/stale filtering so old guest names do not linger after campaign switches or closed tabs.
 
 ### Still Risky
 
@@ -206,6 +207,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
 - [x] Host can copy a same-network Guest Link from Local Table.
 - [x] Waiting-room guests are visible to the host without digging through diagnostics.
+- [x] Stale waiting-room guests expire instead of lingering as broken seat buttons.
 - [ ] Run first real two-machine playtest.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
