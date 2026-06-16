@@ -91,12 +91,13 @@ Every table surface should answer the same practical questions a real table answ
 40. Server security tests now exercise the API-token authorization decision for public guest routes, protected host routes, unknown API routes, and local assets.
 41. JSON contract fixtures now prove narration-first choice suppression across social, travel, exploration/mystery, downtime, and recovery-like scene beats.
 42. Left rail layout now constrains party/combat records and action rows so long names/buttons wrap locally instead of forcing horizontal panel scroll.
-43. Party-vote panels now give the host a "Use leading choice" action when remote votes have a clear leader.
+43. Party-vote panels give the host a draft action when remote votes have a clear leader.
 44. Live recovery controls now use table-facing labels: Try Again, Details, and Use Anyway instead of Retry/Inspect/Import.
 45. Agency fixtures now cover host-controlled, remote-controlled, unassigned, and AI companion boundaries.
 46. CombatEngine fixtures now cover app-owned Help, Disengage, Hide, and Flee/escape outcomes.
 47. Player Notes now persist into the campaign SQLite snapshot with localStorage migration fallback, while remaining player scratch space rather than DM canon.
 48. Implicit combat turn advancement now requires visible resolved mechanics, so initiative cannot move forward from provider narration/phrasing alone.
+49. Party vote panels now distinguish table leaning from tied votes and make the host action draft the leading choice for final send.
 
 ### Still Risky
 
@@ -104,7 +105,7 @@ Every table surface should answer the same practical questions a real table answ
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
 3. Recovery is more table-shaped in the live status strip, but diagnostics/manual import flows still expose software-shaped concepts.
 4. AI companion approval is still a button/badge flow, not yet a smooth table beat.
-5. Party-vote collection now works for remote guests, and clear leaders can be selected by the host from the panel. Tied votes and final confirmation are still lightweight, without a dedicated tie-break/confirm modal.
+5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
 8. Table Talk has a subtle unread cue, but should still be checked during two-machine play.
@@ -125,7 +126,7 @@ Every table surface should answer the same practical questions a real table answ
 | Player can tell who controls each character. | Improved | Badges/actions exist. Language still needs user testing. |
 | DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, suppression, and obvious output validation help. Needs broader scenario fixtures. |
 | AI companions feel like party members. | Improved | Nudge flow and creation defaults help. Approval flow still needs polish. |
-| DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters exist; explicit host tie-break/confirm polish remains open. |
+| DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters, tie language, and host draft action exist. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, and simple spell saves have coverage. Richer spell/effect rules are still open. |
@@ -145,7 +146,7 @@ Every table surface should answer the same practical questions a real table answ
 
 ### High
 
-4. Finish party-vote host resolution polish: guests can vote from LoreKeeper Join, and the host can see the table's leaning, but ties/confirmation should feel like an explicit table beat.
+4. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
 5. Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
 6. Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
 7. Soak-test and keep strengthening the "what the table is waiting for" surface across real stuck states.
@@ -255,7 +256,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
-- [ ] Add explicit host tie-break/confirm flow for party votes. Current state: vote counters, host-facing vote summary, and "Use leading choice" action exist, but tied votes and final confirmation are still the normal Send Turn path.
+- [x] Add explicit host tie-break/confirm flow for party votes. Current state: vote counters, tie/leader language, and "Draft leading choice" action exist; final confirmation remains the normal Send Turn path.
 - [x] Show party-choice vote counters and let guests switch their vote.
 - [ ] Add disconnect/reconnect/campaign-switch soak tests.
 - [ ] Consider WebSocket/broadcast later after polling semantics are solid.

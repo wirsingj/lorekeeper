@@ -1741,6 +1741,14 @@ button:disabled {
   font-size: 0.74rem;
 }
 
+.choice-vote-leading {
+  color: #dfeee6;
+}
+
+.choice-vote-tied {
+  color: #f0d8b6;
+}
+
 .choice-vote-action {
   justify-self: start;
   margin: 0;

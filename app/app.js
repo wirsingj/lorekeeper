@@ -1278,17 +1278,30 @@ function choiceVoteSummaryText(block = {}) {
   if (!isPartyVoteChoiceBlock(block)) {
     return "";
   }
+  const voteState = choiceVoteState(block);
+  if (!voteState.entries.length) {
+    return "";
+  }
+  const votesText = voteState.entries.map((entry) => `${entry.label}: ${entry.count}`).join(", ");
+  if (voteState.tied) {
+    return `Tie at the table - ${votesText}. Host breaks the tie by choosing any option.`;
+  }
+  return `Table leaning - ${votesText}. Leading: ${voteState.leader.label}.`;
+}
+
+function choiceVoteState(block = {}) {
   const entries = choiceVoteEntries(block).filter((entry) => entry.count > 0);
   if (!entries.length) {
-    return "";
+    return { entries, leaders: [], leader: null, tied: false };
   }
   const maxCount = Math.max(...entries.map((entry) => entry.count));
   const leaders = entries.filter((entry) => entry.count === maxCount);
-  const votesText = entries.map((entry) => `${entry.label}: ${entry.count}`).join(", ");
-  if (leaders.length > 1) {
-    return `Votes - ${votesText}. Tie: host chooses.`;
-  }
-  return `Votes - ${votesText}. Leading: ${leaders[0].label}.`;
+  return {
+    entries,
+    leaders,
+    leader: leaders.length === 1 ? leaders[0] : null,
+    tied: leaders.length > 1,
+  };
 }
 
 function choiceVoteEntries(block = {}) {
@@ -1308,13 +1321,7 @@ function leadingChoiceVoteEntry(block = {}) {
   if (!isPartyVoteChoiceBlock(block) || isRemoteTableClient()) {
     return null;
   }
-  const entries = choiceVoteEntries(block).filter((entry) => entry.count > 0);
-  if (!entries.length) {
-    return null;
-  }
-  const maxCount = Math.max(...entries.map((entry) => entry.count));
-  const leaders = entries.filter((entry) => entry.count === maxCount);
-  return leaders.length === 1 ? leaders[0] : null;
+  return choiceVoteState(block).leader;
 }
 
 function currentGuestVoteForChoice(block = {}) {
@@ -10428,7 +10435,10 @@ function messageBodyElements(text, role = "dm", data = {}) {
       const voteSummaryText = choiceVoteSummaryText(block);
       if (voteSummaryText) {
         const voteSummary = document.createElement("small");
-        voteSummary.className = "choice-vote-summary";
+        voteSummary.className = [
+          "choice-vote-summary",
+          choiceVoteState(block).tied ? "choice-vote-tied" : "choice-vote-leading",
+        ].join(" ");
         voteSummary.textContent = voteSummaryText;
         panel.append(voteSummary);
       }
@@ -10437,7 +10447,8 @@ function messageBodyElements(text, role = "dm", data = {}) {
         const voteAction = document.createElement("button");
         voteAction.type = "button";
         voteAction.className = "mini-action choice-vote-action";
-        voteAction.textContent = `Use leading choice ${leadingVote.label}`;
+        voteAction.textContent = `Draft leading choice ${leadingVote.label}`;
+        voteAction.title = "Draft the table's leading vote; send it when the host is ready.";
         voteAction.addEventListener("click", () => chooseVisibleOption(block, leadingVote.index));
         panel.append(voteAction);
       }
