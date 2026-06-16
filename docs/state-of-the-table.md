@@ -133,6 +133,7 @@ Every table surface should answer the same practical questions a real table answ
 82. SQLite schema validation now goes through a versioned migration module; current schema passes as `current`, and unsupported old/new versions fail loudly with a migration-path error.
 83. Imported bundle assets are copied into `data/assets/<campaign>/...` when loaded, and campaign asset records point at the app-owned copy while preserving the original source path.
 84. Agency validation fixtures now cover cinematic body-language overreach for remote PCs, such as a model tightening Mira's grip or leaning her into action without submitted input, while still allowing hostile NPC focus on her.
+85. Local multiplayer regression coverage now includes stale guest snapshot/action rejection after host campaign switch, in addition to disconnect, reconnect, stale table, and stale session cases.
 
 ### Still Risky
 
@@ -304,7 +305,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add explicit host tie-break/confirm flow for party votes. Current state: vote counters, tie/leader language, and "Draft leading choice" action exist; final confirmation remains the normal Send Turn path.
 - [x] Show party-choice vote counters and let guests switch their vote.
 - [x] Add stale-session reconnect regression for guest snapshots after host table restart.
-- [ ] Add disconnect/reconnect/campaign-switch soak tests.
+- [x] Add disconnect/reconnect/campaign-switch soak tests. Current state: deterministic local regression coverage exists; real two-machine soak remains tracked separately.
 - [ ] Consider WebSocket/broadcast later after polling semantics are solid.
 
 ### Character Creation

@@ -301,6 +301,37 @@ assert.throws(
   /session is no longer active/i,
 );
 
+let switchedCampaign = testCampaign();
+switchedCampaign = {
+  ...switchedCampaign,
+  id: "campaign-after-switch",
+  title: "Campaign After Switch",
+};
+switchedCampaign = startLocalTable(switchedCampaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7348 });
+assert.throws(
+  () => createGuestSnapshot(switchedCampaign, connected.id, {
+    clientId: "guest-client",
+    connectionSecret,
+    campaignId: campaign.id,
+    tableId: campaign.multiplayer.localTable.tableId,
+    sessionId: campaign.multiplayer.localTable.sessionId,
+  }),
+  /different campaign/i,
+);
+assert.throws(
+  () => submitGuestAction(switchedCampaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
+    characterId: "kevric",
+    text: "Kevric acts from a campaign that is no longer selected.",
+    campaignId: campaign.id,
+    tableId: campaign.multiplayer.localTable.tableId,
+    sessionId: campaign.multiplayer.localTable.sessionId,
+  }),
+  /different campaign/i,
+);
+
 const driftedCampaign = JSON.parse(JSON.stringify(campaign));
 driftedCampaign.party = driftedCampaign.party.map((member) => member.id === "kevric"
   ? {
