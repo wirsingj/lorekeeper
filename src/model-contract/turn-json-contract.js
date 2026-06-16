@@ -3,7 +3,7 @@ import { compactHiddenStoryThreads } from "../context-packs/story-threads.js";
 const REQUEST_TYPE = "lorekeeper.turn.request";
 const RESPONSE_TYPE = "lorekeeper.turn.response";
 const SCHEMA_VERSION = 1;
-const CONTROLLED_ACTOR_ACTION_VERBS = "(?:says?|asks?|replies?|answers?|shouts?|whispers?|signals?|gestures?|nods?|steps?|moves?|backs?|runs?|draws?|readies?|raises?|attacks?|strikes?|shoots?|casts?|touches?|grabs?|throws?|scans?|searches?|notices?|realizes?|thinks?|decides?|chooses?|insists?|refuses?)";
+const CONTROLLED_ACTOR_ACTION_VERBS = "(?:says?|asks?|replies?|answers?|shouts?|whispers?|signals?|gestures?|nods?|steps?|moves?|backs?|runs?|draws?|readies?|raises?|attacks?|strikes?|shoots?|casts?|touches?|grabs?|throws?|scans?|searches?|notices?|realizes?|thinks?|decides?|chooses?|insists?|refuses?|tightens?|tenses?|leans?|crouches?|flinches?|watches?|prepares?)";
 
 const allowedActionIntents = new Set([
   "combat_action",

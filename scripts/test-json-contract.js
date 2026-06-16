@@ -932,6 +932,17 @@ const neutralRemotePresenceNarration = validTurnResponse({
 });
 assert.equal(validateTurnResponse(neutralRemotePresenceNarration, { request: remoteAgencyRequest }).valid, true);
 
+const remoteBodyLanguageOverreach = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "The guard spits in the dust. Mira's grip tightens on her spear and she leans forward, ready to spring." }],
+});
+assert.equal(validateTurnResponse(remoteBodyLanguageOverreach, { request: remoteAgencyRequest }).valid, false);
+assert.match(validateTurnResponse(remoteBodyLanguageOverreach, { request: remoteAgencyRequest }).errors.join(" "), /Mira/);
+
+const hostileFocusOnRemoteCharacter = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "The guard's eyes flick to Mira before returning to Jarin. The threat is aimed at the whole group, but nobody has committed to violence yet." }],
+});
+assert.equal(validateTurnResponse(hostileFocusOnRemoteCharacter, { request: remoteAgencyRequest }).valid, true);
+
 const remoteSpeakerWithoutInput = validTurnResponse({
   table: [{ speaker: "Mira", speakerId: "mira", role: "party", kind: "dialogue", visibility: "table", text: "Back away from him." }],
 });
