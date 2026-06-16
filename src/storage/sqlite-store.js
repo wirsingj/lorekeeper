@@ -5,10 +5,14 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeCampaign, validateCampaign } from "../campaign-state/schema.js";
+import {
+  migrateSqliteSchema,
+  SQLITE_SCHEMA_VERSION,
+  SQLITE_USER_VERSION,
+} from "./sqlite-migrations.js";
 
 const schemaPath = fileURLToPath(new URL("./sqlite-schema.sql", import.meta.url));
-export const SQLITE_SCHEMA_VERSION = "2.0.0";
-export const SQLITE_USER_VERSION = 2000000;
+export { SQLITE_SCHEMA_VERSION, SQLITE_USER_VERSION };
 
 export async function createSqliteDatabaseForCampaign(campaign) {
   const errors = validateCampaign(campaign);
@@ -722,16 +726,7 @@ function insertMetadata(db, key, value, now) {
 }
 
 function assertSqliteSchema2(db) {
-  const metadata = tableExists(db, "metadata")
-    ? Object.fromEntries(queryRows(db, "SELECT key, value FROM metadata").map((row) => [row.key, row.value]))
-    : {};
-  if (metadata["lorekeeper.sqlite_schema"] !== SQLITE_SCHEMA_VERSION) {
-    throw new Error(`Unsupported SQLite schema: ${metadata["lorekeeper.sqlite_schema"] || "missing"}. Expected ${SQLITE_SCHEMA_VERSION}.`);
-  }
-  const userVersion = firstRow(db, "PRAGMA user_version")?.user_version;
-  if (Number(userVersion) !== SQLITE_USER_VERSION) {
-    throw new Error(`Unsupported SQLite user_version: ${userVersion ?? "missing"}. Expected ${SQLITE_USER_VERSION}.`);
-  }
+  migrateSqliteSchema(db);
 }
 
 function sha256(value) {

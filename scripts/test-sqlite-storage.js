@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import initSqlJs from "sql.js";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
 import {
   createNewActiveCampaign,
@@ -21,6 +22,7 @@ import {
   SQLITE_USER_VERSION,
   writeCampaignSqliteFile,
 } from "../src/storage/sqlite-store.js";
+import { migrateSqliteSchema, readSqliteSchemaIdentity } from "../src/storage/sqlite-migrations.js";
 
 const tempDir = await mkdtemp(path.join(tmpdir(), "lorekeeper-sqlite-"));
 
@@ -189,6 +191,30 @@ try {
   assert.equal(errorsAfterRewrite[0].message, "Qwen returned an empty table response.");
   const summaryAfterRewrite = await readCampaignSqliteSummary(sqlitePath);
   assert.equal(summaryAfterRewrite.engineCounts.errors, 1);
+
+  const SQL = await initSqlJs();
+  const currentDb = new SQL.Database(await readFile(sqlitePath));
+  try {
+    const identity = readSqliteSchemaIdentity(currentDb);
+    assert.equal(identity.schemaVersion, SQLITE_SCHEMA_VERSION);
+    assert.equal(identity.userVersion, SQLITE_USER_VERSION);
+    assert.equal(migrateSqliteSchema(currentDb).status, "current");
+  } finally {
+    currentDb.close();
+  }
+
+  const unsupportedPath = path.join(tempDir, "unsupported-user-version.lorekeeper.sqlite");
+  const unsupportedDb = new SQL.Database(await readFile(sqlitePath));
+  try {
+    unsupportedDb.run("PRAGMA user_version = 1000000");
+    await writeFile(unsupportedPath, unsupportedDb.export());
+  } finally {
+    unsupportedDb.close();
+  }
+  await assert.rejects(
+    () => readCampaignFromSqliteFile(unsupportedPath),
+    /No migration path is registered/,
+  );
 
   const longCampaign = createLongCampaignFixture();
   const longCampaignPath = path.join(tempDir, "long-campaign.lorekeeper.sqlite");

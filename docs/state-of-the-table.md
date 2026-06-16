@@ -130,11 +130,12 @@ Every table surface should answer the same practical questions a real table answ
 79. Provider import outcome copy now comes from a small controller instead of branching inside `app.js`, keeping another recovery/import decision out of the renderer.
 80. Raw diagnostics are now tucked behind a Raw Details disclosure so table-facing health/review summaries are the first thing hosts see.
 81. Latest-provider-response empty/unchanged/duplicate/import decisions now live in `provider-import-controller.js` with direct tests instead of branching inside `app.js`.
+82. SQLite schema validation now goes through a versioned migration module; current schema passes as `current`, and unsupported old/new versions fail loudly with a migration-path error.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches are now rejected.
-2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions, and provider import outcome copy are now extracted.
+2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions, provider import outcome copy, and latest-response import gating are now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, and host review summary, but the underlying manual review textarea still exists as a fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
@@ -149,6 +150,7 @@ Every table surface should answer the same practical questions a real table answ
 14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
 15. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 16. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
+17. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
 
 ## Live Acceptance Matrix
 
@@ -347,7 +349,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
-- [ ] Add migration modules before public release.
+- [x] Add migration modules before public release. Current state: versioned runner exists and unsupported schema/user_version combinations fail loudly; future schema changes still need explicit migration entries.
 - [x] Add backup/export/recycle story before destructive delete in release builds. Current state: delete recycles SQLite files to `data/campaigns/.deleted`; restore UI remains future polish.
 - [ ] Move imported assets into app-owned portable asset storage.
 
