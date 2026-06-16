@@ -147,14 +147,14 @@ export function LorekeeperShell() {
           <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
             <span id="provider-activity-label">Table ready.</span>
             <div className="provider-activity-actions">
-              <button id="repair-retry" className="mini-action" type="button" title="Ask the DM to try the failed response again" hidden>
-                Retry
+              <button id="repair-retry" className="mini-action" type="button" title="Ask the DM to try the response again" hidden>
+                Try Again
               </button>
-              <button id="repair-inspect" className="mini-action" type="button" title="Open diagnostics and timeline for what happened" hidden>
-                Inspect
+              <button id="repair-inspect" className="mini-action" type="button" title="Open details and timeline for what happened" hidden>
+                Details
               </button>
               <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Use this DM response even though it needs review" hidden>
-                Import
+                Use Anyway
               </button>
               <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel the DM response in progress" hidden>
                 Cancel

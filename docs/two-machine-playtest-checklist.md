@@ -61,8 +61,9 @@ Goal: make the session feel like a small real D&D table. The host runs LoreKeepe
 1. If the DM response fails, do not immediately retry silently.
 2. Confirm the Waiting For strip says the DM response needs review.
 3. Confirm the original player/guest input remains visible as staged or submitted.
-4. Use Retry first.
-5. Use Import only if the narration is acceptable and you understand the risk.
+4. Use Try Again first.
+5. Use Details if you need to inspect what happened.
+6. Use Use Anyway only if the narration is acceptable and you understand the risk.
 
 ## Stop Conditions
 

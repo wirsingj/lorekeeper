@@ -24,7 +24,7 @@ Raw provider/app details remain available in diagnostics and in status tooltips.
 | Send turn | Host/player submits input | TurnEngine/App shell | "Turn submitted; DM is resolving it." |
 | Provider generation | Local/bridge provider starts | ProviderOrchestrator | "DM is thinking..." |
 | Cancel | User cancels active generation | TurnEngine | "DM response canceled." |
-| Retry | User retries failed/repaired turn | TurnEngine | "DM is reconsidering the response..." |
+| Try Again | User retries failed/reviewed turn | TurnEngine | "DM is reconsidering the response..." |
 | Repair required | Provider output fails contract | TurnEngine/App shell | "DM response needs review." |
 | Auto resume | Last player action has no DM response | App recovery layer | "Recovering unresolved turn..." |
 | Enemy turn | Active combat actor is enemy | Combat/Turn automation | "DM resolving enemy actions..." |
@@ -51,7 +51,7 @@ Raw provider/app details remain available in diagnostics and in status tooltips.
   - "DM failed"
 - Patched submitted player echoes after provider completion/failure so a message no longer sits on the table with no explanation.
 - Fixed the local provider orchestrator to accept structured-only remote/guest inputs, not only direct text.
-- Added a readable table timeline summary to Settings diagnostics so Inspect shows recent table-facing events before raw JSON.
+- Added a readable table timeline summary to Settings diagnostics so Details shows recent table-facing events before raw JSON.
 
 ## Remaining Work
 

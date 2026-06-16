@@ -1211,6 +1211,9 @@ async function testNewCampaignPreTableJoinerWiring() {
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
     "table status strip should live above the play log",
   );
+  assert.match(appShell, /Try Again/);
+  assert.match(appShell, /Details/);
+  assert.match(appShell, /Use Anyway/);
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
@@ -1250,6 +1253,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited player/);
   assert.match(appJs, /renderDebugMetaControl/);
+  assert.match(appJs, /DM response needs review\. Try Again, Details, or Use Anyway\./);
+  assert.match(appJs, /DM is reconsidering the response/);
   assert.match(appJs, /launchInviteLink/);
   assert.match(appJs, /applyLaunchInviteLink/);
   assert.match(appJs, /clearGuestSession\(\{\s*keepRecent:\s*false\s*\}\)/);

@@ -1365,8 +1365,8 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
     return { providerReceived: false, reason: "busy" };
   }
   if (activeTurnRepair() && !options.allowDuringRepair) {
-    elements.bridgeStatus.textContent = "Resolve the model repair before sending another turn.";
-    setProviderActivity("Repair needed before the next turn. Inspect, Retry, or Import.", "error");
+    elements.bridgeStatus.textContent = "Review the DM response before sending another turn.";
+    setProviderActivity("DM response needs review. Try Again, Details, or Use Anyway.", "error");
     return { providerReceived: false, reason: "repair_required" };
   }
   const approvedPartyInputs = options.playerInputs ? [] : collectApprovedPartyInputs();
@@ -7777,8 +7777,8 @@ function setTurnRepair(repair) {
   const savedRepair = state.turnFlow.setRepair(repair);
   pushDiagnosticsEvent("turn_repair_required", summarizeTurnRepair(savedRepair));
   const reason = compactUiText(savedRepair.reason || "model response failed the JSON contract", 180);
-  elements.bridgeStatus.textContent = `Model response needs repair: ${reason}`;
-  setProviderActivity(`Needs repair - ${reason}. Inspect or retry.`, "error");
+  elements.bridgeStatus.textContent = `DM response needs review: ${reason}`;
+  setProviderActivity(`DM response needs review - ${reason}. Try Again, Details, or Use Anyway.`, "error");
   updateNudgeAvailability();
   render();
 }
@@ -7805,10 +7805,10 @@ function cleanMessageMeta(value) {
 async function retryTurnRepair() {
   const repair = activeTurnRepair();
   if (!repair?.turn) {
-    setProviderActivity("No repairable turn is available", "error");
+    setProviderActivity("No DM response is available to try again", "error");
     return;
   }
-  setProviderActivity("Retrying with strict JSON contract...", "working");
+  setProviderActivity("DM is reconsidering the response...", "working");
   state.turnFlow.retryLastTurn();
   updateTurnRepairControls();
   updateNudgeAvailability();
@@ -7823,23 +7823,23 @@ async function inspectTurnRepair() {
     elements.setupDialog.showModal();
   }
   await refreshDiagnostics();
-  setProviderActivity("Repair details are open in Settings diagnostics", "waiting");
+  setProviderActivity("DM response details are open in Settings diagnostics", "waiting");
 }
 
 async function importTurnRepairAnyway() {
   const repair = activeTurnRepair();
   if (!repair?.responseText) {
-    setProviderActivity("No rejected response text is available", "error");
+    setProviderActivity("No reviewed DM response text is available", "error");
     return;
   }
 
   const confirmed = await confirmInApp({
-    title: "Import Invalid Response?",
-    message: "This model response failed the LoreKeeper JSON contract. Importing it may add bad choices or stale state. Use this only when the visible text is worth keeping.",
-    acceptLabel: "Import Anyway",
+    title: "Use This DM Response?",
+    message: "This DM response needs review and may include bad choices or stale state. Use it only when the visible table text is worth keeping.",
+    acceptLabel: "Use Anyway",
   });
   if (!confirmed) {
-    setProviderActivity("Invalid response import canceled", "waiting");
+    setProviderActivity("DM response kept for review", "waiting");
     return;
   }
 
@@ -8144,7 +8144,7 @@ function buildSessionHealthSummary() {
   }
 
   if (repair) {
-    lines.push("A DM response needs recovery. Use Retry, Inspect, or Import from the table status strip.");
+    lines.push("A DM response needs review. Use Try Again, Details, or Use Anyway from the table status strip.");
   }
 
   if (combat?.inCombat) {
@@ -8410,7 +8410,7 @@ function updateNudgeAvailability() {
   const projection = turnProjection();
   elements.nudgeDm.disabled = clientMode || isRemoteTableClient() || !projection.canNudge || !state.campaign;
   elements.nudgeDm.title = projection.hasRepair
-    ? "Resolve the model repair first"
+    ? "Review the DM response first"
     : projection.hasActiveGeneration
       ? "DM is already generating"
       : isRemoteTableClient()

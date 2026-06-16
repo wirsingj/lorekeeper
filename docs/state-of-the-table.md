@@ -92,12 +92,13 @@ Every table surface should answer the same practical questions a real table answ
 41. JSON contract fixtures now prove narration-first choice suppression across social, travel, exploration/mystery, downtime, and recovery-like scene beats.
 42. Left rail layout now constrains party/combat records and action rows so long names/buttons wrap locally instead of forcing horizontal panel scroll.
 43. Party-vote panels now give the host a "Use leading choice" action when remote votes have a clear leader.
+44. Live recovery controls now use table-facing labels: Try Again, Details, and Use Anyway instead of Retry/Inspect/Import.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some repair/import paths.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
-3. Repair/retry/import still exposes some software-shaped concepts.
+3. Recovery is more table-shaped in the live status strip, but diagnostics/manual import flows still expose software-shaped concepts.
 4. AI companion approval is still a button/badge flow, not yet a smooth table beat.
 5. Party-vote collection now works for remote guests, and clear leaders can be selected by the host from the panel. Tied votes and final confirmation are still lightweight, without a dedicated tie-break/confirm modal.
 6. Local multiplayer still needs longer two-machine soak testing.
@@ -192,7 +193,8 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [ ] Make repair retry lifecycle as table-shaped as auto-resume.
 - [ ] Move remaining recovery/import decisions out of `app/app.js`.
-- [ ] Replace remaining technical wording in repair/import controls.
+- [x] Replace technical wording in live recovery controls.
+- [ ] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [ ] Ensure every stuck state answers who is waiting and what the host can do next.
 
 ### Combat
