@@ -138,6 +138,7 @@ Every table surface should answer the same practical questions a real table answ
 87. Host New now has an Add Party Set action that creates three related AI companion cards from the primary character/draft party theme for quick "four dwarf soldiers" style setup.
 88. Generated 5E-lite sheets now include class-appropriate equipment/inventory and structured spell metadata, while context packs and sheet text areas render those details as readable names.
 89. Provider review auto-commit policy now lives in `provider-import-controller.js`, including hidden story-arc auto-approval and major/invalid/rejected change blocking.
+90. Agency validation now catches subtle remote-PC resolve/body-language overreach from play logs, including "doesn't back down" and eyes/grip locking into action without submitted input.
 
 ### Still Risky
 
@@ -279,7 +280,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Make AI companion suggestions appear as approve/resolve/decline table beats.
 - [x] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
 - [x] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
-- [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration. Current state: neutral presence, hostile focus, host-name-as-object, and remote-PC body-language overreach fixtures are covered.
+- [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration. Current state: neutral presence, hostile focus, host-name-as-object, remote-PC body-language overreach, and "doesn't back down" resolve-overreach fixtures are covered.
 - [x] Let host choose host/AI/unassigned during additional character creation.
 
 ### Multiplayer And LoreKeeper Join

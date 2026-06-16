@@ -943,6 +943,12 @@ const hostileFocusOnRemoteCharacter = validTurnResponse({
 });
 assert.equal(validateTurnResponse(hostileFocusOnRemoteCharacter, { request: remoteAgencyRequest }).valid, true);
 
+const remoteResolveOverreach = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "The guard leans closer. Mira doesn't back down, her eyes locked on his as her hand tightens around the spear." }],
+});
+assert.equal(validateTurnResponse(remoteResolveOverreach, { request: remoteAgencyRequest }).valid, false);
+assert.match(validateTurnResponse(remoteResolveOverreach, { request: remoteAgencyRequest }).errors.join(" "), /Mira/);
+
 const remoteSpeakerWithoutInput = validTurnResponse({
   table: [{ speaker: "Mira", speakerId: "mira", role: "party", kind: "dialogue", visibility: "table", text: "Back away from him." }],
 });
