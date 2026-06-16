@@ -8146,6 +8146,22 @@ function buildSessionHealthSummary() {
   const reviewCount = state.reviewBatch?.proposals?.filter((proposal) => proposal.status !== "committed")?.length ?? 0;
   const tableRunning = Boolean(multiplayer.localTable?.running);
   const providerSettings = currentProviderSettings();
+  const nextStepLine = sessionNextStepLine({
+    providerState,
+    providerText,
+    repair,
+    combat,
+    activeCombatant,
+    readyInputs,
+    waitingInputs,
+    pendingGuests,
+    waitingGuests,
+    reviewCount,
+    multiplayerSettings,
+    guestPendingInput,
+    tableRunning,
+    campaign,
+  });
 
   if (providerState === "working") {
     lines.push(providerText ? `DM is working: ${providerText}` : "DM is working on the next table beat.");
@@ -8157,6 +8173,10 @@ function buildSessionHealthSummary() {
 
   if (repair) {
     lines.push("A DM response needs review. Use Try Again, Details, or Use Anyway from the table status strip.");
+  }
+
+  if (nextStepLine) {
+    lines.push(nextStepLine);
   }
 
   if (combat?.inCombat) {
@@ -8227,6 +8247,93 @@ function buildSessionHealthSummary() {
     tone,
     lines: lines.length ? lines : ["No blockers detected."],
   };
+}
+
+function sessionNextStepLine({
+  providerState,
+  repair,
+  combat,
+  activeCombatant,
+  readyInputs = [],
+  waitingInputs = [],
+  pendingGuests = [],
+  waitingGuests = [],
+  reviewCount = 0,
+  multiplayerSettings = {},
+  guestPendingInput,
+  tableRunning,
+  campaign,
+}) {
+  if (repair) {
+    return "Next: host chooses Try Again, Details, or Use Anyway.";
+  }
+  if (providerState === "working") {
+    return "Next: wait for the DM response; new turns are locked until it lands.";
+  }
+  if (providerState === "error") {
+    return "Next: host reviews the DM response or retries from the status strip.";
+  }
+  if (clientMode || state.guestSession?.hostBaseUrl) {
+    if (guestPendingInput?.passed || guestPendingInput?.text) {
+      return "Next: wait for the host table to resolve your input.";
+    }
+    if (!state.guestSession?.connectionId) {
+      return "Next: choose a table seat and ask the host to let you in.";
+    }
+  }
+  if (pendingGuests.length) {
+    return pendingGuests.length === 1
+      ? `Next: host approves or declines ${pendingGuests[0].displayName || "the guest"} from Local Table.`
+      : "Next: host approves or declines guest requests from Local Table.";
+  }
+  if (waitingGuests.length) {
+    return waitingGuests.length === 1
+      ? `Next: host seats ${waitingGuests[0].displayName || "the guest"} from Local Table.`
+      : "Next: host seats waiting guests from Local Table.";
+  }
+  if (readyInputs.length) {
+    if (multiplayerSettings.requireGuestActionApproval) {
+      return "Next: host approves the staged guest action or asks for changes.";
+    }
+    if (multiplayerSettings.holdGuestActionsForGroupInput) {
+      return "Next: host adds the group turn or presses Resolve Inputs.";
+    }
+    return "Next: host presses Resolve Inputs when ready for the DM.";
+  }
+  if (waitingInputs.length) {
+    return `Next: wait for ${inputNames(waitingInputs)} to finish that table input.`;
+  }
+  if (reviewCount) {
+    return "Next: host reviews or saves the proposed table changes.";
+  }
+  if (combat?.inCombat && activeCombatant) {
+    return combatNextStepLine(campaign, activeCombatant);
+  }
+  if (!tableRunning && !(clientMode || state.guestSession?.hostBaseUrl)) {
+    return "Next: start Local Table when you are ready to invite players.";
+  }
+  return "";
+}
+
+function combatNextStepLine(campaign, activeCombatant) {
+  if (!activeCombatant) {
+    return "";
+  }
+  if (activeCombatant.type === "enemy") {
+    return `Next: DM resolves ${activeCombatant.name}'s turn.`;
+  }
+  const member = (campaign?.party ?? []).find((item) => item.id === activeCombatant.id);
+  const controller = partyControllerKind(member);
+  if (controller === "remote_player") {
+    return `Next: wait for ${activeCombatant.name}'s player to send a combat action.`;
+  }
+  if (controller === "ai_companion") {
+    return `Next: host nudges or resolves ${activeCombatant.name}'s companion turn.`;
+  }
+  if (controller === "unassigned") {
+    return `Next: host assigns or controls ${activeCombatant.name}'s combat turn.`;
+  }
+  return `Next: host sends ${activeCombatant.name}'s combat choice.`;
 }
 
 function pendingReadyInputSummary(inputs = [], settings = {}) {

@@ -104,6 +104,7 @@ Every table surface should answer the same practical questions a real table answ
 53. CombatEngine fixtures now cover chase positioning, intimidation contests, readied reactions, concentration conditions, healing spells, and half-damage-on-save spells.
 54. AI companion nudge beats can now be staged, passed, or resolved immediately as structured companion input.
 55. Diagnostics/manual review labels now say Table Diagnostics, Copy Details, and Review DM Response instead of exposing JSON/import/state-sync language during ordinary recovery.
+56. Session health now prioritizes a `Next:` line for stuck/waiting states, including repair, provider wait, guest seating/approval, queued guest input, combat ownership, and companion combat turns.
 
 ### Still Risky
 
@@ -206,7 +207,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Move remaining recovery/import decisions out of `app/app.js`.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
-- [ ] Ensure every stuck state answers who is waiting and what the host can do next.
+- [x] Ensure every stuck state answers who is waiting and what the host can do next.
 
 ### Combat
 
