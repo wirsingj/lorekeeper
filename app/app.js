@@ -22,6 +22,7 @@ import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-format
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
+import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 import { turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "./turn-repair-controller.js";
@@ -1501,16 +1502,11 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
     ? await runPromptThroughLocalProvider(state.currentTurn)
     : await runPromptThroughSidecar(state.prompt);
   await updatePlayerTurnEchoLifecycle(playerEchoMessageId, runResult);
-  if (runResult?.imported && approvedPartyInputs.length) {
-    await markApprovedPartyInputsSubmitted(approvedPartyInputs);
-  } else if (!runResult?.imported && approvedPartyInputs.length) {
-    await markApprovedPartyInputsStillStaged(approvedPartyInputs, runResult);
-  }
-  if (runResult?.imported && stagedRemoteInputs.length) {
-    await clearSubmittedRemoteInputs(stagedRemoteInputs);
-  } else if (!runResult?.imported && stagedRemoteInputs.length) {
-    await markRemoteInputsStillStaged(stagedRemoteInputs, runResult);
-  }
+  await applyStagedInputRecoveryPlan(buildStagedInputRecoveryPlan({
+    runResult,
+    approvedPartyInputs,
+    stagedRemoteInputs,
+  }), runResult);
   if (runResult?.providerReceived && !options.preserveInput) {
     elements.playerInput.value = "";
   } else if (!runResult?.providerReceived && !options.preserveInput && !elements.playerInput.value.trim()) {
@@ -1753,6 +1749,36 @@ async function dropPendingRemoteInput(inputId) {
   seedPlayLog();
   setProviderActivity("Staged guest action dropped", "idle");
   render();
+}
+
+async function applyStagedInputRecoveryPlan(plan, runResult = {}) {
+  if (plan?.approvedParty?.hasInputs) {
+    if (plan.approvedParty.action === stagedInputRecoveryActions.MARK_SUBMITTED) {
+      await markApprovedPartyInputsSubmitted(plan.approvedParty.inputs);
+    } else if (plan.approvedParty.action === stagedInputRecoveryActions.KEEP_STAGED) {
+      await markApprovedPartyInputsStillStaged(plan.approvedParty.inputs, runResult);
+    }
+  }
+  if (plan?.stagedRemote?.hasInputs) {
+    if (plan.stagedRemote.action === stagedInputRecoveryActions.CLEAR_PENDING) {
+      await clearSubmittedRemoteInputs(plan.stagedRemote.inputs);
+    } else if (plan.stagedRemote.action === stagedInputRecoveryActions.KEEP_STAGED) {
+      await markRemoteInputsStillStaged(plan.stagedRemote.inputs, runResult);
+    }
+  }
+  if (plan?.pendingRemote?.hasInputs) {
+    if (plan.pendingRemote.action === stagedInputRecoveryActions.CLEAR_PENDING) {
+      const result = await postJson(apiMultiplayerClearPendingUrl, {
+        inputIds: plan.pendingRemote.inputs.map((input) => input.id),
+        ...localTableAuthorityPayload(),
+      });
+      setCampaignFromPayload(result, "local_table_pending_cleared");
+      state.multiplayerSnapshot = result.multiplayer;
+      render();
+    } else if (plan.pendingRemote.action === stagedInputRecoveryActions.KEEP_STAGED) {
+      await markRemoteInputsStillStaged(plan.pendingRemote.inputs, runResult);
+    }
+  }
 }
 
 function playerInputsFromChoiceSelection(selection) {
@@ -3898,17 +3924,10 @@ async function resolvePendingInputsWithText(inputs, aggregateText) {
       ready: input.ready,
     })),
   });
-  if (inputs.length && runResult?.imported) {
-    const result = await postJson(apiMultiplayerClearPendingUrl, {
-      inputIds: inputs.map((input) => input.id),
-      ...localTableAuthorityPayload(),
-    });
-    setCampaignFromPayload(result, "local_table_pending_cleared");
-    state.multiplayerSnapshot = result.multiplayer;
-    render();
-  } else if (inputs.length && !runResult?.imported) {
-    await markRemoteInputsStillStaged(inputs, runResult);
-  }
+  await applyStagedInputRecoveryPlan(buildStagedInputRecoveryPlan({
+    runResult,
+    pendingInputs: inputs,
+  }), runResult);
 }
 
 function scheduleAutoResolveGuestInputs(reason = "snapshot") {

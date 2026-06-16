@@ -11,6 +11,7 @@ import { buildInputComposerProjection } from "../app/input-composer-controller.j
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
+import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { tableRepairReason, turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "../app/turn-repair-controller.js";
@@ -1515,6 +1516,29 @@ function testTurnRepairController() {
   assert.equal(options.data.contractWarning, technicalRepair.reason);
 }
 
+function testStagedInputRecoveryController() {
+  const imported = buildStagedInputRecoveryPlan({
+    runResult: { imported: true },
+    approvedPartyInputs: [{ id: "approved-1" }],
+    stagedRemoteInputs: [{ id: "remote-1" }],
+    pendingInputs: [{ id: "pending-1" }],
+  });
+  assert.equal(imported.approvedParty.action, stagedInputRecoveryActions.MARK_SUBMITTED);
+  assert.equal(imported.stagedRemote.action, stagedInputRecoveryActions.CLEAR_PENDING);
+  assert.equal(imported.pendingRemote.action, stagedInputRecoveryActions.CLEAR_PENDING);
+  assert.equal(imported.pendingRemote.inputs[0].id, "pending-1");
+
+  const failed = buildStagedInputRecoveryPlan({
+    runResult: { imported: false, needsRepair: true },
+    approvedPartyInputs: [{ id: "approved-1" }],
+    stagedRemoteInputs: [{ id: "remote-1" }],
+    pendingInputs: [{ id: "pending-1" }],
+  });
+  assert.equal(failed.approvedParty.action, stagedInputRecoveryActions.KEEP_STAGED);
+  assert.equal(failed.stagedRemote.action, stagedInputRecoveryActions.KEEP_STAGED);
+  assert.equal(failed.pendingRemote.action, stagedInputRecoveryActions.KEEP_STAGED);
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -1684,11 +1708,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /dropPendingRemoteInput/, "host should be able to drop a stale staged guest action");
   assert.match(appJs, /label:\s*"Dropped"/, "dropped staged guest actions should not read as DM-resolved");
   assert.match(appJs, /Remove this staged guest action without sending it to the DM/);
-  assert.match(
-    appJs,
-    /else if \(inputs\.length && !runResult\?\.imported\) {\s*await markRemoteInputsStillStaged\(inputs, runResult\);/,
-    "manual and auto-resolved remote inputs should remain visibly staged after provider failure",
-  );
+  assert.match(appJs, /buildStagedInputRecoveryPlan/, "staged input recovery policy should be outside the renderer turn body");
+  assert.match(appJs, /applyStagedInputRecoveryPlan/, "renderer should execute the staged input recovery plan");
+  assert.doesNotMatch(appJs, /else if \(inputs\.length && !runResult\?\.imported\)/, "pending input recovery branching should live in staged-input-recovery-controller");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
@@ -1834,6 +1856,7 @@ testSceneIntentDiscouragesRandomEscalationAfterSmallFight();
 testProviderBoundary();
 testStructuredInputsDoNotMergeIntoHostMessage();
 testTurnRepairController();
+testStagedInputRecoveryController();
 testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();
