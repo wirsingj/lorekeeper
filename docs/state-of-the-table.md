@@ -139,10 +139,11 @@ Every table surface should answer the same practical questions a real table answ
 100. Context packs now include DM Goal Horizon and Living World Memory sections before recent history, giving the provider narrative gravity and durable NPC/faction/location/consequence memory.
 101. Consequences can link to goals, and scene retrieval can pull goal-linked consequences back into focus many turns later.
 102. Provider JSON requests now include `context.goalHorizon` and `context.livingWorld`, plus continuity rules that ask whether new content serves active goals before inventing threats.
+103. CombatEngine now applies app-owned turn economy for resolved party combat actions: action, bonus action, reaction, and movement costs are validated, logged, and reflected in the combat tracker state.
 
 ### Still Risky
 
-1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches are now rejected.
+1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
 2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, and provider review auto-commit policy are now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, and host review summary, but the underlying manual review textarea still exists as a fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
@@ -188,7 +189,7 @@ Every table surface should answer the same practical questions a real table answ
 
 ### Critical
 
-1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
+1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, out-of-turn reactions, concentration saves, complex movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
 3. Continue long-campaign scaling: play-log rendering and core SQLite query helpers are bounded, but more live paths still need to stop hydrating whole snapshots as campaigns age.
 4. Keep future changes out of `app/app.js` and `scripts/serve.js` unless they are glue; extract policy/authority decisions into tested modules first.
@@ -279,6 +280,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add crisp AI companion combat approval flow.
 - [x] Reject provider combat responses that resolve the wrong active actor.
 - [x] Ensure initiative never advances by provider phrasing alone.
+- [x] Apply app-owned turn economy for resolved party combat turns, including action/bonus/reaction/movement validation and logging.
 
 ### Party Agency And AI Companions
 

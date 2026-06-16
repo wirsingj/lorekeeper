@@ -307,10 +307,26 @@ function testCombatEngine() {
   assert.equal(resolved.actionRecord.actorId, "thor");
   assert.equal(resolved.actionRecord.rolls[0].label, "Attack roll");
   assert.equal(resolved.campaign.combat.currentTurnId, "sy", "combat should advance after app-side resolution");
+  assert.equal(resolved.campaign.combat.turnEconomy.thor.action, "spent", "resolved attacks should spend the actor action");
+  assert.equal(resolved.campaign.combat.turnEconomy.sy.action, "available", "next actor should begin with a fresh action");
+  assert.equal(resolved.actionRecord.turnEconomy.cost.action, 1, "combat action log should record the action economy cost");
   assert.equal(resolved.actionRecord.effects.every((effect) => effect.source === "combat_engine"), true);
   assert.equal(resolved.campaign.combatActionLog.length, 1, "combat action should be logged to campaign state");
   assert.equal(resolved.campaign.diceLog.length >= 1, true, "combat rolls should be logged to campaign state");
   assert.equal(resolved.campaign.stateEffectLog.length, resolved.actionRecord.effects.length, "applied effects should be logged to campaign state");
+
+  const spentActionCampaign = structuredClone(campaign);
+  spentActionCampaign.combat.turnEconomy.thor = {
+    ...(spentActionCampaign.combat.turnEconomy.thor ?? {}),
+    action: "spent",
+  };
+  assert.throws(() => resolveCombatAction(spentActionCampaign, {
+    turnId: "combat-action-already-spent",
+    actorId: "thor",
+    actionType: "attack",
+    targetIds: ["miner"],
+    declaredText: "Attack again after already spending an action.",
+  }, { seed: "already-spent" }), /action is already spent/);
 
   assert.throws(() => resolveCombatAction(campaign, {
     turnId: "combat-wrong-option-type",
@@ -543,11 +559,14 @@ function testCombatEngine() {
     skill: "Athletics",
     modifier: 20,
     dc: 12,
+    movementFt: 20,
     successEffects: [{ type: "position_note", targetId: "thor", note: "Kept pace with the fleeing miner." }],
     failureEffects: [{ type: "position_note", targetId: "thor", note: "Lost ground in the chase." }],
   }, { seed: "combat-chase-seed" });
   assert.equal(chased.actionRecord.rolls[0].label, "Athletics check");
   assert.ok(chased.campaign.party.find((member) => member.id === "thor").positionNotes.includes("Kept pace with the fleeing miner."));
+  assert.equal(chased.campaign.combat.turnEconomy.thor.movementRemainingFt, 10);
+  assert.equal(chased.actionRecord.turnEconomy.cost.movementFt, 20);
 
   const reactionCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
@@ -566,6 +585,21 @@ function testCombatEngine() {
   const thorAfterReady = readiedReaction.campaign.party.find((member) => member.id === "thor");
   assert.equal(thorAfterReady.resources.reaction.used, 1);
   assert.ok(thorAfterReady.conditions.includes("readied_reaction"));
+  assert.equal(readiedReaction.campaign.combat.turnEconomy.thor.action, "spent");
+
+  const consumedReactionCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const reactionConsumed = resolveCombatAction(consumedReactionCampaign, {
+    turnId: "combat-consume-reaction-turn",
+    actorId: "thor",
+    actionType: "ready",
+    declaredText: "Ready a shield block that will use Thor's reaction.",
+    consumeReaction: true,
+  }, { seed: "combat-consume-reaction-seed" });
+  assert.equal(reactionConsumed.campaign.combat.turnEconomy.thor.reaction, "spent");
+  assert.equal(reactionConsumed.actionRecord.turnEconomy.cost.reaction, 1);
 
   const defaultReadyCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],

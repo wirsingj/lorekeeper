@@ -111,6 +111,7 @@ Provider text can enrich play, but provider text alone should not silently mutat
 `CombatEngine`
 
 - Owns app-resolved combat mechanics, legal actions, rolls, effects, HP, conditions, and initiative advancement.
+- Owns active-turn economy for resolved party combat turns: action, bonus action, reaction, and movement costs are validated before resolution and logged with the combat action.
 - Provider may narrate combat, but should not be the authority for app-owned mechanics.
 
 `AgencyController` and model contract validation:

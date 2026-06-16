@@ -58,6 +58,7 @@ export function resolveCombatAction(campaign, action, options = {}) {
   }
   const actionType = normalizeActionType(action.actionType ?? action.type);
   const explicitLegalOption = validateExplicitLegalOption(normalized, actor.id, action, actionType);
+  const turnEconomyPlan = planCombatTurnEconomy(normalized, actor, action, actionType, explicitLegalOption);
   const base = {
     turnId: action.turnId ?? `combat-${Date.now()}`,
     actorId: actor.id,
@@ -81,14 +82,15 @@ export function resolveCombatAction(campaign, action, options = {}) {
     : resolveNonAttack(normalized, actor, base, action);
 
   const effectsResult = applyStateEffects(normalized, resolved.effects, { source: "combat_engine", turnId: base.turnId });
+  const campaignAfterEconomy = commitCombatTurnEconomy(effectsResult.campaign, turnEconomyPlan);
   const summary = resolved.summary ?? `${actor.name} resolved ${actionType}.`;
   let advanced = resolved.endsCombat
-    ? endCombat(effectsResult.campaign, {
+    ? endCombat(campaignAfterEconomy, {
       summary,
       outcome: resolved.combatOutcome,
       resolvedAt: options.now,
     })
-    : finishCombatIfResolved(effectsResult.campaign, {
+    : finishCombatIfResolved(campaignAfterEconomy, {
       resolvedActorId: actor.id,
       summary,
       resolvedAt: options.now,
@@ -105,6 +107,11 @@ export function resolveCombatAction(campaign, action, options = {}) {
     rolls: resolved.rolls,
     effects: effectsResult.appliedEffects,
     narration: resolved.narration,
+    turnEconomy: turnEconomyPlan ? {
+      before: turnEconomyPlan.before,
+      cost: turnEconomyPlan.cost,
+      after: turnEconomyPlan.after,
+    } : null,
     createdAt: action.createdAt ?? new Date().toISOString(),
   };
   advanced = appendCombatLogs(advanced, actionRecord);
@@ -476,6 +483,128 @@ function validateExplicitLegalOption(campaign, actorId, action, actionType) {
     throw new Error(`Combat option ${optionId} cannot resolve as ${actionType}`);
   }
   return option;
+}
+
+function planCombatTurnEconomy(campaign, actor, action, actionType, explicitLegalOption) {
+  if (!campaign?.combat?.inCombat || actor.type !== "party") {
+    return null;
+  }
+  const before = normalizeActorTurnEconomy(campaign, actor.id);
+  const cost = combatTurnEconomyCost(action, actionType, explicitLegalOption);
+  if (cost.action > 0 && !isEconomyAvailable(before.action)) {
+    throw new Error(`${actor.name} cannot take another action this turn; action is already spent`);
+  }
+  if (cost.bonusAction > 0 && !isEconomyAvailable(before.bonusAction)) {
+    throw new Error(`${actor.name} cannot take another bonus action this turn; bonus action is already spent`);
+  }
+  if (cost.reaction > 0 && !isEconomyAvailable(before.reaction)) {
+    throw new Error(`${actor.name} cannot take another reaction until it refreshes`);
+  }
+  if (cost.movementFt > before.movementRemainingFt && action.allowOvermove !== true) {
+    throw new Error(`${actor.name} does not have enough movement remaining (${before.movementRemainingFt} ft)`);
+  }
+  return {
+    actorId: actor.id,
+    before,
+    cost,
+    after: applyEconomyCost(before, cost),
+  };
+}
+
+function commitCombatTurnEconomy(campaign, plan) {
+  if (!plan) {
+    return campaign;
+  }
+  const next = structuredClone(campaign);
+  next.combat = {
+    ...(next.combat ?? {}),
+    turnEconomy: {
+      ...(next.combat?.turnEconomy ?? {}),
+      [plan.actorId]: plan.after,
+    },
+  };
+  return next;
+}
+
+function combatTurnEconomyCost(action = {}, actionType, explicitLegalOption) {
+  const optionCost = explicitLegalOption?.cost && typeof explicitLegalOption.cost === "object"
+    ? explicitLegalOption.cost
+    : null;
+  const suppliedCost = action.cost && typeof action.cost === "object" ? action.cost : null;
+  const sourceCost = suppliedCost ?? optionCost;
+  const hasExplicitCost = Boolean(sourceCost);
+  const defaultAction = defaultActionCost(action, actionType, hasExplicitCost);
+  return {
+    action: numberCost(action.actionCost ?? sourceCost?.action ?? defaultAction),
+    bonusAction: numberCost(action.bonusActionCost ?? sourceCost?.bonusAction ?? defaultBonusActionCost(action, actionType, hasExplicitCost)),
+    reaction: numberCost(action.reactionCost ?? sourceCost?.reaction ?? (action.consumeReaction || action.usesReaction ? 1 : 0)),
+    movementFt: Math.max(0, numberCost(action.movementFt ?? action.moveFt ?? action.distanceFt ?? sourceCost?.movementFt ?? 0)),
+  };
+}
+
+function defaultActionCost(action = {}, actionType, hasExplicitCost) {
+  if (hasExplicitCost) {
+    return 0;
+  }
+  if (action.castingTime === "bonus_action" || action.asBonusAction === true) {
+    return 0;
+  }
+  if ([
+    combatActionTypes.ATTACK,
+    combatActionTypes.SPELL,
+    combatActionTypes.DASH,
+    combatActionTypes.DODGE,
+    combatActionTypes.DISENGAGE,
+    combatActionTypes.HELP,
+    combatActionTypes.HIDE,
+    combatActionTypes.READY,
+    combatActionTypes.CHECK,
+    combatActionTypes.IMPROVISE,
+  ].includes(actionType)) {
+    return 1;
+  }
+  return 0;
+}
+
+function defaultBonusActionCost(action = {}, actionType, hasExplicitCost) {
+  if (hasExplicitCost) {
+    return 0;
+  }
+  return actionType === combatActionTypes.SPELL && (action.castingTime === "bonus_action" || action.asBonusAction === true)
+    ? 1
+    : 0;
+}
+
+function normalizeActorTurnEconomy(campaign, actorId) {
+  const member = (campaign.party ?? []).find((item) => item.id === actorId) ?? {};
+  const existing = campaign.combat?.turnEconomy?.[actorId] ?? {};
+  const speed = Number(member.speedFt ?? member.speed ?? member.stats?.speedFt ?? member.stats?.speed ?? 30) || 30;
+  return {
+    action: existing.action ?? "available",
+    bonusAction: existing.bonusAction ?? "available",
+    reaction: existing.reaction ?? "available",
+    movementRemainingFt: Math.max(0, Number(existing.movementRemainingFt ?? existing.movement ?? speed) || 0),
+    freeObjectInteraction: existing.freeObjectInteraction ?? "available",
+  };
+}
+
+function applyEconomyCost(before, cost) {
+  return {
+    ...before,
+    action: cost.action > 0 ? "spent" : before.action,
+    bonusAction: cost.bonusAction > 0 ? "spent" : before.bonusAction,
+    reaction: cost.reaction > 0 ? "spent" : before.reaction,
+    movementRemainingFt: Math.max(0, before.movementRemainingFt - cost.movementFt),
+  };
+}
+
+function isEconomyAvailable(value) {
+  return !/^(spent|used|unavailable)$/i.test(String(value ?? "available"));
+}
+
+function numberCost(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function explicitOptionId(action = {}) {
