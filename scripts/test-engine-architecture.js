@@ -826,6 +826,53 @@ function testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds() {
   assert.equal(retrieval.activeConsequences[0].id, "consequence-participant-only");
 }
 
+function testSceneRetrievalRanksFocusUnderLongCampaignNoise() {
+  const base = campaignFixture();
+  base.relationships = Array.from({ length: 40 }, (_, index) => ({
+    id: `rel-noise-${index}`,
+    sourceId: "tavern",
+    targetId: `patron-${index}`,
+    type: "ambient_room_color",
+    notes: [`Noise relationship ${index}`],
+  }));
+  base.relationships.push({
+    id: "rel-tavern-quest-thor",
+    sourceId: "tavern",
+    targetId: "quest-1",
+    type: "active_thread_pressure",
+    notes: ["This tavern thread should survive noisy relationship history."],
+  });
+  base.timeline = [
+    {
+      id: "event-threaded-stool",
+      title: "Threaded stool clue",
+      summary: "Thor paid for a stool and the quest thread shifted.",
+      relatedIds: ["tavern", "thor", "quest-1"],
+    },
+    ...Array.from({ length: 40 }, (_, index) => ({
+      id: `event-noise-${index}`,
+      title: `Tavern noise ${index}`,
+      summary: "A regular ordered another drink.",
+      relatedIds: ["tavern"],
+    })),
+  ];
+
+  const campaign = transitionScene(base, {
+    id: "scene-long-noise",
+    title: "Long campaign tavern return",
+    type: "social",
+    locationId: "tavern",
+    presentPartyMemberIds: ["thor"],
+    presentPeopleIds: ["barkeep"],
+    activeQuestIds: ["quest-1"],
+    tensions: ["The room remembers Thor's last choice."],
+  });
+
+  const retrieval = buildSceneRetrieval(campaign, { relationshipLimit: 4, eventLimit: 4 });
+  assert.equal(retrieval.relevantRelationships[0].id, "rel-tavern-quest-thor");
+  assert.equal(retrieval.relevantRecentEvents[0].id, "event-threaded-stool");
+}
+
 function testSceneIntentDiscouragesRandomEscalationAfterSmallFight() {
   const base = campaignFixture();
   base.people.push({ id: "merchant-zean", name: "Zean", role: "protected merchant", notes: ["Garren protected him on the mining road."] });
@@ -1546,6 +1593,7 @@ testCombatEndsWhenSideDrops();
 testCombatTrackerView();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
+testSceneRetrievalRanksFocusUnderLongCampaignNoise();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();
 testProviderBoundary();
 testStructuredInputsDoNotMergeIntoHostMessage();

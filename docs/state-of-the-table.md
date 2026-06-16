@@ -112,6 +112,7 @@ Every table surface should answer the same practical questions a real table answ
 61. Hidden-story fixtures now reject visible narration/choice text that directly leaks private DM story phrases while allowing subtle public clues plus `dm_only` story updates.
 62. AI companion combat nudges now work only on that companion's active initiative turn and request a host-approved suggestion rather than resolving mechanics.
 63. Try Again now marks the original player action as "Trying again" and updates that same bubble after the retry result lands.
+64. Scene retrieval now ranks actor/thread-linked relationships and events above noisy same-place history, with a long-campaign-noise fixture.
 
 ### Still Risky
 
@@ -126,7 +127,7 @@ Every table surface should answer the same practical questions a real table answ
 9. Provider narration can still restate the player's action or lean on option panels too much.
 10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
-12. Context retrieval now has a scene-focus pass for actors, place, relationships, consequences, threads, and recent relevant events, but still needs longer-campaign ranking/performance fixtures.
+12. Context retrieval now has a scene-focus pass and noisy long-campaign ranking fixture, but still needs true large-campaign performance/load fixtures.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
 14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
 15. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
@@ -156,7 +157,7 @@ Every table surface should answer the same practical questions a real table answ
 
 1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Add long-campaign retrieval/ranking fixtures so Scene Focus stays useful when campaigns have hundreds of records.
+3. Add true large-campaign performance/load fixtures so Scene Focus stays fast when campaigns have hundreds or thousands of records.
 
 ### High
 
@@ -199,6 +200,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Reject obvious controlled-PC agency violations during response validation.
 - [x] Add richer provider-output fixtures for social, travel, mystery, downtime, combat, and recovery scenes.
 - [x] Improve context retrieval beyond recent history/context pack breadth.
+- [x] Add long-campaign retrieval/ranking fixture for noisy relationship and event history.
 - [x] Add hidden-story scenario tests for adaptation without leaking future twists.
 - [ ] Tighten prompts so normal scene turns can be rich without always forcing choices.
 

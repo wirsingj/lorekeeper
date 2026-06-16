@@ -278,17 +278,45 @@ export function deriveEscalationPolicy(campaign, retrieval = buildSceneRetrieval
 function relevantRelationships(campaign, participantIds, consequences, limit) {
   const consequenceRelationshipIds = new Set(consequences.flatMap((consequence) => consequence.relationshipIds ?? []));
   return (campaign?.relationships ?? [])
-    .filter((relationship) => {
+    .map((relationship, index) => ({ relationship, index }))
+    .filter(({ relationship }) => {
       if (consequenceRelationshipIds.has(relationship.id)) return true;
       return participantIds.has(relationship.sourceId) || participantIds.has(relationship.targetId);
     })
+    .sort((left, right) =>
+      relationshipFocusScore(right.relationship, participantIds, consequenceRelationshipIds) -
+        relationshipFocusScore(left.relationship, participantIds, consequenceRelationshipIds) ||
+      left.index - right.index
+    )
+    .map(({ relationship }) => relationship)
     .slice(0, limit);
 }
 
 function relevantRecentEvents(campaign, participantIds, limit) {
   return (campaign?.timeline ?? [])
-    .filter((event) => (event.relatedIds ?? []).some((id) => participantIds.has(id)))
-    .slice(-limit);
+    .map((event, index) => ({ event, index }))
+    .filter(({ event }) => (event.relatedIds ?? []).some((id) => participantIds.has(id)))
+    .sort((left, right) =>
+      eventFocusScore(right.event, participantIds) - eventFocusScore(left.event, participantIds) ||
+      right.index - left.index
+    )
+    .map(({ event }) => event)
+    .slice(0, limit);
+}
+
+function relationshipFocusScore(relationship, focusIds, consequenceRelationshipIds) {
+  return (
+    (consequenceRelationshipIds.has(relationship.id) ? 5 : 0) +
+    countFocusMatches([relationship.sourceId, relationship.targetId], focusIds)
+  );
+}
+
+function eventFocusScore(event, focusIds) {
+  return countFocusMatches(event.relatedIds ?? [], focusIds);
+}
+
+function countFocusMatches(ids = [], focusIds = new Set()) {
+  return ids.reduce((score, id) => score + (focusIds.has(id) ? 1 : 0), 0);
 }
 
 function normalizeEscalationPolicy(policy = {}) {
