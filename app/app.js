@@ -7135,12 +7135,14 @@ function buildSessionHealthSummary() {
   const readyInputs = pendingInputs.filter((input) => input.ready && !input.passed && input.text);
   const waitingInputs = pendingInputs.filter((input) => !input.ready || input.passed || !input.text);
   const pendingGuests = (campaign?.multiplayer?.connections ?? []).filter((connection) => connection.status === "pending");
+  const multiplayerSettings = campaign?.multiplayer?.settings ?? {};
+  const guestPendingInput = state.guestSnapshot?.pendingInput ?? null;
   const combat = campaign?.combat;
   const activeCombatant = combat?.inCombat
     ? normalizedCombatTurnOrder(campaign).find((entry) => entry.id === combat.currentTurnId)
     : null;
   const reviewCount = state.reviewBatch?.proposals?.filter((proposal) => proposal.status !== "committed")?.length ?? 0;
-  const tableRunning = Boolean(state.multiplayerSnapshot?.localTable?.running || campaign?.multiplayer?.table?.running);
+  const tableRunning = Boolean(state.multiplayerSnapshot?.localTable?.running || campaign?.multiplayer?.localTable?.running);
   const providerSettings = currentProviderSettings();
 
   if (providerState === "working") {
@@ -7162,15 +7164,11 @@ function buildSessionHealthSummary() {
   }
 
   if (readyInputs.length) {
-    lines.push(readyInputs.length === 1
-      ? `${readyInputs[0].characterName || "A party member"} has an action staged for the DM.`
-      : `${readyInputs.length} party actions are staged for the DM.`);
+    lines.push(pendingReadyInputSummary(readyInputs, multiplayerSettings));
   }
 
   if (waitingInputs.length) {
-    lines.push(waitingInputs.length === 1
-      ? "One party input is waiting on the player or host."
-      : `${waitingInputs.length} party inputs are waiting on players or host.`);
+    lines.push(waitingInputSummary(waitingInputs));
   }
 
   if (pendingGuests.length) {
@@ -7184,9 +7182,15 @@ function buildSessionHealthSummary() {
   }
 
   if (clientMode || state.guestSession?.hostBaseUrl) {
-    lines.push(state.guestSession?.connectionId
-      ? "LoreKeeper Join is connected to the host table."
-      : "LoreKeeper Join is not connected to a host table.");
+    if (guestPendingInput?.passed) {
+      lines.push("LoreKeeper Join sent a pass. Waiting for the host table.");
+    } else if (guestPendingInput?.text) {
+      lines.push("LoreKeeper Join sent your action. Waiting for the host table to resolve it.");
+    } else {
+      lines.push(state.guestSession?.connectionId
+        ? "LoreKeeper Join is connected to the host table."
+        : "LoreKeeper Join is not connected to a host table.");
+    }
   } else {
     lines.push(tableRunning ? "Local Table hosting is running." : "Local Table hosting is off.");
   }
@@ -7215,6 +7219,52 @@ function buildSessionHealthSummary() {
     tone,
     lines: lines.length ? lines : ["No blockers detected."],
   };
+}
+
+function pendingReadyInputSummary(inputs = [], settings = {}) {
+  const names = inputNames(inputs);
+  if (settings.requireGuestActionApproval) {
+    return inputs.length === 1
+      ? `${names} is waiting for host approval before the DM sees the action.`
+      : `${names} are waiting for host approval before the DM sees those actions.`;
+  }
+  if (settings.holdGuestActionsForGroupInput) {
+    return inputs.length === 1
+      ? `${names} is waiting for the host's grouped table turn.`
+      : `${names} are waiting for the host's grouped table turn.`;
+  }
+  return inputs.length === 1
+    ? `${names} has an action queued for the DM.`
+    : `${names} have actions queued for the DM.`;
+}
+
+function waitingInputSummary(inputs = []) {
+  const passed = inputs.filter((input) => input.passed);
+  const notReady = inputs.filter((input) => !input.passed);
+  if (passed.length && !notReady.length) {
+    return passed.length === 1
+      ? `${inputNames(passed)} passed and is waiting for the table to move on.`
+      : `${inputNames(passed)} passed and are waiting for the table to move on.`;
+  }
+  return notReady.length === 1
+    ? `${inputNames(notReady)} has a party input open but not ready yet.`
+    : `${inputNames(notReady)} have party inputs open but not ready yet.`;
+}
+
+function inputNames(inputs = []) {
+  const names = inputs
+    .map((input) => input.characterName || input.playerName || "A party member")
+    .filter(Boolean);
+  if (!names.length) {
+    return "A party member";
+  }
+  if (names.length === 1) {
+    return names[0];
+  }
+  if (names.length === 2) {
+    return `${names[0]} and ${names[1]}`;
+  }
+  return `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
 }
 
 function redactedRendererUrl() {

@@ -63,6 +63,7 @@ The user should not feel like they are debugging a model, managing queue machine
 17. Provider/App Settings open from the lobby without implicitly entering the last campaign.
 18. Host/table mode has a Main Menu return control so the front door is reachable after entering a campaign.
 19. Guest action lifecycle now uses clearer sent/waiting/queued/resolved language on both guest and host surfaces.
+20. Session health now names the waiting party member and distinguishes host approval, grouped turns, queued DM actions, passes, and guest sent state.
 
 ### Still Risky
 
@@ -110,7 +111,7 @@ The user should not feel like they are debugging a model, managing queue machine
 4. Build actual party-vote flow: host can call a vote from a party prompt, guests cast votes from LoreKeeper Join, host breaks ties, winning option resolves.
 5. Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
 6. Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
-7. Strengthen the "what the table is waiting for" surface so it covers every stuck state.
+7. Soak-test and keep strengthening the "what the table is waiting for" surface across real stuck states.
 8. Run the two-machine playtest checklist and log every friction point.
 9. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 10. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -153,6 +154,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Auto-resumed unresolved turns mark the original bubble as recovering.
 - [x] Failed provider turns keep approved/remote inputs visibly staged.
 - [x] Diagnostics include table timeline and session health summary.
+- [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [ ] Make repair retry lifecycle as table-shaped as auto-resume.
 - [ ] Move remaining recovery/import decisions out of `app/app.js`.
 - [ ] Replace remaining technical wording in repair/import controls.
