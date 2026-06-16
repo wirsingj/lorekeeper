@@ -117,6 +117,7 @@ Every table surface should answer the same practical questions a real table answ
 66. Context-pack load coverage now builds a thousands-record campaign and asserts Scene Focus stays relevant, bounded, and under a generous performance ceiling.
 67. Manual review/use-anyway live copy now avoids JSON/contract/import wording and frames failures as table checks, with raw details kept in diagnostics.
 68. Turn repair display/use-anyway policy is extracted into a small recovery controller with direct tests instead of living only as renderer string handling.
+69. Narration-first prompt policy now explicitly tells local models to leave `choices.options` empty on ordinary scene turns, while preserving combat/immediate-danger choices.
 
 ### Still Risky
 
@@ -128,7 +129,7 @@ Every table surface should answer the same practical questions a real table answ
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
 8. Table Talk has a subtle unread cue, but should still be checked during two-machine play.
-9. Provider narration can still restate the player's action or lean on option panels too much.
+9. Provider narration can still restate the player's action or lean on option panels too much in real-model soak, though the contract now has stronger narration-first instructions.
 10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Context retrieval now has scene-focus, noisy ranking, and thousands-record load fixtures, but long play-log rendering/persistence still needs scaling work.
@@ -207,7 +208,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add long-campaign retrieval/ranking fixture for noisy relationship and event history.
 - [x] Add large-campaign context-pack performance/load fixture.
 - [x] Add hidden-story scenario tests for adaptation without leaking future twists.
-- [ ] Tighten prompts so normal scene turns can be rich without always forcing choices.
+- [x] Tighten prompts so normal scene turns can be rich without always forcing choices.
 
 ### Table Flow And Recovery
 

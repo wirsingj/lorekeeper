@@ -114,6 +114,7 @@ assert.equal(requestEnvelope.user.playerInputs[0].characterName, "Kevric");
 assert.equal(requestEnvelope.user.playerInputs[0].text, "Kevric keeps running but watches Jarin's flank.");
 assert.equal(requestEnvelope.generation.choicePolicy.default, "narration_first");
 assert.equal(requestEnvelope.generation.choicePolicy.choicesAllowed, false);
+assert.match(requestEnvelope.generation.choicePolicy.structuredChoiceInstruction, /Do not include structured choices\.options/);
 assert.equal(requestEnvelope.generation.narrationTarget.style, "immersive_tabletop");
 assert.equal(requestEnvelope.generation.narrationTarget.paragraphs, "3-6");
 assert.equal(requestEnvelope.generation.narrationTarget.words, "320-700");
@@ -124,6 +125,40 @@ assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
 assert.equal(requestEnvelope.context.hiddenDmStory.length, 3);
 assert.equal(requestEnvelope.context.hiddenDmStory[0].horizon, "long");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
+
+const narrationFirstPrompt = buildTurnJsonPrompt({
+  campaign: testCampaign(),
+  contextPack: testContextPack(),
+  playerTurn: "I ask the ferryman why the line stopped moving.",
+  parsedMessage: {
+    raw: "I ask the ferryman why the line stopped moving.",
+    inWorldText: "I ask the ferryman why the line stopped moving.",
+    metaInstructions: [],
+  },
+});
+assert.match(narrationFirstPrompt, /If generation\.choicePolicy\.choicesAllowed is false, leave choices\.options empty/);
+assert.match(narrationFirstPrompt, /choices\.options must be \[\]/);
+
+const combatChoiceEnvelope = buildTurnRequestEnvelope({
+  campaign: {
+    ...testCampaign(),
+    combat: {
+      inCombat: true,
+      currentTurnId: "jarin",
+      turnOrder: ["jarin", "wolf-1"],
+      enemies: [{ id: "wolf-1", name: "Wolf" }],
+    },
+  },
+  contextPack: testContextPack(),
+  playerTurn: "What are my combat options?",
+  parsedMessage: {
+    raw: "What are my combat options?",
+    inWorldText: "What are my combat options?",
+    metaInstructions: [],
+  },
+});
+assert.equal(combatChoiceEnvelope.generation.choicePolicy.choicesAllowed, true);
+assert.match(combatChoiceEnvelope.generation.choicePolicy.structuredChoiceInstruction, /Choices may be offered/);
 
 const hiddenStoryCampaign = createEmptyCampaign({
   title: "Hidden Story Test",

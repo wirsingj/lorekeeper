@@ -75,6 +75,7 @@ export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedM
     "Do not invent speech, thoughts, scouting, scanning, movement, or purposeful actions for remote/player-controlled party members unless their controller submitted that input.",
     "Before adding a new threat, NPC, or twist, use generation.dmQuality: existing context, natural consequences, NPC motivations, and campaign continuity come first.",
     "Do not be terse. For normal scene turns, write immersive DM narration with enough detail to feel like tabletop play.",
+    "If generation.choicePolicy.choicesAllowed is false, leave choices.options empty. Continue the scene with narration, NPC/world reaction, consequences, and current situation instead of forcing an option panel.",
     "Use context.hiddenDmStory as private DM planning only. Never reveal those notes directly, but keep the campaign moving with long, mid, and short term purpose.",
     "Maintain private story direction with proposedChanges when useful: domain quests, visibility dm_only, data.threadType story_arc, data.horizon long|mid|short.",
     "No markdown. No fenced code. No prose outside JSON.",
@@ -971,6 +972,7 @@ function createResponseFormatSchema() {
       "Never answer a new player action by repeating the previous DM question.",
       "Do not force choices for patrols, travel, investigation progress, NPC replies, atmosphere, consequences, or simple scene continuation.",
       "Offer structured choices only when generation.choicePolicy.choicesAllowed is true or this response establishes immediate danger/combat.",
+      "If generation.choicePolicy.choicesAllowed is false, choices.options must be [] unless the response itself starts immediate danger or combat.",
       "When offering choices, make them separate objects, not a paragraph. Shape: { id: 'A', actorId: null, actor: '', targetActorId: null, targetActor: '', text: 'clear action option', legalOptionId: null }.",
       "Use lettered choices: A, B, C, D. The option id should be the letter.",
       "Use choices.options for every listed option. Do not put action options only in table text.",
@@ -2066,6 +2068,9 @@ function inferChoicePolicy(campaign, parsedMessage, options = {}) {
         ? "combat_or_immediate_danger"
         : "user_requested_options"
       : "ordinary_scene_flow",
+    structuredChoiceInstruction: choicesAllowed
+      ? "Choices may be offered when they clarify a real branch, tactical decision, or explicit option request."
+      : "Do not include structured choices.options for this ordinary scene turn; continue with rich DM narration unless immediate danger or combat emerges.",
     useChoicesWhen: [
       "combat or immediate danger needs tactical input",
       "the user explicitly asks for options",
