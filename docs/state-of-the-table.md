@@ -139,6 +139,7 @@ Every table surface should answer the same practical questions a real table answ
 88. Generated 5E-lite sheets now include class-appropriate equipment/inventory and structured spell metadata, while context packs and sheet text areas render those details as readable names.
 89. Provider review auto-commit policy now lives in `provider-import-controller.js`, including hidden story-arc auto-approval and major/invalid/rejected change blocking.
 90. Agency validation now catches subtle remote-PC resolve/body-language overreach from play logs, including "doesn't back down" and eyes/grip locking into action without submitted input.
+91. The left rail now explicitly contains dense party/combat content so long card text and button clusters wrap or truncate instead of forcing horizontal scroll.
 
 ### Still Risky
 
@@ -153,12 +154,13 @@ Every table surface should answer the same practical questions a real table answ
 9. Provider narration can still restate the player's action or lean on option panels too much in real-model soak, though the contract now has stronger narration-first instructions.
 10. Failed staged inputs now remain visible and can be dropped by the host, but broader retry/cleanup guidance still needs real-session polish.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
-12. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
-13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
-14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
-15. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
-16. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
-17. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
+12. Rail containment is improved, but long-session scroll behavior still needs a real campaign soak with many party members, notes, and combatants.
+13. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
+14. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
+15. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
+16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
+17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
+18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
 
 ## Live Acceptance Matrix
 

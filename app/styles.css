@@ -57,7 +57,7 @@ summary,
 .handheld-shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: 300px minmax(520px, 1fr) 340px;
+  grid-template-columns: minmax(280px, 300px) minmax(520px, 1fr) 340px;
   grid-template-rows: minmax(0, 1fr) var(--command-deck-height);
   grid-template-areas:
     "left screen right"
@@ -193,6 +193,7 @@ h3 {
 .left-panel {
   grid-area: left;
   min-width: 0;
+  max-width: 300px;
 }
 
 .right-panel {
@@ -248,6 +249,16 @@ h3 {
   overflow: hidden;
 }
 
+.panel-rail > *,
+.rail-section,
+.section-title,
+.record,
+.record-stack,
+.combat-turn-order {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .rail-section {
   display: grid;
   gap: 10px;
@@ -263,6 +274,7 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .title-actions {
@@ -661,6 +673,13 @@ h3 {
   line-height: 1.15;
 }
 
+.record h3 > span:first-child,
+.record h3 > strong:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .record p {
   min-width: 0;
   margin: 0;
@@ -686,15 +705,20 @@ h3 {
   min-width: 0;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   margin-top: 8px;
 }
 
 .record-actions .mini-action {
+  max-width: 100%;
   margin: 0;
   min-height: 24px;
   padding: 0 8px;
   font-size: 0.66rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .record small {
@@ -1062,7 +1086,8 @@ button:disabled {
 
 .icon-action.labeled-action {
   width: auto;
-  min-width: 76px;
+  min-width: 0;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1071,8 +1096,12 @@ button:disabled {
 }
 
 .icon-action.labeled-action span {
+  min-width: 0;
+  overflow: hidden;
   font-size: 0.7rem;
   font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .icon-action svg {
