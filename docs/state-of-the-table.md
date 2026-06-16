@@ -100,6 +100,7 @@ Every table surface should answer the same practical questions a real table answ
 49. Party vote panels now distinguish table leaning from tied votes and make the host action draft the leading choice for final send.
 50. AI companion nudge approvals now read as table beats: Stage For DM, Pass, and staged-for-next-Send-Turn status.
 51. Server HTTP integration tests now run against a temporary campaign root and prove API-token protection plus stale campaign-pin rejection on a real mutation route.
+52. Server HTTP integration tests now prove stale public guest actions and choice votes reject wrong table/session identity through real routes.
 
 ### Still Risky
 
@@ -305,7 +306,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add route-level tests for private/guest API split.
-- [ ] Add route-level integration tests with API token enabled and stale campaign/table/session payloads. Current state: real HTTP tests cover API-token protection and stale campaign-pin rejection for campaign mutation; multiplayer table/session route integration still remains open.
+- [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [ ] Add migration modules before public release.
 - [ ] Add backup/export/recycle story before destructive delete in release builds.
 - [ ] Move imported assets into app-owned portable asset storage.

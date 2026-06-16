@@ -76,6 +76,57 @@ try {
     }),
   });
   assert.equal(saved.campaign.playerNotes.scratch, "route integration saved");
+
+  const localTable = await fetchJson(`${baseUrl}/api/multiplayer/start`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lorekeeper-api-token": token,
+      "x-lorekeeper-campaign-id": created.campaign.id,
+    },
+    body: JSON.stringify({
+      host: "127.0.0.1",
+      port,
+    }),
+  });
+  const table = localTable.campaign.multiplayer.localTable;
+  assert.equal(table.running, true);
+  assert.ok(table.tableId);
+  assert.ok(table.sessionId);
+
+  const wrongSessionAction = await fetch(`${baseUrl}/api/multiplayer/action`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      connectionId: "connection-from-old-table",
+      clientId: "client-from-old-table",
+      connectionSecret: "old-secret",
+      characterId: "party-missing",
+      text: "This should not reach the active table.",
+      campaignId: created.campaign.id,
+      tableId: table.tableId,
+      sessionId: "session-from-old-link",
+    }),
+  });
+  assert.equal(wrongSessionAction.status, 409);
+  assert.match(await wrongSessionAction.text(), /session is no longer active/i);
+
+  const wrongTableVote = await fetch(`${baseUrl}/api/multiplayer/choice-vote`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      connectionId: "connection-from-old-table",
+      clientId: "client-from-old-table",
+      connectionSecret: "old-secret",
+      choiceKey: "choice-key",
+      optionId: "A",
+      campaignId: created.campaign.id,
+      tableId: "table-from-old-link",
+      sessionId: table.sessionId,
+    }),
+  });
+  assert.equal(wrongTableVote.status, 409);
+  assert.match(await wrongTableVote.text(), /different table/i);
 } finally {
   if (child && !child.killed) {
     child.kill();
