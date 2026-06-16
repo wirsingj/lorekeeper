@@ -162,7 +162,7 @@ function renderPendingInputs(container, inputs) {
 
 function hostFlowSummary({ table = {}, settings = {}, pendingInputs = [] } = {}) {
   if (!table.running) {
-    return "Start a LAN table when someone is joining from ThinLoreKeeper.";
+    return "Start a LAN table when someone is joining from LoreKeeper.";
   }
   const readyCount = pendingInputs.filter((input) => input.ready && !input.passed && input.text).length;
   if (settings.requireGuestActionApproval) {

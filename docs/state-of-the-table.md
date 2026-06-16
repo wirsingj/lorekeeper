@@ -51,7 +51,7 @@ The user should not feel like they are debugging a model, managing queue machine
 5. Party/character/vote/combat-actor choice targeting exists in the model contract and play log UI.
 6. Normal play hides raw provider meta while diagnostics remain available.
 7. Table status language has shifted toward table-facing wording: DM thinking, waiting for actor, recovery, staged input.
-8. Character creation is standardized across campaign creation, post-start host creation, guest join, and ThinLoreKeeper join.
+8. Character creation is standardized across campaign creation, post-start host creation, guest join, and LoreKeeper Join.
 9. Additional host-created characters default to AI companions, while the first campaign character is host-controlled.
 10. Grouped enemies can expand into separate combatants and initiative rows.
 11. Guest inputs can drive provider turns through structured `user.playerInputs[]`.
@@ -100,7 +100,7 @@ The user should not feel like they are debugging a model, managing queue machine
 
 ### High
 
-4. Build actual party-vote flow: host can call a vote from a party prompt, guests cast votes from ThinLoreKeeper, host breaks ties, winning option resolves.
+4. Build actual party-vote flow: host can call a vote from a party prompt, guests cast votes from LoreKeeper Join, host breaks ties, winning option resolves.
 5. Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
 6. Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
 7. Strengthen the "what the table is waiting for" surface so it covers every stuck state.
@@ -177,14 +177,15 @@ The user should not feel like they are debugging a model, managing queue machine
 - [ ] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
 - [ ] Let host choose host/AI/unassigned during additional character creation.
 
-### Multiplayer And ThinLoreKeeper
+### Multiplayer And LoreKeeper Join
 
 - [x] Host owns SQLite, model calls, canon review, and persistence.
-- [x] Guest/Thin clients do not need Ollama or provider controls.
+- [x] Guest/join clients do not need Ollama or provider controls.
 - [x] Join-as flow supports richer character proposal and host integration note.
 - [x] Guest inputs are visible table messages and can become structured `user.playerInputs[]`.
 - [x] Guest snapshots redact hidden DM notes and enemy HP.
 - [x] Remote-to-AI/host controller transfer clears stale guest links.
+- [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
 - [ ] Run first real two-machine playtest.
 - [ ] Make guest sent/received/resolving/resolved states clearer.
 - [ ] Make host "guest waiting" state harder to miss.
@@ -197,7 +198,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Campaign creation requires one host character.
 - [x] Campaign creation supports `+` additional characters.
 - [x] Post-start host-created character flow uses same compact creator.
-- [x] Guest join and ThinLoreKeeper join use aligned compact fields.
+- [x] Guest join and LoreKeeper Join use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
 - [ ] Make auto-complete campaign-aware without overriding user facts.
 - [ ] Add party-template flow for repeated related companions.
@@ -229,7 +230,7 @@ The user should not feel like they are debugging a model, managing queue machine
 
 ### Before Guest Joins
 
-1. Start Full LoreKeeper on host machine.
+1. Open LoreKeeper on the host machine and choose Host.
 2. Open the campaign to show.
 3. Confirm Local AI/provider ready.
 4. Confirm debug meta in play log is off.
@@ -241,7 +242,7 @@ The user should not feel like they are debugging a model, managing queue machine
 
 ### Guest Join Flow
 
-1. Open ThinLoreKeeper on guest machine.
+1. Open LoreKeeper on the guest machine and choose Join.
 2. Paste invite link.
 3. Confirm preview shows campaign, party, and public situation without hidden DM notes.
 4. Guest enters table name and character details.

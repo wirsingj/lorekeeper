@@ -71,6 +71,7 @@ const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
 const debugMetaStorageKey = "lorekeeper.showDebugMeta";
 const rightRailCollapsedStorageKey = "lorekeeper.rightRailCollapsed";
+const homeFlowSessionKey = "lorekeeper.homeFlow";
 const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -120,6 +121,7 @@ const state = {
   repairingCombatPromptTurn: false,
   lastCombatPromptRepairKey: "",
   rightRailCollapsed: loadRightRailCollapsed(),
+  homeFlow: clientMode ? "join" : loadHomeFlow(),
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
@@ -179,6 +181,13 @@ const elements = {
   sceneIntelligenceTensions: document.querySelector("#scene-intelligence-tensions"),
   sceneIntelligenceConsequences: document.querySelector("#scene-intelligence-consequences"),
   providerStatus: document.querySelector("#provider-status"),
+  homePanel: document.querySelector("#home-panel"),
+  homeHostFlow: document.querySelector("#home-host-flow"),
+  homeJoinFlow: document.querySelector("#home-join-flow"),
+  homeNewCampaign: document.querySelector("#home-new-campaign"),
+  homeSettings: document.querySelector("#home-settings"),
+  homeActiveCampaign: document.querySelector("#home-active-campaign"),
+  homeCharacterCount: document.querySelector("#home-character-count"),
   providerActivity: document.querySelector("#provider-activity"),
   providerActivityLabel: document.querySelector("#provider-activity-label"),
   recheckProvider: document.querySelector("#recheck-provider"),
@@ -395,6 +404,29 @@ elements.copyProviderPrompt.addEventListener("click", async () => {
     successMessage: "Provider prompt copied",
     failureMessage: "Clipboard blocked; prompt is in the drawer",
   });
+});
+
+elements.homeHostFlow?.addEventListener("click", () => {
+  chooseHomeFlow("host");
+});
+
+elements.homeJoinFlow?.addEventListener("click", () => {
+  chooseHomeFlow("join");
+});
+
+elements.homeNewCampaign?.addEventListener("click", () => {
+  chooseHomeFlow("host");
+  openCampaignDialog();
+});
+
+elements.homeSettings?.addEventListener("click", () => {
+  chooseHomeFlow("host");
+  elements.setupDialog.showModal();
+  if (clientMode) {
+    refreshGuestSnapshot({ explicit: false }).catch(() => {});
+    return;
+  }
+  refreshProviderStatus({ quiet: true });
 });
 
 elements.openSetup.addEventListener("click", () => {
@@ -1508,7 +1540,7 @@ async function boot() {
 }
 
 async function bootClientMode() {
-  document.title = "ThinLoreKeeper";
+  document.title = "LoreKeeper Join";
   state.sourceMode = "guest";
   state.campaigns = [];
   state.sqlitePath = "";
@@ -1518,7 +1550,7 @@ async function bootClientMode() {
   });
   seedPlayLog();
   render();
-  setProviderActivity("ThinLoreKeeper ready. Paste a host invite link to join.", "idle");
+  setProviderActivity("LoreKeeper Join ready. Paste a host invite link to join.", "idle");
 
   if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
     try {
@@ -3193,9 +3225,9 @@ async function stagePendingRemoteInput(inputId) {
 
 function createGuestShellCampaign() {
   return normalizeCampaign({
-    id: "thin-lorekeeper",
-    title: "ThinLoreKeeper",
-    summary: "Guest client waiting for a hosted local table.",
+    id: "lorekeeper-join",
+    title: "LoreKeeper Join",
+    summary: "Waiting for a hosted local table.",
     scene: {
       status: "waiting",
       currentPlaceId: "client-lobby",
@@ -3218,7 +3250,7 @@ function createGuestShellCampaign() {
       sessions: [
         {
           id: "thin-lorekeeper-session",
-          title: "ThinLoreKeeper",
+          title: "LoreKeeper Join",
           startedAt: new Date().toISOString(),
           endedAt: null,
           recap: "",
@@ -3230,9 +3262,9 @@ function createGuestShellCampaign() {
           sessionId: "thin-lorekeeper-session",
           role: "system",
           title: "LoreKeeper",
-          body: "ThinLoreKeeper is ready. Join a hosted local table to play as an assigned party member.",
+          body: "LoreKeeper Join is ready. Join a hosted local table to play as an assigned party member.",
           meta: "No local campaign API or model provider is running in this window.",
-          source: "thin_lorekeeper",
+          source: "lorekeeper_join",
           createdAt: new Date().toISOString(),
           data: {},
         },
@@ -3350,6 +3382,17 @@ function loadRecentGuestSession() {
 
 function loadRightRailCollapsed() {
   return localStorage.getItem(rightRailCollapsedStorageKey) === "1";
+}
+
+function loadHomeFlow() {
+  const value = sessionStorage.getItem(homeFlowSessionKey);
+  return value === "host" || value === "join" ? value : "";
+}
+
+function rememberHomeFlow(flow) {
+  if (flow === "host" || flow === "join") {
+    sessionStorage.setItem(homeFlowSessionKey, flow);
+  }
 }
 
 function saveGuestSession(session) {
@@ -4326,27 +4369,32 @@ function turnFlowBlocksNewTurn() {
 }
 
 function currentAppMode() {
-  return clientMode ? "thin" : "full";
+  return clientMode || state.homeFlow === "join" || isRemoteTableClient() ? "thin" : "full";
 }
 
 async function switchAppMode(mode) {
   const nextMode = mode === "thin" ? "thin" : "full";
   localStorage.setItem(appModeStorageKey, nextMode);
+
+  if (!clientMode) {
+    chooseHomeFlow(nextMode === "thin" ? "join" : "host");
+    return;
+  }
+
   renderAppModeControls();
 
   if (nextMode === currentAppMode()) {
-    setProviderActivity(nextMode === "thin" ? "Already in ThinLoreKeeper mode" : "Already in full LoreKeeper mode", "idle");
+    setProviderActivity(nextMode === "thin" ? "Already in Join mode" : "Already in Host mode", "idle");
     return;
   }
 
   if (window.lorekeeperDesktop?.relaunchMode) {
-    setProviderActivity(`Relaunching as ${nextMode === "thin" ? "ThinLoreKeeper" : "LoreKeeper"}...`, "working");
+    setProviderActivity(`Switching to ${nextMode === "thin" ? "Join" : "Host"} mode...`, "working");
     await window.lorekeeperDesktop.relaunchMode(nextMode);
     return;
   }
 
-  const shortcut = nextMode === "thin" ? "ThinLoreKeeper" : "LoreKeeper";
-  setProviderActivity(`Use the ${shortcut} shortcut to open that mode`, "waiting");
+  setProviderActivity(`Use the LoreKeeper app shortcut to open ${nextMode === "thin" ? "Join" : "Host"} mode`, "waiting");
 }
 
 function renderAppModeControls() {
@@ -4355,8 +4403,8 @@ function renderAppModeControls() {
   }
   if (elements.appModeNote) {
     elements.appModeNote.textContent = clientMode
-      ? "ThinLoreKeeper is the lightweight companion mode. It joins a host and syncs visible Table State."
-      : "Full LoreKeeper hosts campaigns, owns SQLite and AI providers, and can also join another host when needed.";
+      ? "Join connects to a host and syncs visible Table State without local provider setup."
+      : "Host runs campaigns, owns SQLite and AI providers, and can also join another host when needed.";
   }
 }
 
@@ -4456,7 +4504,7 @@ function renderProviderControls() {
     elements.recheckProvider.hidden = true;
     elements.bridgeCard.hidden = true;
     elements.promptDrawer.hidden = true;
-    elements.ollamaStatus.textContent = "ThinLoreKeeper uses the host provider.";
+    elements.ollamaStatus.textContent = "Join mode uses the host provider.";
     elements.ollamaBenchmark.textContent = "No local model or browser bridge is needed in this window.";
     applyThinModeChrome();
     return;
@@ -4490,7 +4538,7 @@ function applyThinModeChrome() {
   renderAppModeControls();
   document.body.classList.add("thin-lorekeeper-mode");
   elements.deleteCampaign.hidden = true;
-  elements.providerStatus.textContent = "Mode: ThinLoreKeeper companion";
+  elements.providerStatus.textContent = "Mode: LoreKeeper Join";
   hideSetupSection(elements.providerMode, true);
   hideSetupSection(elements.newCampaign, true);
   hideSetupSection(elements.responseImport, true);
@@ -5078,6 +5126,7 @@ function render() {
   const activeSession = activeSessionRecord(campaign);
 
   renderRightRailState();
+  renderHomePanel();
   elements.title.textContent = campaign.title;
   elements.sessionLabel.textContent = activeSession?.title || "Campaign Play";
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
@@ -5117,6 +5166,44 @@ function render() {
   renderProviderControls();
   renderDebugMetaControl();
   renderMultiplayerPanel();
+}
+
+function chooseHomeFlow(flow) {
+  const nextFlow = flow === "join" ? "join" : "host";
+  state.homeFlow = nextFlow;
+  rememberHomeFlow(nextFlow);
+  renderHomePanel();
+  renderThinJoinPanel();
+  if (nextFlow === "join") {
+    setProviderActivity("LoreKeeper Join ready. Paste a host invite link to request a seat.", "idle");
+    window.setTimeout(() => elements.thinJoinInviteLink?.focus(), 50);
+    return;
+  }
+  setProviderActivity("LoreKeeper Host ready.", "idle");
+}
+
+function renderHomePanel() {
+  if (!elements.homePanel) {
+    return;
+  }
+  const joinedTable = Boolean(state.guestSession?.hostBaseUrl || state.guestSnapshot?.connection);
+  const show = !state.homeFlow && !joinedTable;
+  elements.homePanel.hidden = !show;
+
+  if (elements.homeActiveCampaign) {
+    const campaignCount = state.campaigns?.length ?? 0;
+    const activeTitle = state.campaign?.title || "No active campaign";
+    elements.homeActiveCampaign.textContent = campaignCount > 1
+      ? `${campaignCount} campaigns - ${activeTitle}`
+      : activeTitle;
+  }
+
+  if (elements.homeCharacterCount) {
+    const partyCount = state.campaign?.party?.length ?? 0;
+    elements.homeCharacterCount.textContent = partyCount
+      ? `${partyCount} current party ${partyCount === 1 ? "member" : "members"}`
+      : "Character library coming next";
+  }
 }
 
 function renderRightRailState() {
@@ -5170,7 +5257,8 @@ function renderThinJoinPanel() {
     return;
   }
   const connected = state.guestSession?.status === "connected" || state.guestSnapshot?.connection?.status === "connected";
-  const show = clientMode && !connected;
+  const joinFlowActive = clientMode || state.homeFlow === "join";
+  const show = joinFlowActive && !connected;
   elements.thinJoinPanel.hidden = !show;
   elements.playLog.classList.toggle("play-log-with-join-panel", show);
   if (!show) {
@@ -7063,8 +7151,8 @@ function buildSessionHealthSummary() {
 
   if (clientMode || state.guestSession?.hostBaseUrl) {
     lines.push(state.guestSession?.connectionId
-      ? "ThinLoreKeeper is connected to the host table."
-      : "ThinLoreKeeper is not connected to a host table.");
+      ? "LoreKeeper Join is connected to the host table."
+      : "LoreKeeper Join is not connected to a host table.");
   } else {
     lines.push(tableRunning ? "Local Table hosting is running." : "Local Table hosting is off.");
   }

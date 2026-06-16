@@ -84,6 +84,42 @@ export function LorekeeperShell() {
 
       <main className="play-screen" aria-label="Lorekeeper play screen">
         <div className="screen-bezel">
+          <section id="home-panel" className="home-panel" hidden>
+            <div className="home-menu">
+              <div className="home-menu-heading">
+                <p className="eyebrow">LoreKeeper</p>
+                <h2>Choose Your Seat</h2>
+              </div>
+              <div className="home-flow-grid">
+                <article className="home-flow-card">
+                  <div>
+                    <p className="eyebrow">Host</p>
+                    <h3>Run The Table</h3>
+                    <p>Campaigns, provider setup, invites, and DM state live here.</p>
+                  </div>
+                  <div className="home-flow-actions">
+                    <button id="home-host-flow" type="button">Host</button>
+                    <button id="home-new-campaign" className="secondary-action" type="button">Host New</button>
+                  </div>
+                </article>
+                <article className="home-flow-card">
+                  <div>
+                    <p className="eyebrow">Join</p>
+                    <h3>Sit At A Hosted Table</h3>
+                    <p>Join with an invite link and a character. No local AI provider needed.</p>
+                  </div>
+                  <div className="home-flow-actions">
+                    <button id="home-join-flow" type="button">Join</button>
+                  </div>
+                </article>
+              </div>
+              <div className="home-library-strip" aria-label="Local library summary">
+                <span id="home-active-campaign">Campaigns loading...</span>
+                <span id="home-character-count">Party library coming next</span>
+                <button id="home-settings" className="secondary-action" type="button">Settings</button>
+              </div>
+            </div>
+          </section>
           <span id="session-label" className="visually-hidden">Campaign Play</span>
           <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
             <span id="provider-activity-label">Table ready.</span>
@@ -107,9 +143,9 @@ export function LorekeeperShell() {
           </div>
           <section id="thin-join-panel" className="thin-join-panel" hidden>
             <div className="thin-join-card">
-              <p className="eyebrow">ThinLoreKeeper</p>
+              <p className="eyebrow">LoreKeeper Join</p>
               <h2>Join A Hosted Table</h2>
-              <p className="thin-join-copy">Paste the invite link from the host, add your table name, and request the seat.</p>
+              <p className="thin-join-copy">Paste the invite link from the host, add your table name, and request a seat.</p>
               <label>
                 <span>Invite link</span>
                 <textarea
@@ -510,11 +546,11 @@ function SetupDialog() {
           <label>
             <span>Mode</span>
             <select id="app-mode-select">
-              <option value="full">LoreKeeper Full Host</option>
-              <option value="thin">ThinLoreKeeper Companion</option>
+              <option value="full">Host</option>
+              <option value="thin">Join</option>
             </select>
           </label>
-          <p id="app-mode-note" className="setup-note">Full mode hosts campaigns. Thin mode joins a host as a party member.</p>
+          <p id="app-mode-note" className="setup-note">Host runs campaigns and providers. Join connects to a hosted table without local provider setup.</p>
         </section>
 
         <section className="setup-section">
@@ -637,7 +673,7 @@ function SetupDialog() {
             <span id="local-table-state" className="count-pill">Off</span>
           </div>
           <p id="local-table-address" className="setup-note">Start a LAN table only when another local app is joining.</p>
-          <label className="check-row local-table-option" title="When off, approved ThinLoreKeeper players send actions straight to the host turn queue.">
+          <label className="check-row local-table-option" title="When off, approved joined players send actions straight to the host turn queue.">
             <input id="require-guest-action-approval" type="checkbox" />
             Require host approval before guest actions reach the DM
           </label>
