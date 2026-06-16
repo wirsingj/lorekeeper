@@ -71,7 +71,6 @@ const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
 const debugMetaStorageKey = "lorekeeper.showDebugMeta";
 const rightRailCollapsedStorageKey = "lorekeeper.rightRailCollapsed";
-const homeFlowSessionKey = "lorekeeper.homeFlow";
 const defaultCompanionOptions = {
   providerId: "chatgpt",
   projectHint: "LoreKeeper",
@@ -121,7 +120,7 @@ const state = {
   repairingCombatPromptTurn: false,
   lastCombatPromptRepairKey: "",
   rightRailCollapsed: loadRightRailCollapsed(),
-  homeFlow: clientMode ? "join" : loadHomeFlow(),
+  homeFlow: clientMode ? "join" : "",
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
@@ -3399,17 +3398,6 @@ function loadRightRailCollapsed() {
   return localStorage.getItem(rightRailCollapsedStorageKey) === "1";
 }
 
-function loadHomeFlow() {
-  const value = sessionStorage.getItem(homeFlowSessionKey);
-  return value === "host" || value === "join" ? value : "";
-}
-
-function rememberHomeFlow(flow) {
-  if (flow === "host" || flow === "join") {
-    sessionStorage.setItem(homeFlowSessionKey, flow);
-  }
-}
-
 function saveGuestSession(session) {
   localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
   rememberGuestSession(session);
@@ -5186,7 +5174,6 @@ function render() {
 function chooseHomeFlow(flow) {
   const nextFlow = flow === "join" ? "join" : "host";
   state.homeFlow = nextFlow;
-  rememberHomeFlow(nextFlow);
   renderHomePanel();
   renderThinJoinPanel();
   if (nextFlow === "join") {
@@ -5204,20 +5191,17 @@ function renderHomePanel() {
   const joinedTable = Boolean(state.guestSession?.hostBaseUrl || state.guestSnapshot?.connection);
   const show = !state.homeFlow && !joinedTable;
   elements.homePanel.hidden = !show;
+  elements.app?.classList.toggle("home-mode", show);
 
   if (elements.homeActiveCampaign) {
     const campaignCount = state.campaigns?.length ?? 0;
-    const activeTitle = state.campaign?.title || "No active campaign";
-    elements.homeActiveCampaign.textContent = campaignCount > 1
-      ? `${campaignCount} campaigns - ${activeTitle}`
-      : activeTitle;
+    elements.homeActiveCampaign.textContent = campaignCount
+      ? `${campaignCount} local ${campaignCount === 1 ? "campaign" : "campaigns"}`
+      : "No local campaigns yet";
   }
 
   if (elements.homeCharacterCount) {
-    const partyCount = state.campaign?.party?.length ?? 0;
-    elements.homeCharacterCount.textContent = partyCount
-      ? `${partyCount} current party ${partyCount === 1 ? "member" : "members"}`
-      : "Character library coming next";
+    elements.homeCharacterCount.textContent = "Character library coming next";
   }
 }
 

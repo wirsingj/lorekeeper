@@ -58,6 +58,7 @@ The user should not feel like they are debugging a model, managing queue machine
 12. Failed provider turns preserve approved/remote inputs as visibly staged rather than silently consuming them.
 13. CombatEngine can now resolve app-owned DC checks and opposed checks/contests with logged rolls, success/failure effects, and initiative advancement.
 14. The unified front door now treats Host, Join, and Provider Setup as first-class app-level flows.
+15. The app starts in a neutral lobby mode instead of visibly sitting at the last active table.
 
 ### Still Risky
 
@@ -214,6 +215,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Binder can collapse to give play surface more room.
 - [x] Empty states use more table-shaped language.
 - [x] Main menu separates Host, Join, and Provider Setup from the in-campaign rails.
+- [x] Main menu hides last-table rails, binder, and command input until a flow is chosen.
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.
