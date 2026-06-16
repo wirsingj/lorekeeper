@@ -81,10 +81,11 @@ Every table surface should answer the same practical questions a real table answ
 30. The right rail is split into Campaign Notes and Player Notes, with Table Talk anchored at the bottom of the table surface.
 31. Controlled-party agency validation now rejects obvious model output that speaks or acts for a host/remote/unassigned party member without submitted controller input.
 32. Route classification tests now cover the guest-public vs host-protected API boundary.
+33. Auto-resolved enemy combat turns now run through CombatEngine and commit app-owned rolls/effects/initiative before narration.
 
 ### Still Risky
 
-1. Combat resolution is still partly provider-led for enemy turns and improvised actions.
+1. Combat resolution is still partly provider-led for improvised/richer actions and some repair/import paths.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
 3. Repair/retry/import still exposes some software-shaped concepts.
 4. AI companion approval is still a button/badge flow, not yet a smooth table beat.
@@ -112,7 +113,7 @@ Every table surface should answer the same practical questions a real table answ
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Full vote flow is open. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
-| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, checks, contests, and simple spell saves have coverage. Enemy turns and richer spell/effect rules are still open. |
+| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, and simple spell saves have coverage. Richer spell/effect rules are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression improved. Needs social/travel/downtime fixtures. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist and are private. Needs scenario testing for adaptation, pacing, and non-leakage. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are not yet portable/canonical. |
@@ -123,7 +124,7 @@ Every table surface should answer the same practical questions a real table answ
 
 ### Critical
 
-1. Continue making common combat action resolution app-owned before provider narration: broader action validation, enemy turns, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
+1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
 3. Continue expanding scenario fixtures proving the provider cannot speak for host/remote/unassigned PCs across combat, join-transfer, and AI-companion cases.
 
@@ -193,8 +194,9 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Make common combat resolution app-owned.
 - [x] Add fixtures for app-owned attack, dodge, surrender, de-escalation, DC check, and opposed skill contest.
 - [x] Add fixtures for app-owned simple spell save, spell-slot spending, and save-gated conditions.
-- [ ] Add fixtures for help, disengage, hide, flee/chase, richer intimidation/de-escalation contests, enemy turn, reactions, concentration, and richer spell/effect cases.
-- [ ] Make enemy turns app-bounded: provider may choose intent/narrate, app owns state mutation.
+- [x] Add fixture for app-owned enemy attack turn.
+- [ ] Add fixtures for help, disengage, hide, flee/chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases.
+- [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
 - [ ] Add crisp AI companion combat approval flow.
 - [ ] Ensure initiative never advances by provider phrasing alone.
 

@@ -423,6 +423,30 @@ function testCombatEngine() {
   assert.equal(thorAfterSpell.stats.spellSlots[1].used, 1);
   assert.equal(entangled.campaign.combat.currentTurnId, "sy");
 
+  const enemyTurnCampaign = startCombat(campaignFixture(), {
+    enemies: [{
+      id: "miner",
+      name: "Drunk miner",
+      hp: { current: 12, max: 12 },
+      armorClass: 10,
+      attackBonus: 50,
+      damage: "1d4",
+    }],
+    initiativeRolls: { miner: 20, thor: 12, sy: 7, karl: 6 },
+  });
+  const enemyResolved = resolveCombatAction(enemyTurnCampaign, {
+    turnId: "combat-enemy-turn",
+    actorId: "miner",
+    actionType: "attack",
+    targetIds: ["thor"],
+    declaredText: "The miner swings at Thor.",
+  }, { seed: "combat-enemy-turn-seed" });
+  assert.equal(enemyResolved.actionRecord.actorId, "miner");
+  assert.equal(enemyResolved.actionRecord.rolls[0].label, "Attack roll");
+  assert.equal(enemyResolved.actionRecord.rolls[1].label, "Damage roll");
+  assert.ok(enemyResolved.campaign.party.find((member) => member.id === "thor").stats.hp.current < 12);
+  assert.equal(enemyResolved.campaign.combat.currentTurnId, "thor");
+
   const surrenderCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
     initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },

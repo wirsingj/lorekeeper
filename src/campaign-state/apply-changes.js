@@ -302,6 +302,7 @@ function mergeCombatChange(campaign, change, operation) {
   campaign.combat = normalizeCombatPatch(campaign.combat ?? {}, data);
   applyCombatActorUpdates(campaign, normalizeList(data.actorUpdates ?? data.partyUpdates));
   applyCombatEnemyUpdates(campaign.combat, normalizeList(data.enemyUpdates));
+  appendCombatLogs(campaign, data);
   reconcileDefeatedCombatants(campaign, change.summary);
   if (campaign.combat?.inCombat) {
     let orderedCampaign;
@@ -326,8 +327,55 @@ function mergeCombatChange(campaign, change, operation) {
   return { applied: true };
 }
 
+function appendCombatLogs(campaign, data = {}) {
+  const combatActions = normalizeList(data.combatActionLog ?? data.combatActions);
+  if (combatActions.length) {
+    campaign.combatActionLog = appendUniqueRecords(campaign.combatActionLog, combatActions).slice(-500);
+  }
+
+  const dice = normalizeList(data.diceLog ?? data.rolls);
+  if (dice.length) {
+    campaign.diceLog = appendUniqueRecords(campaign.diceLog, dice).slice(-1000);
+  }
+
+  const effects = normalizeList(data.stateEffectLog ?? data.effects);
+  if (effects.length) {
+    campaign.stateEffectLog = appendUniqueRecords(campaign.stateEffectLog, effects).slice(-1000);
+  }
+}
+
+function appendUniqueRecords(existing = [], additions = []) {
+  const seen = new Set(normalizeList(existing).map((item) => item?.id).filter(Boolean));
+  const next = normalizeList(existing).slice();
+  for (const item of additions) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    if (item.id && seen.has(item.id)) {
+      continue;
+    }
+    next.push(item);
+    if (item.id) {
+      seen.add(item.id);
+    }
+  }
+  return next;
+}
+
 function normalizeCombatPatch(existing = {}, data = {}) {
-  const excluded = new Set(["actorUpdates", "partyUpdates", "enemyUpdates", "promptedActorId", "onlyFromNonParty"]);
+  const excluded = new Set([
+    "actorUpdates",
+    "partyUpdates",
+    "enemyUpdates",
+    "promptedActorId",
+    "onlyFromNonParty",
+    "combatActionLog",
+    "combatActions",
+    "diceLog",
+    "rolls",
+    "stateEffectLog",
+    "effects",
+  ]);
   const patch = Object.fromEntries(Object.entries(data).filter(([key]) => !excluded.has(key)));
   const merged = mergeNestedObjects(existing, patch);
 

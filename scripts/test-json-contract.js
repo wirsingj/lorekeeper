@@ -522,6 +522,33 @@ const advancedCombat = applyCanonicalChanges(startedCombat.campaign, [
 ]);
 assert.notEqual(advancedCombat.campaign.combat.currentTurnId, resolvedActorId);
 
+const loggedCombat = applyCanonicalChanges(startedCombat.campaign, [
+  {
+    id: "combat-engine-logged-turn",
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "LoreKeeper resolved a combat action.",
+    data: {
+      inCombat: true,
+      currentTurnId: startedCombat.campaign.combat.currentTurnId,
+      combatActionLog: [{ id: "combat-action-log-test", actorId: resolvedActorId, actionType: "attack" }],
+      diceLog: [{ id: "dice-log-test", label: "Attack roll", total: 17 }],
+      stateEffectLog: [{ id: "effect-log-test", type: "hp_delta", targetId: "enemy-wolf", amount: -3 }],
+    },
+    confidence: "high",
+    reason: "Engine-owned combat turns should keep an audit trail.",
+  },
+]);
+assert.equal(loggedCombat.campaign.combatActionLog.some((entry) => entry.id === "combat-action-log-test"), true);
+assert.equal(loggedCombat.campaign.diceLog.some((entry) => entry.id === "dice-log-test"), true);
+assert.equal(loggedCombat.campaign.stateEffectLog.some((entry) => entry.id === "effect-log-test"), true);
+assert.equal(loggedCombat.campaign.combat.combatActionLog, undefined);
+assert.equal(loggedCombat.campaign.combat.diceLog, undefined);
+assert.equal(loggedCombat.campaign.combat.stateEffectLog, undefined);
+
 const repairedPromptedCombat = applyCanonicalChanges({
   ...rulesCampaignData,
   combat: {
