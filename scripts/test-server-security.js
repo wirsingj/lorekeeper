@@ -11,6 +11,7 @@ const publicGuestRoutes = [
   ["POST", "/api/multiplayer/action"],
   ["POST", "/api/multiplayer/choice-vote"],
   ["POST", "/api/multiplayer/pass"],
+  ["POST", "/api/multiplayer/disconnect"],
   ["POST", "/api/multiplayer/combat/join"],
   ["POST", "/api/multiplayer/table-talk"],
 ];

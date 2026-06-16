@@ -139,6 +139,29 @@ assert.throws(
   }),
   /Waiting room secret/,
 );
+campaign = disconnectGuest(campaign, seatedStatus.connection.id, {
+  clientId: "waiting-client",
+  connectionSecret: seatedStatus.connectionSecret,
+  requireConnectionSecret: true,
+});
+const releasedLysa = campaign.party.find((member) => member.id === "lysa");
+assert.equal(releasedLysa.controllerKind, controllerKinds.HOST);
+assert.equal(releasedLysa.inviteIntent, "remote_player");
+waitingResult = registerWaitingGuest(campaign, {
+  playerName: "Nora",
+  clientId: "waiting-client",
+  campaignId: campaign.id,
+  tableId: campaign.multiplayer.localTable.tableId,
+  tableSessionId: campaign.multiplayer.localTable.sessionId,
+  preferredPartyMemberId: "lysa",
+});
+campaign = waitingResult.campaign;
+waitingHostSnapshot = createHostSnapshot(campaign);
+assert.equal(waitingHostSnapshot.waitingGuests.length, 1);
+assert.equal(waitingHostSnapshot.waitingGuests[0].preferredPartyMemberId, "lysa");
+campaign.multiplayer.waitingGuests = campaign.multiplayer.waitingGuests.map((guest) => (
+  guest.id === waitingResult.waitingGuest.id ? { ...guest, status: "closed", closedAt: new Date().toISOString() } : guest
+));
 
 const inviteResult = createInviteForPartyMember(campaign, {
   partyMemberId: "kevric",
@@ -536,9 +559,22 @@ assert.equal(
   "resolved",
 );
 
-campaign = disconnectGuest(campaign, connected.id);
+assert.throws(
+  () => disconnectGuest(campaign, connected.id, {
+    clientId: "guest-client",
+    connectionSecret: "wrong-secret",
+    requireConnectionSecret: true,
+  }),
+  /connection secret/i,
+);
+campaign = disconnectGuest(campaign, connected.id, {
+  clientId: "guest-client",
+  connectionSecret,
+  requireConnectionSecret: true,
+});
 const releasedKevric = campaign.party.find((member) => member.id === "kevric");
-assert.equal(releasedKevric.controllerKind, controllerKinds.AI_COMPANION);
+assert.equal(releasedKevric.controllerKind, controllerKinds.HOST);
+assert.equal(releasedKevric.controllerId, "host");
 const reconnectResult = requestJoin(campaign, {
   inviteLink: inviteResult.inviteLink,
   playerName: "Jess",

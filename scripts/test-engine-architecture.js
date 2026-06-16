@@ -1230,7 +1230,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /preferredPartyMemberId/);
   assert.match(appJs, /apiMultiplayerWaitingRegisterUrl/);
   assert.match(appJs, /apiMultiplayerChoiceVoteUrl/);
+  assert.match(appJs, /apiMultiplayerDisconnectUrl/);
   assert.match(appJs, /submitGuestChoiceVote/);
+  assert.match(appJs, /notifyHostGuestLeaving/);
   assert.match(appJs, /choice-vote-count/);
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderWaitingGuestCue/);

@@ -599,7 +599,11 @@ const server = createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
         assertRequestOwnsActiveTable(campaign, body);
-        return { campaign: disconnectGuest(campaign, body.connectionId) };
+        return { campaign: disconnectGuest(campaign, body.connectionId, {
+          clientId: body.clientId,
+          connectionSecret: body.connectionSecret,
+          requireConnectionSecret: true,
+        }) };
       });
       sendJson(response, 200, {
         ...payload,
@@ -1274,6 +1278,7 @@ export function isProtectedApiPath(pathname, method) {
     || pathname === "/api/multiplayer/action"
     || pathname === "/api/multiplayer/choice-vote"
     || pathname === "/api/multiplayer/pass"
+    || pathname === "/api/multiplayer/disconnect"
     || pathname === "/api/multiplayer/combat/join"
     || pathname === "/api/multiplayer/table-talk") {
     return false;
@@ -1329,7 +1334,6 @@ export function requiresCampaignPin(pathname) {
     "/api/multiplayer/join/approve",
     "/api/multiplayer/join/deny",
     "/api/multiplayer/waiting-room/seat",
-    "/api/multiplayer/disconnect",
     "/api/multiplayer/controller/revoke",
     "/api/multiplayer/controller/ai",
     "/api/multiplayer/controller/host",

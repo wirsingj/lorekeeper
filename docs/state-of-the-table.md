@@ -237,6 +237,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Host can copy a same-network Guest Link from Local Table.
 - [x] Waiting-room guests are visible to the host without digging through diagnostics, including requested character seat.
 - [x] Stale waiting-room guests expire instead of lingering as broken seat buttons.
+- [x] Guest Leave notifies the host, releases the remote controller to Host, and makes the vacated seat requestable again.
 - [x] Generated Guest Links carry campaign/table/session identity to reject stale/wrong-table joins.
 - [x] Guest snapshots and staged actions reject wrong campaign/table/session identity when supplied.
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.

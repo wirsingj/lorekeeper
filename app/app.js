@@ -62,6 +62,7 @@ const apiMultiplayerGuestSnapshotUrl = "/api/multiplayer/guest-snapshot";
 const apiMultiplayerActionUrl = "/api/multiplayer/action";
 const apiMultiplayerChoiceVoteUrl = "/api/multiplayer/choice-vote";
 const apiMultiplayerPassUrl = "/api/multiplayer/pass";
+const apiMultiplayerDisconnectUrl = "/api/multiplayer/disconnect";
 const apiMultiplayerCombatJoinUrl = "/api/multiplayer/combat/join";
 const apiMultiplayerTableTalkUrl = "/api/multiplayer/table-talk";
 const apiMultiplayerSettingsUrl = "/api/multiplayer/settings";
@@ -451,8 +452,8 @@ elements.homeJoinFlow?.addEventListener("click", () => {
   chooseHomeFlow("join");
 });
 
-elements.joinBackHome?.addEventListener("click", () => {
-  returnToMainMenu();
+elements.joinBackHome?.addEventListener("click", async () => {
+  await returnToMainMenu();
 });
 
 elements.homeNewCampaign?.addEventListener("click", () => {
@@ -472,8 +473,8 @@ elements.openSetup.addEventListener("click", () => {
   openSetupDialog();
 });
 
-elements.returnMainMenu?.addEventListener("click", () => {
-  returnToMainMenu();
+elements.returnMainMenu?.addEventListener("click", async () => {
+  await returnToMainMenu();
 });
 
 elements.nudgeDm?.addEventListener("click", async () => {
@@ -6044,9 +6045,14 @@ function chooseHomeFlow(flow) {
   setProviderActivity("LoreKeeper Host ready.", "idle");
 }
 
-function returnToMainMenu() {
+async function returnToMainMenu() {
   const wasGuest = Boolean(clientMode || state.guestSession?.hostBaseUrl || state.waitingRoomSession?.waitingGuestId);
   if (wasGuest) {
+    await notifyHostGuestLeaving().catch((error) => {
+      pushDiagnosticsEvent("guest_leave_disconnect_failed", {
+        message: error instanceof Error ? error.message : String(error ?? "disconnect failed"),
+      });
+    });
     clearGuestSession({ keepRecent: false });
     clearWaitingRoomSession();
     state.guestLobbyPreview = null;
@@ -6063,6 +6069,21 @@ function returnToMainMenu() {
     wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Host, Join, or Provider Setup.",
     "idle",
   );
+}
+
+async function notifyHostGuestLeaving() {
+  const session = state.guestSession;
+  if (!session?.hostBaseUrl || !session?.connectionId || !session.connectionSecret) {
+    return null;
+  }
+  return postJson(`${session.hostBaseUrl}${apiMultiplayerDisconnectUrl}`, {
+    connectionId: session.connectionId,
+    clientId: session.clientId || guestClientId(),
+    connectionSecret: session.connectionSecret,
+    campaignId: session.campaignId || "",
+    tableId: session.tableId || "",
+    sessionId: session.sessionId || "",
+  });
 }
 
 function renderHomePanel() {

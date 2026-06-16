@@ -921,24 +921,37 @@ export function postTableTalk(campaign, { connectionId, clientId, connectionSecr
   return touchCampaign(next);
 }
 
-export function disconnectGuest(campaign, connectionId) {
+export function disconnectGuest(campaign, connectionId, options = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
   if (!connection) {
     throw new Error("Connection not found.");
   }
+  if (options.requireConnectionSecret) {
+    assertClientMatchesConnection(next, connection, options.clientId);
+    assertConnectionSecret(connection, options.connectionSecret);
+  }
   connection.status = "disconnected";
   connection.disconnectedAt = nowIso();
   next.party = next.party.map((member) => (
     member.id === connection.partyMemberId && member.controllerId === connection.playerId
-      ? releaseRemoteController(member)
+      ? releaseRemoteControllerToHost(member)
       : member
   ));
   next.multiplayer.pendingTurnInputs = next.multiplayer.pendingTurnInputs
     .filter((input) => input.playerId !== connection.playerId);
+  next.multiplayer.waitingGuests = next.multiplayer.waitingGuests.map((guest) => (
+    guest.connectionId === connection.id || (guest.partyMemberId === connection.partyMemberId && guest.clientId === connection.clientId)
+      ? {
+        ...guest,
+        status: "closed",
+        closedAt: nowIso(),
+      }
+      : guest
+  ));
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "guest_disconnected",
-    summary: `${connection.displayName} disconnected; character control returned to fallback.`,
+    summary: `${connection.displayName} disconnected; character control returned to the host.`,
     connectionId,
     partyMemberId: connection.partyMemberId,
   });
@@ -1573,6 +1586,19 @@ function releaseRemoteController(member) {
     ...member,
     controllerKind: fallback,
     controllerId: fallback === controllerKinds.HOST ? "host" : null,
+  };
+}
+
+function releaseRemoteControllerToHost(member) {
+  if (member.controllerKind !== controllerKinds.REMOTE_PLAYER) {
+    return member;
+  }
+  return {
+    ...member,
+    controllerKind: controllerKinds.HOST,
+    controllerId: "host",
+    fallbackControllerKind: controllerKinds.HOST,
+    inviteIntent: "remote_player",
   };
 }
 
