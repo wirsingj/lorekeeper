@@ -1110,6 +1110,26 @@ button:disabled {
   gap: 8px;
 }
 
+.home-campaign-picker {
+  display: grid;
+  gap: 6px;
+  color: #dfe7eb;
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.home-campaign-picker select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(174, 191, 202, 0.2);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: rgba(11, 14, 16, 0.62);
+  color: #edf2f4;
+  font-weight: 800;
+}
+
 .home-flow-actions button,
 .home-library-strip button {
   min-height: 36px;

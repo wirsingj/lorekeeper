@@ -197,6 +197,7 @@ const elements = {
   homeProviderSetup: document.querySelector("#home-provider-setup"),
   homeNewCampaign: document.querySelector("#home-new-campaign"),
   homeSettings: document.querySelector("#home-settings"),
+  homeCampaignSelect: document.querySelector("#home-campaign-select"),
   homeActiveCampaign: document.querySelector("#home-active-campaign"),
   homeCharacterCount: document.querySelector("#home-character-count"),
   providerActivity: document.querySelector("#provider-activity"),
@@ -431,8 +432,8 @@ elements.copyProviderPrompt.addEventListener("click", async () => {
   });
 });
 
-elements.homeHostFlow?.addEventListener("click", () => {
-  chooseHomeFlow("host");
+elements.homeHostFlow?.addEventListener("click", async () => {
+  await openSelectedHomeCampaign();
 });
 
 elements.homeJoinFlow?.addEventListener("click", () => {
@@ -5661,6 +5662,16 @@ function openLocalTableSeating() {
   window.setTimeout(() => section?.classList.remove("setup-section-focused"), 1800);
 }
 
+async function openSelectedHomeCampaign() {
+  const sqlitePath = String(elements.homeCampaignSelect?.value || "").trim();
+  if (!sqlitePath) {
+    setProviderActivity("Choose a campaign to host, or use Host New.", "waiting");
+    return;
+  }
+  state.homeFlow = "host";
+  await selectCampaignByPath(sqlitePath);
+}
+
 function chooseHomeFlow(flow) {
   const nextFlow = flow === "join" ? "join" : "host";
   state.homeFlow = nextFlow;
@@ -5699,6 +5710,42 @@ function renderHomePanel() {
 
   if (elements.homeCharacterCount) {
     elements.homeCharacterCount.textContent = "Character library coming next";
+  }
+
+  renderHomeCampaignPicker();
+}
+
+function renderHomeCampaignPicker() {
+  if (!elements.homeCampaignSelect) {
+    return;
+  }
+  const campaigns = state.campaigns ?? [];
+  if (!campaigns.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No local campaigns yet";
+    option.selected = true;
+    elements.homeCampaignSelect.replaceChildren(option);
+    elements.homeCampaignSelect.disabled = true;
+    if (elements.homeHostFlow) {
+      elements.homeHostFlow.disabled = true;
+      elements.homeHostFlow.title = "Create a campaign first.";
+    }
+    return;
+  }
+  elements.homeCampaignSelect.disabled = false;
+  elements.homeCampaignSelect.replaceChildren(
+    ...campaigns.map((campaign) => {
+      const option = document.createElement("option");
+      option.value = campaign.sqlitePath;
+      option.textContent = campaign.title;
+      option.selected = campaign.sqlitePath === state.sqlitePath;
+      return option;
+    }),
+  );
+  if (elements.homeHostFlow) {
+    elements.homeHostFlow.disabled = false;
+    elements.homeHostFlow.title = "Open the selected campaign as host.";
   }
 }
 

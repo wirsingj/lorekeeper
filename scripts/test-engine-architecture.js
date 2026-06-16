@@ -1077,6 +1077,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="right-rail-toggle"/);
   assert.match(appShell, /guest-waiting-room-panel/);
   assert.match(appShell, /Ask To Join/);
+  assert.match(appShell, /home-campaign-select/);
+  assert.match(appShell, /Existing Campaign/);
   assert.match(appShell, /id="waiting-guests"/);
   assert.ok(
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
@@ -1094,6 +1096,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /campaign-wizard-mode/);
   assert.match(appJs, /campaignWizardReturnHome/);
   assert.match(appJs, /dismissCampaignWizard/);
+  assert.match(appJs, /openSelectedHomeCampaign/);
+  assert.match(appJs, /renderHomeCampaignPicker/);
   assert.match(appJs, /guestWaitingRoomMode/);
   assert.match(appJs, /apiMultiplayerWaitingRegisterUrl/);
   assert.match(appJs, /seatWaitingGuestAtTable/);

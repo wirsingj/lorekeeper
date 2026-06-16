@@ -70,6 +70,7 @@ The user should not feel like they are debugging a model, managing queue machine
 24. Host Local Table now exposes a copyable Guest Link built from the detected LAN IP and port.
 25. Waiting-room guests now surface from the live host snapshot in Local Table, party seating actions, session health, and the table status strip.
 26. Waiting-room presence now uses guest heartbeat/stale filtering so old guest names do not linger after campaign switches or closed tabs.
+27. The front door Host flow now requires choosing an existing campaign instead of dropping into the last active table.
 
 ### Still Risky
 
@@ -239,6 +240,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Empty states use more table-shaped language.
 - [x] Main menu separates Host, Join, and Provider Setup from the in-campaign rails.
 - [x] Main menu hides last-table rails, binder, and command input until a flow is chosen.
+- [x] Host on the main menu opens a selected campaign instead of implicitly resuming the last active campaign.
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.

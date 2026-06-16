@@ -102,10 +102,16 @@ export function LorekeeperShell() {
                   <div>
                     <p className="eyebrow">Host</p>
                     <h3>Run The Table</h3>
-                    <p>Campaigns, provider setup, invites, and DM state live here.</p>
+                    <p>Open an existing campaign or start a new table.</p>
                   </div>
+                  <label className="home-campaign-picker">
+                    <span>Existing Campaign</span>
+                    <select id="home-campaign-select" aria-label="Existing campaign">
+                      <option>Loading campaigns...</option>
+                    </select>
+                  </label>
                   <div className="home-flow-actions">
-                    <button id="home-host-flow" type="button">Host</button>
+                    <button id="home-host-flow" type="button">Open</button>
                     <button id="home-new-campaign" className="secondary-action" type="button">Host New</button>
                   </div>
                 </article>
