@@ -11,6 +11,7 @@ import { buildHostResponseReviewProjection } from "../app/host-response-review-c
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
+import { buildProviderImportOutcome } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
@@ -1568,6 +1569,26 @@ function testHostResponseReviewProjection() {
   assert.match(changes.body, /1 proposed state change/);
 }
 
+function testProviderImportOutcomeProjection() {
+  const warning = buildProviderImportOutcome({ extractionError: "missing state block" });
+  assert.equal(warning.state, "imported_with_warning");
+  assert.match(warning.bridgeStatus, /missing state block/);
+  assert.equal(warning.activityState, "waiting");
+
+  const saved = buildProviderImportOutcome({ autoCommitAppliedCount: 2, source: "local" });
+  assert.equal(saved.state, "state_saved");
+  assert.match(saved.bridgeStatus, /2 state changes saved/);
+  assert.equal(saved.activityText, "State updated from local response");
+
+  const review = buildProviderImportOutcome({ proposedChangesCount: 1 });
+  assert.equal(review.state, "review_pending");
+  assert.match(review.bridgeStatus, /1 proposed state change awaiting review/);
+
+  const imported = buildProviderImportOutcome();
+  assert.equal(imported.state, "imported");
+  assert.equal(imported.activityState, "idle");
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -1740,6 +1761,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /buildStagedInputRecoveryPlan/, "staged input recovery policy should be outside the renderer turn body");
   assert.match(appJs, /applyStagedInputRecoveryPlan/, "renderer should execute the staged input recovery plan");
   assert.doesNotMatch(appJs, /else if \(inputs\.length && !runResult\?\.imported\)/, "pending input recovery branching should live in staged-input-recovery-controller");
+  assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
+  assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
@@ -1892,6 +1915,7 @@ testStructuredInputsDoNotMergeIntoHostMessage();
 testTurnRepairController();
 testStagedInputRecoveryController();
 testHostResponseReviewProjection();
+testProviderImportOutcomeProjection();
 testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();

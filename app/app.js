@@ -22,6 +22,7 @@ import { buildInputComposerProjection, applyInputComposerProjection } from "./in
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
+import { buildProviderImportOutcome } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
@@ -6559,18 +6560,15 @@ async function importProviderResponse(responseText, options = {}) {
       error: extraction.error,
       responseChars: responseText.length,
     });
-    elements.bridgeStatus.textContent = `DM response imported; ${extraction.error}`;
-    setProviderActivity("Imported response; no state updates saved", "waiting");
-  } else if (autoCommitResult?.applied?.length) {
-    elements.bridgeStatus.textContent = `${autoCommitResult.applied.length} state change${autoCommitResult.applied.length === 1 ? "" : "s"} saved to SQLite`;
-    setProviderActivity("State updated from local response", "idle");
-  } else if (proposedChanges.length > 0) {
-    elements.bridgeStatus.textContent = `${proposedChanges.length} proposed state change${proposedChanges.length === 1 ? "" : "s"} awaiting review`;
-    setProviderActivity("Imported response; proposed changes awaiting review", "waiting");
-  } else {
-    elements.bridgeStatus.textContent = "DM response imported with no proposed changes";
-    setProviderActivity("Imported provider response", "idle");
   }
+  const importOutcome = buildProviderImportOutcome({
+    extractionError: extraction.error,
+    autoCommitAppliedCount: autoCommitResult?.applied?.length ?? 0,
+    proposedChangesCount: proposedChanges.length,
+    source: options.source || "provider",
+  });
+  elements.bridgeStatus.textContent = importOutcome.bridgeStatus;
+  setProviderActivity(importOutcome.activityText, importOutcome.activityState);
   pushDiagnosticsEvent("provider_imported", {
     source: options.source || "manual_import",
     responseChars: responseText.length,
