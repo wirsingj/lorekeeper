@@ -1060,6 +1060,155 @@ for (const fixture of ordinarySceneChoiceSpamFixtures) {
   assert.match(parsed.response.warnings.join(" "), /Structured choices suppressed/, `${fixture.mode} fixture should explain choice suppression`);
 }
 
+const richFullTurnFixtures = [
+  {
+    name: "social negotiation",
+    response: fullTurnResponse({
+      table: [{
+        speaker: "DM",
+        speakerId: null,
+        role: "dm",
+        kind: "narration",
+        visibility: "table",
+        text: "The toll keeper's bravado thins when Jarin names the burned wagon. He glances once toward the shuttered counting house, then lowers his voice. 'Not here,' he says. 'If the captain sees me talking, my family loses their place on the ferry.'",
+      }],
+      sceneStatus: { mode: "social", danger: "tense", awaitingPlayer: false },
+      proposedChanges: [{
+        operation: "note",
+        domain: "people",
+        targetId: "toll-keeper",
+        summary: "The toll keeper fears the ferry captain and has family leverage over him.",
+        data: { relationship: "afraid_of_ferry_captain", leverage: "family place on ferry" },
+        confidence: "high",
+        reason: "Established through dialogue.",
+      }],
+    }),
+    expected: /toll keeper's bravado thins/,
+  },
+  {
+    name: "travel consequence",
+    response: fullTurnResponse({
+      table: [{
+        speaker: "DM",
+        speakerId: null,
+        role: "dm",
+        kind: "narration",
+        visibility: "table",
+        text: "By dusk the road has become a ribbon of black mud. The cart wheels keep to the high ridge, but the party loses the clean tracks they were following. Far behind, a horn answers another horn, both softened by rain.",
+      }],
+      sceneStatus: { mode: "travel", danger: "tense", awaitingPlayer: false },
+      proposedChanges: [{
+        operation: "note",
+        domain: "scene",
+        targetId: null,
+        summary: "Rain erased the clean trail, but distant horns suggest organized pursuit.",
+        data: { immediateSituation: "Rainy road travel with distant horns behind the party." },
+        confidence: "high",
+        reason: "Travel consequence from the current scene.",
+      }],
+    }),
+    expected: /ribbon of black mud/,
+  },
+  {
+    name: "mystery clue",
+    response: fullTurnResponse({
+      table: [{
+        speaker: "DM",
+        speakerId: null,
+        role: "dm",
+        kind: "narration",
+        visibility: "table",
+        text: "The shrine dust breaks in a pattern too clean for wind. Under the offering bowl is a crescent scratch, repeated three times, each mark cut from the same angle as if someone used the bowl itself as a guide.",
+      }],
+      sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: false },
+      proposedChanges: [{
+        operation: "add",
+        domain: "items",
+        targetId: null,
+        summary: "Crescent guide-marks found beneath the shrine offering bowl.",
+        data: { name: "Crescent guide-marks", type: "clue", description: "Three repeated crescent scratches under the offering bowl." },
+        confidence: "high",
+        reason: "Directly discovered investigation clue.",
+      }],
+    }),
+    expected: /crescent scratch/,
+  },
+  {
+    name: "downtime fallout",
+    response: fullTurnResponse({
+      table: [{
+        speaker: "DM",
+        speakerId: null,
+        role: "dm",
+        kind: "narration",
+        visibility: "table",
+        text: "By morning, the taproom has decided the party is either cursed or useful. The innkeeper does not charge for breakfast, but the bowl of porridge arrives with a folded note tucked beneath it: Meet me where the old bell fell.",
+      }],
+      sceneStatus: { mode: "downtime", danger: "none", awaitingPlayer: false },
+      proposedChanges: [{
+        operation: "add",
+        domain: "quests",
+        targetId: null,
+        summary: "A folded note asks the party to meet where the old bell fell.",
+        data: { title: "Where the old bell fell", status: "active", stakes: "Someone local wants a private meeting after last night's events." },
+        confidence: "medium",
+        reason: "Downtime consequence introduced a follow-up thread.",
+      }],
+    }),
+    expected: /old bell fell/,
+  },
+  {
+    name: "combat resolution",
+    response: fullTurnResponse({
+      table: [{
+        speaker: "DM",
+        speakerId: null,
+        role: "dm",
+        kind: "narration",
+        visibility: "table",
+        text: "Mira's spear catches the wolf as it lunges, turning its charge into a skidding crash through wet leaves. The creature snaps once at empty air, then scrambles back with blood darkening its shoulder.",
+      }],
+      sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+      mechanics: [{ type: "attack", actor: "Mira", target: "Massive wolf", roll: "d20+5 = 18 vs AC 14", damage: "1d8+3 = 9 piercing", outcome: "success", text: "Mira hits the Massive wolf for 9 piercing damage." }],
+      proposedChanges: [{
+        operation: "update",
+        domain: "combat",
+        targetId: null,
+        summary: "Mira's spear attack resolves and initiative advances.",
+        data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "mira" },
+        confidence: "high",
+        reason: "Submitted combat action resolved with visible mechanics.",
+      }],
+    }),
+    expected: /spear catches the wolf/,
+  },
+  {
+    name: "recovery continuation",
+    response: fullTurnResponse({
+      table: [{
+        speaker: "DM",
+        speakerId: null,
+        role: "dm",
+        kind: "narration",
+        visibility: "table",
+        text: "The moment settles back into place. The sheriff still waits in the rain with one hand on the ferry rail, and the crowd has not moved; whatever confusion crossed the table, the scene is intact.",
+      }],
+      sceneStatus: { mode: "social", danger: "tense", awaitingPlayer: false },
+      flags: { requiresReview: false, startsCombat: false, endsScene: false, containsSecretInfo: false },
+      proposedChanges: [],
+    }),
+    expected: /scene is intact/,
+  },
+];
+for (const fixture of richFullTurnFixtures) {
+  const parsed = parseTurnJsonResponse(JSON.stringify(fixture.response), {
+    choicePolicy: { choicesAllowed: false, default: "narration_first" },
+  });
+  assert.equal(parsed.ok, true, `${fixture.name} full-turn fixture should parse`);
+  assert.equal(parsed.response.choices.options.length, 0, `${fixture.name} should not force options`);
+  assert.match(renderTurnResponseForImport(parsed.response), fixture.expected, `${fixture.name} should render narration`);
+}
+
 const markdownWrapped = parseTurnJsonResponse(`\`\`\`json\n${JSON.stringify(validTurnResponse())}\n\`\`\``);
 assert.equal(markdownWrapped.ok, true);
 assert.equal(markdownWrapped.recovery, "markdown_stripped");
@@ -1734,6 +1883,14 @@ function validTurnResponse(overrides = {}) {
     warnings: [],
     ...overrides,
   };
+}
+
+function fullTurnResponse(overrides = {}) {
+  return validTurnResponse({
+    mechanics: [],
+    choices: { prompt: "", options: [], allowOther: true },
+    ...overrides,
+  });
 }
 
 function validChange() {

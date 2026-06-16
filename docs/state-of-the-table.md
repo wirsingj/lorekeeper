@@ -107,6 +107,7 @@ Every table surface should answer the same practical questions a real table answ
 56. Session health now prioritizes a `Next:` line for stuck/waiting states, including repair, provider wait, guest seating/approval, queued guest input, combat ownership, and companion combat turns.
 57. Provider turn requests now include an app-owned AI companion interjection policy with rarity/cooldown gates, explicit nudge bypass, and low-stakes constraints.
 58. Combat response validation now rejects wrong `resolvedActorId` and next-actor overreach for enemy turns as well as player turns.
+59. JSON contract fixtures now include richer full-turn social, travel, mystery, downtime, combat, and recovery scenes that render without forced option panels.
 
 ### Still Risky
 
@@ -192,7 +193,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Choice targeting supports party, character, subset, vote, combat actor, and free prompts.
 - [x] Add provider-output fixtures for obvious controlled-PC agency failures.
 - [x] Reject obvious controlled-PC agency violations during response validation.
-- [ ] Add richer provider-output fixtures for social, travel, mystery, downtime, combat, and recovery scenes. Current state: narration-first choice-suppression fixtures cover social, travel, exploration/mystery, downtime, and recovery-like beats; richer full-turn fixtures are still needed.
+- [x] Add richer provider-output fixtures for social, travel, mystery, downtime, combat, and recovery scenes.
 - [ ] Improve context retrieval beyond recent history/context pack breadth.
 - [ ] Add hidden-story scenario tests for adaptation without leaking future twists.
 - [ ] Tighten prompts so normal scene turns can be rich without always forcing choices.
