@@ -263,7 +263,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Errors table records provider/session diagnostics.
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
-- [ ] Add route-level tests for private/guest API split.
+- [x] Add route-level tests for private/guest API split.
 - [ ] Add migration modules before public release.
 - [ ] Add backup/export/recycle story before destructive delete in release builds.
 - [ ] Move imported assets into app-owned portable asset storage.

@@ -11,7 +11,7 @@
   "scripts": {
     "check": "node ./src/index.js",
     "demo": "node ./src/index.js",
-    "test": "node ./scripts/test-engine-architecture.js && node ./scripts/test-json-contract.js && node ./scripts/test-multiplayer.js && node ./scripts/test-sqlite-storage.js",
+    "test": "node ./scripts/test-engine-architecture.js && node ./scripts/test-json-contract.js && node ./scripts/test-multiplayer.js && node ./scripts/test-sqlite-storage.js && node ./scripts/test-server-security.js",
     "new:campaign": "node ./scripts/new-campaign.js",
     "import:folder": "node ./scripts/import-campaign-folder.js",
     "api": "node ./scripts/serve.js 4174",

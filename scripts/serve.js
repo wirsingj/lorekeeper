@@ -58,6 +58,8 @@ import {
 } from "../src/multiplayer/local-table.js";
 
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const serverModulePath = fileURLToPath(import.meta.url);
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === serverModulePath;
 const port = Number(process.env.PORT ?? process.argv[2] ?? 4173);
 const bindHost = process.env.LOREKEEPER_BIND_HOST || process.env.HOST || "127.0.0.1";
 const apiToken = process.env.LOREKEEPER_API_TOKEN || "";
@@ -692,9 +694,11 @@ server.on("error", (error) => {
   process.exitCode = 1;
 });
 
-server.listen(port, bindHost, () => {
-  console.log(`Lorekeeper local app: http://${bindHost === "127.0.0.1" ? "localhost" : bindHost}:${port}`);
-});
+if (isDirectRun) {
+  server.listen(port, bindHost, () => {
+    console.log(`Lorekeeper local app: http://${bindHost === "127.0.0.1" ? "localhost" : bindHost}:${port}`);
+  });
+}
 
 if (process.channel) {
   process.on("disconnect", () => shutdownServer("parent-disconnect"));
@@ -1231,7 +1235,7 @@ function isAuthorizedRequest(request, url) {
   return request.headers["x-lorekeeper-api-token"] === apiToken;
 }
 
-function isProtectedApiPath(pathname, method) {
+export function isProtectedApiPath(pathname, method) {
   if (!pathname.startsWith("/api/")) {
     return false;
   }
@@ -1282,7 +1286,7 @@ async function validateCampaignPin(request, url) {
   return { ok: true };
 }
 
-function requiresCampaignPin(pathname) {
+export function requiresCampaignPin(pathname) {
   return new Set([
     "/api/campaign/record",
     "/api/campaign/delete",
