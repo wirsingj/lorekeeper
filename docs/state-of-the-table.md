@@ -89,6 +89,7 @@ Every table surface should answer the same practical questions a real table answ
 38. Remote guests can vote on party-scoped choice prompts without drafting locked action text; vote counters and a host-facing vote summary are shown on the choice panel.
 39. Guest Leave now notifies the host, releases the remote controller to Host, and makes the vacated seat requestable again.
 40. Server security tests now exercise the API-token authorization decision for public guest routes, protected host routes, unknown API routes, and local assets.
+41. JSON contract fixtures now prove narration-first choice suppression across social, travel, exploration/mystery, downtime, and recovery-like scene beats.
 
 ### Still Risky
 
@@ -174,7 +175,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Choice targeting supports party, character, subset, vote, combat actor, and free prompts.
 - [x] Add provider-output fixtures for obvious controlled-PC agency failures.
 - [x] Reject obvious controlled-PC agency violations during response validation.
-- [ ] Add fixtures for social, travel, mystery, downtime, combat, and recovery scenes.
+- [ ] Add richer provider-output fixtures for social, travel, mystery, downtime, combat, and recovery scenes. Current state: narration-first choice-suppression fixtures cover social, travel, exploration/mystery, downtime, and recovery-like beats; richer full-turn fixtures are still needed.
 - [ ] Improve context retrieval beyond recent history/context pack breadth.
 - [ ] Add hidden-story scenario tests for adaptation without leaking future twists.
 - [ ] Tighten prompts so normal scene turns can be rich without always forcing choices.

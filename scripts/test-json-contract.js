@@ -881,6 +881,43 @@ assert.equal(narrationFirstChoiceSpam.ok, true);
 assert.equal(narrationFirstChoiceSpam.response.choices.options.length, 0);
 assert.match(narrationFirstChoiceSpam.response.warnings.join(" "), /Structured choices suppressed/);
 
+const ordinarySceneChoiceSpamFixtures = [
+  {
+    mode: "social",
+    text: "The merchant exhales slowly. The coins remain on the counter, but her hand no longer covers them.",
+  },
+  {
+    mode: "travel",
+    text: "Rain tracks down the cart canvas while the old road bends toward a line of distant watchfires.",
+  },
+  {
+    mode: "exploration",
+    text: "Dust shifts under the shrine stones, revealing a clean groove where someone recently dragged a narrow box.",
+  },
+  {
+    mode: "downtime",
+    text: "By morning, the innkeeper has set aside a private room and a bowl of ink-stained keys.",
+  },
+  {
+    mode: "recovery",
+    text: "The table beat settles. The last action is still intact, and the DM is ready to continue from the same moment.",
+  },
+];
+for (const fixture of ordinarySceneChoiceSpamFixtures) {
+  const parsed = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+    table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: fixture.text }],
+    sceneStatus: { mode: fixture.mode, danger: "none", awaitingPlayer: false },
+    mechanics: [],
+    flags: { requiresReview: false, startsCombat: false, endsScene: false, containsSecretInfo: false },
+    proposedChanges: [],
+  })), {
+    choicePolicy: { choicesAllowed: false, default: "narration_first" },
+  });
+  assert.equal(parsed.ok, true, `${fixture.mode} fixture should parse`);
+  assert.equal(parsed.response.choices.options.length, 0, `${fixture.mode} narration should not keep structured choices`);
+  assert.match(parsed.response.warnings.join(" "), /Structured choices suppressed/, `${fixture.mode} fixture should explain choice suppression`);
+}
+
 const markdownWrapped = parseTurnJsonResponse(`\`\`\`json\n${JSON.stringify(validTurnResponse())}\n\`\`\``);
 assert.equal(markdownWrapped.ok, true);
 assert.equal(markdownWrapped.recovery, "markdown_stripped");
