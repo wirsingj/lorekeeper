@@ -58,13 +58,14 @@ import {
   updateMultiplayerSettings,
 } from "../src/multiplayer/local-table.js";
 
-const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const defaultProjectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const projectRoot = path.resolve(process.env.LOREKEEPER_PROJECT_ROOT || defaultProjectRoot);
 const serverModulePath = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === serverModulePath;
 const port = Number(process.env.PORT ?? process.argv[2] ?? 4173);
 const bindHost = process.env.LOREKEEPER_BIND_HOST || process.env.HOST || "127.0.0.1";
 const apiToken = process.env.LOREKEEPER_API_TOKEN || "";
-const builtAppRoot = path.join(projectRoot, "dist", "app");
+const builtAppRoot = path.join(defaultProjectRoot, "dist", "app");
 const startedAt = new Date().toISOString();
 const maxJsonBodyBytes = 1024 * 1024;
 
@@ -138,7 +139,7 @@ const server = createServer(async (request, response) => {
         pid: process.pid,
         parentPid: process.ppid,
         projectRoot,
-        port,
+        port: activeServerPort(),
         bindHost,
         startedAt,
         authRequired: Boolean(apiToken),
@@ -731,7 +732,7 @@ server.on("error", (error) => {
 
 if (isDirectRun) {
   server.listen(port, bindHost, () => {
-    console.log(`Lorekeeper local app: http://${bindHost === "127.0.0.1" ? "localhost" : bindHost}:${port}`);
+    console.log(`Lorekeeper local app: http://${bindHost === "127.0.0.1" ? "localhost" : bindHost}:${activeServerPort()}`);
   });
 }
 
@@ -761,6 +762,11 @@ function shutdownServer(signal) {
     process.exit(0);
   });
   setTimeout(() => process.exit(0), 2000).unref();
+}
+
+function activeServerPort() {
+  const address = server.address();
+  return address && typeof address === "object" ? address.port : port;
 }
 
 async function buildDiagnosticsBundle() {
