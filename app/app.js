@@ -24,7 +24,8 @@ import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 
 const launchParams = new URLSearchParams(window.location.search);
-const clientMode = launchParams.get("mode") === "client";
+const guestWaitingRoomMode = window.location.pathname === "/guest" || launchParams.get("mode") === "guest";
+const clientMode = launchParams.get("mode") === "client" || guestWaitingRoomMode;
 const apiToken = launchParams.get("lkToken") || "";
 const nativeFetch = window.fetch.bind(window);
 const bundleUrl = "/data/imports/veil-of-the-towers.bundle.json";
@@ -52,6 +53,9 @@ const apiMultiplayerInviteUrl = "/api/multiplayer/invite";
 const apiMultiplayerInviteCharacterUrl = "/api/multiplayer/invite-character";
 const apiMultiplayerJoinUrl = "/api/multiplayer/join";
 const apiMultiplayerJoinPreviewUrl = "/api/multiplayer/join-preview";
+const apiMultiplayerWaitingRegisterUrl = "/api/multiplayer/waiting-room/register";
+const apiMultiplayerWaitingStatusUrl = "/api/multiplayer/waiting-room/status";
+const apiMultiplayerWaitingSeatUrl = "/api/multiplayer/waiting-room/seat";
 const apiMultiplayerGuestSnapshotUrl = "/api/multiplayer/guest-snapshot";
 const apiMultiplayerActionUrl = "/api/multiplayer/action";
 const apiMultiplayerPassUrl = "/api/multiplayer/pass";
@@ -69,6 +73,7 @@ const extensionResponseType = "lorekeeper.appBridge.response";
 const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
+const guestWaitingRoomStorageKey = "lorekeeper.guestWaitingRoomSession";
 const debugMetaStorageKey = "lorekeeper.showDebugMeta";
 const rightRailCollapsedStorageKey = "lorekeeper.rightRailCollapsed";
 const defaultCompanionOptions = {
@@ -106,6 +111,7 @@ const state = {
   multiplayerSnapshot: null,
   guestSession: loadGuestSession(),
   recentGuestSession: loadRecentGuestSession(),
+  waitingRoomSession: loadWaitingRoomSession(),
   guestSnapshot: null,
   guestPollInFlight: false,
   joinPreviewTimer: null,
@@ -257,6 +263,13 @@ const elements = {
   promptDrawer: document.querySelector("#prompt-drawer"),
   sessionLabel: document.querySelector("#session-label"),
   thinJoinPanel: document.querySelector("#thin-join-panel"),
+  thinJoinTitle: document.querySelector("#thin-join-title"),
+  thinJoinCopy: document.querySelector("#thin-join-copy"),
+  guestInvitePanel: document.querySelector("#guest-invite-panel"),
+  guestWaitingRoomPanel: document.querySelector("#guest-waiting-room-panel"),
+  guestWaitingPlayerName: document.querySelector("#guest-waiting-player-name"),
+  guestWaitingRegister: document.querySelector("#guest-waiting-register"),
+  guestWaitingStatus: document.querySelector("#guest-waiting-status"),
   thinJoinInviteLink: document.querySelector("#thin-join-invite-link"),
   thinJoinPreview: document.querySelector("#thin-join-preview"),
   thinJoinPlayerName: document.querySelector("#thin-join-player-name"),
@@ -311,6 +324,7 @@ const elements = {
   inviteNewCharacterMain: document.querySelector("#invite-new-character-main"),
   syncGuestTable: document.querySelector("#sync-guest-table"),
   resolvePartyInputs: document.querySelector("#resolve-party-inputs"),
+  waitingGuests: document.querySelector("#waiting-guests"),
   connectedGuests: document.querySelector("#connected-guests"),
   pendingInputs: document.querySelector("#pending-inputs"),
   joinCampaignDialog: document.querySelector("#join-campaign-dialog"),
@@ -672,6 +686,10 @@ elements.thinJoinOpenDialog?.addEventListener("click", () => {
 
 elements.thinJoinSubmit?.addEventListener("click", async () => {
   await requestJoinFromThinPanel();
+});
+
+elements.guestWaitingRegister?.addEventListener("click", async () => {
+  await registerGuestWaitingRoom();
 });
 
 elements.thinJoinInviteLink?.addEventListener("input", () => {
@@ -1593,7 +1611,12 @@ async function bootClientMode() {
   });
   seedPlayLog();
   render();
-  setProviderActivity("LoreKeeper Join ready. Paste a host invite link to join.", "idle");
+  setProviderActivity(
+    guestWaitingRoomMode
+      ? "Guest waiting room ready. Ask the host for a seat."
+      : "LoreKeeper Join ready. Paste a host invite link to join.",
+    "idle",
+  );
 
   if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
     try {
@@ -1604,7 +1627,24 @@ async function bootClientMode() {
     }
   }
 
-  window.setTimeout(() => elements.thinJoinInviteLink?.focus(), 200);
+  if (guestWaitingRoomMode && state.waitingRoomSession?.waitingGuestId) {
+    if (elements.guestWaitingPlayerName && state.waitingRoomSession.playerName) {
+      elements.guestWaitingPlayerName.value = state.waitingRoomSession.playerName;
+    }
+    await refreshWaitingRoomStatus({ explicit: false }).catch(() => {
+      setProviderActivity("Waiting room session expired. Ask to join again.", "waiting");
+      clearWaitingRoomSession();
+    });
+    return;
+  }
+
+  window.setTimeout(() => {
+    if (guestWaitingRoomMode) {
+      elements.guestWaitingPlayerName?.focus();
+      return;
+    }
+    elements.thinJoinInviteLink?.focus();
+  }, 200);
 }
 
 async function bootRemoteClientMode() {
@@ -1641,6 +1681,10 @@ function startMultiplayerPolling() {
     try {
       if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
         await refreshGuestSnapshot({ explicit: false });
+        return;
+      }
+      if (guestWaitingRoomMode && state.waitingRoomSession?.waitingGuestId) {
+        await refreshWaitingRoomStatus({ explicit: false });
         return;
       }
       if (state.campaign?.multiplayer?.localTable?.running) {
@@ -2756,6 +2800,98 @@ async function requestJoinFromThinPanel() {
   });
 }
 
+async function registerGuestWaitingRoom() {
+  const playerName = String(elements.guestWaitingPlayerName?.value ?? "").trim();
+  if (!playerName) {
+    if (elements.guestWaitingStatus) {
+      elements.guestWaitingStatus.textContent = "Enter the name the host should see at the table.";
+    }
+    return;
+  }
+  try {
+    if (elements.guestWaitingRegister) {
+      elements.guestWaitingRegister.disabled = true;
+    }
+    const clientId = guestClientId();
+    const hostBaseUrl = window.location.origin;
+    const result = await postJson(`${hostBaseUrl}${apiMultiplayerWaitingRegisterUrl}`, {
+      playerName,
+      clientId,
+    });
+    saveWaitingRoomSession({
+      hostBaseUrl,
+      clientId,
+      waitingGuestId: result.waitingGuest?.id,
+      waitingSecret: result.waitingSecret || "",
+      playerName,
+      campaignTitle: result.campaignTitle || "",
+      status: "waiting",
+      savedAt: new Date().toISOString(),
+    });
+    if (elements.guestWaitingStatus) {
+      elements.guestWaitingStatus.textContent = "You are in the waiting room. The host can seat you now.";
+    }
+    setProviderActivity("Waiting for the host to seat you.", "waiting");
+    await refreshWaitingRoomStatus({ explicit: true });
+  } catch (error) {
+    if (elements.guestWaitingStatus) {
+      elements.guestWaitingStatus.textContent = error instanceof Error ? error.message : "Could not join the waiting room.";
+    }
+    setProviderActivity(error instanceof Error ? error.message : "Could not join the waiting room.", "error");
+  } finally {
+    if (elements.guestWaitingRegister) {
+      elements.guestWaitingRegister.disabled = false;
+    }
+  }
+}
+
+async function refreshWaitingRoomStatus({ explicit = false } = {}) {
+  const session = state.waitingRoomSession;
+  if (!session?.hostBaseUrl || !session?.waitingGuestId) {
+    return null;
+  }
+  const url = new URL(`${session.hostBaseUrl}${apiMultiplayerWaitingStatusUrl}`);
+  url.searchParams.set("waitingGuestId", session.waitingGuestId);
+  url.searchParams.set("clientId", session.clientId || guestClientId());
+  url.searchParams.set("waitingSecret", session.waitingSecret || "");
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+  const status = await response.json();
+  if (status.seated && status.connection && status.connectionSecret) {
+    const guestSession = {
+      inviteLink: "",
+      hostBaseUrl: session.hostBaseUrl,
+      connectionId: status.connection.id,
+      clientId: session.clientId || guestClientId(),
+      connectionSecret: status.connectionSecret,
+      campaignId: status.campaignId,
+      partyMemberId: status.connection.partyMemberId,
+      playerName: status.connection.displayName || session.playerName || "",
+      status: "connected",
+      savedAt: new Date().toISOString(),
+    };
+    saveGuestSession(guestSession);
+    clearWaitingRoomSession();
+    renderGuestSnapshot(status.snapshot);
+    setProviderActivity(`You are seated as ${status.snapshot?.assignedCharacter?.name || "a party member"}.`, "idle");
+    return status;
+  }
+  saveWaitingRoomSession({
+    ...session,
+    campaignTitle: status.campaignTitle || session.campaignTitle || "",
+    status: status.waitingGuest?.status || "waiting",
+    savedAt: new Date().toISOString(),
+  });
+  if (elements.guestWaitingStatus) {
+    elements.guestWaitingStatus.textContent = explicit
+      ? "Still waiting for the host to choose your seat."
+      : "Waiting for the host to choose your seat.";
+  }
+  return status;
+}
+
 function copyThinJoinCharacterToDialog() {
   const pairs = [
     [elements.joinCharacterName, elements.thinJoinCharacterName],
@@ -3017,6 +3153,22 @@ async function denyGuest(connectionId) {
     setProviderActivity("Guest denied", "idle");
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Deny failed: ${error.message}` : "Deny failed", "error");
+  }
+}
+
+async function seatWaitingGuestAtTable(waitingGuestId, partyMemberId) {
+  try {
+    const result = await postJson(apiMultiplayerWaitingSeatUrl, {
+      waitingGuestId,
+      partyMemberId,
+    });
+    setCampaignFromPayload(result, "local_table_waiting_guest_seated");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    const guest = result.multiplayer?.connections?.find((connection) => connection.partyMemberId === partyMemberId && connection.status === "connected");
+    setProviderActivity(`${guest?.displayName || "Guest"} seated at the table`, "idle");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Seat guest failed: ${error.message}` : "Seat guest failed", "error");
   }
 }
 
@@ -3350,7 +3502,9 @@ function createGuestShellCampaign() {
     scene: {
       status: "waiting",
       currentPlaceId: "client-lobby",
-      immediateSituation: "Paste a host invite link to join a local table.",
+      immediateSituation: guestWaitingRoomMode
+        ? "Ask to join this local table. The host will choose your character seat."
+        : "Paste a host invite link to join a local table.",
     },
     party: [],
     people: [],
@@ -3381,7 +3535,9 @@ function createGuestShellCampaign() {
           sessionId: "thin-lorekeeper-session",
           role: "system",
           title: "LoreKeeper",
-          body: "LoreKeeper Join is ready. Join a hosted local table to play as an assigned party member.",
+          body: guestWaitingRoomMode
+            ? "Guest waiting room is ready. Ask the host for a seat to join the table."
+            : "LoreKeeper Join is ready. Join a hosted local table to play as an assigned party member.",
           meta: "No local campaign API or model provider is running in this window.",
           source: "lorekeeper_join",
           createdAt: new Date().toISOString(),
@@ -3403,6 +3559,7 @@ function renderMultiplayerPanel() {
       locationPort: location.port,
     }),
     labelById: (id) => labelById(state.campaign, id),
+    seatWaitingGuest: seatWaitingGuestAtTable,
     approveGuest,
     denyGuest,
   });
@@ -3518,6 +3675,14 @@ function loadRecentGuestSession() {
   }
 }
 
+function loadWaitingRoomSession() {
+  try {
+    return JSON.parse(localStorage.getItem(guestWaitingRoomStorageKey) || "null");
+  } catch {
+    return null;
+  }
+}
+
 function loadRightRailCollapsed() {
   return localStorage.getItem(rightRailCollapsedStorageKey) === "1";
 }
@@ -3549,6 +3714,16 @@ function clearGuestSession({ keepRecent = true } = {}) {
   state.guestSession = null;
   state.guestSnapshot = null;
   localStorage.removeItem(guestSessionStorageKey);
+}
+
+function saveWaitingRoomSession(session) {
+  state.waitingRoomSession = session;
+  localStorage.setItem(guestWaitingRoomStorageKey, JSON.stringify(session));
+}
+
+function clearWaitingRoomSession() {
+  state.waitingRoomSession = null;
+  localStorage.removeItem(guestWaitingRoomStorageKey);
 }
 
 function normalizeWizardCharacter(input = {}) {
@@ -5440,6 +5615,33 @@ function renderThinJoinPanel() {
   }
 
   const awaitingApproval = state.guestSession?.status === "pending" || state.guestSnapshot?.awaitingApproval;
+  if (elements.thinJoinTitle) {
+    elements.thinJoinTitle.textContent = guestWaitingRoomMode ? "Guest Waiting Room" : "Join A Hosted Table";
+  }
+  if (elements.joinBackHome) {
+    elements.joinBackHome.hidden = guestWaitingRoomMode;
+  }
+  if (elements.guestWaitingRoomPanel) {
+    elements.guestWaitingRoomPanel.hidden = !guestWaitingRoomMode;
+  }
+  if (elements.guestInvitePanel) {
+    elements.guestInvitePanel.hidden = guestWaitingRoomMode;
+  }
+  document.querySelector(".thin-join-character")?.toggleAttribute("hidden", guestWaitingRoomMode);
+  document.querySelector(".thin-join-actions")?.toggleAttribute("hidden", guestWaitingRoomMode);
+  if (elements.thinJoinCopy) {
+    elements.thinJoinCopy.textContent = guestWaitingRoomMode
+      ? "Ask the host for a seat at this table. You will only see campaign details after the host assigns you a character."
+      : "Paste the invite link from the host, add your table name, and request a seat.";
+  }
+  if (elements.guestWaitingStatus && guestWaitingRoomMode) {
+    elements.guestWaitingStatus.textContent = state.waitingRoomSession?.waitingGuestId
+      ? `Waiting as ${state.waitingRoomSession.playerName || "Guest"}. The host can seat you now.`
+      : "Enter your name and ask to join.";
+  }
+  if (elements.thinJoinStatus) {
+    elements.thinJoinStatus.hidden = guestWaitingRoomMode;
+  }
   if (elements.thinJoinStatus && awaitingApproval) {
     elements.thinJoinStatus.textContent = "Join request sent. Waiting for host approval.";
   }
@@ -8480,6 +8682,13 @@ function partyControllerActions(member, pendingConnection = null) {
 
   const kind = member.controllerKind || (member.type === "player_character" ? "host" : "ai_companion");
   const actions = [];
+  for (const guest of waitingGuestsForSeating().slice(0, 2)) {
+    actions.push({
+      label: `Seat ${guest.displayName || "Guest"}`,
+      title: `Seat ${guest.displayName || "Guest"} as ${member.name}`,
+      onClick: () => seatWaitingGuestAtTable(guest.id, member.id),
+    });
+  }
   if (pendingConnection) {
     actions.push({
       label: `Approve ${pendingConnection.displayName || "Guest"}`,
@@ -8526,6 +8735,11 @@ function partyControllerActions(member, pendingConnection = null) {
     onClick: () => createInviteForMember(member),
   });
   return actions;
+}
+
+function waitingGuestsForSeating() {
+  return (state.campaign?.multiplayer?.waitingGuests ?? state.multiplayerSnapshot?.waitingGuests ?? [])
+    .filter((guest) => guest.status === "waiting");
 }
 
 function openCharacterSheet(member) {

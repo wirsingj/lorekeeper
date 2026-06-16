@@ -66,6 +66,7 @@ The user should not feel like they are debugging a model, managing queue machine
 20. Session health now names the waiting party member and distinguishes host approval, grouped turns, queued DM actions, passes, and guest sent state.
 21. Table Talk now gets a subtle unread cue when new side-chat messages arrive.
 22. Host New is becoming a real pre-table setup workspace with party controller intent instead of a small modal over the last table.
+23. Browser guests can open `/guest`, enter a waiting room, and be seated by the host without a packaged client or pasted invite link.
 
 ### Still Risky
 
@@ -200,6 +201,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Remote-to-AI/host controller transfer clears stale guest links.
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
 - [x] Provider Setup is reachable as a first-class front-door flow.
+- [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
 - [ ] Run first real two-machine playtest.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
@@ -218,6 +220,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Guest join and LoreKeeper Join use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
 - [ ] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character.
+- [ ] Let Host New remote-invite slots seat waiting-room guests before campaign start.
 - [ ] Make auto-complete campaign-aware without overriding user facts.
 - [ ] Add party-template flow for repeated related companions.
 - [ ] Improve class/spell/equipment depth beyond shallow 5E-lite starts.

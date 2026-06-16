@@ -1219,6 +1219,23 @@ button:disabled {
   padding: 9px 10px;
 }
 
+.guest-waiting-room-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(125, 213, 201, 0.2);
+  border-radius: 9px;
+  background: rgba(9, 21, 20, 0.34);
+}
+
+.guest-waiting-room-panel[hidden] {
+  display: none;
+}
+
+.guest-waiting-room-panel button {
+  min-height: 38px;
+}
+
 .thin-join-card .compact-invite-input,
 .join-dialog .compact-invite-input {
   min-height: 46px;

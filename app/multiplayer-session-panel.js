@@ -25,6 +25,7 @@ export function buildMultiplayerSessionProjection({
       requireGuestActionApproval: false,
       holdGuestActionsForGroupInput: false,
       connectedGuests: [],
+      waitingGuests: [],
       pendingInputs: guestSnapshot?.pendingInput ? [decoratePendingInput(guestSnapshot.pendingInput, { mode: "guest" })] : [],
     };
   }
@@ -49,7 +50,9 @@ export function buildMultiplayerSessionProjection({
     resolvePartyInputsLabel: resolvePartyInputsLabel({ readyInputs, settings }),
     requireGuestActionApproval: settings.requireGuestActionApproval,
     holdGuestActionsForGroupInput: settings.holdGuestActionsForGroupInput,
+    party: campaign?.party ?? [],
     connectedGuests: multiplayer.connections ?? [],
+    waitingGuests: multiplayer.waitingGuests ?? [],
     pendingInputs: pendingInputs.map((input) => decoratePendingInput(input, { settings })),
   };
 }
@@ -58,6 +61,7 @@ export function renderMultiplayerSessionPanel({
   elements,
   projection,
   labelById,
+  seatWaitingGuest,
   approveGuest,
   denyGuest,
 }) {
@@ -81,8 +85,32 @@ export function renderMultiplayerSessionPanel({
   }
   elements.resolvePartyInputs.disabled = !projection.canResolvePartyInputs;
   elements.resolvePartyInputs.textContent = projection.resolvePartyInputsLabel || "Resolve Inputs";
+  renderWaitingGuests(elements.waitingGuests, projection.waitingGuests, { party: projection.party ?? [], seatWaitingGuest });
   renderConnectedGuests(elements.connectedGuests, projection.connectedGuests, { labelById, approveGuest, denyGuest });
   renderPendingInputs(elements.pendingInputs, projection.pendingInputs);
+}
+
+function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWaitingGuest } = {}) {
+  if (!container) {
+    return;
+  }
+  const openParty = party.filter((member) => member.controllerKind !== "remote_player");
+  container.replaceChildren(
+    ...emptyOrRows(
+      waitingGuests.map((guest) => {
+        const actions = openParty.slice(0, 3).map((member) => ({
+          label: `Seat as ${member.name}`,
+          onClick: () => seatWaitingGuest?.(guest.id, member.id),
+        }));
+        return localTableRow({
+          title: guest.displayName || "Guest",
+          subtitle: "waiting for a character seat",
+          actions,
+        });
+      }),
+      "No players waiting for seats.",
+    ),
+  );
 }
 
 function renderConnectedGuests(container, connections, { labelById, approveGuest, denyGuest }) {

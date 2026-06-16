@@ -37,16 +37,19 @@ import {
   createJoinPreview,
   createCharacterRequestInvite,
   createInviteForPartyMember,
+  createWaitingGuestSnapshot,
   denyJoinRequest,
   disconnectGuest,
   firstLanAddress,
   passGuestAction,
   joinPartyMemberCombat,
   postTableTalk,
+  registerWaitingGuest,
   requestJoin,
   returnToAiCompanion,
   revokeController,
   revokeInvite,
+  seatWaitingGuest,
   setHostController,
   startLocalTable,
   stopLocalTable,
@@ -117,7 +120,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    if (url.pathname === "/") {
+    if (url.pathname === "/" || url.pathname === "/guest") {
       const builtIndex = path.join(builtAppRoot, "index.html");
       if (existsSync(builtIndex)) {
         await serveFile(builtIndex, response);
@@ -362,6 +365,53 @@ const server = createServer(async (request, response) => {
     if (url.pathname === "/api/multiplayer/join-preview" && request.method === "GET") {
       const { campaign } = await loadActiveCampaign(projectRoot);
       sendJson(response, 200, createJoinPreview(campaign, url.searchParams.get("inviteLink")));
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/waiting-room/register" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      let waitingResult = null;
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        waitingResult = registerWaitingGuest(campaign, {
+          playerName: body.playerName,
+          clientId: body.clientId,
+        });
+        return { campaign: waitingResult.campaign };
+      });
+      sendJson(response, 200, {
+        waitingGuest: {
+          id: waitingResult.waitingGuest.id,
+          displayName: waitingResult.waitingGuest.displayName,
+          status: waitingResult.waitingGuest.status,
+        },
+        waitingSecret: waitingResult.waitingSecret,
+        campaignTitle: payload.campaign?.title ?? "",
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/waiting-room/status" && request.method === "GET") {
+      const { campaign } = await loadActiveCampaign(projectRoot);
+      sendJson(response, 200, createWaitingGuestSnapshot(campaign, {
+        waitingGuestId: url.searchParams.get("waitingGuestId"),
+        clientId: url.searchParams.get("clientId"),
+        waitingSecret: url.searchParams.get("waitingSecret"),
+      }));
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/waiting-room/seat" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
+        campaign: seatWaitingGuest(campaign, {
+          waitingGuestId: body.waitingGuestId,
+          partyMemberId: body.partyMemberId,
+        }),
+      }));
+      sendJson(response, 200, {
+        ...payload,
+        multiplayer: createHostSnapshot(payload.campaign),
+      });
       return;
     }
 
@@ -1146,6 +1196,8 @@ function isProtectedApiPath(pathname, method) {
   }
   if (pathname === "/api/multiplayer/join"
     || pathname === "/api/multiplayer/join-preview"
+    || pathname === "/api/multiplayer/waiting-room/register"
+    || pathname === "/api/multiplayer/waiting-room/status"
     || pathname === "/api/multiplayer/guest-snapshot"
     || pathname === "/api/multiplayer/action"
     || pathname === "/api/multiplayer/pass"
@@ -1203,6 +1255,7 @@ function requiresCampaignPin(pathname) {
     "/api/multiplayer/invite/revoke",
     "/api/multiplayer/join/approve",
     "/api/multiplayer/join/deny",
+    "/api/multiplayer/waiting-room/seat",
     "/api/multiplayer/disconnect",
     "/api/multiplayer/controller/revoke",
     "/api/multiplayer/controller/ai",

@@ -1051,6 +1051,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /session-health-summary/);
   assert.match(appShell, /local-table-guidance/);
   assert.match(appShell, /id="right-rail-toggle"/);
+  assert.match(appShell, /guest-waiting-room-panel/);
+  assert.match(appShell, /Ask To Join/);
+  assert.match(appShell, /id="waiting-guests"/);
   assert.ok(
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
     "table status strip should live above the play log",
@@ -1067,6 +1070,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /campaign-wizard-mode/);
   assert.match(appJs, /campaignWizardReturnHome/);
   assert.match(appJs, /dismissCampaignWizard/);
+  assert.match(appJs, /guestWaitingRoomMode/);
+  assert.match(appJs, /apiMultiplayerWaitingRegisterUrl/);
+  assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited player/);
   assert.match(appJs, /renderDebugMetaControl/);

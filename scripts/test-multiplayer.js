@@ -9,11 +9,14 @@ import {
   createHostSnapshot,
   createInviteForPartyMember,
   createJoinPreview,
+  createWaitingGuestSnapshot,
   disconnectGuest,
   parseInviteLink,
   postTableTalk,
+  registerWaitingGuest,
   requestJoin,
   returnToAiCompanion,
+  seatWaitingGuest,
   stopLocalTable,
   startLocalTable,
   submitGuestAction,
@@ -26,6 +29,46 @@ campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.2
 assert.equal(campaign.multiplayer.localTable.running, true);
 assert.equal(campaign.multiplayer.settings.requireGuestActionApproval, false);
 assert.equal(campaign.multiplayer.settings.holdGuestActionsForGroupInput, false);
+
+let waitingResult = registerWaitingGuest(campaign, {
+  playerName: "Nora",
+  clientId: "waiting-client",
+});
+campaign = waitingResult.campaign;
+assert.ok(waitingResult.waitingSecret);
+let waitingHostSnapshot = createHostSnapshot(campaign);
+assert.equal(waitingHostSnapshot.waitingGuests.length, 1);
+assert.equal(waitingHostSnapshot.waitingGuests[0].displayName, "Nora");
+assert.equal("secret" in waitingHostSnapshot.waitingGuests[0], false);
+const waitingGuestSnapshot = createWaitingGuestSnapshot(campaign, {
+  waitingGuestId: waitingResult.waitingGuest.id,
+  clientId: "waiting-client",
+  waitingSecret: waitingResult.waitingSecret,
+});
+assert.equal(waitingGuestSnapshot.seated, false);
+assert.equal(waitingGuestSnapshot.snapshot, null);
+campaign = seatWaitingGuest(campaign, {
+  waitingGuestId: waitingResult.waitingGuest.id,
+  partyMemberId: "jarin",
+});
+waitingHostSnapshot = createHostSnapshot(campaign);
+assert.equal(waitingHostSnapshot.waitingGuests.length, 0);
+const seatedStatus = createWaitingGuestSnapshot(campaign, {
+  waitingGuestId: waitingResult.waitingGuest.id,
+  clientId: "waiting-client",
+  waitingSecret: waitingResult.waitingSecret,
+});
+assert.equal(seatedStatus.seated, true);
+assert.equal(seatedStatus.snapshot.assignedCharacter.id, "jarin");
+assert.equal(campaign.party.find((member) => member.id === "jarin").controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.throws(
+  () => createWaitingGuestSnapshot(campaign, {
+    waitingGuestId: waitingResult.waitingGuest.id,
+    clientId: "waiting-client",
+    waitingSecret: "wrong-secret",
+  }),
+  /Waiting room secret/,
+);
 
 const inviteResult = createInviteForPartyMember(campaign, {
   partyMemberId: "kevric",
@@ -64,7 +107,7 @@ const joinResult = requestJoin(campaign, {
 campaign = joinResult.campaign;
 assert.equal(joinResult.approved, false);
 assert.ok(joinResult.connectionSecret);
-assert.equal(campaign.multiplayer.connections[0].status, "pending");
+assert.equal(campaign.multiplayer.connections.find((connection) => connection.id === joinResult.connection.id).status, "pending");
 const duplicateJoinResult = requestJoin(campaign, {
   inviteLink: inviteResult.inviteLink,
   playerName: "Jess",
@@ -73,10 +116,13 @@ const duplicateJoinResult = requestJoin(campaign, {
 campaign = duplicateJoinResult.campaign;
 assert.equal(duplicateJoinResult.connection.id, joinResult.connection.id);
 assert.equal(duplicateJoinResult.connectionSecret, joinResult.connectionSecret);
-assert.equal(campaign.multiplayer.connections.length, 1);
+assert.equal(
+  campaign.multiplayer.connections.filter((connection) => connection.inviteId === inviteResult.invite.id).length,
+  1,
+);
 
 campaign = approveJoinRequest(campaign, joinResult.connection.id);
-const connected = campaign.multiplayer.connections[0];
+const connected = campaign.multiplayer.connections.find((connection) => connection.id === joinResult.connection.id);
 const connectionSecret = joinResult.connectionSecret;
 const kevric = campaign.party.find((member) => member.id === "kevric");
 assert.equal(connected.status, "connected");

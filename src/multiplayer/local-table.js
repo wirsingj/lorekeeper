@@ -101,6 +101,11 @@ export function stopLocalTable(campaign) {
     status: connection.status === "connected" || connection.status === "pending" ? "disconnected" : connection.status,
     disconnectedAt: connection.disconnectedAt ?? nowIso(),
   }));
+  next.multiplayer.waitingGuests = next.multiplayer.waitingGuests.map((guest) => ({
+    ...guest,
+    status: guest.status === "waiting" ? "closed" : guest.status,
+    closedAt: guest.status === "waiting" ? nowIso() : guest.closedAt ?? null,
+  }));
   next.party = next.party.map((member) => releaseRemoteController(member));
   next.multiplayer.pendingTurnInputs = [];
   next.multiplayer.hostTurnState = hostTurnStates.WAITING_FOR_PLAYER;
@@ -224,6 +229,172 @@ export function createCharacterRequestInvite(campaign, { host, port } = {}) {
     invite,
     inviteLink,
   };
+}
+
+export function registerWaitingGuest(campaign, { playerName, clientId } = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  if (!next.multiplayer.localTable?.running) {
+    throw publicMultiplayerError("The host local table is not open yet.", 409);
+  }
+  const normalizedClientId = compactLine(clientId || "", 120);
+  const displayName = compactLine(playerName || "Guest Player", 80);
+  const existing = normalizedClientId
+    ? next.multiplayer.waitingGuests.find((guest) =>
+      guest.clientId === normalizedClientId &&
+      (guest.status === "waiting" || guest.status === "seated")
+    )
+    : null;
+  if (existing) {
+    existing.displayName = displayName || existing.displayName;
+    existing.lastSeenAt = nowIso();
+    if (!existing.secret) {
+      existing.secret = randomToken(24);
+    }
+    return {
+      campaign: touchCampaign(next),
+      waitingGuest: existing,
+      waitingSecret: existing.secret,
+    };
+  }
+
+  const waitingGuest = {
+    id: `wait-${randomToken(10)}`,
+    displayName,
+    clientId: normalizedClientId,
+    status: "waiting",
+    secret: randomToken(24),
+    requestedAt: nowIso(),
+    lastSeenAt: nowIso(),
+    seatedAt: null,
+    connectionId: null,
+    partyMemberId: null,
+    deniedAt: null,
+  };
+  next.multiplayer.waitingGuests = upsertById(next.multiplayer.waitingGuests, waitingGuest);
+  next.multiplayer.events = appendEvent(next.multiplayer.events, {
+    type: "guest_waiting",
+    summary: `${waitingGuest.displayName || "Guest"} is waiting for a table seat.`,
+    waitingGuestId: waitingGuest.id,
+  });
+  return {
+    campaign: touchCampaign(next),
+    waitingGuest,
+    waitingSecret: waitingGuest.secret,
+  };
+}
+
+export function createWaitingGuestSnapshot(campaign, { waitingGuestId, clientId, waitingSecret } = {}) {
+  const normalized = normalizeMultiplayerCampaign(campaign);
+  const waitingGuest = normalized.multiplayer.waitingGuests.find((guest) => guest.id === waitingGuestId);
+  if (!waitingGuest) {
+    throw publicMultiplayerError("Waiting guest not found. Ask the host for the table address again.", 404);
+  }
+  assertWaitingGuestSecret(waitingGuest, waitingSecret);
+  const normalizedClientId = compactLine(clientId || "", 120);
+  if (waitingGuest.clientId && normalizedClientId && waitingGuest.clientId !== normalizedClientId) {
+    throw publicMultiplayerError("This waiting room session belongs to a different device.", 403);
+  }
+  waitingGuest.lastSeenAt = nowIso();
+  const connection = waitingGuest.connectionId
+    ? normalized.multiplayer.connections.find((item) => item.id === waitingGuest.connectionId)
+    : null;
+  const seated = waitingGuest.status === "seated" && connection?.status === "connected";
+  return {
+    protocolVersion: multiplayerProtocolVersion,
+    revision: tableRevision(normalized),
+    campaignId: normalized.id,
+    campaignTitle: normalized.title,
+    localTable: normalized.multiplayer.localTable,
+    waitingGuest: publicWaitingGuest(waitingGuest),
+    seated,
+    connection: connection ? publicConnection(connection) : null,
+    connectionSecret: seated ? connection.secret : "",
+    snapshot: seated
+      ? createGuestSnapshot(normalized, connection.id, {
+        clientId: waitingGuest.clientId,
+        connectionSecret: connection.secret,
+      })
+      : null,
+  };
+}
+
+export function seatWaitingGuest(campaign, { waitingGuestId, partyMemberId } = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  const waitingGuest = next.multiplayer.waitingGuests.find((guest) => guest.id === waitingGuestId);
+  if (!waitingGuest || waitingGuest.status !== "waiting") {
+    throw new Error("Waiting guest not found.");
+  }
+  const member = next.party.find((item) => item.id === partyMemberId);
+  if (!member) {
+    throw new Error("Party member not found.");
+  }
+  const playerId = `player-${slugify(waitingGuest.displayName || waitingGuest.clientId || "guest")}-${randomToken(4)}`;
+  const connectionId = `conn-${randomToken(10)}`;
+  const invite = {
+    id: `invite-${randomToken(8)}`,
+    token: randomToken(18),
+    campaignId: next.id,
+    kind: inviteKinds.PARTY_MEMBER,
+    seatId: member.id,
+    partyMemberId: member.id,
+    status: "active",
+    approvalRequired: false,
+    createdAt: nowIso(),
+    revokedAt: null,
+    claimedByPlayerId: playerId,
+    source: "waiting_room",
+  };
+  const player = {
+    id: playerId,
+    displayName: waitingGuest.displayName || "Guest Player",
+    kind: "remote_player",
+    clientId: waitingGuest.clientId,
+    createdAt: nowIso(),
+    lastSeenAt: nowIso(),
+  };
+  const connection = {
+    id: connectionId,
+    playerId,
+    displayName: player.displayName,
+    inviteId: invite.id,
+    partyMemberId: member.id,
+    proposedCharacter: null,
+    requestedNewCharacter: false,
+    status: "connected",
+    secret: randomToken(24),
+    requestedAt: waitingGuest.requestedAt || nowIso(),
+    approvedAt: nowIso(),
+    deniedAt: null,
+    disconnectedAt: null,
+    source: "waiting_room",
+  };
+
+  releaseActiveConnectionsForPartyMember(next, member.id, "controller_reassigned_waiting_guest");
+  next.multiplayer.invites = upsertById(next.multiplayer.invites, invite);
+  next.multiplayer.players = upsertById(next.multiplayer.players, player);
+  next.multiplayer.connections = upsertById(next.multiplayer.connections, connection);
+  next.multiplayer.seats = upsertById(next.multiplayer.seats, {
+    id: member.id,
+    partyMemberId: member.id,
+    label: member.name,
+    controllerKind: controllerKinds.REMOTE_PLAYER,
+    controllerId: player.id,
+    inviteId: invite.id,
+    updatedAt: nowIso(),
+  });
+  waitingGuest.status = "seated";
+  waitingGuest.seatedAt = nowIso();
+  waitingGuest.connectionId = connection.id;
+  waitingGuest.partyMemberId = member.id;
+  assignController(next, connection);
+  next.multiplayer.events = appendEvent(next.multiplayer.events, {
+    type: "waiting_guest_seated",
+    summary: `${waitingGuest.displayName || "Guest"} was seated as ${member.name}.`,
+    waitingGuestId: waitingGuest.id,
+    connectionId: connection.id,
+    partyMemberId: member.id,
+  });
+  return touchCampaign(next);
 }
 
 export function revokeInvite(campaign, inviteId) {
@@ -728,6 +899,9 @@ export function createHostSnapshot(campaign) {
       revokedAt: invite.revokedAt,
     })),
     connections: normalized.multiplayer.connections.map(publicConnection),
+    waitingGuests: normalized.multiplayer.waitingGuests
+      .filter((guest) => guest.status === "waiting")
+      .map(publicWaitingGuest),
     pendingTurnInputs: normalized.multiplayer.pendingTurnInputs,
     tableTalk: normalized.multiplayer.tableTalk.map(publicTableTalkMessage),
     events: normalized.multiplayer.events.slice(-20),
@@ -948,6 +1122,7 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
     seats: normalizeSeats(multiplayer.seats, campaign.party ?? []),
     invites: Array.isArray(multiplayer.invites) ? multiplayer.invites : [],
     connections: Array.isArray(multiplayer.connections) ? multiplayer.connections : [],
+    waitingGuests: Array.isArray(multiplayer.waitingGuests) ? multiplayer.waitingGuests : [],
     pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs : [],
     tableTalk: Array.isArray(multiplayer.tableTalk)
       ? multiplayer.tableTalk.slice(-tableStateLimits.tableTalk).map(normalizeTableTalkMessage).filter(Boolean)
@@ -1220,6 +1395,15 @@ function assertConnectionSecret(connection, connectionSecret) {
   }
 }
 
+function assertWaitingGuestSecret(waitingGuest, waitingSecret) {
+  if (!waitingGuest.secret) {
+    return;
+  }
+  if (waitingGuest.secret !== String(waitingSecret ?? "")) {
+    throw publicMultiplayerError("Waiting room secret does not match.", 403);
+  }
+}
+
 function normalizeControllerKind(value, fallback) {
   return allowedControllerKinds.has(value) ? value : fallback;
 }
@@ -1307,6 +1491,20 @@ function publicTableTalkMessage(message) {
     role: message.role,
     text: message.text,
     createdAt: message.createdAt,
+  };
+}
+
+function publicWaitingGuest(waitingGuest) {
+  return {
+    id: waitingGuest.id,
+    displayName: waitingGuest.displayName,
+    clientId: waitingGuest.clientId,
+    status: waitingGuest.status,
+    requestedAt: waitingGuest.requestedAt,
+    lastSeenAt: waitingGuest.lastSeenAt,
+    seatedAt: waitingGuest.seatedAt ?? null,
+    connectionId: waitingGuest.connectionId ?? null,
+    partyMemberId: waitingGuest.partyMemberId ?? null,
   };
 }
 

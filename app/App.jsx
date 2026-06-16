@@ -163,7 +163,7 @@ export function LorekeeperShell() {
               <div className="join-panel-header">
                 <div>
                   <p className="eyebrow">LoreKeeper Join</p>
-                  <h2>Join A Hosted Table</h2>
+                  <h2 id="thin-join-title">Join A Hosted Table</h2>
                 </div>
                 <button id="join-back-home" className="secondary-action back-home-action" type="button" title="Back to main menu">
                   <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -172,24 +172,34 @@ export function LorekeeperShell() {
                   <span>Back</span>
                 </button>
               </div>
-              <p className="thin-join-copy">Paste the invite link from the host, add your table name, and request a seat.</p>
-              <label>
-                <span>Invite link</span>
-                <textarea
-                  id="thin-join-invite-link"
-                  className="compact-invite-input"
-                  rows="2"
-                  spellCheck="false"
-                  placeholder="lorekeeper://join?host=192.168.1.24&port=4173&campaign=..."
-                ></textarea>
-              </label>
-              <section id="thin-join-preview" className="join-preview-card" hidden>
-                <p className="join-preview-empty">Paste a host invite link to preview the table.</p>
+              <p id="thin-join-copy" className="thin-join-copy">Paste the invite link from the host, add your table name, and request a seat.</p>
+              <section id="guest-waiting-room-panel" className="guest-waiting-room-panel" hidden>
+                <label>
+                  <span>Your table name</span>
+                  <input id="guest-waiting-player-name" autoComplete="name" placeholder="Jess" />
+                </label>
+                <button id="guest-waiting-register" type="button">Ask To Join</button>
+                <p id="guest-waiting-status" className="thin-join-status">Enter your name and ask to join.</p>
               </section>
-              <label>
-                <span>Your name</span>
-                <input id="thin-join-player-name" autoComplete="off" placeholder="Jess" />
-              </label>
+              <section id="guest-invite-panel">
+                <label>
+                  <span>Invite link</span>
+                  <textarea
+                    id="thin-join-invite-link"
+                    className="compact-invite-input"
+                    rows="2"
+                    spellCheck="false"
+                    placeholder="lorekeeper://join?host=192.168.1.24&port=4173&campaign=..."
+                  ></textarea>
+                </label>
+                <section id="thin-join-preview" className="join-preview-card" hidden>
+                  <p className="join-preview-empty">Paste a host invite link to preview the table.</p>
+                </section>
+                <label>
+                  <span>Your name</span>
+                  <input id="thin-join-player-name" autoComplete="off" placeholder="Jess" />
+                </label>
+              </section>
               <div className="thin-join-character">
                 <h3>Join As Your Character</h3>
                 <p className="thin-join-copy">Fill this out to request a new party character. Leave it blank only when the host specifically invited you to control an existing party member.</p>
@@ -762,6 +772,7 @@ function SetupDialog() {
             readOnly
             placeholder="Generated invite links appear here for copying."
           ></textarea>
+          <div id="waiting-guests" className="local-table-list"></div>
           <div id="connected-guests" className="local-table-list"></div>
           <div id="pending-inputs" className="local-table-list"></div>
         </section>

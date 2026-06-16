@@ -23,6 +23,8 @@ The pre-table joiner is seeded into the campaign as an unassigned party member b
 The current implementation supports:
 
 - starting/stopping a local table session from setup
+- serving a browser guest waiting room at `http://host-lan-ip:port/guest`
+- letting a nearby guest raise their hand from `/guest` before the host assigns a character seat
 - generating an invite link for a party member
 - joining from ThinLoreKeeper by pasting the invite link into the front-center join card
 - "join as my character" requests, where a guest proposes a new PC with a character pitch and DM integration hook, then the host approves it into the party
@@ -70,6 +72,18 @@ The guest workflow should be:
 4. For a fixed-seat invite, enter a table name and click `Join Table`.
 5. For a Join-As invite, fill in character name, ancestry/class, table role, appearance, character pitch, and why they join this party, then click `Join Table`.
 6. Wait for host approval.
+
+## Browser Guest Waiting Room
+
+When the host local table is running, a guest can open:
+
+```text
+http://host-lan-ip:4173/guest
+```
+
+The guest enters a table name and clicks `Ask To Join`. The host sees that waiting player in Local Table and as seating actions on party cards. The guest receives no campaign state until the host seats them as an existing party member or remote-invite slot.
+
+The older invite-link path still works for fixed-seat and Join-As flows. Use it when you want to send a precise seat link instead of having the guest enter a waiting room first.
 
 Join-As is meant to give the guest real first-session agency. The host receives the proposed character as a pending join request. Before approving, the host can add an optional scene-integration note for the DM, such as "introduce her as the scout who knows the flooded bridge detour." Approval creates a canonical party member plus a system table note the DM/provider can use to weave the new character into the current scene. The proposal stores:
 
