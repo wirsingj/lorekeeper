@@ -54,6 +54,7 @@ import {
   startLocalTable,
   stopLocalTable,
   submitGuestAction,
+  submitGuestChoiceVote,
   updateMultiplayerSettings,
 } from "../src/multiplayer/local-table.js";
 
@@ -500,6 +501,23 @@ const server = createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
         campaign: submitGuestAction(campaign, body),
+      }));
+      sendJson(response, 200, {
+        snapshot: createGuestSnapshot(payload.campaign, body.connectionId, {
+          clientId: body.clientId,
+          connectionSecret: body.connectionSecret,
+          campaignId: body.campaignId,
+          tableId: body.tableId,
+          sessionId: body.sessionId,
+        }),
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/choice-vote" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
+        campaign: submitGuestChoiceVote(campaign, body),
       }));
       sendJson(response, 200, {
         snapshot: createGuestSnapshot(payload.campaign, body.connectionId, {
@@ -1254,6 +1272,7 @@ export function isProtectedApiPath(pathname, method) {
     || pathname === "/api/multiplayer/waiting-room/status"
     || pathname === "/api/multiplayer/guest-snapshot"
     || pathname === "/api/multiplayer/action"
+    || pathname === "/api/multiplayer/choice-vote"
     || pathname === "/api/multiplayer/pass"
     || pathname === "/api/multiplayer/combat/join"
     || pathname === "/api/multiplayer/table-talk") {

@@ -225,6 +225,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Guest/join clients do not need Ollama or provider controls.
 - [x] Join-as flow supports richer character proposal and host integration note.
 - [x] Guest inputs are visible table messages and can become structured `user.playerInputs[]`.
+- [x] Party-scoped DM choices are host-submitted decisions; remote guests vote on options instead of drafting locked action text.
 - [x] Guest snapshots redact hidden DM notes and enemy HP.
 - [x] Remote-to-AI/host controller transfer clears stale guest links.
 - [x] Desktop protocol invite links preload the Join screen and clear stale saved sessions for different invites.
@@ -241,7 +242,8 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
-- [ ] Add actual party-vote collection and host tie-break flow.
+- [ ] Add explicit host tie-break/confirm flow for party votes.
+- [x] Show party-choice vote counters and let guests switch their vote.
 - [ ] Add disconnect/reconnect/campaign-switch soak tests.
 - [ ] Consider WebSocket/broadcast later after polling semantics are solid.
 

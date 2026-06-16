@@ -60,6 +60,7 @@ const apiMultiplayerWaitingStatusUrl = "/api/multiplayer/waiting-room/status";
 const apiMultiplayerWaitingSeatUrl = "/api/multiplayer/waiting-room/seat";
 const apiMultiplayerGuestSnapshotUrl = "/api/multiplayer/guest-snapshot";
 const apiMultiplayerActionUrl = "/api/multiplayer/action";
+const apiMultiplayerChoiceVoteUrl = "/api/multiplayer/choice-vote";
 const apiMultiplayerPassUrl = "/api/multiplayer/pass";
 const apiMultiplayerCombatJoinUrl = "/api/multiplayer/combat/join";
 const apiMultiplayerTableTalkUrl = "/api/multiplayer/table-talk";
@@ -1234,13 +1235,65 @@ function choiceLabelForIndex(index) {
   return String.fromCharCode(65 + index);
 }
 
+function choiceOptionId(block, index) {
+  return String(block.options?.[index]?.id || choiceLabelForIndex(index));
+}
+
+function choicePanelKey(block = {}) {
+  return compactCompareText([
+    block.prompt || "",
+    block.scope || "",
+    block.forActorId || "",
+    (block.options ?? []).map((option, index) => `${choiceOptionId(block, index)}:${option?.text || block.items?.[index] || ""}`).join("|"),
+  ].join("::")).slice(0, 500);
+}
+
+function isPartyVoteChoiceBlock(block = {}) {
+  const scope = String(block.scope || "").trim();
+  return block.allowVote === true || scope === "party" || scope === "vote";
+}
+
+function currentChoiceVotes(block = {}) {
+  const key = choicePanelKey(block);
+  if (!key) {
+    return [];
+  }
+  return (state.campaign?.multiplayer?.choiceVotes ?? [])
+    .filter((vote) => vote.choiceKey === key);
+}
+
+function choiceVoteCounts(block = {}) {
+  const counts = new Map();
+  for (const vote of currentChoiceVotes(block)) {
+    const id = String(vote.optionId || "");
+    counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  return counts;
+}
+
+function currentGuestVoteForChoice(block = {}) {
+  const playerId = state.guestSession?.playerId || state.guestSnapshot?.connection?.playerId || "";
+  const characterId = state.guestSession?.partyMemberId || state.guestSnapshot?.connection?.partyMemberId || "";
+  if (!playerId && !characterId) {
+    return null;
+  }
+  return currentChoiceVotes(block).find((vote) =>
+    (playerId && vote.playerId === playerId) ||
+    (characterId && vote.characterId === characterId)
+  ) ?? null;
+}
+
 function chooseVisibleOption(block, index) {
   const item = block.items?.[index];
   if (!item) {
     return;
   }
   const label = choiceLabelForIndex(index);
-  const optionId = block.options?.[index]?.id || label;
+  const optionId = choiceOptionId(block, index);
+  if (isRemoteTableClient() && isPartyVoteChoiceBlock(block)) {
+    submitGuestChoiceVote(block, index);
+    return;
+  }
   state.pendingChoiceSelection = {
     labels: [label],
     choices: [item],
@@ -1252,11 +1305,11 @@ function chooseVisibleOption(block, index) {
     forActorIds: Array.isArray(block.forActorIds) ? block.forActorIds : [],
     allowVote: block.allowVote === true,
     selectedOptionIds: [optionId],
-    inWorldText: `I choose ${optionId}: ${item}`,
+    inWorldText: `I choose ${label}: ${item}`,
   };
-  elements.playerInput.value = `I choose ${optionId}: ${item}`;
+  elements.playerInput.value = `I choose ${label}: ${item}`;
   elements.playerInput.focus();
-  setProviderActivity(`Selected choice ${optionId}; edit or send`, "idle");
+  setProviderActivity(`Selected choice ${label}; edit or send`, "idle");
 }
 
 async function submitPlayerTurnFromInput(originalInput, options = {}) {
@@ -3625,6 +3678,42 @@ async function submitGuestActionFromUi({ pass = false } = {}) {
   }
 }
 
+async function submitGuestChoiceVote(block, index) {
+  if (!state.guestSession?.hostBaseUrl || !state.guestSession?.connectionId) {
+    setProviderActivity("Join a local table first", "error");
+    return;
+  }
+  const item = block.items?.[index] || "";
+  const label = choiceLabelForIndex(index);
+  const optionId = choiceOptionId(block, index);
+  if (elements.playerInput && (
+    pendingSelectionMatchesText(state.pendingChoiceSelection, elements.playerInput.value) ||
+    extractChoiceTokenText(elements.playerInput.value)
+  )) {
+    elements.playerInput.value = "";
+  }
+  state.pendingChoiceSelection = null;
+  try {
+    setProviderActivity(`Voted ${label}. Waiting for the host to choose for the party.`, "waiting");
+    const result = await postJson(`${state.guestSession.hostBaseUrl}${apiMultiplayerChoiceVoteUrl}`, {
+      connectionId: state.guestSession.connectionId,
+      clientId: state.guestSession.clientId || guestClientId(),
+      connectionSecret: state.guestSession.connectionSecret || "",
+      characterId: state.guestSession.partyMemberId,
+      choiceKey: choicePanelKey(block),
+      optionId,
+      optionLabel: label,
+      optionText: item,
+      prompt: block.prompt || "",
+      ...guestTableAuthorityPayload(),
+    });
+    renderGuestSnapshot(result.snapshot);
+    setProviderActivity(`Voted ${label}. The host will make the party call.`, "waiting");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Vote failed: ${error.message}` : "Vote failed", "error");
+  }
+}
+
 async function sendTableTalkFromUi() {
   const text = elements.tableTalkInput?.value.trim() ?? "";
   if (!text) {
@@ -3817,6 +3906,7 @@ function renderGuestSnapshot(snapshot) {
       messages: tableState.messages ?? snapshot.messages ?? [],
     },
     multiplayer: {
+      choiceVotes: tableState.choiceVotes ?? snapshot.choiceVotes ?? [],
       tableTalk: tableState.tableTalk ?? snapshot.tableTalk ?? [],
     },
   });
@@ -10179,13 +10269,25 @@ function messageBodyElements(text, role = "dm", data = {}) {
       }
 
       const list = document.createElement("ol");
+      const voteCounts = choiceVoteCounts(block);
+      const guestVote = currentGuestVoteForChoice(block);
       block.items.forEach((itemText, index) => {
         const item = document.createElement("li");
         const button = document.createElement("button");
         button.type = "button";
         button.className = "choice-option";
-        button.textContent = itemText;
-        button.title = `Choose ${choiceLabelForIndex(index)}`;
+        const label = choiceLabelForIndex(index);
+        const optionId = choiceOptionId(block, index);
+        button.classList.toggle("choice-option-voted", guestVote?.optionId === optionId);
+        const text = document.createElement("span");
+        text.className = "choice-option-text";
+        text.textContent = itemText;
+        const votes = document.createElement("span");
+        votes.className = "choice-vote-count";
+        votes.textContent = String(voteCounts.get(optionId) || 0);
+        votes.title = `${voteCounts.get(optionId) || 0} ${voteCounts.get(optionId) === 1 ? "vote" : "votes"}`;
+        button.replaceChildren(text, votes);
+        button.title = isRemoteTableClient() && isPartyVoteChoiceBlock(block) ? `Vote ${label}` : `Choose ${label}`;
         button.addEventListener("click", () => chooseVisibleOption(block, index));
         item.append(button);
         list.append(item);

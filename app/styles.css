@@ -1683,6 +1683,10 @@ button:disabled {
 }
 
 .choice-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
   width: 100%;
   min-height: auto;
   padding: 0;
@@ -1695,6 +1699,30 @@ button:disabled {
   line-height: 1.35;
 }
 
+.choice-option-text {
+  min-width: 0;
+}
+
+.choice-vote-count {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid rgba(125, 213, 201, 0.26);
+  border-radius: 999px;
+  background: rgba(125, 213, 201, 0.1);
+  color: #dff9f3;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.choice-option-voted .choice-vote-count {
+  border-color: rgba(125, 213, 201, 0.62);
+  background: rgba(125, 213, 201, 0.2);
+}
+
 .choice-option:hover,
 .choice-option:focus-visible {
   color: #f5fbf7;
@@ -1702,7 +1730,7 @@ button:disabled {
 }
 
 .choice-panel li::before {
-  content: counter(choice);
+  content: counter(choice, upper-alpha);
   display: grid;
   place-items: center;
   width: 22px;

@@ -771,6 +771,72 @@ export function submitGuestAction(campaign, { connectionId, clientId, connection
   return touchCampaign(next);
 }
 
+export function submitGuestChoiceVote(campaign, {
+  connectionId,
+  clientId,
+  connectionSecret,
+  characterId,
+  choiceKey,
+  optionId,
+  optionLabel,
+  optionText,
+  prompt,
+  campaignId = "",
+  tableId = "",
+  sessionId = "",
+} = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  assertTableAuthority(next, { campaignId, tableId, sessionId });
+  const connection = next.multiplayer.connections.find((item) => item.id === connectionId);
+  if (!connection || connection.status !== "connected") {
+    throw new Error("Connection is not approved.");
+  }
+  assertClientMatchesConnection(next, connection, clientId);
+  assertConnectionSecret(connection, connectionSecret);
+  if (connection.partyMemberId !== characterId) {
+    throw new Error("Guest can only vote for their assigned party member.");
+  }
+  const member = ensureConnectedController(next, connection);
+  if (!member || member.id !== characterId) {
+    throw new Error("Guest does not control that party member.");
+  }
+  const normalizedChoiceKey = compactLine(choiceKey || "", 500);
+  const normalizedOptionId = compactLine(optionId || optionLabel || "", 120);
+  if (!normalizedChoiceKey || !normalizedOptionId) {
+    throw new Error("Choice vote must identify a choice and option.");
+  }
+  const vote = {
+    id: `vote-${connection.playerId}-${characterId}-${normalizedChoiceKey}`,
+    campaignId: next.id,
+    tableId: currentTableId(next),
+    sessionId: currentSessionId(next),
+    choiceKey: normalizedChoiceKey,
+    optionId: normalizedOptionId,
+    optionLabel: compactLine(optionLabel || normalizedOptionId, 12),
+    optionText: compactLine(optionText || "", 800),
+    prompt: compactLine(prompt || "", 500),
+    playerId: connection.playerId,
+    playerName: connection.displayName,
+    characterId,
+    characterName: member.name,
+    updatedAt: nowIso(),
+  };
+  next.multiplayer.choiceVotes = upsertById(
+    (next.multiplayer.choiceVotes ?? []).filter((item) => sameTableRecord(item, next)),
+    vote,
+  ).slice(-200);
+  connection.lastSeenAt = nowIso();
+  next.multiplayer.events = appendEvent(next.multiplayer.events, {
+    type: "choice_vote",
+    summary: `${member.name} voted ${vote.optionLabel}.`,
+    connectionId,
+    partyMemberId: characterId,
+    choiceKey: normalizedChoiceKey,
+    optionId: normalizedOptionId,
+  });
+  return touchCampaign(next);
+}
+
 export function passGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId, campaignId = "", tableId = "", sessionId = "" } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   assertTableAuthority(next, { campaignId, tableId, sessionId });
@@ -993,6 +1059,7 @@ export function createHostSnapshot(campaign) {
       .filter((guest) => isFreshWaitingGuest(guest))
       .map(publicWaitingGuest),
     pendingTurnInputs: normalized.multiplayer.pendingTurnInputs,
+    choiceVotes: normalized.multiplayer.choiceVotes.map(publicChoiceVote),
     tableTalk: normalized.multiplayer.tableTalk.map(publicTableTalkMessage),
     events: normalized.multiplayer.events.slice(-20),
   };
@@ -1024,6 +1091,12 @@ function normalizePreferredSeatId(campaign, preferredPartyMemberId) {
   }
   const joinable = new Set(joinableGuestSeats(campaign).map((seat) => seat.id));
   return joinable.has(requested) ? requested : null;
+}
+
+function sameTableRecord(record, campaign) {
+  return (!record.campaignId || record.campaignId === campaign.id) &&
+    (!record.tableId || record.tableId === currentTableId(campaign)) &&
+    (!record.sessionId || record.sessionId === currentSessionId(campaign));
 }
 
 function seatLabel(campaign, partyMemberId) {
@@ -1354,6 +1427,7 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
     connections: Array.isArray(multiplayer.connections) ? multiplayer.connections.map((connection) => normalizeOwnedRecord(connection, campaign, multiplayer)) : [],
     waitingGuests: Array.isArray(multiplayer.waitingGuests) ? multiplayer.waitingGuests.map((guest) => normalizeOwnedRecord(guest, campaign, multiplayer)) : [],
     pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs.map((input) => normalizeOwnedRecord(input, campaign, multiplayer)) : [],
+    choiceVotes: Array.isArray(multiplayer.choiceVotes) ? multiplayer.choiceVotes.map((vote) => normalizeOwnedRecord(vote, campaign, multiplayer)) : [],
     tableTalk: Array.isArray(multiplayer.tableTalk)
       ? multiplayer.tableTalk.slice(-tableStateLimits.tableTalk).map(normalizeTableTalkMessage).filter(Boolean)
       : [],
@@ -1732,6 +1806,25 @@ function publicTableTalkMessage(message) {
   };
 }
 
+function publicChoiceVote(vote) {
+  return {
+    id: vote.id,
+    campaignId: vote.campaignId ?? null,
+    tableId: vote.tableId ?? null,
+    sessionId: vote.sessionId ?? null,
+    choiceKey: vote.choiceKey,
+    optionId: vote.optionId,
+    optionLabel: vote.optionLabel,
+    optionText: vote.optionText,
+    prompt: vote.prompt,
+    playerId: vote.playerId,
+    playerName: vote.playerName,
+    characterId: vote.characterId,
+    characterName: vote.characterName,
+    updatedAt: vote.updatedAt,
+  };
+}
+
 function publicWaitingGuest(waitingGuest) {
   return {
     id: waitingGuest.id,
@@ -1813,6 +1906,7 @@ function createVisibleTableState(campaign, connection) {
       .map(publicMessage),
     tableTalk: campaign.multiplayer.tableTalk.map(publicTableTalkMessage),
     choices: campaign.multiplayer.lastChoices ?? null,
+    choiceVotes: campaign.multiplayer.choiceVotes.map(publicChoiceVote),
     pendingInput: campaign.multiplayer.pendingTurnInputs
       .find((input) => input.playerId === connection.playerId && input.characterId === connection.partyMemberId) ?? null,
   };

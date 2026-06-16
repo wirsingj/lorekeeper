@@ -9,6 +9,7 @@ const publicGuestRoutes = [
   ["GET", "/api/multiplayer/waiting-room/status"],
   ["GET", "/api/multiplayer/guest-snapshot"],
   ["POST", "/api/multiplayer/action"],
+  ["POST", "/api/multiplayer/choice-vote"],
   ["POST", "/api/multiplayer/pass"],
   ["POST", "/api/multiplayer/combat/join"],
   ["POST", "/api/multiplayer/table-talk"],

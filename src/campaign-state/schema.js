@@ -108,6 +108,7 @@ export function createDefaultMultiplayerState() {
     connections: [],
     waitingGuests: [],
     pendingTurnInputs: [],
+    choiceVotes: [],
     tableTalk: [],
     events: [],
   };
@@ -134,6 +135,7 @@ function normalizeMultiplayerState(multiplayer = {}) {
     connections: Array.isArray(multiplayer.connections) ? multiplayer.connections : [],
     waitingGuests: Array.isArray(multiplayer.waitingGuests) ? multiplayer.waitingGuests : [],
     pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs : [],
+    choiceVotes: Array.isArray(multiplayer.choiceVotes) ? multiplayer.choiceVotes : [],
     tableTalk: Array.isArray(multiplayer.tableTalk) ? multiplayer.tableTalk.slice(-120) : [],
     events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
   };

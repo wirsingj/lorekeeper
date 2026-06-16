@@ -22,6 +22,7 @@ import {
   stopLocalTable,
   startLocalTable,
   submitGuestAction,
+  submitGuestChoiceVote,
   updateMultiplayerSettings,
   waitingGuestHeartbeatTimeoutMs,
 } from "../src/multiplayer/local-table.js";
@@ -203,6 +204,54 @@ assert.equal(connected.tableId, campaign.multiplayer.localTable.tableId);
 assert.equal(connected.sessionId, campaign.multiplayer.localTable.sessionId);
 assert.equal(kevric.controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.equal(kevric.controllerId, connected.playerId);
+
+campaign = submitGuestChoiceVote(campaign, {
+  connectionId: connected.id,
+  clientId: "guest-client",
+  connectionSecret,
+  characterId: "kevric",
+  choiceKey: "river-crossing-choice",
+  optionId: "B",
+  optionLabel: "B",
+  optionText: "Offer to help load the last boat.",
+  prompt: "What do you do?",
+  campaignId: campaign.id,
+  tableId: campaign.multiplayer.localTable.tableId,
+  sessionId: campaign.multiplayer.localTable.sessionId,
+});
+let hostVoteSnapshot = createHostSnapshot(campaign);
+assert.equal(hostVoteSnapshot.choiceVotes.length, 1);
+assert.equal(hostVoteSnapshot.choiceVotes[0].characterId, "kevric");
+assert.equal(hostVoteSnapshot.choiceVotes[0].optionLabel, "B");
+campaign = submitGuestChoiceVote(campaign, {
+  connectionId: connected.id,
+  clientId: "guest-client",
+  connectionSecret,
+  characterId: "kevric",
+  choiceKey: "river-crossing-choice",
+  optionId: "C",
+  optionLabel: "C",
+  optionText: "Sneak onto the boat.",
+  prompt: "What do you do?",
+  campaignId: campaign.id,
+  tableId: campaign.multiplayer.localTable.tableId,
+  sessionId: campaign.multiplayer.localTable.sessionId,
+});
+hostVoteSnapshot = createHostSnapshot(campaign);
+assert.equal(hostVoteSnapshot.choiceVotes.length, 1);
+assert.equal(hostVoteSnapshot.choiceVotes[0].optionLabel, "C");
+assert.throws(
+  () => submitGuestChoiceVote(campaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
+    characterId: "jarin",
+    choiceKey: "river-crossing-choice",
+    optionId: "A",
+    optionLabel: "A",
+  }),
+  /assigned party member/i,
+);
 
 assert.throws(
   () => createGuestSnapshot(campaign, connected.id, {
