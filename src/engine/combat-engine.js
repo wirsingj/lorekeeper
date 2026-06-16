@@ -8,6 +8,10 @@ import { extractFirstRollFormula, rollD20, rollFormula } from "./dice-engine.js"
 import { applyStateEffects } from "./state-effects.js";
 import { combatActionTypes } from "./types.js";
 
+// App-owned combat resolution.
+// The provider can narrate outcomes, but this module is where legal options,
+// rolls, HP/resource effects, conditions, and initiative advancement should
+// become deterministic campaign state.
 export function getCombatState(campaign) {
   return campaign?.combat ?? { inCombat: false };
 }
@@ -44,6 +48,8 @@ export function legalActionsForActor(campaign, actorId, options = {}) {
 }
 
 export function resolveCombatAction(campaign, action, options = {}) {
+  // Resolve against the current active actor only. This prevents stale UI,
+  // provider overreach, or guest lag from advancing the wrong initiative row.
   const normalized = ensureCombatTurnOrder(campaign);
   const actor = getActiveCombatActor(normalized);
   if (!actor) throw new Error("Cannot resolve combat action without an active combat actor");

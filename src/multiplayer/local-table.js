@@ -5,6 +5,10 @@ import { isAllowedInviteHost } from "./invite-security.js";
 import { buildAggregatedPlayerTurn as buildAggregatedPlayerTurnPure } from "./turn-inputs.js";
 import { addMissingCombatantsToTurnOrder } from "../rules/combat-turns.js";
 
+// Current local-table authority center.
+// Campaign state is still persisted as a single campaign snapshot, but every
+// live multiplayer record is stamped with campaign/table/session identity so
+// stale guest tabs cannot mutate whatever campaign the host happens to view.
 export const multiplayerProtocolVersion = 1;
 
 export const controllerKinds = Object.freeze({
@@ -95,6 +99,8 @@ export function startLocalTable(campaign, options = {}) {
 }
 
 export function stopLocalTable(campaign) {
+  // Stopping a table is also an authority reset: remote controllers, waiting
+  // guests, and staged inputs must not silently survive into the next session.
   const next = normalizeMultiplayerCampaign(campaign);
   next.multiplayer.localTable = {
     ...next.multiplayer.localTable,

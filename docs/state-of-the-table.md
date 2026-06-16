@@ -4,19 +4,7 @@ Updated: 2026-06-16
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
-Source docs consolidated here:
-
-- `docs/tabletop-reality-check.md`
-- `docs/two-machine-playtest-checklist.md`
-- `docs/model-io.md`
-- `docs/lorekeeper-json-contract.md`
-- `docs/local-multiplayer.md`
-- `docs/anti-supernatural-state.md`
-- `docs/validation-and-recovery.md`
-- `docs/product-maturity-review.md`
-- `docs/deep-audit-hardening-2026-06.md`
-- `docs/table-authority-model.md`
-- `docs/session-isolation.md`
+This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The only long-lived companion doc should be `docs/ARCHITECTURE.md`.
 
 Status legend:
 

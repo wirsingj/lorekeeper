@@ -14,6 +14,9 @@ import {
 const schemaPath = fileURLToPath(new URL("./sqlite-schema.sql", import.meta.url));
 export { SQLITE_SCHEMA_VERSION, SQLITE_USER_VERSION };
 
+// SQLite is durable canon plus queryable logs. Most writes currently rebuild the
+// snapshot file atomically; bounded read helpers below exist so long campaigns
+// do not need to hydrate thousands of messages just to render one surface.
 export async function createSqliteDatabaseForCampaign(campaign) {
   const errors = validateCampaign(campaign);
   if (errors.length > 0) {
@@ -29,6 +32,8 @@ export async function createSqliteDatabaseForCampaign(campaign) {
 }
 
 export async function writeCampaignSqliteFile(campaign, outputPath) {
+  // Preserve diagnostic/error rows across snapshot rewrites so failed provider
+  // turns remain debuggable even after the campaign state is saved again.
   const preservedErrors = await readCampaignErrorsFromSqliteFile(outputPath, { limit: 500 }).catch(() => []);
   const db = await createSqliteDatabaseForCampaign(campaign);
   insertErrorRows(db, campaign.id, preservedErrors);

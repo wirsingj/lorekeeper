@@ -1,5 +1,10 @@
 import { compactHiddenStoryThreads } from "../context-packs/story-threads.js";
 
+// Provider I/O contract.
+// The app sends this request envelope to a model, then validates the returned
+// JSON before any narration or proposed state changes can affect the table.
+// Agency checks in this file are a safety net for model drift, not a substitute
+// for app-owned controller authority.
 const REQUEST_TYPE = "lorekeeper.turn.request";
 const RESPONSE_TYPE = "lorekeeper.turn.response";
 const SCHEMA_VERSION = 1;
@@ -85,6 +90,8 @@ export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedM
 }
 
 export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, parsedMessage, options = {} } = {}) {
+  // Keep this envelope explicit. It is the model's only trusted view of canon,
+  // controller ownership, choice policy, hidden DM story, and current table task.
   const mode = normalizeEnum(options.mode, allowedGenerationModes, inferGenerationMode(campaign, parsedMessage, options));
   const responseMode = normalizeEnum(options.responseMode, allowedResponseModes, inferResponseMode(campaign, parsedMessage, options));
   const request = {

@@ -13,6 +13,10 @@ import {
   providerModes,
 } from "./provider-settings.js";
 
+// Server-side provider bridge.
+// The renderer asks for a table turn; this module builds the model contract,
+// calls Ollama, repairs common malformed responses once, and returns a validated
+// importable turn. It must not become campaign authority.
 export function getCampaignProviderSettings(campaign) {
   return normalizeProviderRuntimeSettings(campaign.providerSettings ?? {});
 }
@@ -82,6 +86,8 @@ export async function generateTurnWithProvider({
       playerInputs: parsedMessage?.playerInputs ?? [],
     },
   });
+  // Build the request first, then build the prompt with the same request id so
+  // stale or mismatched provider responses can be rejected during import.
   const prompt = buildTurnJsonPrompt({
     campaign,
     contextPack,

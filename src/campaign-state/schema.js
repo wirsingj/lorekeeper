@@ -1,5 +1,9 @@
 export const CAMPAIGN_SCHEMA_VERSION = "2.0.0";
 
+// Canonical campaign shape.
+// Keep defaults and normalizers here conservative: old campaigns may be opened
+// months later, so missing fields should heal into safe empty structures rather
+// than crashing the table.
 export const entityTypes = Object.freeze({
   PERSON: "person",
   PARTY_MEMBER: "party_member",
@@ -34,6 +38,8 @@ export const contextPackKinds = Object.freeze({
 export function createEmptyCampaign(overrides = {}) {
   const now = new Date().toISOString();
 
+  // This object is the durable top-level campaign contract. New long-lived
+  // domains should be added here, normalized below, and covered by SQLite tests.
   return {
     schemaVersion: CAMPAIGN_SCHEMA_VERSION,
     id: overrides.id ?? "campaign-local",

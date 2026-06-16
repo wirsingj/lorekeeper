@@ -58,6 +58,10 @@ import {
   updateMultiplayerSettings,
 } from "../src/multiplayer/local-table.js";
 
+// Local HTTP surface for both the desktop host and same-network guests.
+// This file is still intentionally pragmatic: route handling, campaign loading,
+// and local-table mutations meet here. When changing multiplayer behavior, keep
+// identity checks close to the route and pure table logic in src/multiplayer.
 const defaultProjectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const projectRoot = path.resolve(process.env.LOREKEEPER_PROJECT_ROOT || defaultProjectRoot);
 const serverModulePath = fileURLToPath(import.meta.url);
@@ -101,6 +105,8 @@ const corsHeaders = {
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, `http://${request.headers.host}`);
+    // Request gates are ordered from broadest to most stateful:
+    // origin/auth first, then active-campaign pinning, then route handling.
     if (!isAllowedRequestOrigin(request)) {
       sendText(response, 403, "Forbidden origin");
       return;

@@ -1,3 +1,6 @@
+// Shared character creation helper for Host New, post-start host creation, and
+// guest join. Preserve user-supplied facts first; fill only the missing pieces
+// from campaign premise, party theme, and lightweight 5E-lite defaults.
 export function completeCharacterSeed(seed = {}, options = {}) {
   const campaignContext = buildCharacterAutocompleteContext(options);
   const text = [

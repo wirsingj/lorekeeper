@@ -1,4 +1,6 @@
 export function LorekeeperShell() {
+  // Static shell only. app/app.js binds behavior to these ids, so changing an id
+  // is a behavior change unless the renderer registry is updated too.
   return (
     <div id="app" className="handheld-shell">
       <aside className="left-panel panel-rail">

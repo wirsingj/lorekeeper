@@ -80,17 +80,13 @@ dumps.
 
 ## Project Structure
 
-- `docs/ARCHITECTURE.md`: system architecture and major components.
-- `docs/STORAGE.md`: campaign state, persistence options, and durability strategy.
-- `docs/ROADMAP.md`: phased implementation plan.
-- `docs/VOTT_USE_CASE.md`: motivating long-campaign use case.
-- `docs/PROVIDER_UI_BRIDGE.md`: provider UI automation approach and boundaries.
-- `docs/FIREFOX_CHATGPT_SIDECAR.md`: Firefox headless extension and ChatGPT tab bridge notes.
-- `docs/UX_HANDHELD_SHELL.md`: handheld play UI concept and input ownership.
-- `docs/UX_AUDIT.md`: current usability findings and next UX priorities.
-- `src/`: campaign engine, context packs, prompt builder, importers, storage, and bridge contracts.
-- `app/`: React/Vite app shell and transitional controller.
-- `extension/`: headless browser extension source for provider web UI bridging.
+- `docs/ARCHITECTURE.md`: current architecture, ownership boundaries, and code landmarks.
+- `docs/state-of-the-table.md`: working product state, priorities, and checklist.
+- `electron/`: desktop window, local server launch, and desktop protocol handling.
+- `scripts/serve.js`: local HTTP/API surface for the desktop host and same-network guests.
+- `app/`: Vite app shell, renderer orchestration, UI controllers, and styles.
+- `src/`: campaign state, engines, model contract, multiplayer authority, storage, provider service, and rules.
+- `scripts/test-*.js`: regression tests for engine behavior, provider contract, multiplayer, SQLite, and server security.
 
 ## Local Commands
 

@@ -15,6 +15,9 @@ export const campaignIndexFileName = "campaign-index.json";
 export const campaignIndexVersion = "2.0.0";
 const writeQueues = new Map();
 
+// Repository facade for user-owned campaign files.
+// The index is a convenience pointer/list; the SQLite files are the durable
+// campaign source. Writes are queued per path below to avoid overlapping saves.
 export async function loadActiveCampaign(projectRoot) {
   const index = await loadCampaignIndex(projectRoot);
   const selectedPath = index.activeCampaignPath;

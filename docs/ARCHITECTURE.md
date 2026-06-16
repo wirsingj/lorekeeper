@@ -1,173 +1,232 @@
-# Architecture
+# LoreKeeper Architecture
 
-Lorekeeper is a browser-extension-first campaign continuity manager. It runs locally, manages
-campaign memory as structured state plus human-readable notes, and uses supported provider web UIs
-as visible AI execution surfaces.
+Updated: 2026-06-16
 
-## Design Principle
+This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most.
 
-Lorekeeper is a campaign memory engine, not just a chat wrapper.
+## Product Shape
 
-The provider chat is where model execution happens. Lorekeeper is where campaign canon lives,
-where prompts are assembled, where responses are imported, and where proposed state changes are
-reviewed before becoming canon.
+LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a local AI provider, or serve a same-network guest page for remote players.
 
-## Major Components
+The north-star table model is:
 
-### Lorekeeper App Tab / Side Panel
+- the app and provider together are the DM,
+- the app owns canon, rules, persistence, authority, and recovery,
+- the provider owns narration, atmosphere, NPC behavior, and proposed state changes,
+- party members are player-facing table voices with controller ownership,
+- SQLite/app state is canon; provider memory is only scratch context.
 
-The main user interface for campaigns, current scene state, context packs, prompt preparation,
-response import, and state review.
+## Runtime Surfaces
 
-It may run as a full extension page, side panel, or both.
+Electron desktop:
 
-The primary play UI should use a handheld-shell layout: Lorekeeper-owned input at the bottom,
-campaign controls on the sides, provider status in the top bar, and a central play screen that mirrors
-provider responses. The user should not need to type directly into the provider once a bridge is
-selected.
+- `electron/main.js` creates the desktop window, starts the local server, handles `lorekeeper://join` links, and launches the Vite-built app.
+- `electron/preload.cjs` exposes a tiny safe bridge to the renderer.
 
-### Provider Tab Selection
+Local HTTP server:
 
-The user explicitly selects a supported provider tab or window. Lorekeeper does not operate on
-arbitrary tabs.
+- `scripts/serve.js` serves the app, campaign data APIs, provider APIs, local multiplayer APIs, guest pages, assets, diagnostics, and storage-backed mutations.
+- The server still has transitional active-campaign APIs, but multiplayer routes now validate explicit campaign/table/session identity before mutating.
 
-Selection should show clear status:
+Renderer:
 
-- selected provider
-- selected tab title/domain
-- automation readiness
-- current send/import state
-- pause/stop controls
+- `app/App.jsx` is mostly static JSX for the shell, front door, table view, join view, setup dialogs, and rails.
+- `app/app.js` wires DOM events, renderer state, fetch calls, render functions, provider turns, multiplayer actions, and recovery flows. This is still the largest risk/god file.
+- Smaller `app/*controller.js` modules hold projections and policies that have been extracted from `app.js`.
 
-### Provider Adapters
+Domain engine:
 
-Provider-specific content scripts isolate DOM automation details for each supported provider.
-ChatGPT should be the first adapter. Claude can follow later.
+- `src/engine/*` owns deterministic tabletop rules, turn state, combat state, scene retrieval, consequences, agency checks, and provider orchestration.
+- `src/campaign-state/*` owns campaign shape, normalization, direct record mutations, review logs, and canonical change application.
+- `src/storage/*` owns campaign file persistence, SQLite import/export, migrations, and review commits.
+- `src/model-contract/*` owns provider response validation, rendering, fixtures, and agency guard rails.
+- `src/multiplayer/*` owns invites, table identity, waiting-room guests, guest snapshots, staged inputs, table talk, and seat assignments.
 
-Adapters are expected to be brittle by nature because provider DOMs change, so each adapter should
-have clear failure reporting and a manual fallback path.
+Tests:
 
-### Prompt Builder
+- `scripts/test-engine-architecture.js` is the broad engine/app-policy regression suite.
+- `scripts/test-json-contract.js` exercises provider JSON, agency, hidden-story leakage, and rendered DM response behavior.
+- `scripts/test-multiplayer.js` exercises local table authority, guest joins, stale links, votes, disconnect/reconnect, and session isolation.
+- `scripts/test-sqlite-storage.js` exercises SQLite persistence, migrations, logs, errors, and bounded query helpers.
+- `scripts/test-server-security.js` and `scripts/test-server-integration.js` cover route exposure and real HTTP mutation behavior.
 
-The prompt builder assembles focused prompts from campaign state, provider templates, scene state,
-style rules, and optional user instructions.
+## Identity And Authority
 
-It should be able to build focused context packs such as:
+Do not rely on "the active campaign" for multiplayer behavior.
 
-- current scene context
-- active party context
-- nearby people and places
-- relevant lore
-- current inventory
-- unresolved plot threads
-- combat state if in combat
-- relationship notes
-- campaign style and formatting rules
+Campaign:
 
-### Play Loop Orchestrator
+- `campaignId`
+- long-lived canonical world state,
+- owns durable party, records, scenes, consequences, combat, provider settings, logs, and notes.
 
-The play loop takes the user's raw Lorekeeper input and turns it into a provider-ready turn:
+Table:
 
-1. capture player action/message
-2. retrieve focused context from campaign storage
-3. build provider prompt
-4. send or copy through selected provider bridge
-5. import provider response
-6. show response in Lorekeeper's central play screen
-7. extract proposed state changes
-8. route those changes through canon review
+- `tableId`
+- active table for a campaign,
+- owns seats, invites, waiting guests, table talk, staged actions, and table-facing projections.
 
-### Response Importer
+Session:
 
-The response importer reads the latest provider assistant response, stores the raw imported text,
-and passes it to extraction and review flows.
+- `sessionId`
+- live host runtime instance,
+- owns LAN guest links, guest heartbeats, connection validity, and stale-link rejection.
 
-The raw response should be retained for audit and recovery even when structured extraction fails.
+Every multiplayer request should be able to answer:
 
-### State Diff Reviewer
+- Which campaign owns this?
+- Which table owns this?
+- Which live host session owns this?
+- Which guest/client/seat is authorized to act?
 
-The model may propose campaign state updates, but proposed changes are never canon immediately.
-The user must be able to review, edit, approve, or reject changes before they are committed.
+Renderer state is never authority. It can hold selected views, form drafts, local convenience caches, and display projections. Server/domain modules must validate ownership before persistence.
 
-The reviewer should support:
+## Canon Lifecycle
 
-- structured diffs
-- human-readable summaries
-- per-change approval or rejection
-- manual edits before commit
-- rollback or version history for approved updates
+Canon changes should flow through these stages:
 
-### Campaign State Engine
+1. Player, guest, AI companion, combat, or DM action enters the table.
+2. The app builds a context pack and provider task.
+3. Provider returns narration and optional structured changes.
+4. Provider output is validated.
+5. Valid state changes become proposed review changes, auto-approved safe changes, or repair-needed diagnostics.
+6. Approved changes commit into campaign state.
+7. SQLite persists canon, logs, provider diagnostics, errors, and review records.
 
-The campaign state engine owns canonical campaign memory. It stores structured entities,
-relationships, timeline events, current scene state, combat state, style rules, and templates.
+Provider text can enrich play, but provider text alone should not silently mutate critical state.
 
-State should be queryable enough to build narrow context packs instead of dumping the entire
-campaign into every prompt.
+## Important Ownership Boundaries
 
-### Storage Layer
+`CampaignStateStore`
 
-The storage layer persists campaign bundles in user-owned durable storage. Browser storage may be
-used for cache and convenience, but it should not be the only trusted long-term store.
+- Intended owner for canonical campaign state transitions.
+- Still underused by live renderer paths; many routes still load/update whole active campaigns.
 
-### Export / Import Layer
+`TurnEngine`
 
-Campaigns must be exportable and importable. Export should preserve structured state, notes,
-templates, raw session history, reviewed diffs, and attachments or references where possible.
+- Owns deterministic turn lifecycle states.
+- Renderer still carries helper state around current turns and recovery.
 
-## Campaign State Domains
+`CombatEngine`
 
-Campaign state must explicitly model and persist:
+- Owns app-resolved combat mechanics, legal actions, rolls, effects, HP, conditions, and initiative advancement.
+- Provider may narrate combat, but should not be the authority for app-owned mechanics.
 
-- people, characters, and NPCs
-- player party members
-- factions and organizations
-- places, regions, and maps
-- items, artifacts, and inventory
-- world lore and canon notes
-- timeline and session events
-- active quests and unresolved threads
-- relationships between characters, factions, and places
-- party location and scene state
-- combat style preferences
-- combat turn format
-- D&D 5e-lite rules profile and stat tracking
-- character stats, HP, abilities, and spells when available
-- encounter state, enemies, initiative, and conditions
-- writing tone and campaign style rules
-- provider prompt templates
-- recap and context-pack templates
+`AgencyController` and model contract validation:
 
-## Canon Model
+- Decide whether a party member can be acted for by provider output.
+- Host/remote/unassigned party members cannot receive invented speech, thoughts, scouting, resolve, body language, or purposeful action unless their controller submitted it.
 
-Lorekeeper tracks canon as both structured state and human-readable notes.
+`ProviderOrchestrator`
 
-Structured state makes retrieval, context packing, and diff review possible. Human-readable notes
-keep the campaign understandable to the user and resilient when schemas evolve.
+- Owns provider request lifecycle, request ids, stale response rejection, and local generation events.
+- Provider imports still need fuller table/session envelopes end to end.
 
-Canon changes should flow through this lifecycle:
+`MultiplayerSessionEngine` target:
 
-1. imported provider response
-2. proposed extraction
-3. reviewable diff
-4. user edit or approval
-5. canonical commit
-6. durable persistence
+- Not yet a single explicit module, but `src/multiplayer/local-table.js` is the current authority center.
+- Should eventually own session identity, seats, guests, approvals, connection recovery, and staged action lifecycle as a clearer engine.
 
-## Rules Profile
+UI projections:
 
-Lorekeeper should provide mechanical guard rails for D&D 5e-lite play without becoming a deep game
-rules engine or full virtual tabletop.
+- `app/*controller.js` files should keep growing as small projection/policy modules.
+- Prefer extracting pure decisions into these modules with tests before adding more branches to `app/app.js`.
 
-The rules profile should track enough to keep provider output consistent:
+## Storage Model
 
-- level, class, ancestry, AC, HP, temporary HP
-- ability scores and modifiers
-- proficiency bonus, saves, skills, and passive perception
-- attacks, features, abilities, spells, and spell slots when known
-- initiative, conditions, enemies, resources, and encounter state
-- advantage/disadvantage and ordinary d20 check conventions
-- the campaign's preferred combat turn format
+Campaigns persist as SQLite-backed local files under the app data area.
 
-When stats are missing, the provider should state assumptions and propose a Lorekeeper update instead
-of silently inventing permanent mechanics.
+Important storage modules:
+
+- `src/storage/campaign-repository.js`: load/save campaign files and app-owned imported assets.
+- `src/storage/sqlite-store.js`: serialize/deserialize campaign snapshots and query bounded logs/records.
+- `src/storage/sqlite-migrations.js`: schema version checks and future migration spine.
+- `src/storage/review-commit.js`: commit reviewed changes into canonical campaign state.
+
+SQLite stores:
+
+- campaign snapshot,
+- session/play messages,
+- provider events,
+- errors,
+- review batches and proposed changes,
+- dice rolls,
+- combat actions,
+- state effects,
+- player notes.
+
+Deletion currently recycles SQLite/WAL/SHM files into `data/campaigns/.deleted/...` for manual recovery instead of hard-deleting immediately.
+
+## Provider Model
+
+Provider support lives in:
+
+- `src/ai/provider-service.js`
+- `src/ai/ollama-provider.js`
+- `src/ai/bridge-provider.js`
+- `src/ai/ollama-context-cache.js`
+- `src/engine/provider-orchestrator.js`
+
+The app supports local Ollama and manual bridge mode. Qwen-style models use special handling such as no JSON mode and `/no_think` where needed.
+
+Provider memory/context keys may warm up a model per campaign, but app/SQLite state must remain the source of truth. Never depend on provider memory for canon or isolation.
+
+## Multiplayer Model
+
+Same-network guests open:
+
+```text
+http://<host-lan-ip>:<port>/guest
+```
+
+The guest page can show the active table, available non-host seats, and a waiting room. Fixed join-as links still exist as an advanced bypass, but normal flow should use the waiting room.
+
+Security rules:
+
+- public guest routes validate campaign/table/session identity and guest secrets,
+- host routes require host authorization,
+- stale `campaignId`, `tableId`, or `sessionId` must reject instead of applying to the active table,
+- guest leave should release the remote controller back to host control and make the seat requestable again.
+
+## UI Model
+
+Front door:
+
+- Host existing campaign,
+- Host New setup workspace,
+- Join hosted table,
+- Provider/App setup.
+
+Table view:
+
+- left rail: campaign controls, party, combat,
+- center: play log and command deck,
+- right rail: Campaign Notes, Player Notes, Table Talk.
+
+Ordinary play should avoid implementation language such as JSON, import, sync, or contract unless the user opens diagnostics.
+
+## Readability Landmarks
+
+Start here when making changes:
+
+- UI shell/layout: `app/App.jsx`, `app/styles.css`
+- Main UI behavior: `app/app.js`
+- Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
+- Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`
+- Character creation/autocomplete: `app/character-autocomplete-controller.js`
+- Local multiplayer: `src/multiplayer/local-table.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`
+- Combat: `src/engine/combat-engine.js`, `src/rules/combat-turns.js`, `app/combat-resolution-controller.js`
+- Provider contract/agency: `src/model-contract/turn-json-contract.js`
+- SQLite: `src/storage/sqlite-store.js`, `src/storage/sqlite-schema.sql`, `src/storage/sqlite-migrations.js`
+- State shape: `src/campaign-state/schema.js`
+
+## Known Architecture Debt
+
+1. `app/app.js` is still too large and owns too much orchestration.
+2. `scripts/serve.js` is also large and mixes routing, validation, storage calls, and local table behavior.
+3. Some live paths still hydrate whole campaign snapshots instead of using bounded SQLite query helpers.
+4. Provider import/generation is not fully table/session-scoped end to end.
+5. Settings are still physically one dialog, even though app-level and campaign-level settings are conceptually separate.
+6. Pre-table remote seating for brand-new unsaved campaign drafts is not safely modeled yet.
+
+When in doubt, prefer extracting a pure policy/projection into a small module with tests over adding more conditional logic to `app/app.js` or `scripts/serve.js`.

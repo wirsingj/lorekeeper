@@ -1,3 +1,5 @@
+// Provider import policy projections. Keep table-facing wording and
+// auto-commit decisions here so app.js can execute the policy without owning it.
 export function buildProviderImportOutcome({
   extractionError = "",
   autoCommitAppliedCount = 0,

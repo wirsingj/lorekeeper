@@ -30,6 +30,16 @@ import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 import { turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "./turn-repair-controller.js";
 
+// Renderer orchestration map:
+// 1. constants/state/elements,
+// 2. event listeners,
+// 3. turn/provider/multiplayer actions,
+// 4. render helpers,
+// 5. small local utilities.
+//
+// This file is intentionally kept working while smaller pure policies move into
+// app/*controller.js and src/engine/*.js. Prefer adding new decisions there with
+// tests instead of growing this renderer file further.
 const launchParams = new URLSearchParams(window.location.search);
 const guestWaitingRoomMode = window.location.pathname === "/guest" || launchParams.get("mode") === "guest";
 const clientMode = launchParams.get("mode") === "client" || guestWaitingRoomMode;
@@ -95,6 +105,10 @@ const defaultCompanionOptions = {
 };
 const userSettingsStorageKey = "lorekeeper.lastProviderSettings";
 const appModeStorageKey = "lorekeeper.appMode";
+
+// Renderer state is a UI cache, not canon. Campaign canon lives in the server
+// and SQLite-backed campaign state; multiplayer authority is validated by
+// campaign/table/session ids before server mutations are accepted.
 const state = {
   campaign: null,
   contextPack: null,
@@ -196,6 +210,8 @@ function shouldAttachLorekeeperApiToken(input) {
   }
 }
 
+// Static element registry for the hand-written DOM shell. IDs live in App.jsx;
+// behavior lives here until a fuller React state model replaces this bridge.
 const elements = {
   app: document.querySelector("#app"),
   title: document.querySelector("#campaign-title"),
