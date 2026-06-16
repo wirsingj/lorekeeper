@@ -84,6 +84,7 @@ Every table surface should answer the same practical questions a real table answ
 33. Auto-resolved enemy combat turns now run through CombatEngine and commit app-owned rolls/effects/initiative before narration.
 34. Enemy combat resolution glue is extracted from `app/app.js` into a focused combat-resolution controller with tests.
 35. Provider combat validation now rejects resolved combat changes whose `resolvedActorId` is not the active initiative actor.
+36. Desktop `lorekeeper://join` links now open Join mode with the invite preloaded, replacing stale saved guest sessions from prior tables.
 
 ### Still Risky
 
@@ -139,6 +140,7 @@ Every table surface should answer the same practical questions a real table answ
 8. Run the two-machine playtest checklist and log every friction point.
 9. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 10. Soak-test host-side "guest is waiting on you" affordance on two machines.
+11. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
 
 ### Medium
 
@@ -224,6 +226,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Guest inputs are visible table messages and can become structured `user.playerInputs[]`.
 - [x] Guest snapshots redact hidden DM notes and enemy HP.
 - [x] Remote-to-AI/host controller transfer clears stale guest links.
+- [x] Desktop protocol invite links preload the Join screen and clear stale saved sessions for different invites.
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
 - [x] Provider Setup is reachable as a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.

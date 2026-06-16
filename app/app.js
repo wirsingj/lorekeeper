@@ -27,6 +27,7 @@ import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 const launchParams = new URLSearchParams(window.location.search);
 const guestWaitingRoomMode = window.location.pathname === "/guest" || launchParams.get("mode") === "guest";
 const clientMode = launchParams.get("mode") === "client" || guestWaitingRoomMode;
+const launchInviteLink = launchParams.get("inviteLink") || "";
 const apiToken = launchParams.get("lkToken") || "";
 const nativeFetch = window.fetch.bind(window);
 const bundleUrl = "/data/imports/veil-of-the-towers.bundle.json";
@@ -133,6 +134,7 @@ const state = {
   playerNotesCampaignId: "",
   homeFlow: clientMode ? "join" : "",
   campaignWizardReturnHome: false,
+  launchInviteError: "",
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
@@ -1619,6 +1621,7 @@ async function boot() {
 
 async function bootClientMode() {
   document.title = "LoreKeeper Join";
+  const loadedInvite = applyLaunchInviteLink();
   state.sourceMode = "guest";
   state.campaigns = [];
   state.sqlitePath = "";
@@ -1628,12 +1631,18 @@ async function bootClientMode() {
   });
   seedPlayLog();
   render();
-  setProviderActivity(
-    guestWaitingRoomMode
-      ? "Guest waiting room ready. Ask the host for a seat."
-      : "LoreKeeper Join ready. Paste a host invite link to join.",
-    "idle",
-  );
+  if (state.launchInviteError) {
+    setProviderActivity(state.launchInviteError, "error");
+  } else {
+    setProviderActivity(
+      loadedInvite
+        ? "Invite link loaded. Enter your name, then join the hosted table."
+        : guestWaitingRoomMode
+        ? "Guest waiting room ready. Ask the host for a seat."
+        : "LoreKeeper Join ready. Paste a host invite link to join.",
+      loadedInvite ? "waiting" : "idle",
+    );
+  }
 
   if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
     try {
@@ -1658,6 +1667,10 @@ async function bootClientMode() {
   window.setTimeout(() => {
     if (guestWaitingRoomMode) {
       elements.guestWaitingPlayerName?.focus();
+      return;
+    }
+    if (loadedInvite && elements.thinJoinPlayerName && !elements.thinJoinPlayerName.value) {
+      elements.thinJoinPlayerName.focus();
       return;
     }
     elements.thinJoinInviteLink?.focus();
@@ -2013,6 +2026,36 @@ async function maybeAutoResolveCombatRemoteInputs() {
   } finally {
     state.autoResolvingCombatInput = false;
   }
+}
+
+function applyLaunchInviteLink() {
+  const inviteLink = String(launchInviteLink || "").trim();
+  if (!inviteLink || guestWaitingRoomMode) {
+    return false;
+  }
+  const parsed = parseInviteLinkForClient(inviteLink);
+  if (!parsed.valid) {
+    state.launchInviteError = parsed.error;
+    return false;
+  }
+
+  const rememberedName = state.guestSession?.playerName || state.recentGuestSession?.playerName || "";
+  if (state.guestSession?.inviteLink !== inviteLink) {
+    clearGuestSession({ keepRecent: false });
+  }
+  clearWaitingRoomSession();
+  state.recentGuestSession = {
+    inviteLink,
+    hostBaseUrl: `http://${parsed.host}:${parsed.port}`,
+    playerName: rememberedName,
+    campaignId: parsed.campaign,
+    tableId: parsed.tableId,
+    sessionId: parsed.sessionId,
+    partyMemberId: parsed.seat,
+    savedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(guestRecentSessionStorageKey, JSON.stringify(state.recentGuestSession));
+  return true;
 }
 
 async function loadCampaign() {
@@ -5943,11 +5986,15 @@ function renderThinJoinPanel() {
   if (elements.thinJoinPlayerName && savedSession?.playerName && !elements.thinJoinPlayerName.value) {
     elements.thinJoinPlayerName.value = savedSession.playerName;
   }
-  if (elements.thinJoinStatus && !awaitingApproval && !state.guestSession && state.recentGuestSession?.inviteLink) {
-    elements.thinJoinStatus.textContent = "Previous table remembered. Request join again when the host is available.";
+  if (elements.thinJoinStatus && state.launchInviteError) {
+    elements.thinJoinStatus.textContent = state.launchInviteError;
+  } else if (elements.thinJoinStatus && !awaitingApproval && !state.guestSession && state.recentGuestSession?.inviteLink) {
+    elements.thinJoinStatus.textContent = launchInviteLink
+      ? "Invite loaded. Enter your name, then join the hosted table."
+      : "Previous table remembered. Request join again when the host is available.";
   }
   if (elements.thinJoinSubmit) {
-    elements.thinJoinSubmit.textContent = !state.guestSession && state.recentGuestSession?.inviteLink
+    elements.thinJoinSubmit.textContent = !launchInviteLink && !state.guestSession && state.recentGuestSession?.inviteLink
       ? "Reconnect"
       : "Join Table";
   }

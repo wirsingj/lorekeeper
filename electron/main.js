@@ -10,7 +10,8 @@ const preferredPort = Number(process.env.LOREKEEPER_PORT || 4173);
 let apiPort = preferredPort;
 const executableName = path.basename(process.execPath);
 const packagedJoinDefault = /(thinlorekeeper|lorekeeperjoin)/i.test(`${app.getName()} ${executableName}`);
-const clientMode = process.argv.includes("--client") || process.env.LOREKEEPER_CLIENT_MODE === "1" || packagedJoinDefault;
+const initialJoinLink = findJoinLinkArg(process.argv);
+const clientMode = Boolean(initialJoinLink) || process.argv.includes("--client") || process.env.LOREKEEPER_CLIENT_MODE === "1" || packagedJoinDefault;
 const appName = "LoreKeeper";
 const appDisplayName = clientMode ? "LoreKeeper Join" : "LoreKeeper";
 const appIconPath = path.join(rootDir, "assets", "brand", "lorekeeper-icon.ico");
@@ -18,10 +19,16 @@ let apiProcess = null;
 let mainWindow = null;
 let quitting = false;
 let cleanupStarted = false;
+let pendingJoinLink = initialJoinLink;
 const apiToken = crypto.randomBytes(24).toString("hex");
 
 app.setName(appName);
 app.setPath("userData", path.join(app.getPath("appData"), appName));
+try {
+  app.setAsDefaultProtocolClient("lorekeeper");
+} catch {
+  // Protocol registration can fail in portable/dev contexts; pasted links still work.
+}
 
 const singleInstanceLock = app.requestSingleInstanceLock({ mode: clientMode ? "client" : "host" });
 if (!singleInstanceLock) {
@@ -79,8 +86,12 @@ async function createWindow() {
   setupRendererContextMenu(mainWindow);
 
   if (clientMode) {
+    const query = { mode: "client" };
+    if (pendingJoinLink) {
+      query.inviteLink = pendingJoinLink;
+    }
     await mainWindow.loadFile(path.join(rootDir, "dist", "app", "index.html"), {
-      query: { mode: "client" },
+      query,
     });
     mainWindow.setTitle(appDisplayName);
   } else {
@@ -294,7 +305,14 @@ ipcMain.handle("lorekeeper:relaunch-mode", (_event, requestedMode) => {
   return { ok: true, mode: nextMode, relaunched: true };
 });
 
-app.on("second-instance", () => {
+app.on("second-instance", (_event, argv = []) => {
+  const joinLink = findJoinLinkArg(argv);
+  if (joinLink) {
+    pendingJoinLink = joinLink;
+    loadJoinLinkInClientWindow(joinLink).catch((error) => {
+      console.error(error instanceof Error ? error.message : error);
+    });
+  }
   focusMainWindow();
 });
 
@@ -364,4 +382,21 @@ function focusMainWindow() {
       mainWindow.focus();
     }, 750);
   }
+}
+
+function findJoinLinkArg(args = []) {
+  return args.map((arg) => String(arg || "").trim()).find((arg) => /^lorekeeper:\/\/join(?:[/?#]|$)/i.test(arg)) || "";
+}
+
+async function loadJoinLinkInClientWindow(joinLink) {
+  if (!clientMode || !mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  await mainWindow.loadFile(path.join(rootDir, "dist", "app", "index.html"), {
+    query: {
+      mode: "client",
+      inviteLink: joinLink,
+    },
+  });
+  mainWindow.setTitle(appDisplayName);
 }

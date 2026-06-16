@@ -1177,6 +1177,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
+  const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
   assert.match(appShell, /Additional Characters/);
   assert.match(appShell, /add-wizard-party-member/);
   assert.match(appShell, /Remote Invite/);
@@ -1233,6 +1234,14 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited player/);
   assert.match(appJs, /renderDebugMetaControl/);
+  assert.match(appJs, /launchInviteLink/);
+  assert.match(appJs, /applyLaunchInviteLink/);
+  assert.match(appJs, /clearGuestSession\(\{\s*keepRecent:\s*false\s*\}\)/);
+  assert.match(appJs, /Invite loaded\. Enter your name/);
+  assert.match(electronMain, /findJoinLinkArg\(process\.argv\)/);
+  assert.match(electronMain, /setAsDefaultProtocolClient\("lorekeeper"\)/);
+  assert.match(electronMain, /query\.inviteLink = pendingJoinLink/);
+  assert.match(electronMain, /second-instance", \(_event, argv = \[\]\)/);
 }
 
 testDiceEngine();
