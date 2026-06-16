@@ -90,6 +90,7 @@ Every table surface should answer the same practical questions a real table answ
 39. Guest Leave now notifies the host, releases the remote controller to Host, and makes the vacated seat requestable again.
 40. Server security tests now exercise the API-token authorization decision for public guest routes, protected host routes, unknown API routes, and local assets.
 41. JSON contract fixtures now prove narration-first choice suppression across social, travel, exploration/mystery, downtime, and recovery-like scene beats.
+42. Left rail layout now constrains party/combat records and action rows so long names/buttons wrap locally instead of forcing horizontal panel scroll.
 
 ### Still Risky
 
@@ -285,6 +286,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Consider context-sensitive note sections or tabs after playtest.
 - [ ] Persist Player Notes to campaign SQLite or an explicit per-user notes store before relying on them for long campaigns.
 - [x] Make Table Talk harder to miss without making it noisy.
+- [x] Keep the left rail stable when party cards and combat rows have long names/actions.
 
 ### Storage, Diagnostics, And Safety
 

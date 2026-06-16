@@ -192,6 +192,7 @@ h3 {
 
 .left-panel {
   grid-area: left;
+  min-width: 0;
 }
 
 .right-panel {
@@ -199,6 +200,7 @@ h3 {
 }
 
 .panel-rail {
+  min-width: 0;
   min-height: 0;
   max-height: 100%;
   display: grid;
@@ -256,6 +258,7 @@ h3 {
 }
 
 .section-title {
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -263,8 +266,11 @@ h3 {
 }
 
 .title-actions {
+  min-width: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
 }
 
@@ -281,6 +287,7 @@ h3 {
 
 .record-stack,
 .context-stack {
+  min-width: 0;
   display: grid;
   gap: 8px;
 }
@@ -622,6 +629,7 @@ h3 {
 }
 
 .record {
+  min-width: 0;
   padding: 9px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.055);
@@ -642,6 +650,7 @@ h3 {
 }
 
 .record h3 {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -653,10 +662,12 @@ h3 {
 }
 
 .record p {
+  min-width: 0;
   margin: 0;
   color: #d4dce1;
   font-size: 0.78rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .controller-badge {
@@ -672,6 +683,7 @@ h3 {
 }
 
 .record-actions {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -710,6 +722,7 @@ h3 {
 }
 
 .combat-turn-order {
+  min-width: 0;
   display: grid;
   gap: 6px;
   margin: 0;

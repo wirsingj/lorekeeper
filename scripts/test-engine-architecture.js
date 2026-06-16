@@ -1177,6 +1177,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
+  const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
   assert.match(appShell, /Additional Characters/);
   assert.match(appShell, /add-wizard-party-member/);
@@ -1255,6 +1256,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(electronMain, /setAsDefaultProtocolClient\("lorekeeper"\)/);
   assert.match(electronMain, /query\.inviteLink = pendingJoinLink/);
   assert.match(electronMain, /second-instance", \(_event, argv = \[\]\)/);
+  assert.match(styles, /\.left-panel\s*{\s*grid-area:\s*left;\s*min-width:\s*0;/);
+  assert.match(styles, /\.panel-rail\s*{\s*min-width:\s*0;/);
+  assert.match(styles, /\.title-actions\s*{[\s\S]*?flex-wrap:\s*wrap;/);
+  assert.match(styles, /\.record\s*{\s*min-width:\s*0;/);
 }
 
 testDiceEngine();
