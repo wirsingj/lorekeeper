@@ -312,6 +312,35 @@ function testCombatEngine() {
   assert.ok(dodged.campaign.party.find((member) => member.id === "thor").conditions.includes("dodging"));
   assert.equal(dodged.campaign.combat.currentTurnId, "sy");
 
+  const helpCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const helped = resolveCombatAction(helpCampaign, {
+    turnId: "combat-help-turn",
+    actorId: "thor",
+    actionType: "help",
+    declaredText: "Help Sy line up a shot.",
+  }, { seed: "help-seed" });
+  assert.equal(helped.actionRecord.rolls.length, 0);
+  assert.ok(helped.campaign.party.find((member) => member.id === "thor").conditions.includes("helping"));
+  assert.equal(helped.campaign.combat.currentTurnId, "sy");
+
+  const disengageCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const disengaged = resolveCombatAction(disengageCampaign, {
+    turnId: "combat-disengage-turn",
+    actorId: "thor",
+    actionType: "disengage",
+    declaredText: "Disengage and back toward the doorway.",
+    positionNote: "Backed toward the doorway without provoking.",
+  }, { seed: "disengage-seed" });
+  assert.equal(disengaged.actionRecord.rolls.length, 0);
+  assert.ok(disengaged.campaign.party.find((member) => member.id === "thor").positionNotes.includes("Backed toward the doorway without provoking."));
+  assert.equal(disengaged.campaign.combat.currentTurnId, "sy");
+
   const checkCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
     initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
@@ -347,6 +376,27 @@ function testCombatEngine() {
     dc: 5,
   }, { seed: "combat-skill-check-seed" });
   assert.equal(skilled.actionRecord.rolls[0].formula, "1d20+5");
+
+  const hideCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor" ? { ...member, skills: ["Stealth"] } : member),
+  }, {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const hidden = resolveCombatAction(hideCampaign, {
+    turnId: "combat-hide-turn",
+    actorId: "thor",
+    actionType: "check",
+    declaredText: "Hide behind the overturned bar.",
+    skill: "Stealth",
+    modifier: 20,
+    dc: 10,
+    successEffects: [{ type: "condition_add", targetId: "thor", condition: "hidden", reason: "Successful hide action" }],
+  }, { seed: "combat-hide-seed" });
+  assert.equal(hidden.actionRecord.rolls[0].label, "Stealth check");
+  assert.ok(hidden.campaign.party.find((member) => member.id === "thor").conditions.includes("hidden"));
+  assert.equal(hidden.campaign.combat.currentTurnId, "sy");
 
   const contestCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
@@ -481,6 +531,22 @@ function testCombatEngine() {
   assert.equal(surrendered.campaign.combat.lastOutcome, "enemy_surrendered");
   assert.equal(surrendered.campaign.combat.lastAction, "Thor de-escalated the brawl and the miner surrendered.");
   assert.equal(surrendered.campaign.engineState.mode, gameModes.RP);
+
+  const fleeCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const fled = resolveCombatAction(fleeCampaign, {
+    turnId: "combat-flee-turn",
+    actorId: "thor",
+    actionType: "improvise",
+    declaredText: "The party retreats and escapes into the alley.",
+    endsCombat: true,
+    summary: "The party escaped the brawl.",
+  }, { seed: "flee-seed", now: "2026-01-01T00:00:00.000Z" });
+  assert.equal(fled.campaign.combat.inCombat, false);
+  assert.equal(fled.campaign.combat.lastOutcome, "enemies_retreat");
+  assert.equal(fled.campaign.combat.lastAction, "The party escaped the brawl.");
 }
 
 function testCombatEndsWhenSideDrops() {

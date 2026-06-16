@@ -94,6 +94,7 @@ Every table surface should answer the same practical questions a real table answ
 43. Party-vote panels now give the host a "Use leading choice" action when remote votes have a clear leader.
 44. Live recovery controls now use table-facing labels: Try Again, Details, and Use Anyway instead of Retry/Inspect/Import.
 45. Agency fixtures now cover host-controlled, remote-controlled, unassigned, and AI companion boundaries.
+46. CombatEngine fixtures now cover app-owned Help, Disengage, Hide, and Flee/escape outcomes.
 
 ### Still Risky
 
@@ -209,7 +210,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add fixtures for app-owned attack, dodge, surrender, de-escalation, DC check, and opposed skill contest.
 - [x] Add fixtures for app-owned simple spell save, spell-slot spending, and save-gated conditions.
 - [x] Add fixture for app-owned enemy attack turn.
-- [ ] Add fixtures for help, disengage, hide, flee/chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases.
+- [ ] Add fixtures for chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases. Current state: app-owned Help, Disengage, Hide, and Flee/escape fixtures exist.
 - [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
 - [ ] Add crisp AI companion combat approval flow.
 - [x] Reject provider combat responses that resolve the wrong active actor.
