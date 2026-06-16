@@ -12,6 +12,7 @@ import { renderTurnResponseForImport } from "../src/model-contract/turn-json-con
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
+import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
@@ -132,6 +133,7 @@ const state = {
   diagnosticsEvents: [],
   tableTimeline: [],
   lastTableStatusText: "",
+  tableSession: null,
   pendingChoiceSelection: null,
   playLogVisibleLimit: defaultPlayLogVisibleLimit,
   forceScrollToBottom: false,
@@ -6126,6 +6128,7 @@ function render() {
   renderTableTalk();
   renderPrompt(state.prompt);
   renderReviewBatch();
+  refreshTableSessionProjection();
   renderSessionHealthSummary();
   renderCampaignSelector();
   renderProviderControls();
@@ -8178,6 +8181,7 @@ function buildRendererDiagnostics() {
     reviewBatch: state.reviewBatch,
     bridge: state.bridge,
     turnRepair: summarizeTurnRepair(activeTurnRepair()),
+    tableSession: state.tableSession ?? buildCurrentTableSessionProjection(),
     sessionHealth: buildSessionHealthSummary(),
     recentPlayMessages: state.playMessages.slice(-30),
     tableTimeline: state.tableTimeline.slice(-80),
@@ -8211,264 +8215,48 @@ function renderSessionHealthSummary(summary = buildSessionHealthSummary()) {
     }),
   );
   elements.sessionHealthSummary.dataset.tone = summary.tone || "ready";
+  elements.sessionHealthSummary.dataset.phase = summary.phase || summary.tableSession?.phase || "";
   elements.sessionHealthSummary.replaceChildren(headline, list);
 }
 
 function buildSessionHealthSummary() {
-  const lines = [];
-  const providerState = elements.providerActivity?.dataset.state || "idle";
-  const providerText = (elements.providerActivityLabel?.textContent || "").trim();
-  const campaign = state.campaign;
-  const multiplayer = effectiveMultiplayerState();
-  const repair = activeTurnRepair();
-  const pendingInputs = multiplayer.pendingTurnInputs ?? [];
-  const readyInputs = pendingInputs.filter((input) => input.ready && !input.passed && input.text);
-  const waitingInputs = pendingInputs.filter((input) => !input.ready || input.passed || !input.text);
-  const pendingGuests = (multiplayer.connections ?? []).filter((connection) => connection.status === "pending");
-  const waitingGuests = effectiveWaitingGuests().filter((guest) => guest.status === "waiting");
-  const multiplayerSettings = multiplayer.settings ?? {};
-  const guestPendingInput = state.guestSnapshot?.pendingInput ?? null;
-  const combat = campaign?.combat;
-  const activeCombatant = combat?.inCombat
-    ? normalizedCombatTurnOrder(campaign).find((entry) => entry.id === combat.currentTurnId)
-    : null;
-  const reviewCount = state.reviewBatch?.proposals?.filter((proposal) => proposal.status !== "committed")?.length ?? 0;
-  const tableRunning = Boolean(multiplayer.localTable?.running);
-  const providerSettings = currentProviderSettings();
-  const nextStepLine = sessionNextStepLine({
-    providerState,
-    providerText,
-    repair,
-    combat,
-    activeCombatant,
-    readyInputs,
-    waitingInputs,
-    pendingGuests,
-    waitingGuests,
-    reviewCount,
-    multiplayerSettings,
-    guestPendingInput,
-    tableRunning,
-    campaign,
-  });
-
-  if (providerState === "working") {
-    lines.push(providerText ? `DM is working: ${providerText}` : "DM is working on the next table beat.");
-  } else if (providerState === "error") {
-    lines.push(providerText ? `Needs attention: ${providerText}` : "Something needs attention before play continues.");
-  } else if (providerState === "waiting") {
-    lines.push(providerText ? `Waiting: ${providerText}` : "The table is waiting for the next host or provider step.");
-  }
-
-  if (repair) {
-    lines.push("A DM response needs review. Use Try Again, Details, or Use Anyway from the table status strip.");
-  }
-
-  if (nextStepLine) {
-    lines.push(nextStepLine);
-  }
-
-  if (combat?.inCombat) {
-    lines.push(activeCombatant
-      ? `Combat is active: ${activeCombatant.name}'s turn in round ${combat.round ?? 1}.`
-      : `Combat is active: round ${combat.round ?? 1}.`);
-  }
-
-  if (readyInputs.length) {
-    lines.push(pendingReadyInputSummary(readyInputs, multiplayerSettings));
-  }
-
-  if (waitingInputs.length) {
-    lines.push(waitingInputSummary(waitingInputs));
-  }
-
-  if (pendingGuests.length) {
-    lines.push(pendingGuests.length === 1
-      ? `${pendingGuests[0].displayName || "A guest"} is waiting for host approval.`
-      : `${pendingGuests.length} guests are waiting for host approval.`);
-  }
-
-  if (waitingGuests.length) {
-    lines.push(waitingGuests.length === 1
-      ? `${waitingGuests[0].displayName || "A guest"} is waiting for a character seat.`
-      : `${waitingGuests.length} guests are waiting for character seats.`);
-  }
-
-  if (reviewCount) {
-    lines.push(`${reviewCount} proposed state ${reviewCount === 1 ? "change is" : "changes are"} waiting for review.`);
-  }
-
-  if (clientMode || state.guestSession?.hostBaseUrl) {
-    if (guestPendingInput?.passed) {
-      lines.push("LoreKeeper Join sent a pass. Waiting for the host table.");
-    } else if (guestPendingInput?.text) {
-      lines.push("LoreKeeper Join sent your action. Waiting for the host table to resolve it.");
-    } else {
-      lines.push(state.guestSession?.connectionId
-        ? "LoreKeeper Join is connected to the host table."
-        : "LoreKeeper Join is not connected to a host table.");
-    }
-  } else {
-    lines.push(tableRunning ? "Local Table hosting is running." : "Local Table hosting is off.");
-  }
-
-  lines.push(providerSettings.preferredProvider === "ollama"
-    ? `Provider: Ollama ${providerSettings.selectedModel}.`
-    : "Provider: ChatGPT bridge/manual flow.");
-
-  const tone = repair || providerState === "error"
-    ? "attention"
-    : providerState === "working"
-      ? "working"
-      : providerState === "waiting" || readyInputs.length || waitingInputs.length || pendingGuests.length || waitingGuests.length || reviewCount
-        ? "waiting"
-        : "ready";
-  const headline = tone === "attention"
-    ? "Needs Attention"
-    : tone === "working"
-      ? "DM Resolving"
-      : tone === "waiting"
-        ? "Table Waiting"
-        : "Table Ready";
-
+  const tableSession = state.tableSession ?? refreshTableSessionProjection();
   return {
-    headline,
-    tone,
-    lines: lines.length ? lines : ["No blockers detected."],
+    headline: tableSession.headline,
+    tone: tableSession.tone,
+    phase: tableSession.phase,
+    lines: tableSession.lines?.length ? tableSession.lines : ["No blockers detected."],
+    tableSession,
   };
 }
 
-function sessionNextStepLine({
-  providerState,
-  repair,
-  combat,
-  activeCombatant,
-  readyInputs = [],
-  waitingInputs = [],
-  pendingGuests = [],
-  waitingGuests = [],
-  reviewCount = 0,
-  multiplayerSettings = {},
-  guestPendingInput,
-  tableRunning,
-  campaign,
-}) {
-  if (repair) {
-    return "Next: host chooses Try Again, Details, or Use Anyway.";
+function refreshTableSessionProjection() {
+  state.tableSession = buildCurrentTableSessionProjection();
+  if (elements.providerActivity) {
+    elements.providerActivity.dataset.tablePhase = state.tableSession.phase;
+    elements.providerActivity.dataset.expectedActor = state.tableSession.expectedActor?.kind || "";
   }
-  if (providerState === "working") {
-    return "Next: wait for the DM response; new turns are locked until it lands.";
-  }
-  if (providerState === "error") {
-    return "Next: host reviews the DM response or retries from the status strip.";
-  }
-  if (clientMode || state.guestSession?.hostBaseUrl) {
-    if (guestPendingInput?.passed || guestPendingInput?.text) {
-      return "Next: wait for the host table to resolve your input.";
-    }
-    if (!state.guestSession?.connectionId) {
-      return "Next: choose a table seat and ask the host to let you in.";
-    }
-  }
-  if (pendingGuests.length) {
-    return pendingGuests.length === 1
-      ? `Next: host approves or declines ${pendingGuests[0].displayName || "the guest"} from Local Table.`
-      : "Next: host approves or declines guest requests from Local Table.";
-  }
-  if (waitingGuests.length) {
-    return waitingGuests.length === 1
-      ? `Next: host seats ${waitingGuests[0].displayName || "the guest"} from Local Table.`
-      : "Next: host seats waiting guests from Local Table.";
-  }
-  if (readyInputs.length) {
-    if (multiplayerSettings.requireGuestActionApproval) {
-      return "Next: host approves the staged guest action or asks for changes.";
-    }
-    if (multiplayerSettings.holdGuestActionsForGroupInput) {
-      return "Next: host adds the group turn or presses Resolve Inputs.";
-    }
-    return "Next: host presses Resolve Inputs when ready for the DM.";
-  }
-  if (waitingInputs.length) {
-    return `Next: wait for ${inputNames(waitingInputs)} to finish that table input.`;
-  }
-  if (reviewCount) {
-    return "Next: host reviews or saves the proposed table changes.";
-  }
-  if (combat?.inCombat && activeCombatant) {
-    return combatNextStepLine(campaign, activeCombatant);
-  }
-  if (!tableRunning && !(clientMode || state.guestSession?.hostBaseUrl)) {
-    return "Next: start Local Table when you are ready to invite players.";
-  }
-  return "";
+  return state.tableSession;
 }
 
-function combatNextStepLine(campaign, activeCombatant) {
-  if (!activeCombatant) {
-    return "";
-  }
-  if (activeCombatant.type === "enemy") {
-    return `Next: DM resolves ${activeCombatant.name}'s turn.`;
-  }
-  const member = (campaign?.party ?? []).find((item) => item.id === activeCombatant.id);
-  const controller = partyControllerKind(member);
-  if (controller === "remote_player") {
-    return `Next: wait for ${activeCombatant.name}'s player to send a combat action.`;
-  }
-  if (controller === "ai_companion") {
-    return `Next: host nudges or resolves ${activeCombatant.name}'s companion turn.`;
-  }
-  if (controller === "unassigned") {
-    return `Next: host assigns or controls ${activeCombatant.name}'s combat turn.`;
-  }
-  return `Next: host sends ${activeCombatant.name}'s combat choice.`;
-}
-
-function pendingReadyInputSummary(inputs = [], settings = {}) {
-  const names = inputNames(inputs);
-  if (settings.requireGuestActionApproval) {
-    return inputs.length === 1
-      ? `${names} is waiting for host approval before the DM sees the action.`
-      : `${names} are waiting for host approval before the DM sees those actions.`;
-  }
-  if (settings.holdGuestActionsForGroupInput) {
-    return inputs.length === 1
-      ? `${names} is waiting for the host's grouped table turn.`
-      : `${names} are waiting for the host's grouped table turn.`;
-  }
-  return inputs.length === 1
-    ? `${names} has an action queued for the DM.`
-    : `${names} have actions queued for the DM.`;
-}
-
-function waitingInputSummary(inputs = []) {
-  const passed = inputs.filter((input) => input.passed);
-  const notReady = inputs.filter((input) => !input.passed);
-  if (passed.length && !notReady.length) {
-    return passed.length === 1
-      ? `${inputNames(passed)} passed and is waiting for the table to move on.`
-      : `${inputNames(passed)} passed and are waiting for the table to move on.`;
-  }
-  return notReady.length === 1
-    ? `${inputNames(notReady)} has a party input open but not ready yet.`
-    : `${inputNames(notReady)} have party inputs open but not ready yet.`;
-}
-
-function inputNames(inputs = []) {
-  const names = inputs
-    .map((input) => input.characterName || input.playerName || "A party member")
-    .filter(Boolean);
-  if (!names.length) {
-    return "A party member";
-  }
-  if (names.length === 1) {
-    return names[0];
-  }
-  if (names.length === 2) {
-    return `${names[0]} and ${names[1]}`;
-  }
-  return `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
+function buildCurrentTableSessionProjection() {
+  const providerState = elements.providerActivity?.dataset.state || "idle";
+  return buildTableSessionProjection({
+    campaign: state.campaign,
+    turnProjection: state.turnFlow?.getProjection?.() ?? null,
+    providerActivity: {
+      text: (elements.providerActivityLabel?.textContent || "").trim(),
+      raw: elements.providerActivityLabel?.title || "",
+      state: providerState,
+      phase: elements.providerActivity?.dataset.phase || providerState,
+    },
+    reviewBatch: state.reviewBatch,
+    repair: activeTurnRepair(),
+    multiplayer: effectiveMultiplayerState(),
+    guestSession: state.guestSession,
+    guestSnapshot: state.guestSnapshot,
+    clientMode,
+  });
 }
 
 function redactedRendererUrl() {
@@ -8599,12 +8387,14 @@ function setProviderActivity(message, status = "idle") {
   }
   elements.providerActivity.dataset.state = status;
   elements.providerActivity.dataset.phase = tableStatus.phase;
+  refreshTableSessionProjection();
   if (visibleMessage && visibleMessage !== state.lastTableStatusText) {
     state.lastTableStatusText = visibleMessage;
     pushTableTimelineEvent("table_status_changed", {
       message: visibleMessage,
       rawMessage: tableStatus.raw,
       phase: tableStatus.phase,
+      tablePhase: state.tableSession.phase,
       status,
     });
   }

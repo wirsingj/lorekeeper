@@ -122,6 +122,13 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Owns provider request lifecycle, request ids, stale response rejection, and local generation events.
 - Provider imports still need fuller table/session envelopes end to end.
 
+`TableSessionEngine`
+
+- Lives in `src/engine/table-session-engine.js`.
+- Consumes campaign, turn, combat, provider, review, recovery, guest, and multiplayer state.
+- Produces the unified table phase used by diagnostics/status surfaces: idle, roleplay, waiting for player, waiting for guest, waiting for DM, party vote, combat, host review, and recovery.
+- Does not replace TurnEngine, CombatEngine, AgencyController, or multiplayer authority. It is a table-experience projection over them.
+
 `MultiplayerSessionEngine` target:
 
 - Not yet a single explicit module, but `src/multiplayer/local-table.js` is the current authority center.

@@ -129,6 +129,7 @@ Every table surface should answer the same practical questions a real table answ
 90. Agency validation now catches subtle remote-PC resolve/body-language overreach from play logs, including "doesn't back down" and eyes/grip locking into action without submitted input.
 91. The left rail now explicitly contains dense party/combat content so long card text and button clusters wrap or truncate instead of forcing horizontal scroll.
 92. Staged-input failure wording now lives with the staged recovery controller, so retry/keep-staged language is tested outside `app.js`.
+93. `TableSessionEngine` now provides a unified table phase projection for roleplay, waiting player/guest/DM, party vote, combat, host review, and recovery states.
 
 ### Still Risky
 
@@ -150,6 +151,7 @@ Every table surface should answer the same practical questions a real table answ
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
+19. TableSessionEngine is currently a projection layer. More UI surfaces still need to consume it directly before the table fully stops combining local flags.
 
 ## Live Acceptance Matrix
 
@@ -233,6 +235,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Let hosts drop stale staged guest inputs without marking them DM-resolved.
 - [x] Diagnostics include table timeline and session health summary.
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
+- [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
 - [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, and provider review auto-commit policy are extracted; broader provider/import orchestration remains.
 - [x] Replace technical wording in live recovery controls.

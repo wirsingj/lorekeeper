@@ -28,6 +28,7 @@ import { rollD20, rollFormula } from "../src/engine/dice-engine.js";
 import { buildProviderTaskRequest, acceptProviderResponseForTurn, createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneIntentPack, buildSceneRetrieval, transitionScene } from "../src/engine/scene-engine.js";
 import { applyStateEffects } from "../src/engine/state-effects.js";
+import { buildTableSessionProjection, tablePhases } from "../src/engine/table-session-engine.js";
 import {
   addPendingInput,
   beginTurn,
@@ -1503,6 +1504,87 @@ function testTableStatusVocabulary() {
   assert.equal(event.at, "2026-01-01T00:00:00.000Z");
 }
 
+function testTableSessionEnginePhases() {
+  const campaign = campaignFixture();
+  const roleplay = buildTableSessionProjection({ campaign });
+  assert.equal(roleplay.phase, tablePhases.ROLEPLAY);
+  assert.equal(roleplay.headline, "Roleplay");
+
+  const waitingForPlayer = buildTableSessionProjection({
+    campaign,
+    turnProjection: { state: "awaiting_input", canSubmit: true },
+  });
+  assert.equal(waitingForPlayer.phase, tablePhases.WAITING_FOR_PLAYER);
+  assert.equal(waitingForPlayer.expectedActor.kind, "player");
+
+  const waitingForDm = buildTableSessionProjection({
+    campaign,
+    providerActivity: { state: "working", phase: "dm_thinking", text: "DM is thinking..." },
+  });
+  assert.equal(waitingForDm.phase, tablePhases.WAITING_FOR_DM);
+  assert.equal(waitingForDm.expectedActor.kind, "dm");
+
+  const partyVote = buildTableSessionProjection({
+    campaign: {
+      ...campaign,
+      multiplayer: {
+        ...campaign.multiplayer,
+        choiceVotes: [{ id: "vote-1", playerId: "p1", optionId: "choice-a" }],
+      },
+    },
+  });
+  assert.equal(partyVote.phase, tablePhases.PARTY_VOTE);
+  assert.match(partyVote.nextStep, /host makes the final/i);
+
+  const guestWaiting = buildTableSessionProjection({
+    campaign: {
+      ...campaign,
+      multiplayer: {
+        ...campaign.multiplayer,
+        waitingGuests: [{ id: "guest-1", displayName: "Mira", status: "waiting" }],
+      },
+    },
+  });
+  assert.equal(guestWaiting.phase, tablePhases.WAITING_FOR_GUEST);
+  assert.equal(guestWaiting.multiplayer.waitingGuestCount, 1);
+
+  const review = buildTableSessionProjection({
+    campaign,
+    reviewBatch: { proposedChanges: [{ id: "change-1", status: "pending" }] },
+  });
+  assert.equal(review.phase, tablePhases.HOST_REVIEW);
+  assert.equal(review.review.count, 1);
+
+  const recovery = buildTableSessionProjection({
+    campaign,
+    repair: { reason: "invalid response" },
+  });
+  assert.equal(recovery.phase, tablePhases.RECOVERY);
+  assert.equal(recovery.recovery.active, true);
+
+  const combatCampaign = startCombat(campaign, {
+    reroll: false,
+    initiativeRolls: [
+      { actorId: "thor", total: 18 },
+      { actorId: "sy", total: 14 },
+      { actorId: "karl", total: 10 },
+    ],
+  });
+  const combat = buildTableSessionProjection({ campaign: combatCampaign });
+  assert.equal(combat.phase, tablePhases.COMBAT);
+  assert.equal(combat.combat.active, true);
+  assert.equal(combat.expectedActor.kind, "combat_actor");
+
+  const guestSent = buildTableSessionProjection({
+    campaign,
+    clientMode: true,
+    guestSession: { connectionId: "conn-1" },
+    guestSnapshot: { pendingInput: { id: "input-1", text: "I help." } },
+  });
+  assert.equal(guestSent.phase, tablePhases.WAITING_FOR_DM);
+  assert.match(guestSent.nextStep, /host table/i);
+}
+
 function testPlayLogProjectionBoundsLongSessions() {
   const messages = Array.from({ length: defaultPlayLogVisibleLimit + 75 }, (_, index) => ({
     id: `msg-${index + 1}`,
@@ -1840,6 +1922,7 @@ function testReviewPanelProjection() {
 
 async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
   assert.equal(/function latestCommittedReviewBatch/.test(appJs), false);
@@ -1867,10 +1950,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
   assert.match(appJs, /buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
   assert.match(appJs, /sessionHealth: buildSessionHealthSummary\(\)/, "renderer diagnostics should serialize session health");
-  assert.match(appJs, /sessionNextStepLine/, "session health should name the next table action");
-  assert.match(appJs, /Next: host presses Resolve Inputs when ready for the DM\./, "host should get a clear next step for queued guest input");
-  assert.match(appJs, /Next: wait for .*player to send a combat action/, "remote combat waits should name the controller's next step");
-  assert.match(appJs, /Next: host nudges or resolves .*companion turn/, "AI companion combat waits should point back to host approval");
+  assert.match(tableSessionEngine, /phaseNextStep/, "table session projection should name the next table action");
+  assert.match(tableSessionEngine, /Host resolves the staged table input when ready/, "host should get a clear next step for queued guest input");
+  assert.match(tableSessionEngine, /takes the active combat turn/, "combat waits should name the active turn");
   assert.match(appJs, /function isActiveAiCompanionCombatTurn/, "AI companion combat nudges should be scoped to their active initiative turn");
   assert.match(appJs, /state\.campaign\.combat\.currentTurnId === member\.id/, "AI companion combat nudge must match the current initiative actor");
   assert.match(appJs, /buildAiCompanionCombatNudgePrompt/, "AI companion combat nudges should request a suggestion, not resolution");
@@ -1905,6 +1987,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
   assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
   assert.doesNotMatch(appJs, /function shouldAutoApproveChange/, "renderer should not own provider auto-approval policy");
+  assert.match(appJs, /buildTableSessionProjection/, "renderer should consume the table session projection");
+  assert.match(appJs, /dataset\.tablePhase/, "status strip should expose the unified table phase");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
@@ -2073,6 +2157,7 @@ testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();
+testTableSessionEnginePhases();
 testPlayLogProjectionBoundsLongSessions();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
