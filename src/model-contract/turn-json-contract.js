@@ -3,6 +3,7 @@ import { compactHiddenStoryThreads } from "../context-packs/story-threads.js";
 const REQUEST_TYPE = "lorekeeper.turn.request";
 const RESPONSE_TYPE = "lorekeeper.turn.response";
 const SCHEMA_VERSION = 1;
+const CONTROLLED_ACTOR_ACTION_VERBS = "(?:says?|asks?|replies?|answers?|shouts?|whispers?|signals?|gestures?|nods?|steps?|moves?|backs?|runs?|draws?|readies?|raises?|attacks?|strikes?|shoots?|casts?|touches?|grabs?|throws?|scans?|searches?|notices?|realizes?|thinks?|decides?|chooses?|insists?|refuses?)";
 
 const allowedActionIntents = new Set([
   "combat_action",
@@ -850,7 +851,7 @@ function submittedPartyActorIds(request, controlledActors = []) {
     if (actor.controllerKind !== "host" || !actor.name || actor.name.length < 3) {
       continue;
     }
-    if (new RegExp(`\\b${escapeRegExp(actor.name)}\\b`, "i").test(hostText)) {
+    if (hostTextSubmitsNamedActor(hostText, actor.name)) {
       submitted.add(actor.id);
     }
   }
@@ -877,10 +878,18 @@ function dmTextPilotsControlledActor(text, actorName) {
   if (!name || name.length < 3) {
     return false;
   }
-  const activeVerb = "(?:says?|asks?|replies?|answers?|shouts?|whispers?|signals?|gestures?|nods?|steps?|moves?|backs?|runs?|draws?|readies?|raises?|attacks?|strikes?|shoots?|casts?|touches?|grabs?|throws?|scans?|searches?|notices?|realizes?|thinks?|decides?|chooses?|insists?|refuses?)";
-  const namedAction = new RegExp(`\\b${escapeRegExp(name)}\\b(?:[^.!?]{0,80})\\b${activeVerb}\\b`, "i");
-  const possessiveAction = new RegExp(`\\b${escapeRegExp(name)}'?s\\b(?:[^.!?]{0,80})\\b(?:hand|eyes?|voice|weapon|bow|blade|staff|spell|attention|grip)\\b(?:[^.!?]{0,80})\\b${activeVerb}\\b`, "i");
+  const namedAction = new RegExp(`\\b${escapeRegExp(name)}\\b(?:[^.!?]{0,80})\\b${CONTROLLED_ACTOR_ACTION_VERBS}\\b`, "i");
+  const possessiveAction = new RegExp(`\\b${escapeRegExp(name)}'?s\\b(?:[^.!?]{0,80})\\b(?:hand|eyes?|voice|weapon|bow|blade|staff|spell|attention|grip)\\b(?:[^.!?]{0,80})\\b${CONTROLLED_ACTOR_ACTION_VERBS}\\b`, "i");
   return namedAction.test(text) || possessiveAction.test(text);
+}
+
+function hostTextSubmitsNamedActor(text, actorName) {
+  const name = normalizeHumanName(actorName);
+  if (!name || name.length < 3) {
+    return false;
+  }
+  const namedAction = new RegExp(`\\b${escapeRegExp(name)}\\b(?:[^.!?]{0,80})\\b${CONTROLLED_ACTOR_ACTION_VERBS}\\b`, "i");
+  return namedAction.test(String(text || ""));
 }
 
 function createResponseFormatSchema() {

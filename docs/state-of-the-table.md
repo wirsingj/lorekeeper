@@ -124,6 +124,7 @@ Every table surface should answer the same practical questions a real table answ
 73. SQLite storage now has bounded recent-message and record-query helpers, with a long-campaign fixture proving transcript paging and campaign-record reads stay capped.
 74. Common combat actions now cover app-owned Attack, Dodge, Help, Dash, Disengage, Hide, Ready, checks/contests, simple spells, healing, saves, concentration, reactions, surrender, and retreat fixtures.
 75. Staged input recovery policy now lives in a small controller that decides whether approved/remote inputs are submitted, cleared, or kept staged after a DM run.
+76. Agency validation now distinguishes neutral controlled-PC presence from piloting, and host name mentions only authorize that character when the submitted text actually gives them an action.
 
 ### Still Risky
 
@@ -179,7 +180,7 @@ Every table surface should answer the same practical questions a real table answ
 8. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 9. Soak-test host-side "guest is waiting on you" affordance on two machines.
 10. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
-11. Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration.
+11. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 
 ### Medium
 
@@ -263,7 +264,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Make AI companion suggestions appear as approve/resolve/decline table beats.
 - [x] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
 - [x] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
-- [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration.
+- [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration. Current state: neutral presence and host-name-as-object fixtures are covered.
 - [x] Let host choose host/AI/unassigned during additional character creation.
 
 ### Multiplayer And LoreKeeper Join

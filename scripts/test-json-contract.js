@@ -927,6 +927,11 @@ const pilotedRemoteNarration = validTurnResponse({
 assert.equal(validateTurnResponse(pilotedRemoteNarration, { request: remoteAgencyRequest }).valid, false);
 assert.match(validateTurnResponse(pilotedRemoteNarration, { request: remoteAgencyRequest }).errors.join(" "), /Mira/);
 
+const neutralRemotePresenceNarration = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "The guard spits in the dust. Mira is beside Jarin in the road, close enough to hear the exchange." }],
+});
+assert.equal(validateTurnResponse(neutralRemotePresenceNarration, { request: remoteAgencyRequest }).valid, true);
+
 const remoteSpeakerWithoutInput = validTurnResponse({
   table: [{ speaker: "Mira", speakerId: "mira", role: "party", kind: "dialogue", visibility: "table", text: "Back away from him." }],
 });
@@ -954,6 +959,37 @@ const pilotedHostNarration = validTurnResponse({
 });
 assert.equal(validateTurnResponse(pilotedHostNarration, { request: hostAgencyRequest }).valid, false);
 assert.match(validateTurnResponse(pilotedHostNarration, { request: hostAgencyRequest }).errors.join(" "), /Jarin/);
+
+const hostMentionAsObjectRequest = buildTurnRequestEnvelope({
+  campaign: remoteAgencyCampaign,
+  contextPack: remoteAgencyContext,
+  playerTurn: "I look at Jarin to see whether he agrees.",
+  parsedMessage: {
+    raw: "I look at Jarin to see whether he agrees.",
+    inWorldText: "I look at Jarin to see whether he agrees.",
+    metaInstructions: [],
+  },
+});
+const hostMentionObjectPilotedNarration = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Jarin steps forward and decides to challenge the guard." }],
+});
+assert.equal(validateTurnResponse(hostMentionObjectPilotedNarration, { request: hostMentionAsObjectRequest }).valid, false);
+assert.match(validateTurnResponse(hostMentionObjectPilotedNarration, { request: hostMentionAsObjectRequest }).errors.join(" "), /Jarin/);
+
+const namedHostActionRequest = buildTurnRequestEnvelope({
+  campaign: remoteAgencyCampaign,
+  contextPack: remoteAgencyContext,
+  playerTurn: "Jarin asks the guard who ordered the road closed.",
+  parsedMessage: {
+    raw: "Jarin asks the guard who ordered the road closed.",
+    inWorldText: "Jarin asks the guard who ordered the road closed.",
+    metaInstructions: [],
+  },
+});
+const namedHostActionNarration = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Jarin asks his question clearly, and the guard's jaw tightens before he answers." }],
+});
+assert.equal(validateTurnResponse(namedHostActionNarration, { request: namedHostActionRequest }).valid, true);
 
 const unassignedAgencyCampaign = {
   ...remoteAgencyCampaign,
