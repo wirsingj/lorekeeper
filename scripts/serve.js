@@ -375,6 +375,7 @@ const server = createServer(async (request, response) => {
         waitingResult = registerWaitingGuest(campaign, {
           playerName: body.playerName,
           clientId: body.clientId,
+          tableSessionId: body.tableSessionId,
         });
         return { campaign: waitingResult.campaign };
       });
@@ -397,6 +398,7 @@ const server = createServer(async (request, response) => {
           waitingGuestId: url.searchParams.get("waitingGuestId"),
           clientId: url.searchParams.get("clientId"),
           waitingSecret: url.searchParams.get("waitingSecret"),
+          tableSessionId: url.searchParams.get("tableSessionId"),
         });
         return { campaign: heartbeatResult.campaign };
       });

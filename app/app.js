@@ -2723,7 +2723,13 @@ function currentLocalGuestLink() {
   }
   const host = table.lanAddress || window.location.hostname || "127.0.0.1";
   const port = table.port || window.location.port;
-  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
+  const base = port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
+  if (!table.sessionId) {
+    return base;
+  }
+  const url = new URL(base);
+  url.searchParams.set("table", table.sessionId);
+  return url.toString();
 }
 
 function showGuestLink(link) {
@@ -2897,15 +2903,18 @@ async function registerGuestWaitingRoom() {
     }
     const clientId = guestClientId();
     const hostBaseUrl = window.location.origin;
+    const tableSessionId = launchParams.get("table") || "";
     const result = await postJson(`${hostBaseUrl}${apiMultiplayerWaitingRegisterUrl}`, {
       playerName,
       clientId,
+      tableSessionId,
     });
     saveWaitingRoomSession({
       hostBaseUrl,
       clientId,
       waitingGuestId: result.waitingGuest?.id,
       waitingSecret: result.waitingSecret || "",
+      tableSessionId,
       playerName,
       campaignTitle: result.campaignTitle || "",
       status: "waiting",
@@ -2937,6 +2946,9 @@ async function refreshWaitingRoomStatus({ explicit = false } = {}) {
   url.searchParams.set("waitingGuestId", session.waitingGuestId);
   url.searchParams.set("clientId", session.clientId || guestClientId());
   url.searchParams.set("waitingSecret", session.waitingSecret || "");
+  if (session.tableSessionId) {
+    url.searchParams.set("tableSessionId", session.tableSessionId);
+  }
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(await response.text());

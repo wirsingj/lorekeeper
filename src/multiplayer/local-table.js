@@ -73,8 +73,10 @@ export function startLocalTable(campaign, options = {}) {
   const port = Number(options.port) || 4173;
   const lanAddress = options.lanAddress || firstLanAddress() || "127.0.0.1";
   const next = normalizeMultiplayerCampaign(campaign);
+  const sessionId = options.sessionId || `table-${randomToken(12)}`;
   next.multiplayer.localTable = {
     running: true,
+    sessionId,
     host: options.host || "0.0.0.0",
     port,
     lanAddress,
@@ -232,11 +234,12 @@ export function createCharacterRequestInvite(campaign, { host, port } = {}) {
   };
 }
 
-export function registerWaitingGuest(campaign, { playerName, clientId } = {}) {
+export function registerWaitingGuest(campaign, { playerName, clientId, tableSessionId } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   if (!next.multiplayer.localTable?.running) {
     throw publicMultiplayerError("The host local table is not open yet.", 409);
   }
+  assertLocalTableSession(next, tableSessionId);
   const normalizedClientId = compactLine(clientId || "", 120);
   const displayName = compactLine(playerName || "Guest Player", 80);
   const existing = normalizedClientId
@@ -321,6 +324,7 @@ export function createWaitingGuestSnapshot(campaign, { waitingGuestId, clientId,
 
 export function heartbeatWaitingGuest(campaign, options = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
+  assertLocalTableSession(next, options.tableSessionId);
   const waitingGuest = next.multiplayer.waitingGuests.find((guest) => guest.id === options.waitingGuestId);
   if (!waitingGuest) {
     throw publicMultiplayerError("Waiting room session expired. Ask the host for the guest link, then click Ask To Join again.", 404);
@@ -943,6 +947,17 @@ function isFreshWaitingGuest(guest, nowMs = Date.now()) {
   return nowMs - seenAt <= waitingGuestHeartbeatTimeoutMs;
 }
 
+function assertLocalTableSession(campaign, tableSessionId) {
+  const expected = compactLine(tableSessionId || "", 120);
+  if (!expected) {
+    return;
+  }
+  const actual = campaign.multiplayer?.localTable?.sessionId || "";
+  if (actual !== expected) {
+    throw publicMultiplayerError("That guest link belongs to a different table. Ask the host for a fresh Guest Link.", 409);
+  }
+}
+
 export function createGuestSnapshot(campaign, connectionId, options = {}) {
   const normalized = normalizeMultiplayerCampaign(campaign);
   const revision = tableRevision(normalized);
@@ -1140,6 +1155,7 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
     protocolVersion: Number(multiplayer.protocolVersion) || multiplayerProtocolVersion,
     localTable: {
       running: Boolean(multiplayer.localTable?.running),
+      sessionId: multiplayer.localTable?.sessionId || "",
       host: multiplayer.localTable?.host || "",
       port: multiplayer.localTable?.port ?? null,
       lanAddress: multiplayer.localTable?.lanAddress || "",

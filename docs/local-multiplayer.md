@@ -82,7 +82,7 @@ When the host local table is running, a guest can open:
 http://host-lan-ip:4173/guest
 ```
 
-The host Settings -> Local Table section shows the detected Guest Link and can copy it directly. Use that link for same-network play so the guest can request a seat without installing or configuring anything.
+The host Settings -> Local Table section shows the detected Guest Link and can copy it directly. Use that link for same-network play so the guest can request a seat without installing or configuring anything. Generated guest links include a table session key, so an old link cannot silently attach a waiting guest to a different active campaign after the host changes tables.
 
 The guest enters a table name and clicks `Ask To Join`. The host sees that waiting player in Local Table and as seating actions on party cards. The guest receives no campaign state until the host seats them as an existing party member or remote-invite slot.
 

@@ -111,7 +111,13 @@ function localGuestLink(table = {}, locationPort = "") {
   }
   const host = table.lanAddress || "127.0.0.1";
   const port = table.port || locationPort;
-  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
+  const base = port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
+  if (!table.sessionId) {
+    return base;
+  }
+  const url = new URL(base);
+  url.searchParams.set("table", table.sessionId);
+  return url.toString();
 }
 
 function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWaitingGuest } = {}) {

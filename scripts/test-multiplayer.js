@@ -29,6 +29,7 @@ import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-pa
 let campaign = testCampaign();
 campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
 assert.equal(campaign.multiplayer.localTable.running, true);
+assert.ok(campaign.multiplayer.localTable.sessionId);
 assert.equal(campaign.multiplayer.settings.requireGuestActionApproval, false);
 assert.equal(campaign.multiplayer.settings.holdGuestActionsForGroupInput, false);
 
@@ -61,13 +62,23 @@ assert.throws(
 waitingResult = registerWaitingGuest(campaign, {
   playerName: "Nora",
   clientId: "waiting-client",
+  tableSessionId: campaign.multiplayer.localTable.sessionId,
 });
 campaign = waitingResult.campaign;
+assert.throws(
+  () => registerWaitingGuest(campaign, {
+    playerName: "Wrong Table",
+    clientId: "wrong-table-client",
+    tableSessionId: "table-stale",
+  }),
+  /different table/i,
+);
 assert.equal(createHostSnapshot(campaign).waitingGuests.length, 1);
 const heartbeatResult = heartbeatWaitingGuest(campaign, {
   waitingGuestId: waitingResult.waitingGuest.id,
   clientId: "waiting-client",
   waitingSecret: waitingResult.waitingSecret,
+  tableSessionId: campaign.multiplayer.localTable.sessionId,
 });
 campaign = heartbeatResult.campaign;
 assert.equal(heartbeatResult.snapshot.waitingGuest.displayName, "Nora");

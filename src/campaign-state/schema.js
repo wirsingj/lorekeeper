@@ -89,6 +89,7 @@ export function createDefaultMultiplayerState() {
     protocolVersion: 1,
     localTable: {
       running: false,
+      sessionId: "",
       host: "",
       port: null,
       lanAddress: "",

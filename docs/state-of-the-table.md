@@ -14,6 +14,7 @@ Source docs consolidated here:
 - `docs/anti-supernatural-state.md`
 - `docs/validation-and-recovery.md`
 - `docs/product-maturity-review.md`
+- `docs/deep-audit-hardening-2026-06.md`
 
 Status legend:
 
@@ -71,6 +72,7 @@ The user should not feel like they are debugging a model, managing queue machine
 25. Waiting-room guests now surface from the live host snapshot in Local Table, party seating actions, session health, and the table status strip.
 26. Waiting-room presence now uses guest heartbeat/stale filtering so old guest names do not linger after campaign switches or closed tabs.
 27. The front door Host flow now requires choosing an existing campaign instead of dropping into the last active table.
+28. Generated Guest Links are scoped to the current local-table session so stale links do not silently join a different active campaign.
 
 ### Still Risky
 
@@ -209,6 +211,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Host can copy a same-network Guest Link from Local Table.
 - [x] Waiting-room guests are visible to the host without digging through diagnostics.
 - [x] Stale waiting-room guests expire instead of lingering as broken seat buttons.
+- [x] Generated Guest Links carry a table session key to reject stale/wrong-table joins.
 - [ ] Run first real two-machine playtest.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
