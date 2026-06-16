@@ -845,6 +845,85 @@ const remoteDmRoleMixup = validTurnResponse({
 assert.equal(validateTurnResponse(remoteDmRoleMixup, { request: remoteAgencyRequest }).valid, false);
 assert.match(validateTurnResponse(remoteDmRoleMixup, { request: remoteAgencyRequest }).errors.join(" "), /uses DM role for controlled party member Mira/);
 
+const hostAgencyRequest = buildTurnRequestEnvelope({
+  campaign: remoteAgencyCampaign,
+  contextPack: remoteAgencyContext,
+  playerTurn: "I wait and watch the guard.",
+  parsedMessage: {
+    raw: "I wait and watch the guard.",
+    inWorldText: "I wait and watch the guard.",
+    metaInstructions: [],
+  },
+});
+const pilotedHostNarration = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Jarin steps forward, draws his bow, and decides the guard is lying." }],
+});
+assert.equal(validateTurnResponse(pilotedHostNarration, { request: hostAgencyRequest }).valid, false);
+assert.match(validateTurnResponse(pilotedHostNarration, { request: hostAgencyRequest }).errors.join(" "), /Jarin/);
+
+const unassignedAgencyCampaign = {
+  ...remoteAgencyCampaign,
+  scene: {
+    ...remoteAgencyCampaign.scene,
+    presentPartyMemberIds: ["jarin", "mira", "orrin"],
+  },
+  party: [
+    ...remoteAgencyCampaign.party,
+    {
+      id: "orrin",
+      name: "Orrin",
+      type: "player_character",
+      controllerKind: "unassigned",
+      role: "Unassigned scholar",
+    },
+  ],
+};
+const unassignedAgencyContext = buildContextPack(unassignedAgencyCampaign);
+const unassignedAgencyRequest = buildTurnRequestEnvelope({
+  campaign: unassignedAgencyCampaign,
+  contextPack: unassignedAgencyContext,
+  playerTurn: "I wait and watch the guard.",
+  parsedMessage: {
+    raw: "I wait and watch the guard.",
+    inWorldText: "I wait and watch the guard.",
+    metaInstructions: [],
+  },
+});
+const pilotedUnassignedNarration = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Orrin notices a hidden sigil and whispers the answer before anyone asks him." }],
+});
+assert.equal(validateTurnResponse(pilotedUnassignedNarration, { request: unassignedAgencyRequest }).valid, false);
+assert.match(validateTurnResponse(pilotedUnassignedNarration, { request: unassignedAgencyRequest }).errors.join(" "), /Orrin/);
+
+const aiCompanionAgencyCampaign = {
+  ...remoteAgencyCampaign,
+  party: [
+    ...remoteAgencyCampaign.party,
+    {
+      id: "sy",
+      name: "Sy",
+      type: "player_character",
+      controllerKind: "ai_companion",
+      role: "AI companion scout",
+    },
+  ],
+};
+const aiCompanionAgencyContext = buildContextPack(aiCompanionAgencyCampaign);
+const aiCompanionAgencyRequest = buildTurnRequestEnvelope({
+  campaign: aiCompanionAgencyCampaign,
+  contextPack: aiCompanionAgencyContext,
+  playerTurn: "I wait and watch the guard.",
+  parsedMessage: {
+    raw: "I wait and watch the guard.",
+    inWorldText: "I wait and watch the guard.",
+    metaInstructions: [],
+  },
+});
+const lowStakesAiCompanionVoice = validTurnResponse({
+  table: [{ speaker: "Sy", speakerId: "sy", role: "party", kind: "dialogue", visibility: "table", text: "Maybe ask who ordered the road closed before we draw blades." }],
+});
+assert.equal(validateTurnResponse(lowStakesAiCompanionVoice, { request: aiCompanionAgencyRequest }).valid, true);
+
 const remoteAgencySubmittedRequest = buildTurnRequestEnvelope({
   campaign: remoteAgencyCampaign,
   contextPack: remoteAgencyContext,

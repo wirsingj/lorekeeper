@@ -93,6 +93,7 @@ Every table surface should answer the same practical questions a real table answ
 42. Left rail layout now constrains party/combat records and action rows so long names/buttons wrap locally instead of forcing horizontal panel scroll.
 43. Party-vote panels now give the host a "Use leading choice" action when remote votes have a clear leader.
 44. Live recovery controls now use table-facing labels: Try Again, Details, and Use Anyway instead of Retry/Inspect/Import.
+45. Agency fixtures now cover host-controlled, remote-controlled, unassigned, and AI companion boundaries.
 
 ### Still Risky
 
@@ -223,7 +224,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Choice prompts can target individual party members.
 - [ ] Make AI companion suggestions appear as approve/resolve/decline table beats.
 - [ ] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
-- [ ] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
+- [x] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
 - [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration.
 - [x] Let host choose host/AI/unassigned during additional character creation.
 

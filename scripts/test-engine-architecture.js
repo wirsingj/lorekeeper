@@ -203,7 +203,10 @@ function testAgencyController() {
   assert.equal(requiresHumanInput(campaign, "thor"), true);
   assert.equal(requiresHumanInput(campaign, "karl"), true);
   assert.equal(canProviderActForActor(campaign, "sy", { actionScope: "minor" }), true);
+  assert.equal(canProviderActForActor(campaign, "sy", { actionScope: "major" }), false);
+  assert.equal(canProviderActForActor(campaign, "sy", { actionScope: "major", allowMajorAiCompanion: true }), true);
   assert.equal(canProviderActForActor(campaign, "thor", { actionScope: "major" }), false);
+  assert.equal(requiresHumanInput(campaign, "missing-actor"), true);
 }
 
 function testTurnEngine() {
