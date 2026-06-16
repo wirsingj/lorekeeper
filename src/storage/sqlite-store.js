@@ -128,6 +128,95 @@ export async function readCampaignErrorsFromSqliteFile(sqlitePath, { limit = 80 
   }
 }
 
+export async function readRecentSessionMessagesFromSqliteFile(sqlitePath, options = {}) {
+  if (!existsLikePath(sqlitePath)) {
+    return [];
+  }
+  const safeLimit = boundedSqlLimit(options.limit, 240, 1000);
+  const beforeSequence = Number.isFinite(Number(options.beforeSequence)) ? Number(options.beforeSequence) : null;
+  const sessionId = compactOptionalText(options.sessionId, 120);
+  const SQL = await initSqlJs();
+  const bytes = await readFile(sqlitePath);
+  const db = new SQL.Database(bytes);
+  try {
+    assertSqliteSchema2(db);
+    if (!tableExists(db, "session_messages")) {
+      return [];
+    }
+    const campaignId = firstRow(db, "SELECT id FROM campaigns LIMIT 1")?.id;
+    if (!campaignId) {
+      return [];
+    }
+    const where = ["campaign_id = ?"];
+    const params = [campaignId];
+    if (sessionId) {
+      where.push("session_id = ?");
+      params.push(sessionId);
+    }
+    if (beforeSequence !== null) {
+      where.push("sequence < ?");
+      params.push(beforeSequence);
+    }
+    const rows = queryRows(
+      db,
+      `SELECT id, session_id, sequence, role, title, body, meta, source, provider_run_id, created_at, data_json
+       FROM session_messages
+       WHERE ${where.join(" AND ")}
+       ORDER BY sequence DESC, created_at DESC
+       LIMIT ${safeLimit}`,
+      params,
+    );
+    return rows.reverse().map((row) => normalizeSessionMessageRow(row));
+  } finally {
+    db.close();
+  }
+}
+
+export async function readCampaignRecordsFromSqliteFile(sqlitePath, options = {}) {
+  if (!existsLikePath(sqlitePath)) {
+    return [];
+  }
+  const safeLimit = boundedSqlLimit(options.limit, 80, 500);
+  const domains = Array.isArray(options.domains)
+    ? options.domains.map((domain) => compactOptionalText(domain, 80)).filter(Boolean)
+    : [];
+  const query = compactOptionalText(options.query, 160);
+  const SQL = await initSqlJs();
+  const bytes = await readFile(sqlitePath);
+  const db = new SQL.Database(bytes);
+  try {
+    assertSqliteSchema2(db);
+    const campaignId = firstRow(db, "SELECT id FROM campaigns LIMIT 1")?.id;
+    if (!campaignId) {
+      return [];
+    }
+    if (query && tableExists(db, "record_search")) {
+      return queryCampaignRecordSearch(db, campaignId, { domains, query, limit: safeLimit });
+    }
+    if (!tableExists(db, "records")) {
+      return [];
+    }
+    const where = ["campaign_id = ?"];
+    const params = [campaignId];
+    if (domains.length) {
+      where.push(`domain IN (${domains.map(() => "?").join(", ")})`);
+      params.push(...domains);
+    }
+    const rows = queryRows(
+      db,
+      `SELECT id, domain, record_type, title, body, source_state, created_at, updated_at, data_json
+       FROM records
+       WHERE ${where.join(" AND ")}
+       ORDER BY domain ASC, title ASC
+       LIMIT ${safeLimit}`,
+      params,
+    );
+    return rows.map((row) => normalizeRecordRow(row));
+  } finally {
+    db.close();
+  }
+}
+
 async function writeFileAtomically(outputPath, bytes) {
   const directory = path.dirname(outputPath);
   const tempPath = path.join(directory, `.${path.basename(outputPath)}.${process.pid}.${Date.now()}.tmp`);
@@ -414,6 +503,74 @@ function compactSqlText(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength) || "unknown";
 }
 
+function compactOptionalText(value, maxLength) {
+  return String(value ?? "").trim().slice(0, maxLength);
+}
+
+function boundedSqlLimit(value, fallback, max) {
+  return Math.max(1, Math.min(Number(value) || fallback, max));
+}
+
+function normalizeSessionMessageRow(row) {
+  const data = parseJson(row.data_json, {});
+  return {
+    ...data,
+    id: data.id ?? row.id,
+    sessionId: data.sessionId ?? row.session_id,
+    sequence: row.sequence,
+    role: data.role ?? row.role,
+    title: data.title ?? row.title,
+    body: data.body ?? row.body,
+    meta: data.meta ?? row.meta,
+    source: data.source ?? row.source,
+    providerRunId: data.providerRunId ?? row.provider_run_id,
+    createdAt: data.createdAt ?? row.created_at,
+  };
+}
+
+function normalizeRecordRow(row) {
+  return {
+    id: row.id,
+    domain: row.domain,
+    recordType: row.record_type,
+    title: row.title,
+    body: row.body,
+    sourceState: row.source_state,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    data: parseJson(row.data_json, {}),
+  };
+}
+
+function queryCampaignRecordSearch(db, campaignId, { domains, query, limit }) {
+  const where = ["campaign_id = ?", "search_text LIKE ? ESCAPE '\\'"];
+  const params = [campaignId, `%${escapeSqlLike(query)}%`];
+  if (domains.length) {
+    where.push(`domain IN (${domains.map(() => "?").join(", ")})`);
+    params.push(...domains);
+  }
+  const rows = queryRows(
+    db,
+    `SELECT record_id AS id, domain, title, body, search_text
+     FROM record_search
+     WHERE ${where.join(" AND ")}
+     ORDER BY domain ASC, title ASC
+     LIMIT ${limit}`,
+    params,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    domain: row.domain,
+    title: row.title,
+    body: row.body,
+    searchText: row.search_text,
+  }));
+}
+
+function escapeSqlLike(value) {
+  return String(value).replace(/[\\%_]/g, (match) => `\\${match}`);
+}
+
 function ensureErrorsTable(db) {
   if (tableExists(db, "errors")) {
     return;
@@ -611,8 +768,8 @@ function runInsert(db, table, values) {
   );
 }
 
-function queryRows(db, sql) {
-  const result = db.exec(sql)[0];
+function queryRows(db, sql, params = []) {
+  const result = db.exec(sql, params)[0];
   if (!result) {
     return [];
   }

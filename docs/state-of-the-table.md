@@ -121,6 +121,7 @@ Every table surface should answer the same practical questions a real table answ
 70. Multiplayer regression coverage now proves a guest snapshot with a previous local-table session id is rejected after host table restart.
 71. Long play logs now render through a bounded projection with a Show Earlier control, so old transcript entries remain reachable without repainting the entire campaign log every turn.
 72. Hosts can drop stale staged guest actions without falsely marking them as DM-resolved; dropped inputs get their own transcript lifecycle.
+73. SQLite storage now has bounded recent-message and record-query helpers, with a long-campaign fixture proving transcript paging and campaign-record reads stay capped.
 
 ### Still Risky
 
@@ -135,7 +136,7 @@ Every table surface should answer the same practical questions a real table answ
 9. Provider narration can still restate the player's action or lean on option panels too much in real-model soak, though the contract now has stronger narration-first instructions.
 10. Failed staged inputs now remain visible and can be dropped by the host, but broader retry/cleanup guidance still needs real-session polish.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
-12. Context retrieval now has scene-focus, noisy ranking, and thousands-record load fixtures, and play-log rendering is bounded; persistence/query scaling for very old campaigns still needs work.
+12. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
 14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
 15. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
@@ -165,7 +166,7 @@ Every table surface should answer the same practical questions a real table answ
 
 1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Continue long-campaign scaling: play-log rendering is bounded, but persistence/query scaling fixtures are still needed so old campaigns stay fast after hundreds of hours.
+3. Continue long-campaign scaling: play-log rendering and core SQLite query helpers are bounded, but more live paths still need to stop hydrating whole snapshots as campaigns age.
 
 ### High
 
@@ -185,7 +186,7 @@ Every table surface should answer the same practical questions a real table answ
 14. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
 15. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
 16. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
-17. Add long-campaign persistence/query performance fixtures and eventually upgrade the play log from chunked rendering to true virtualization if needed.
+17. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
 
 ### Low
 
@@ -210,6 +211,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Improve context retrieval beyond recent history/context pack breadth.
 - [x] Add long-campaign retrieval/ranking fixture for noisy relationship and event history.
 - [x] Add large-campaign context-pack performance/load fixture.
+- [x] Add long-campaign SQLite query fixture for bounded transcript and campaign-record reads.
 - [x] Add hidden-story scenario tests for adaptation without leaking future twists.
 - [x] Tighten prompts so normal scene turns can be rich without always forcing choices.
 

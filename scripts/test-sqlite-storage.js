@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
 import {
   createNewActiveCampaign,
@@ -13,7 +14,9 @@ import {
   appendCampaignErrorToSqliteFile,
   readCampaignFromSqliteFile,
   readCampaignErrorsFromSqliteFile,
+  readCampaignRecordsFromSqliteFile,
   readCampaignSqliteSummary,
+  readRecentSessionMessagesFromSqliteFile,
   SQLITE_SCHEMA_VERSION,
   SQLITE_USER_VERSION,
   writeCampaignSqliteFile,
@@ -187,6 +190,36 @@ try {
   const summaryAfterRewrite = await readCampaignSqliteSummary(sqlitePath);
   assert.equal(summaryAfterRewrite.engineCounts.errors, 1);
 
+  const longCampaign = createLongCampaignFixture();
+  const longCampaignPath = path.join(tempDir, "long-campaign.lorekeeper.sqlite");
+  await writeCampaignSqliteFile(longCampaign, longCampaignPath);
+  const queryStartedAt = performance.now();
+  const recentMessages = await readRecentSessionMessagesFromSqliteFile(longCampaignPath, { limit: 25 });
+  const earlierMessages = await readRecentSessionMessagesFromSqliteFile(longCampaignPath, {
+    beforeSequence: recentMessages[0].sequence,
+    limit: 10,
+  });
+  const places = await readCampaignRecordsFromSqliteFile(longCampaignPath, {
+    domains: ["places"],
+    limit: 30,
+  });
+  const searchHits = await readCampaignRecordsFromSqliteFile(longCampaignPath, {
+    domains: ["people", "places", "lore"],
+    query: "Moonlit Archive",
+    limit: 12,
+  });
+  const queryElapsedMs = performance.now() - queryStartedAt;
+  assert.equal(recentMessages.length, 25);
+  assert.equal(recentMessages[0].sequence, longCampaign.sessionLog.messages.length - 24);
+  assert.equal(recentMessages.at(-1).body, "Long session beat 1200.");
+  assert.equal(earlierMessages.length, 10);
+  assert.equal(earlierMessages.at(-1).sequence, recentMessages[0].sequence - 1);
+  assert.equal(places.length, 30);
+  assert.ok(places.every((record) => record.domain === "places"));
+  assert.equal(searchHits.length, 12);
+  assert.ok(searchHits.every((record) => /Moonlit Archive/.test(record.searchText)));
+  assert.ok(queryElapsedMs < 3000, `bounded SQLite queries should stay comfortably local, got ${Math.round(queryElapsedMs)}ms`);
+
   const repoRoot = path.join(tempDir, "campaign-repo");
   const first = await createNewActiveCampaign(repoRoot, {
     title: "Delete Target",
@@ -224,3 +257,65 @@ try {
 }
 
 console.log("Lorekeeper SQLite storage tests passed.");
+
+function createLongCampaignFixture() {
+  const campaign = createStarterCampaign({
+    title: "Long Campaign Fixture",
+    premise: "A campaign with enough history to catch unbounded storage reads.",
+    startingLocation: "Moonlit Archive Gate",
+  });
+  const now = campaign.createdAt;
+  campaign.people = Array.from({ length: 500 }, (_, index) => ({
+    id: `person-${index + 1}`,
+    name: index % 25 === 0 ? `Moonlit Archive Contact ${index + 1}` : `Old Contact ${index + 1}`,
+    role: "contact",
+    summary: `A remembered contact from session ${index + 1}.`,
+    notes: [`Met during long-campaign fixture beat ${index + 1}.`],
+    tags: ["fixture"],
+  }));
+  campaign.places = [
+    ...campaign.places,
+    ...Array.from({ length: 500 }, (_, index) => ({
+      id: `place-long-${index + 1}`,
+      name: index % 20 === 0 ? `Moonlit Archive Annex ${index + 1}` : `Old Road Stop ${index + 1}`,
+      type: "location",
+      region: "Long Fixture",
+      summary: `A place from old campaign history ${index + 1}.`,
+      notes: [`Storage query fixture place ${index + 1}.`],
+      connectedPlaceIds: [],
+    })),
+  ];
+  campaign.lore = [
+    ...campaign.lore,
+    ...Array.from({ length: 500 }, (_, index) => ({
+      id: `lore-long-${index + 1}`,
+      title: index % 30 === 0 ? `Moonlit Archive Rumor ${index + 1}` : `Old Rumor ${index + 1}`,
+      canon: true,
+      notes: [`A lore note that should not require loading every record into a panel ${index + 1}.`],
+      tags: ["fixture"],
+    })),
+  ];
+  campaign.sessionLog = {
+    activeSessionId: "session-long",
+    sessions: [{
+      id: "session-long",
+      title: "Long Fixture Session",
+      startedAt: now,
+      endedAt: null,
+      recap: "",
+    }],
+    messages: Array.from({ length: 1200 }, (_, index) => ({
+      id: `message-${index + 1}`,
+      sessionId: "session-long",
+      role: index % 2 === 0 ? "dm" : "player",
+      title: index % 2 === 0 ? "DM" : "YOU",
+      body: `Long session beat ${index + 1}.`,
+      meta: "",
+      source: "fixture",
+      providerRunId: null,
+      createdAt: new Date(Date.parse(now) + index * 1000).toISOString(),
+      data: {},
+    })),
+  };
+  return campaign;
+}
