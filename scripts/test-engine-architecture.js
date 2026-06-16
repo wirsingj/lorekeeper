@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { performance } from "node:perf_hooks";
 import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
@@ -908,6 +909,89 @@ function testSceneRetrievalRanksFocusUnderLongCampaignNoise() {
   assert.equal(retrieval.relevantRecentEvents[0].id, "event-threaded-stool");
 }
 
+function testLargeCampaignContextPackStaysBounded() {
+  const campaign = transitionScene({
+    ...campaignFixture(),
+    people: [
+      ...campaignFixture().people,
+      ...Array.from({ length: 800 }, (_, index) => ({
+        id: `person-${index}`,
+        name: `Person ${index}`,
+        role: index % 2 ? "market contact" : "old road witness",
+        notes: [`Long campaign person note ${index}`],
+      })),
+    ],
+    places: [
+      ...campaignFixture().places,
+      ...Array.from({ length: 400 }, (_, index) => ({
+        id: `place-${index}`,
+        name: `Place ${index}`,
+        summary: `A remembered location from earlier play ${index}.`,
+      })),
+    ],
+    quests: [
+      ...campaignFixture().quests,
+      ...Array.from({ length: 300 }, (_, index) => ({
+        id: `quest-${index}`,
+        title: `Old thread ${index}`,
+        status: index % 5 === 0 ? "completed" : "active",
+        stakes: `Historical campaign pressure ${index}.`,
+      })),
+    ],
+    relationships: [
+      ...Array.from({ length: 1200 }, (_, index) => ({
+        id: `rel-large-${index}`,
+        sourceId: index % 3 === 0 ? "tavern" : `person-${index % 800}`,
+        targetId: index % 7 === 0 ? "quest-1" : `place-${index % 400}`,
+        type: "history",
+        notes: [`Relationship history ${index}`],
+      })),
+      {
+        id: "rel-large-current",
+        sourceId: "thor",
+        targetId: "quest-1",
+        type: "current_pressure",
+        notes: ["Thor's current choice matters to the active quest."],
+      },
+    ],
+    timeline: [
+      ...Array.from({ length: 1200 }, (_, index) => ({
+        id: `event-large-${index}`,
+        title: `Old event ${index}`,
+        summary: `A long-ago event ${index}.`,
+        relatedIds: index % 9 === 0 ? ["tavern"] : [`person-${index % 800}`],
+      })),
+      {
+        id: "event-large-current",
+        title: "Current thread pressure",
+        summary: "Thor's current tavern choice points at the active quest.",
+        relatedIds: ["thor", "tavern", "quest-1"],
+      },
+    ],
+  }, {
+    id: "scene-large-context",
+    title: "Large campaign focused scene",
+    type: "social",
+    locationId: "tavern",
+    presentPartyMemberIds: ["thor"],
+    presentPeopleIds: ["barkeep"],
+    activeQuestIds: ["quest-1"],
+    tensions: ["The current table beat must not drown in old campaign history."],
+  });
+
+  const started = performance.now();
+  const contextPack = buildContextPack(campaign);
+  const durationMs = performance.now() - started;
+  const serialized = JSON.stringify(contextPack);
+  const sceneFocus = contextPack.sections.find((section) => section.kind === "scene_focus");
+
+  assert.ok(durationMs < 1000, `large context pack should build under 1000ms, got ${Math.round(durationMs)}ms`);
+  assert.ok(serialized.length < 70000, `context pack should stay bounded, got ${serialized.length} chars`);
+  assert.ok(sceneFocus, "large context pack should include Scene Focus");
+  assert.match(sceneFocus.entries.join(" "), /Thor's current choice matters|Current thread pressure/);
+  assert.equal(contextPack.sections.some((section) => section.entries.length > 20), false, "sections should remain bounded");
+}
+
 function testSceneIntentDiscouragesRandomEscalationAfterSmallFight() {
   const base = campaignFixture();
   base.people.push({ id: "merchant-zean", name: "Zean", role: "protected merchant", notes: ["Garren protected him on the mining road."] });
@@ -1629,6 +1713,7 @@ testCombatTrackerView();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
+testLargeCampaignContextPackStaysBounded();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();
 testProviderBoundary();
 testStructuredInputsDoNotMergeIntoHostMessage();
