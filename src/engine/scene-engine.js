@@ -142,18 +142,34 @@ export function buildSceneRetrieval(campaign, options = {}) {
   const activeConsequences = activeConsequencesForScene(campaign, scene, { limit: options.consequenceLimit ?? 6 });
   const consequenceThreadIds = activeConsequences.flatMap((consequence) => consequence.threadIds ?? []);
   const threadIds = new Set([...(scene?.threadIds ?? []), ...consequenceThreadIds]);
+  const focusIds = sceneFocusIds(scene, activeConsequences, threadIds);
 
   return {
     scene,
     participants: [...participantIds].map((id) => lookupEntity(campaign, id)).filter(Boolean),
     activeConsequences,
-    relevantRelationships: relevantRelationships(campaign, participantIds, activeConsequences, options.relationshipLimit ?? 8),
+    relevantRelationships: relevantRelationships(campaign, focusIds, activeConsequences, options.relationshipLimit ?? 8),
     activeThreads: (campaign?.quests ?? [])
       .filter((quest) => quest.status !== "completed")
       .filter((quest) => threadIds.has(quest.id) || !threadIds.size)
       .slice(0, options.threadLimit ?? 6),
-    relevantRecentEvents: relevantRecentEvents(campaign, participantIds, options.eventLimit ?? 5),
+    relevantRecentEvents: relevantRecentEvents(campaign, focusIds, options.eventLimit ?? 5),
   };
+}
+
+function sceneFocusIds(scene, activeConsequences = [], threadIds = new Set()) {
+  return new Set([
+    ...(scene?.participantIds ?? []),
+    ...(scene?.partyMemberIds ?? []),
+    ...(scene?.peopleIds ?? []),
+    ...(scene?.locationId ? [scene.locationId] : []),
+    ...threadIds,
+    ...activeConsequences.flatMap((consequence) => [
+      ...(consequence.participantIds ?? []),
+      ...(consequence.relatedEntityIds ?? []),
+      ...(consequence.threadIds ?? []),
+    ]),
+  ]);
 }
 
 export function buildSceneIntentPack(campaign, options = {}) {

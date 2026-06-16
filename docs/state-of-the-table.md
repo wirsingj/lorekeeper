@@ -108,6 +108,7 @@ Every table surface should answer the same practical questions a real table answ
 57. Provider turn requests now include an app-owned AI companion interjection policy with rarity/cooldown gates, explicit nudge bypass, and low-stakes constraints.
 58. Combat response validation now rejects wrong `resolvedActorId` and next-actor overreach for enemy turns as well as player turns.
 59. JSON contract fixtures now include richer full-turn social, travel, mystery, downtime, combat, and recovery scenes that render without forced option panels.
+60. Context packs now start with a Scene Focus section and scene retrieval includes current-place/thread/consequence-linked relationships and timeline events, not only recent chat or explicit participants.
 
 ### Still Risky
 
@@ -122,7 +123,7 @@ Every table surface should answer the same practical questions a real table answ
 9. Provider narration can still restate the player's action or lean on option panels too much.
 10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
-12. Context retrieval is still coarse and recent-message heavy compared with the desired actor/place/consequence/thread retrieval.
+12. Context retrieval now has a scene-focus pass for actors, place, relationships, consequences, threads, and recent relevant events, but still needs longer-campaign ranking/performance fixtures.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
 14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
 15. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
@@ -194,7 +195,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add provider-output fixtures for obvious controlled-PC agency failures.
 - [x] Reject obvious controlled-PC agency violations during response validation.
 - [x] Add richer provider-output fixtures for social, travel, mystery, downtime, combat, and recovery scenes.
-- [ ] Improve context retrieval beyond recent history/context pack breadth.
+- [x] Improve context retrieval beyond recent history/context pack breadth.
 - [ ] Add hidden-story scenario tests for adaptation without leaking future twists.
 - [ ] Tighten prompts so normal scene turns can be rich without always forcing choices.
 

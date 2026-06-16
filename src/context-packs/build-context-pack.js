@@ -5,6 +5,7 @@ import { buildRulesLedger } from "../rules/dnd5e-lite-ledger.js";
 import { isHiddenStoryThread } from "./story-threads.js";
 
 const DEFAULT_PACK_KINDS = [
+  contextPackKinds.SCENE_FOCUS,
   contextPackKinds.SCENE,
   contextPackKinds.CONSEQUENCES,
   contextPackKinds.HISTORY,
@@ -64,6 +65,8 @@ export function renderContextPackMarkdown(contextPack) {
 
 function buildSection(kind, campaign, options) {
   switch (kind) {
+    case contextPackKinds.SCENE_FOCUS:
+      return buildSceneFocusSection(campaign);
     case contextPackKinds.SCENE:
       return buildSceneSection(campaign);
     case contextPackKinds.CONSEQUENCES:
@@ -91,6 +94,42 @@ function buildSection(kind, campaign, options) {
     default:
       return null;
   }
+}
+
+function buildSceneFocusSection(campaign) {
+  const retrieval = buildSceneRetrieval(campaign);
+  const scene = retrieval.scene;
+  const currentPlace = findById(campaign.places, scene?.locationId ?? campaign.scene.currentPlaceId);
+  const participants = retrieval.participants
+    .filter((participant) => participant.id)
+    .slice(0, 8)
+    .map((participant) => `${participant.name ?? participant.title ?? participant.id}${participant.role ? ` (${participant.role})` : ""}`);
+  const relationships = retrieval.relevantRelationships.slice(0, 4).map((relationship) =>
+    `${labelEntity(campaign, relationship.sourceId)} -> ${labelEntity(campaign, relationship.targetId)} (${relationship.type}): ${formatCompactList(relationship.notes, 2)}`,
+  );
+  const consequences = retrieval.activeConsequences.slice(0, 4).map((consequence) =>
+    `${consequence.title}: ${consequence.description}`,
+  );
+  const threads = retrieval.activeThreads.slice(0, 4).map((thread) =>
+    `${thread.title}: ${thread.stakes ?? ""}`,
+  );
+  const events = retrieval.relevantRecentEvents.slice(0, 3).map((event) =>
+    `${event.title ?? event.summary ?? "Recent event"}: ${event.summary ?? event.text ?? ""}`,
+  );
+
+  return {
+    kind: contextPackKinds.SCENE_FOCUS,
+    title: "Scene Focus",
+    entries: [
+      currentPlace ? `Current place: ${currentPlace.name}. ${compactText(currentPlace.summary || currentPlace.description || "", SHORT_ENTRY_LIMIT)}` : null,
+      participants.length ? `Present actors: ${participants.join(", ")}` : null,
+      relationships.length ? `Relevant relationships: ${relationships.map((entry) => compactText(entry, SHORT_ENTRY_LIMIT)).join(" | ")}` : null,
+      consequences.length ? `Active consequences: ${consequences.map((entry) => compactText(entry, SHORT_ENTRY_LIMIT)).join(" | ")}` : null,
+      threads.length ? `Open threads: ${threads.map((entry) => compactText(entry, SHORT_ENTRY_LIMIT)).join(" | ")}` : null,
+      events.length ? `Recent relevant events: ${events.map((entry) => compactText(entry, SHORT_ENTRY_LIMIT)).join(" | ")}` : null,
+      "Use this focus before inventing new people, places, threats, or option panels.",
+    ].filter(Boolean),
+  };
 }
 
 function buildHistorySection(campaign) {

@@ -40,6 +40,7 @@ const allowedDomains = new Set([
 const allowedImportance = new Set(["minor", "normal", "major"]);
 const allowedVisibility = new Set(["player_visible", "dm_only", "system_only"]);
 const allowedSectionKinds = new Set([
+  "scene_focus",
   "current_scene",
   "recent_history",
   "recent_play_history",

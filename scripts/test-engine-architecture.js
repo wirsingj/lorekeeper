@@ -865,7 +865,21 @@ function testSceneIntentDiscouragesRandomEscalationAfterSmallFight() {
 function testProviderBoundary() {
   const campaign = campaignFixture();
   campaign.sessionLog.messages = [{ role: "dm", title: "DM", text: "Legacy text-only message." }];
+  campaign.places[0].summary = "A tavern where social fallout travels faster than ale.";
   campaign.relationships[0].notes = ["The barkeep remembers restraint.", "He dislikes broken furniture."];
+  campaign.relationships.push({
+    id: "rel-tavern-brawl-thread",
+    sourceId: "tavern",
+    targetId: "quest-1",
+    type: "reputation_pressure",
+    notes: ["The tavern regulars will carry the story into the street."],
+  });
+  campaign.timeline = [{
+    id: "event-tavern-stool",
+    title: "Broken stool was paid for",
+    summary: "Thor paid for the broken stool instead of escalating the brawl.",
+    relatedIds: ["tavern", "thor", "quest-1"],
+  }];
   const sceneCampaign = addConsequence(transitionScene(campaign, {
     id: "scene-provider",
     title: "Barkeep's tense room",
@@ -894,11 +908,19 @@ function testProviderBoundary() {
   assert.equal(request.readonlyContext.escalationPolicy.level, "soft");
   assert.equal(request.readonlyContext.activeConsequences[0].id, "consequence-provider");
   assert.equal(request.readonlyContext.relevantRelationships[0].id, "rel-thor-barkeep");
+  assert.ok(
+    request.readonlyContext.relevantRelationships.some((relationship) => relationship.id === "rel-tavern-brawl-thread"),
+    "provider retrieval should include current-place/thread relationships",
+  );
   assert.match(request.readonlyContext.relevantRelationships[0].notes, /broken furniture/);
   assert.equal(request.readonlyContext.activeThreads[0].id, "quest-1");
+  assert.equal(request.readonlyContext.sceneIntent.recentEvents[0].id, "event-tavern-stool");
   assert.equal(request.readonlyContext.party, undefined, "provider request should not include whole campaign dumps");
 
   const contextPack = buildContextPack(sceneCampaign);
+  assert.equal(contextPack.sections[0].kind, "scene_focus");
+  assert.match(JSON.stringify(contextPack.sections[0]), /social fallout travels faster than ale/);
+  assert.match(JSON.stringify(contextPack.sections[0]), /Broken stool was paid for/);
   assert.ok(contextPack.sections.some((section) => section.kind === "active_consequences"), "context pack should include active consequences");
   assert.match(JSON.stringify(contextPack.sections), /broken furniture/, "context pack should tolerate array relationship notes");
 
