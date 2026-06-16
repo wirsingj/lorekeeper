@@ -313,11 +313,13 @@ const elements = {
   localTableState: document.querySelector("#local-table-state"),
   localTableAddress: document.querySelector("#local-table-address"),
   localTableGuidance: document.querySelector("#local-table-guidance"),
+  localTableGuestLink: document.querySelector("#local-table-guest-link"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
   holdGuestActionsForGroup: document.querySelector("#hold-guest-actions-for-group"),
   startLocalTable: document.querySelector("#start-local-table"),
   stopLocalTable: document.querySelector("#stop-local-table"),
+  copyGuestLink: document.querySelector("#copy-guest-link"),
   copyCharacterInvite: document.querySelector("#copy-character-invite"),
   joinCampaign: document.querySelector("#join-campaign"),
   joinCampaignMain: document.querySelector("#join-campaign-main"),
@@ -666,6 +668,10 @@ elements.holdGuestActionsForGroup?.addEventListener("change", async () => {
 
 elements.copyCharacterInvite?.addEventListener("click", async () => {
   await createCharacterRequestInviteFromUi();
+});
+
+elements.copyGuestLink?.addEventListener("click", async () => {
+  await copyGuestLinkFromUi();
 });
 
 elements.joinCampaign.addEventListener("click", () => {
@@ -2585,8 +2591,10 @@ async function startLocalTableFromUi() {
     state.multiplayerSnapshot = result.multiplayer;
     render();
     setProviderActivity("Local table started", "idle");
+    return result;
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Local table failed: ${error.message}` : "Local table failed", "error");
+    return null;
   }
 }
 
@@ -2669,6 +2677,72 @@ async function createCharacterRequestInviteFromUi() {
     });
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Join-as invite failed: ${error.message}` : "Join-as invite failed", "error");
+  }
+}
+
+async function copyGuestLinkFromUi() {
+  try {
+    if (!state.campaign?.multiplayer?.localTable?.running) {
+      const result = await startLocalTableFromUi();
+      if (!result) {
+        return false;
+      }
+    }
+    const link = currentLocalGuestLink();
+    if (!link) {
+      throw new Error("Local Table did not report a guest link.");
+    }
+    showGuestLink(link);
+    const copied = await writeClipboardText(link);
+    if (copied) {
+      setProviderActivity("Guest link copied", "idle");
+      return true;
+    }
+    revealGuestLink();
+    setProviderActivity("Guest link ready; copy it from Local Table.", "waiting");
+    return false;
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Guest link failed: ${error.message}` : "Guest link failed", "error");
+    return false;
+  }
+}
+
+function currentLocalGuestLink() {
+  const table = state.campaign?.multiplayer?.localTable ?? state.multiplayerSnapshot?.localTable ?? {};
+  if (!table.running) {
+    return "";
+  }
+  const host = table.lanAddress || window.location.hostname || "127.0.0.1";
+  const port = table.port || window.location.port;
+  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
+}
+
+function showGuestLink(link) {
+  if (!elements.localTableGuestLink) {
+    return;
+  }
+  elements.localTableGuestLink.value = link;
+}
+
+function revealGuestLink() {
+  if (!elements.localTableGuestLink) {
+    return;
+  }
+  if (elements.setupDialog && !elements.setupDialog.open) {
+    try {
+      elements.setupDialog.showModal();
+      if (!clientMode) {
+        refreshProviderStatus({ quiet: true });
+      }
+    } catch {
+      // The field is still filled when the setup dialog can be opened later.
+    }
+  }
+  try {
+    elements.localTableGuestLink.focus();
+    elements.localTableGuestLink.select();
+  } catch {
+    // Selection is only a convenience.
   }
 }
 
@@ -4884,6 +4958,12 @@ function applyThinModeChrome() {
   if (elements.copyCharacterInvite) {
     elements.copyCharacterInvite.hidden = true;
   }
+  if (elements.copyGuestLink) {
+    elements.copyGuestLink.hidden = true;
+  }
+  if (elements.localTableGuestLink) {
+    elements.localTableGuestLink.closest(".local-table-share")?.setAttribute("hidden", "");
+  }
   if (elements.requireGuestActionApproval) {
     elements.requireGuestActionApproval.closest(".local-table-option")?.setAttribute("hidden", "");
   }
@@ -4928,6 +5008,12 @@ function applyFullModeChrome() {
   elements.stopLocalTable.hidden = false;
   if (elements.copyCharacterInvite) {
     elements.copyCharacterInvite.hidden = false;
+  }
+  if (elements.copyGuestLink) {
+    elements.copyGuestLink.hidden = false;
+  }
+  if (elements.localTableGuestLink) {
+    elements.localTableGuestLink.closest(".local-table-share")?.removeAttribute("hidden");
   }
   if (elements.requireGuestActionApproval) {
     elements.requireGuestActionApproval.closest(".local-table-option")?.removeAttribute("hidden");

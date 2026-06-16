@@ -923,6 +923,8 @@ function testMultiplayerSessionProjection() {
   assert.equal(hostProjection.holdGuestActionsForGroupInput, false);
   assert.equal(hostProjection.connectedGuests.length, 1);
   assert.match(hostProjection.localTableAddress, /192\.168\.1\.24:7347/);
+  assert.equal(hostProjection.guestLink, "http://192.168.1.24:7347/guest");
+  assert.equal(hostProjection.canCopyGuestLink, true);
   assert.match(hostProjection.flowSummary, /queued/i);
   assert.match(hostProjection.pendingInputs[0].statusLabel, /Queued for DM/);
 
@@ -939,6 +941,8 @@ function testMultiplayerSessionProjection() {
   });
   assert.equal(stoppedProjection.localTableState, "Off");
   assert.equal(stoppedProjection.canStopLocalTable, false);
+  assert.equal(stoppedProjection.guestLink, "");
+  assert.equal(stoppedProjection.canCopyGuestLink, false);
   assert.equal(stoppedProjection.canResolvePartyInputs, false);
 
   campaign.multiplayer.settings.requireGuestActionApproval = true;
@@ -1050,6 +1054,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /table-timeline-summary/);
   assert.match(appShell, /session-health-summary/);
   assert.match(appShell, /local-table-guidance/);
+  assert.match(appShell, /local-table-guest-link/);
+  assert.match(appShell, /copy-guest-link/);
   assert.match(appShell, /id="right-rail-toggle"/);
   assert.match(appShell, /guest-waiting-room-panel/);
   assert.match(appShell, /Ask To Join/);
@@ -1073,6 +1079,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /guestWaitingRoomMode/);
   assert.match(appJs, /apiMultiplayerWaitingRegisterUrl/);
   assert.match(appJs, /seatWaitingGuestAtTable/);
+  assert.match(appJs, /copyGuestLinkFromUi/);
+  assert.match(appJs, /currentLocalGuestLink/);
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited player/);
   assert.match(appJs, /renderDebugMetaControl/);

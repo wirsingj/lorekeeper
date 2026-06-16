@@ -67,6 +67,7 @@ The user should not feel like they are debugging a model, managing queue machine
 21. Table Talk now gets a subtle unread cue when new side-chat messages arrive.
 22. Host New is becoming a real pre-table setup workspace with party controller intent instead of a small modal over the last table.
 23. Browser guests can open `/guest`, enter a waiting room, and be seated by the host without a packaged client or pasted invite link.
+24. Host Local Table now exposes a copyable Guest Link built from the detected LAN IP and port.
 
 ### Still Risky
 
@@ -202,6 +203,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
 - [x] Provider Setup is reachable as a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
+- [x] Host can copy a same-network Guest Link from Local Table.
 - [ ] Run first real two-machine playtest.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
@@ -264,7 +266,8 @@ The user should not feel like they are debugging a model, managing queue machine
 6. Create/confirm host character.
 7. Add AI companions before invite if desired.
 8. Start Local Table.
-9. Copy Join-As link or specific character invite.
+9. Copy the Guest Link and send it to the guest.
+10. Copy a Join-As link or specific character invite only when you want to bypass the waiting-room seating flow.
 
 ### Guest Join Flow
 

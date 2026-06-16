@@ -16,8 +16,10 @@ export function buildMultiplayerSessionProjection({
         : "Paste a host invite link to join.",
       canStartLocalTable: false,
       canStopLocalTable: false,
+      canCopyGuestLink: false,
       canSyncGuestTable: Boolean(guestSession?.hostBaseUrl),
       canResolvePartyInputs: false,
+      guestLink: "",
       flowSummary: guestSession?.hostBaseUrl
         ? "Your action goes to the host table first. The host DM resolves it from LoreKeeper."
         : "Paste an invite link to join a host table.",
@@ -36,6 +38,7 @@ export function buildMultiplayerSessionProjection({
     requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
     holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
   };
+  const guestLink = localGuestLink(table, locationPort);
   return {
     mode: "host",
     localTableState: table.running ? "On" : "Off",
@@ -44,8 +47,10 @@ export function buildMultiplayerSessionProjection({
       : "Start a LAN table only when another local app is joining.",
     canStartLocalTable: true,
     canStopLocalTable: Boolean(table.running),
+    canCopyGuestLink: Boolean(guestLink),
     canSyncGuestTable: false,
     canResolvePartyInputs: readyInputs.length > 0,
+    guestLink,
     flowSummary: hostFlowSummary({ table, settings, pendingInputs }),
     resolvePartyInputsLabel: resolvePartyInputsLabel({ readyInputs, settings }),
     requireGuestActionApproval: settings.requireGuestActionApproval,
@@ -70,8 +75,17 @@ export function renderMultiplayerSessionPanel({
   if (elements.localTableGuidance) {
     elements.localTableGuidance.textContent = projection.flowSummary;
   }
+  if (elements.localTableGuestLink) {
+    elements.localTableGuestLink.value = projection.guestLink || "";
+    elements.localTableGuestLink.placeholder = projection.guestLink
+      ? ""
+      : "Start Local Table to get a guest link.";
+  }
   elements.startLocalTable.disabled = !projection.canStartLocalTable;
   elements.stopLocalTable.disabled = !projection.canStopLocalTable;
+  if (elements.copyGuestLink) {
+    elements.copyGuestLink.disabled = !projection.canCopyGuestLink && projection.mode !== "host";
+  }
   if (elements.syncGuestTable) {
     elements.syncGuestTable.disabled = !projection.canSyncGuestTable;
   }
@@ -88,6 +102,15 @@ export function renderMultiplayerSessionPanel({
   renderWaitingGuests(elements.waitingGuests, projection.waitingGuests, { party: projection.party ?? [], seatWaitingGuest });
   renderConnectedGuests(elements.connectedGuests, projection.connectedGuests, { labelById, approveGuest, denyGuest });
   renderPendingInputs(elements.pendingInputs, projection.pendingInputs);
+}
+
+function localGuestLink(table = {}, locationPort = "") {
+  if (!table.running) {
+    return "";
+  }
+  const host = table.lanAddress || "127.0.0.1";
+  const port = table.port || locationPort;
+  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
 }
 
 function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWaitingGuest } = {}) {

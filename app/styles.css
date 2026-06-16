@@ -878,6 +878,28 @@ h3 {
   font-size: 0.74rem;
 }
 
+.local-table-share {
+  display: grid;
+  gap: 5px;
+  margin-top: 2px;
+  color: #dfe7eb;
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.local-table-share input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(174, 191, 202, 0.18);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: rgba(14, 18, 21, 0.72);
+  color: #edf2f4;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+}
+
 .setup-note {
   margin: 0;
   color: #aebbc2;

@@ -756,9 +756,19 @@ function SetupDialog() {
             Hold guest actions for a group turn
           </label>
           <p id="local-table-guidance" className="setup-note">Guest actions resolve one at a time when the DM is idle.</p>
+          <label className="field-stack local-table-share">
+            <span>Guest Link</span>
+            <input
+              id="local-table-guest-link"
+              readOnly
+              spellCheck="false"
+              placeholder="Start Local Table to get a guest link."
+            />
+          </label>
           <div className="button-stack two-up">
             <button id="start-local-table" type="button">Start Local Table</button>
             <button id="stop-local-table" type="button">Stop</button>
+            <button id="copy-guest-link" type="button">Copy Guest Link</button>
             <button id="copy-character-invite" type="button">Copy Join-As Link</button>
             <button id="join-campaign" type="button">Join Campaign</button>
             <button id="sync-guest-table" type="button">Resync</button>

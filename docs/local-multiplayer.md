@@ -24,6 +24,7 @@ The current implementation supports:
 
 - starting/stopping a local table session from setup
 - serving a browser guest waiting room at `http://host-lan-ip:port/guest`
+- showing a copyable host Guest Link built from the detected LAN IP and local table port
 - letting a nearby guest raise their hand from `/guest` before the host assigns a character seat
 - generating an invite link for a party member
 - joining from ThinLoreKeeper by pasting the invite link into the front-center join card
@@ -80,6 +81,8 @@ When the host local table is running, a guest can open:
 ```text
 http://host-lan-ip:4173/guest
 ```
+
+The host Settings -> Local Table section shows the detected Guest Link and can copy it directly. Use that link for same-network play so the guest can request a seat without installing or configuring anything.
 
 The guest enters a table name and clicks `Ask To Join`. The host sees that waiting player in Local Table and as seating actions on party cards. The guest receives no campaign state until the host seats them as an existing party member or remote-invite slot.
 
