@@ -1372,6 +1372,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     "AI companion card actions should place Nudge after Invite Player and use nudge styling",
   );
   assert.match(appJs, /Stage For DM/, "AI companion approval should read like staging a table beat");
+  assert.match(appJs, /Resolve Now/, "AI companion approval should support immediate DM resolution");
+  assert.match(appJs, /resolvePartySuggestionNow/, "AI companion resolve-now flow should be explicit");
+  assert.match(appJs, /partySuggestionInputFromMessage/, "AI companion resolve-now should send a structured party input");
   assert.match(appJs, /Pass/, "AI companion approval should allow the host to pass on the beat");
   assert.match(appJs, /Companion beat staged; add host text or press Send Turn when ready\./);
   assert.match(appJs, /markApprovedPartyInputsStillStaged/, "failed DM turns should keep approved party inputs visibly staged");

@@ -8886,6 +8886,13 @@ function renderPartyApprovalActions(message, approval) {
     approveButton.title = "Stage this companion beat for the next Send Turn";
     approveButton.addEventListener("click", () => setPartySuggestionStatus(message, "approved_party_input"));
 
+    const resolveButton = document.createElement("button");
+    resolveButton.type = "button";
+    resolveButton.className = "mini-action message-submit-action";
+    resolveButton.textContent = "Resolve Now";
+    resolveButton.title = "Send this companion beat to the DM now";
+    resolveButton.addEventListener("click", () => resolvePartySuggestionNow(message));
+
     const rejectButton = document.createElement("button");
     rejectButton.type = "button";
     rejectButton.className = "mini-action secondary-action";
@@ -8893,7 +8900,7 @@ function renderPartyApprovalActions(message, approval) {
     rejectButton.title = "Do not send this companion beat to the DM";
     rejectButton.addEventListener("click", () => setPartySuggestionStatus(message, "rejected_party_input"));
 
-    actionRow.append(approveButton, rejectButton);
+    actionRow.append(approveButton, resolveButton, rejectButton);
     return actionRow;
   }
 
@@ -8937,6 +8944,41 @@ async function setPartySuggestionStatus(message, status) {
     ? "Companion beat staged; add host text or press Send Turn when ready."
     : meta || "Companion beat updated";
   setProviderActivity(activity, status === "approved_party_input" ? "waiting" : "idle");
+}
+
+async function resolvePartySuggestionNow(message) {
+  if (!message?.id || hasActiveGeneration()) {
+    setProviderActivity("Wait for the current DM response before resolving this companion beat", "waiting");
+    return;
+  }
+  const input = partySuggestionInputFromMessage(message);
+  if (!input.text) {
+    setProviderActivity("That companion beat has no table text to send", "error");
+    return;
+  }
+  await setPartySuggestionStatus(message, "approved_party_input");
+  const runResult = await submitPlayerTurnFromInput("", {
+    playerInputs: [input],
+    skipPlayerEcho: true,
+    skipPartySeed: true,
+    preserveInput: true,
+  });
+  if (runResult?.imported) {
+    await setPartySuggestionStatus(message, "submitted_party_input");
+  } else {
+    await markApprovedPartyInputsStillStaged([input], runResult);
+  }
+}
+
+function partySuggestionInputFromMessage(message) {
+  return {
+    type: "approved_party_contribution",
+    id: message.id,
+    characterId: message.data?.characterId || "",
+    characterName: message.data?.characterName || message.title || "",
+    text: message.body || "",
+    ready: true,
+  };
 }
 
 async function patchPlayMessage(messageId, patch = {}) {
