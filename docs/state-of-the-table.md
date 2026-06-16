@@ -115,12 +115,13 @@ Every table surface should answer the same practical questions a real table answ
 64. Scene retrieval now ranks actor/thread-linked relationships and events above noisy same-place history, with a long-campaign-noise fixture.
 65. CombatEngine now rejects explicit legal option IDs that are stale, unavailable, or incompatible with the requested action type.
 66. Context-pack load coverage now builds a thousands-record campaign and asserts Scene Focus stays relevant, bounded, and under a generous performance ceiling.
+67. Manual review/use-anyway live copy now avoids JSON/contract/import wording and frames failures as table checks, with raw details kept in diagnostics.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches are now rejected.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
-3. Recovery is more table-shaped in the live status strip, retry lifecycle, and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
+3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
@@ -165,7 +166,7 @@ Every table surface should answer the same practical questions a real table answ
 
 4. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
 5. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-6. Make manual review/use-anyway lifecycle less developer-shaped after retry flow improvements.
+6. Replace the remaining manual review textarea escape hatch with a guided host review flow after retry/use-anyway wording improvements.
 7. Run the two-machine playtest checklist and log every friction point.
 8. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 9. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -219,6 +220,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Move remaining recovery/import decisions out of `app/app.js`.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
+- [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
 - [x] Ensure every stuck state answers who is waiting and what the host can do next.
 
 ### Combat

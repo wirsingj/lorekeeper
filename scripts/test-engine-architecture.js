@@ -1686,6 +1686,14 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /renderDebugMetaControl/);
   assert.match(appJs, /DM response needs review\. Try Again, Details, or Use Anyway\./);
   assert.match(appJs, /DM is reconsidering the response/);
+  assert.match(appJs, /function tableRepairReason/, "repair reasons should pass through a table-facing display helper");
+  assert.match(appJs, /the DM response did not pass LoreKeeper's table checks/, "technical repair reasons should be softened for live play");
+  assert.match(appJs, /Opening scene needs review; use Try Again or Details before starting play\./);
+  assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);
+  assert.doesNotMatch(appJs, /imported despite contract failure/);
+  assert.match(appJs, /DM response details are open in Table Diagnostics/);
+  assert.match(appJs, /The DM response was received, but the table has not applied it yet\./);
+  assert.match(appJs, /The DM responded, but LoreKeeper needs the host to review it before play continues\./);
   assert.match(appJs, /launchInviteLink/);
   assert.match(appJs, /applyLaunchInviteLink/);
   assert.match(appJs, /clearGuestSession\(\{\s*keepRecent:\s*false\s*\}\)/);

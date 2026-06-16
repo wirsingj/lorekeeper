@@ -2707,7 +2707,7 @@ async function startNewCampaignOpening(openingPrompt) {
   });
   elements.playerInput.value = "";
   if (result?.needsRepair) {
-    elements.bridgeStatus.textContent = "Opening scene needs JSON repair; inspect or retry the model response.";
+    elements.bridgeStatus.textContent = "Opening scene needs review; use Try Again or Details before starting play.";
     return;
   }
   if (!result?.providerReceived) {
@@ -7817,7 +7817,7 @@ function cancelActiveGeneration() {
 function setTurnRepair(repair) {
   const savedRepair = state.turnFlow.setRepair(repair);
   pushDiagnosticsEvent("turn_repair_required", summarizeTurnRepair(savedRepair));
-  const reason = compactUiText(savedRepair.reason || "model response failed the JSON contract", 180);
+  const reason = tableRepairReason(savedRepair.reason);
   elements.bridgeStatus.textContent = `DM response needs review: ${reason}`;
   setProviderActivity(`DM response needs review - ${reason}. Try Again, Details, or Use Anyway.`, "error");
   updateNudgeAvailability();
@@ -7833,6 +7833,17 @@ function clearTurnRepair() {
 function compactUiText(value, limit = 160) {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
   return text.length <= limit ? text : `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}...`;
+}
+
+function tableRepairReason(value) {
+  const text = compactUiText(value, 140);
+  if (!text) {
+    return "the DM response did not pass LoreKeeper's table checks";
+  }
+  if (/(?:json|schema|contract|parse|validation|sceneStatus|choices\.|flags\.|mechanics\.|proposedChanges|provider result)/i.test(text)) {
+    return "the DM response did not pass LoreKeeper's table checks";
+  }
+  return text;
 }
 
 function cleanMessageMeta(value) {
@@ -7901,19 +7912,19 @@ async function inspectTurnRepair() {
     elements.setupDialog.showModal();
   }
   await refreshDiagnostics();
-  setProviderActivity("DM response details are open in Settings diagnostics", "waiting");
+  setProviderActivity("DM response details are open in Table Diagnostics", "waiting");
 }
 
 async function importTurnRepairAnyway() {
   const repair = activeTurnRepair();
   if (!repair?.responseText) {
-    setProviderActivity("No reviewed DM response text is available", "error");
+    setProviderActivity("No reviewed DM response is available", "error");
     return;
   }
 
   const confirmed = await confirmInApp({
     title: "Use This DM Response?",
-    message: "This DM response needs review and may include bad choices or stale state. Use it only when the visible table text is worth keeping.",
+    message: "LoreKeeper could not fully verify this DM response. Use it only if the visible table text looks right for your campaign.",
     acceptLabel: "Use Anyway",
   });
   if (!confirmed) {
@@ -7924,7 +7935,7 @@ async function importTurnRepairAnyway() {
   clearTurnRepair();
   await importProviderResponse(repair.responseText, {
     source: repair.source || "ollama_repair",
-    meta: [repair.meta, "imported despite contract failure"].filter(Boolean).join("; "),
+    meta: [repair.meta, "used after review warning"].filter(Boolean).join("; "),
     autoCommit: false,
     rememberProviderText: true,
     data: {
@@ -9230,12 +9241,12 @@ function messageLifecycleForMessage(message) {
       },
       waiting_for_import: {
         label: "Waiting for DM result",
-        title: "The provider received this action, but the DM result has not been imported yet.",
+        title: "The DM response was received, but the table has not applied it yet.",
         tone: "waiting",
       },
       turn_waiting_for_import: {
         label: "Waiting for DM result",
-        title: "The provider received this action, but the DM result has not been imported yet.",
+        title: "The DM response was received, but the table has not applied it yet.",
         tone: "waiting",
       },
       recovering: {
@@ -9270,12 +9281,12 @@ function messageLifecycleForMessage(message) {
       },
       needs_review: {
         label: "DM response needs review",
-        title: "The provider responded, but the app needs review before trusting the result.",
+        title: "The DM responded, but LoreKeeper needs the host to review it before play continues.",
         tone: "review",
       },
       turn_needs_review: {
         label: "DM response needs review",
-        title: "The provider responded, but the app needs review before trusting the result.",
+        title: "The DM responded, but LoreKeeper needs the host to review it before play continues.",
         tone: "review",
       },
       timed_out: {
