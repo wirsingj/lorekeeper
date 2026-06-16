@@ -19,6 +19,7 @@ import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecover
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { tableRepairReason, turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "../app/turn-repair-controller.js";
+import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
@@ -27,6 +28,7 @@ import { createCampaignStateStore } from "../src/engine/campaign-state-store.js"
 import { addConsequence, resolveConsequence } from "../src/engine/consequence-engine.js";
 import { rollD20, rollFormula } from "../src/engine/dice-engine.js";
 import { buildGoalHorizon, buildLivingWorldMemory } from "../src/engine/living-world-engine.js";
+import { applyRelationshipTransition } from "../src/engine/relationship-engine.js";
 import { buildProviderTaskRequest, acceptProviderResponseForTurn, createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneIntentPack, buildSceneRetrieval, transitionScene } from "../src/engine/scene-engine.js";
 import { applyStateEffects } from "../src/engine/state-effects.js";
@@ -1156,6 +1158,66 @@ function testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise() {
   const memorySection = contextPack.sections.find((section) => section.kind === "world_memory");
   assert.match(goalSection.entries.join(" "), /Discover who is funding the river raids|Ask Osric/);
   assert.match(memorySection.entries.join(" "), /Osric owes Thor a favor|River Guild|collapsed bridge/);
+}
+
+function testRelationshipEvolutionEngine() {
+  const base = {
+    ...campaignFixture(),
+    relationships: [{
+      id: "rel-barkeep-thor",
+      sourceId: "barkeep",
+      targetId: "thor",
+      state: "neutral",
+      notes: ["The barkeep knows Thor by sight."],
+    }],
+  };
+
+  const improved = applyRelationshipTransition(base, {
+    id: "rel-barkeep-thor",
+    shift: "improve",
+    reason: "Thor protected the tavern without breaking furniture.",
+    linkedGoalId: "quest-1",
+    relatedIds: ["tavern"],
+  }, { now: "2026-01-01T00:00:00.000Z" });
+  assert.equal(improved.previousState, "neutral");
+  assert.equal(improved.nextState, "respectful");
+  assert.equal(improved.relationship.state, "respectful");
+  assert.ok(improved.relationship.notes.includes("Thor protected the tavern without breaking furniture."));
+  assert.ok(improved.relationship.goalIds.includes("quest-1"));
+  assert.ok(improved.relationship.relatedIds.includes("tavern"));
+
+  const canonical = applyCanonicalChanges(base, [{
+    id: "change-relationship-shift",
+    operation: "update",
+    domain: "relationships",
+    targetId: "rel-barkeep-thor",
+    summary: "The barkeep now trusts Thor after the restraint shown in the brawl.",
+    data: {
+      shift: "major_improve",
+      linkedGoalId: "quest-1",
+      relatedIds: ["tavern"],
+    },
+  }]);
+  const canonicalRelationship = canonical.campaign.relationships.find((relationship) => relationship.id === "rel-barkeep-thor");
+  assert.equal(canonical.applied.length, 1);
+  assert.equal(canonicalRelationship.state, "friendly");
+  assert.ok(canonicalRelationship.memory.includes("The barkeep now trusts Thor after the restraint shown in the brawl."));
+
+  const newlyCreated = applyCanonicalChanges(base, [{
+    id: "change-new-relationship",
+    operation: "add",
+    domain: "relationship",
+    summary: "The River Guild becomes suspicious of Thor.",
+    data: {
+      sourceId: "river-guild",
+      targetId: "thor",
+      state: "distrustful",
+      factionIds: ["river-guild"],
+    },
+  }]);
+  const newRelationship = newlyCreated.campaign.relationships.find((relationship) => relationship.sourceId === "river-guild");
+  assert.equal(newRelationship.state, "distrustful");
+  assert.ok(newRelationship.relatedIds.includes("river-guild"));
 }
 
 function testLargeCampaignContextPackStaysBounded() {
@@ -2340,6 +2402,7 @@ testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
 testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise();
+testRelationshipEvolutionEngine();
 testLargeCampaignContextPackStaysBounded();
 testContextPackFormatsStructuredSheetDetails();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();

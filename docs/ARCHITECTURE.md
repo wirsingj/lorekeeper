@@ -145,6 +145,12 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Projects NPC, faction, location, relationship, and consequence memory so provider requests can use durable world facts before recent-message noise.
 - Produces an internal living-world score: if the same NPC, faction, or place appears later, would they react differently because of prior play?
 
+`RelationshipEngine`
+
+- Lives in `src/engine/relationship-engine.js`.
+- Normalizes relationship records and applies durable relationship-state transitions such as neutral -> respectful -> friendly -> loyal or neutral -> distrustful -> fearful/hostile.
+- `src/campaign-state/apply-changes.js` routes relationship-shaped reviewed changes through this engine so provider proposals become structured memory instead of loose notes.
+
 `MultiplayerSessionEngine` target:
 
 - Not yet a single explicit module, but `src/multiplayer/local-table.js` is the current authority center.
@@ -236,6 +242,7 @@ Start here when making changes:
 - Main UI behavior: `app/app.js`
 - Maintainer commands/playbooks: `docs/MAINTAINER_GUIDE.md`
 - Living world continuity model: `docs/living-world.md`, `src/engine/living-world-engine.js`
+- Relationship continuity transitions: `src/engine/relationship-engine.js`
 - One-blob state debugging: `src/engine/table-debug-snapshot.js`, diagnostics `debugSnapshot`
 - Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
 - Stale combat prompt repair: `app/combat-prompt-repair-controller.js`

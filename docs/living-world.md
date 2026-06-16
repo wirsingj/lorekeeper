@@ -28,6 +28,7 @@ Relationship evolution:
 - stored in `campaign.relationships`,
 - should represent meaningful shifts such as neutral to friendly, friendly to loyal, distrustful to hostile, hostile to fearful, fearful to respectful,
 - should link to current actors, places, factions, consequences, or goals when relevant.
+- normalized through `src/engine/relationship-engine.js` for reviewed changes, using the state ladder `hostile`, `fearful`, `distrustful`, `neutral`, `respectful`, `friendly`, `loyal`.
 
 Faction memory:
 
@@ -114,6 +115,7 @@ The score is diagnostic guidance, not a player-facing grade.
 ## Important Files
 
 - `src/engine/living-world-engine.js`: goal horizons, memory projection, score.
+- `src/engine/relationship-engine.js`: relationship normalization and durable state transitions.
 - `src/engine/consequence-engine.js`: consequence normalization, storage links, scene retrieval.
 - `src/engine/scene-engine.js`: current scene retrieval and scene intent.
 - `src/context-packs/build-context-pack.js`: DM Goal Horizon and Living World Memory sections.

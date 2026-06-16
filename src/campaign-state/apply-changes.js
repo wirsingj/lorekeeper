@@ -1,5 +1,6 @@
 import { touchCampaign } from "./schema.js";
 import { advanceCombatTurn, ensureCombatTurnOrder, repairCombatTurnOwner } from "../rules/combat-turns.js";
+import { applyRelationshipTransition, normalizeRelationshipRecord } from "../engine/relationship-engine.js";
 
 const arrayDomains = new Set([
   "people",
@@ -87,6 +88,9 @@ function applyOneChange(campaign, change) {
 function applyArrayChange(campaign, records, change, domain, operation) {
   const targetId = change.targetId || inferTargetId(campaign, records, change, domain, operation);
   const changeData = inferRevealedRecordData(change, domain, targetId);
+  if (domain === "relationships" && isRelationshipTransitionChange(change, changeData, targetId)) {
+    return applyRelationshipChange(campaign, records, change, changeData, targetId, operation);
+  }
 
   if (operation === "add") {
     const existingIndex = targetId ? records.findIndex((record) => record.id === targetId) : -1;
@@ -148,6 +152,44 @@ function applyArrayChange(campaign, records, change, domain, operation) {
   addHumanNote(records[index], change);
   applySceneHints(campaign, domain, records[index]);
   return { applied: true };
+}
+
+function applyRelationshipChange(campaign, records, change, changeData, targetId, operation) {
+  if (operation === "remove") {
+    const removeId = targetId || changeData.id || changeData.relationshipId;
+    const index = records.findIndex((record) => record.id === removeId);
+    if (index === -1) {
+      return { applied: false, reason: `No record found for ${removeId}.` };
+    }
+    records.splice(index, 1);
+    return { applied: true };
+  }
+
+  const transition = applyRelationshipTransition(campaign, {
+    ...changeData,
+    id: targetId || changeData.id || changeData.relationshipId,
+    summary: change.summary,
+    reason: change.reason,
+  });
+  campaign.relationships = transition.campaign.relationships;
+  applySceneHints(campaign, "relationships", transition.relationship);
+  return { applied: true };
+}
+
+function isRelationshipTransitionChange(change, data = {}, targetId = "") {
+  return Boolean(
+    targetId ||
+    data.id ||
+    data.relationshipId ||
+    (data.sourceId && data.targetId) ||
+    data.state ||
+    data.toState ||
+    data.nextState ||
+    data.disposition ||
+    data.shift ||
+    data.delta ||
+    data.transition
+  );
 }
 
 function mergeRecordPatch(record, patch) {
@@ -669,6 +711,10 @@ function normalizeRecordForDomain(domain, record) {
       createdAt: record.createdAt || now,
       updatedAt: now,
     };
+  }
+
+  if (domain === "relationships") {
+    return normalizeRelationshipRecord(record, { now });
   }
 
   if (domain === "lore") {
