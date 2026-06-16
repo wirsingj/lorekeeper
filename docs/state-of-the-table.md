@@ -116,11 +116,12 @@ Every table surface should answer the same practical questions a real table answ
 65. CombatEngine now rejects explicit legal option IDs that are stale, unavailable, or incompatible with the requested action type.
 66. Context-pack load coverage now builds a thousands-record campaign and asserts Scene Focus stays relevant, bounded, and under a generous performance ceiling.
 67. Manual review/use-anyway live copy now avoids JSON/contract/import wording and frames failures as table checks, with raw details kept in diagnostics.
+68. Turn repair display/use-anyway policy is extracted into a small recovery controller with direct tests instead of living only as renderer string handling.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches are now rejected.
-2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
+2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy is now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
@@ -221,6 +222,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
+- [x] Extract turn repair display/use-anyway policy out of `app/app.js`.
 - [x] Ensure every stuck state answers who is waiting and what the host can do next.
 
 ### Combat

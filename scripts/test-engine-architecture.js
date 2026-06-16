@@ -12,6 +12,7 @@ import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-pa
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
+import { tableRepairReason, turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "../app/turn-repair-controller.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
@@ -1420,6 +1421,30 @@ function testTableStatusVocabulary() {
   assert.equal(event.at, "2026-01-01T00:00:00.000Z");
 }
 
+function testTurnRepairController() {
+  const technicalRepair = {
+    reason: "sceneStatus.awaitingPlayer must be boolean.",
+    source: "ollama",
+    meta: "Ollama qwen3; 12s",
+    turn: { turnId: "turn-1" },
+    providerResult: { model: "qwen3" },
+  };
+  assert.equal(tableRepairReason(technicalRepair.reason), "the DM response did not pass LoreKeeper's table checks");
+  assert.equal(turnRepairStatusText(technicalRepair), "DM response needs review: the DM response did not pass LoreKeeper's table checks");
+  assert.match(turnRepairActivityText(technicalRepair), /Try Again, Details, or Use Anyway/);
+  assert.equal(tableRepairReason("The DM contradicted the last seated guest."), "The DM contradicted the last seated guest.");
+
+  const dialog = turnRepairUseAnywayDialog();
+  assert.equal(dialog.title, "Use This DM Response?");
+  assert.doesNotMatch(dialog.message, /JSON|contract|import/i);
+
+  const options = turnRepairImportOptions(technicalRepair);
+  assert.equal(options.source, "ollama");
+  assert.equal(options.autoCommit, false);
+  assert.match(options.meta, /used after review warning/);
+  assert.equal(options.data.contractWarning, technicalRepair.reason);
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -1593,6 +1618,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 
 async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
@@ -1686,11 +1712,13 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /renderDebugMetaControl/);
   assert.match(appJs, /DM response needs review\. Try Again, Details, or Use Anyway\./);
   assert.match(appJs, /DM is reconsidering the response/);
-  assert.match(appJs, /function tableRepairReason/, "repair reasons should pass through a table-facing display helper");
-  assert.match(appJs, /the DM response did not pass LoreKeeper's table checks/, "technical repair reasons should be softened for live play");
+  assert.match(appJs, /turn-repair-controller\.js/, "repair display policy should live outside the main app renderer");
+  assert.match(appJs, /turnRepairStatusText/, "repair status should come from the repair controller");
+  assert.match(appJs, /turnRepairImportOptions/, "Use Anyway import packaging should come from the repair controller");
+  assert.match(turnRepairController, /the DM response did not pass LoreKeeper's table checks/, "technical repair reasons should be softened for live play");
   assert.match(appJs, /Opening scene needs review; use Try Again or Details before starting play\./);
   assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);
-  assert.doesNotMatch(appJs, /imported despite contract failure/);
+  assert.doesNotMatch(turnRepairController, /imported despite contract failure/);
   assert.match(appJs, /DM response details are open in Table Diagnostics/);
   assert.match(appJs, /The DM response was received, but the table has not applied it yet\./);
   assert.match(appJs, /The DM responded, but LoreKeeper needs the host to review it before play continues\./);
@@ -1725,6 +1753,7 @@ testLargeCampaignContextPackStaysBounded();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();
 testProviderBoundary();
 testStructuredInputsDoNotMergeIntoHostMessage();
+testTurnRepairController();
 testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();

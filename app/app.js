@@ -23,6 +23,7 @@ import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
+import { turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "./turn-repair-controller.js";
 
 const launchParams = new URLSearchParams(window.location.search);
 const guestWaitingRoomMode = window.location.pathname === "/guest" || launchParams.get("mode") === "guest";
@@ -7817,9 +7818,8 @@ function cancelActiveGeneration() {
 function setTurnRepair(repair) {
   const savedRepair = state.turnFlow.setRepair(repair);
   pushDiagnosticsEvent("turn_repair_required", summarizeTurnRepair(savedRepair));
-  const reason = tableRepairReason(savedRepair.reason);
-  elements.bridgeStatus.textContent = `DM response needs review: ${reason}`;
-  setProviderActivity(`DM response needs review - ${reason}. Try Again, Details, or Use Anyway.`, "error");
+  elements.bridgeStatus.textContent = turnRepairStatusText(savedRepair);
+  setProviderActivity(turnRepairActivityText(savedRepair), "error");
   updateNudgeAvailability();
   render();
 }
@@ -7828,22 +7828,6 @@ function clearTurnRepair() {
   state.turnFlow.clearRepair();
   updateTurnRepairControls();
   updateNudgeAvailability();
-}
-
-function compactUiText(value, limit = 160) {
-  const text = String(value ?? "").replace(/\s+/g, " ").trim();
-  return text.length <= limit ? text : `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}...`;
-}
-
-function tableRepairReason(value) {
-  const text = compactUiText(value, 140);
-  if (!text) {
-    return "the DM response did not pass LoreKeeper's table checks";
-  }
-  if (/(?:json|schema|contract|parse|validation|sceneStatus|choices\.|flags\.|mechanics\.|proposedChanges|provider result)/i.test(text)) {
-    return "the DM response did not pass LoreKeeper's table checks";
-  }
-  return text;
 }
 
 function cleanMessageMeta(value) {
@@ -7922,29 +7906,14 @@ async function importTurnRepairAnyway() {
     return;
   }
 
-  const confirmed = await confirmInApp({
-    title: "Use This DM Response?",
-    message: "LoreKeeper could not fully verify this DM response. Use it only if the visible table text looks right for your campaign.",
-    acceptLabel: "Use Anyway",
-  });
+  const confirmed = await confirmInApp(turnRepairUseAnywayDialog());
   if (!confirmed) {
     setProviderActivity("DM response kept for review", "waiting");
     return;
   }
 
   clearTurnRepair();
-  await importProviderResponse(repair.responseText, {
-    source: repair.source || "ollama_repair",
-    meta: [repair.meta, "used after review warning"].filter(Boolean).join("; "),
-    autoCommit: false,
-    rememberProviderText: true,
-    data: {
-      providerResult: repair.providerResult,
-      turn: repair.turn,
-      contractWarning: repair.reason,
-      importedDespiteContractFailure: true,
-    },
-  });
+  await importProviderResponse(repair.responseText, turnRepairImportOptions(repair));
 }
 
 async function* readNdjsonResponse(body) {
