@@ -66,31 +66,31 @@ summary,
   padding: 12px;
 }
 
-.handheld-shell.home-mode {
+.handheld-shell.lobby-mode {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas: "screen";
   padding: 0;
 }
 
-.handheld-shell.home-mode .left-panel,
-.handheld-shell.home-mode .right-panel,
-.handheld-shell.home-mode .command-deck {
+.handheld-shell.lobby-mode .left-panel,
+.handheld-shell.lobby-mode .right-panel,
+.handheld-shell.lobby-mode .command-deck {
   display: none;
 }
 
-.handheld-shell.home-mode .play-screen {
+.handheld-shell.lobby-mode .play-screen {
   min-height: 100vh;
 }
 
-.handheld-shell.home-mode .screen-bezel {
+.handheld-shell.lobby-mode .screen-bezel {
   border: 0;
   border-radius: 0;
   box-shadow: none;
 }
 
-.handheld-shell.home-mode .provider-activity,
-.handheld-shell.home-mode .play-log {
+.handheld-shell.lobby-mode .provider-activity,
+.handheld-shell.lobby-mode .play-log {
   visibility: hidden;
 }
 
@@ -988,11 +988,12 @@ button:disabled {
   border: 0;
   border-radius: 0;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    radial-gradient(circle at 22% 18%, rgba(143, 166, 184, 0.12), transparent 24%),
-    linear-gradient(135deg, #171c20, #252c31 52%, #15191c);
-  background-size: 52px 52px, 52px 52px, auto;
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+    linear-gradient(145deg, rgba(99, 124, 111, 0.12), transparent 38%),
+    linear-gradient(315deg, rgba(168, 132, 91, 0.1), transparent 42%),
+    linear-gradient(135deg, #141819, #20272a 54%, #111516);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto;
 }
 
 .home-panel[hidden] {
@@ -1091,6 +1092,22 @@ button:disabled {
   padding: 12px 12px 4px;
 }
 
+.handheld-shell.join-mode .thin-join-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  align-items: start;
+  overflow: auto;
+  padding: 48px 20px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+    linear-gradient(145deg, rgba(99, 124, 111, 0.12), transparent 38%),
+    linear-gradient(315deg, rgba(168, 132, 91, 0.1), transparent 42%),
+    linear-gradient(135deg, #141819, #20272a 54%, #111516);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+}
+
 .thin-join-card {
   width: min(620px, 94%);
   padding: 18px;
@@ -1098,6 +1115,34 @@ button:disabled {
   border-radius: 12px;
   background: rgba(20, 26, 29, 0.96);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.join-panel-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.back-home-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-weight: 850;
+}
+
+.back-home-action svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .thin-join-card h2 {

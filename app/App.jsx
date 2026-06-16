@@ -153,8 +153,18 @@ export function LorekeeperShell() {
           </div>
           <section id="thin-join-panel" className="thin-join-panel" hidden>
             <div className="thin-join-card">
-              <p className="eyebrow">LoreKeeper Join</p>
-              <h2>Join A Hosted Table</h2>
+              <div className="join-panel-header">
+                <div>
+                  <p className="eyebrow">LoreKeeper Join</p>
+                  <h2>Join A Hosted Table</h2>
+                </div>
+                <button id="join-back-home" className="secondary-action back-home-action" type="button" title="Back to main menu">
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M15 18l-6-6l6-6"></path>
+                  </svg>
+                  <span>Back</span>
+                </button>
+              </div>
               <p className="thin-join-copy">Paste the invite link from the host, add your table name, and request a seat.</p>
               <label>
                 <span>Invite link</span>

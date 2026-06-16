@@ -268,6 +268,7 @@ const elements = {
   thinJoinSubmit: document.querySelector("#thin-join-submit"),
   thinJoinOpenDialog: document.querySelector("#thin-join-open-dialog"),
   thinJoinStatus: document.querySelector("#thin-join-status"),
+  joinBackHome: document.querySelector("#join-back-home"),
   bridgeCard: document.querySelector("#bridge-card"),
   bridgeStatus: document.querySelector("#bridge-status"),
   checkSidecar: document.querySelector("#check-sidecar"),
@@ -415,18 +416,23 @@ elements.homeJoinFlow?.addEventListener("click", () => {
   chooseHomeFlow("join");
 });
 
+elements.joinBackHome?.addEventListener("click", () => {
+  state.homeFlow = "";
+  renderHomePanel();
+  renderThinJoinPanel();
+  setProviderActivity("Choose Host, Join, or Provider Setup.", "idle");
+});
+
 elements.homeNewCampaign?.addEventListener("click", () => {
   chooseHomeFlow("host");
   openCampaignDialog();
 });
 
 elements.homeProviderSetup?.addEventListener("click", () => {
-  chooseHomeFlow("host");
   openSetupDialog({ focusProvider: true });
 });
 
 elements.homeSettings?.addEventListener("click", () => {
-  chooseHomeFlow("host");
   openSetupDialog();
 });
 
@@ -5191,7 +5197,7 @@ function renderHomePanel() {
   const joinedTable = Boolean(state.guestSession?.hostBaseUrl || state.guestSnapshot?.connection);
   const show = !state.homeFlow && !joinedTable;
   elements.homePanel.hidden = !show;
-  elements.app?.classList.toggle("home-mode", show);
+  renderLobbyChrome({ homeVisible: show });
 
   if (elements.homeActiveCampaign) {
     const campaignCount = state.campaigns?.length ?? 0;
@@ -5203,6 +5209,14 @@ function renderHomePanel() {
   if (elements.homeCharacterCount) {
     elements.homeCharacterCount.textContent = "Character library coming next";
   }
+}
+
+function renderLobbyChrome({ homeVisible = null, joinVisible = null } = {}) {
+  const home = homeVisible ?? !elements.homePanel?.hidden;
+  const join = joinVisible ?? !elements.thinJoinPanel?.hidden;
+  elements.app?.classList.toggle("lobby-mode", Boolean(home || join));
+  elements.app?.classList.toggle("home-mode", Boolean(home));
+  elements.app?.classList.toggle("join-mode", Boolean(join));
 }
 
 function renderRightRailState() {
@@ -5260,6 +5274,7 @@ function renderThinJoinPanel() {
   const show = joinFlowActive && !connected;
   elements.thinJoinPanel.hidden = !show;
   elements.playLog.classList.toggle("play-log-with-join-panel", show);
+  renderLobbyChrome({ joinVisible: show });
   if (!show) {
     return;
   }
