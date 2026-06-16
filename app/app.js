@@ -12,6 +12,7 @@ import { renderTurnResponseForImport } from "../src/model-contract/turn-json-con
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
+import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
@@ -1428,6 +1429,9 @@ function chooseVisibleOption(block, index) {
 }
 
 async function submitPlayerTurnFromInput(originalInput, options = {}) {
+  // Danger zone: renderer still coordinates input echoing, staged guest inputs,
+  // provider execution, and recovery lifecycle. Future target: a TurnFlow
+  // command handler that returns a projection for app.js to render.
   if (hasActiveGeneration()) {
     elements.bridgeStatus.textContent = "The DM is already resolving a turn.";
     setProviderActivity("Wait for the current DM response before sending again", "waiting");
@@ -6087,6 +6091,9 @@ function seedPlayLog() {
 }
 
 function render() {
+  // Danger zone: one render pass still owns the hand-written DOM shell. Future
+  // target: keep app.js as event wiring while React/projection modules own the
+  // individual table surfaces.
   const campaign = state.campaign;
   const currentPlace = findById(campaign.places, campaign.scene.currentPlaceId);
   const activeSession = activeSessionRecord(campaign);
@@ -7692,6 +7699,9 @@ async function runPromptThroughSidecar(prompt) {
 }
 
 async function runPromptThroughLocalProvider(turn) {
+  // Danger zone: provider orchestration is extracted, but renderer still imports
+  // accepted results into play-log/review/recovery surfaces. Future target:
+  // ProviderOrchestrator should own table/session envelopes end to end.
   if (!turn?.playerMessage?.trim() && !turn?.playerInputs?.length) {
     setProviderActivity("Build a table turn first", "idle");
     return { providerReceived: false };
@@ -7951,6 +7961,9 @@ async function inspectTurnRepair() {
 }
 
 async function importTurnRepairAnyway() {
+  // Manual repair fallback stays local to the renderer because it is a host UI
+  // escape hatch. Future target: a guided recovery flow without raw response
+  // import controls in normal play.
   const repair = activeTurnRepair();
   if (!repair?.responseText) {
     setProviderActivity("No reviewed DM response is available", "error");
@@ -7997,6 +8010,9 @@ async function* readNdjsonResponse(body) {
 }
 
 async function importLatestProviderResponse({
+  // Bridge/manual-provider import still lands here because it depends on the
+  // browser extension sidecar. Future target: provider import service with the
+  // same table/session ownership checks as local generation.
   newerThanText = "",
   requireNewerThanLastImport = false,
   quietIfUnchanged = false,
@@ -8163,6 +8179,7 @@ function renderTableTimelineSummary(timeline = []) {
 }
 
 function buildRendererDiagnostics() {
+  const tableSession = state.tableSession ?? buildCurrentTableSessionProjection();
   return {
     generatedAt: new Date().toISOString(),
     url: redactedRendererUrl(),
@@ -8181,7 +8198,24 @@ function buildRendererDiagnostics() {
     reviewBatch: state.reviewBatch,
     bridge: state.bridge,
     turnRepair: summarizeTurnRepair(activeTurnRepair()),
-    tableSession: state.tableSession ?? buildCurrentTableSessionProjection(),
+    tableSession,
+    debugSnapshot: buildTableDebugSnapshot({
+      campaign: state.campaign,
+      tableSession,
+      turnProjection: state.turnFlow?.getProjection?.() ?? null,
+      currentTurn: state.currentTurn,
+      providerActivity: {
+        text: elements.providerActivityLabel?.textContent || "",
+        state: elements.providerActivity?.dataset.state || "",
+        phase: elements.providerActivity?.dataset.phase || "",
+      },
+      reviewBatch: state.reviewBatch,
+      repair: activeTurnRepair(),
+      multiplayer: effectiveMultiplayerState(),
+      guestSession: state.guestSession,
+      guestSnapshot: state.guestSnapshot,
+      recentErrors: state.diagnosticsEvents,
+    }),
     sessionHealth: buildSessionHealthSummary(),
     recentPlayMessages: state.playMessages.slice(-30),
     tableTimeline: state.tableTimeline.slice(-80),
@@ -8700,6 +8734,9 @@ function sendExtensionMessage(message, timeoutMs = 10000) {
 }
 
 function renderPlayLog() {
+  // Play-log rendering is bounded by buildPlayLogProjection, but DOM ownership
+  // still lives here because message actions call renderer-local handlers.
+  // Future target: message components/actions backed by pure lifecycle policies.
   const playLog = elements.playLog;
   const wasNearBottom = isPlayLogNearBottom(playLog);
   const previousScrollBottom = playLog.scrollHeight - playLog.scrollTop;
@@ -9268,6 +9305,8 @@ function formatMessageTime(value) {
 }
 
 function renderParty(campaign) {
+  // Party cards combine ownership, invite, nudge, and sheet actions. Future
+  // target: a PartyRail projection so controller changes stay out of app.js.
   const pendingNewCharacterConnections = pendingNewCharacterJoinConnections(campaign);
   elements.partyCount.textContent = pendingNewCharacterConnections.length
     ? `${campaign.party.length}+${pendingNewCharacterConnections.length}`

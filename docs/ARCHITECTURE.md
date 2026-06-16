@@ -2,7 +2,7 @@
 
 Updated: 2026-06-16
 
-This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most.
+This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers.
 
 ## Product Shape
 
@@ -49,6 +49,7 @@ Tests:
 - `scripts/test-multiplayer.js` exercises local table authority, guest joins, stale links, votes, disconnect/reconnect, and session isolation.
 - `scripts/test-sqlite-storage.js` exercises SQLite persistence, migrations, logs, errors, and bounded query helpers.
 - `scripts/test-server-security.js` and `scripts/test-server-integration.js` cover route exposure and real HTTP mutation behavior.
+- `scripts/test-high-risk-regressions.js` is the small fast pack for scary changes: provider rejection, stale guest identity, controlled-PC agency, combat narration-only advancement, staged input preservation, campaign switch wiring, and delete recycling.
 
 ## Identity And Authority
 
@@ -128,6 +129,13 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Consumes campaign, turn, combat, provider, review, recovery, guest, and multiplayer state.
 - Produces the unified table phase used by diagnostics/status surfaces: idle, roleplay, waiting for player, waiting for guest, waiting for DM, party vote, combat, host review, and recovery.
 - Does not replace TurnEngine, CombatEngine, AgencyController, or multiplayer authority. It is a table-experience projection over them.
+
+`TableDebugSnapshot`
+
+- Lives in `src/engine/table-debug-snapshot.js`.
+- Produces the compact diagnostics blob used by renderer and server diagnostics.
+- Captures campaign/table/session identity, table phase, active turn/actor/controller, provider state, combat state, staged guest inputs, review/recovery state, and recent errors.
+- This should stay pure and redaction-friendly so it remains safe to copy during a stuck session.
 
 `MultiplayerSessionEngine` target:
 
@@ -218,6 +226,8 @@ Start here when making changes:
 
 - UI shell/layout: `app/App.jsx`, `app/styles.css`
 - Main UI behavior: `app/app.js`
+- Maintainer commands/playbooks: `docs/MAINTAINER_GUIDE.md`
+- One-blob state debugging: `src/engine/table-debug-snapshot.js`, diagnostics `debugSnapshot`
 - Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
 - Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`
 - Character creation/autocomplete: `app/character-autocomplete-controller.js`

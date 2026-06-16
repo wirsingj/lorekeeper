@@ -4,7 +4,7 @@ Updated: 2026-06-16
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
-This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The only long-lived companion doc should be `docs/ARCHITECTURE.md`.
+This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The long-lived companion docs are `docs/ARCHITECTURE.md` for ownership boundaries and `docs/MAINTAINER_GUIDE.md` for commands, debugging, and failure playbooks.
 
 Status legend:
 
@@ -130,6 +130,11 @@ Every table surface should answer the same practical questions a real table answ
 91. The left rail now explicitly contains dense party/combat content so long card text and button clusters wrap or truncate instead of forcing horizontal scroll.
 92. Staged-input failure wording now lives with the staged recovery controller, so retry/keep-staged language is tested outside `app.js`.
 93. `TableSessionEngine` now provides a unified table phase projection for roleplay, waiting player/guest/DM, party vote, combat, host review, and recovery states.
+94. `TableDebugSnapshot` now gives one copyable diagnostics blob for campaign/table/session identity, table phase, active actor/controller, provider state, combat, staged guest inputs, review/recovery, and recent errors.
+95. Future-maintainer docs now include a practical Maintainer Guide with commands, owner files, danger files, and failure playbooks.
+96. Focused npm test commands now exist for engine, contract, multiplayer, storage, security, regression, and all checks.
+97. A high-risk regression pack now covers provider rejection without state carryover, stale guest session rejection, controlled-PC agency, combat narration-only guardrails, staged input preservation, campaign-switch wiring, and delete recycling.
+98. Major remaining `app.js` and `serve.js` responsibilities now have danger-zone comments and intended extraction targets.
 
 ### Still Risky
 
@@ -152,6 +157,8 @@ Every table surface should answer the same practical questions a real table answ
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
 19. TableSessionEngine is currently a projection layer. More UI surfaces still need to consume it directly before the table fully stops combining local flags.
+20. `app/app.js` and `scripts/serve.js` are better marked, but still large enough that future fixes can accidentally create hidden coupling if new decisions are added there.
+21. `debugSnapshot` summarizes current runtime state, but it is not yet a persisted session recorder or replay tool.
 
 ## Live Acceptance Matrix
 
@@ -178,26 +185,28 @@ Every table surface should answer the same practical questions a real table answ
 1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
 3. Continue long-campaign scaling: play-log rendering and core SQLite query helpers are bounded, but more live paths still need to stop hydrating whole snapshots as campaigns age.
+4. Keep future changes out of `app/app.js` and `scripts/serve.js` unless they are glue; extract policy/authority decisions into tested modules first.
 
 ### High
 
-4. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
-5. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-6. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before the paste/use fallback.
-7. Run the two-machine playtest checklist and log every friction point.
-8. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
-9. Soak-test host-side "guest is waiting on you" affordance on two machines.
-10. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
-11. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
+5. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
+6. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
+7. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before the paste/use fallback.
+8. Run the two-machine playtest checklist and log every friction point.
+9. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
+10. Soak-test host-side "guest is waiting on you" affordance on two machines.
+11. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
+12. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
+13. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
 
 ### Medium
 
-12. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
-13. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
-14. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
-15. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
-16. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
-17. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
+14. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
+15. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
+16. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
+17. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
+18. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
+19. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
 
 ### Low
 
@@ -354,6 +363,10 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add migration modules before public release. Current state: versioned runner exists and unsupported schema/user_version combinations fail loudly; future schema changes still need explicit migration entries.
 - [x] Add backup/export/recycle story before destructive delete in release builds. Current state: delete recycles SQLite files to `data/campaigns/.deleted`; restore UI remains future polish.
 - [x] Move imported assets into app-owned portable asset storage. Current state: imported bundle assets are copied into `data/assets/<campaign>/...`; broader export/restore asset packaging remains future polish.
+- [x] Add a Maintainer Guide with focused commands, debug owners, and common failure playbooks.
+- [x] Add a compact table debug snapshot to renderer/server diagnostics.
+- [x] Add high-risk regression pack for authority/recovery/combat/storage promises.
+- [x] Add focused npm test scripts so future maintainers can run subsystem checks without memorizing file names.
 
 ## Two-Machine Playtest Checklist
 

@@ -29,6 +29,7 @@ import {
 } from "../src/ai/provider-service.js";
 import { OllamaProvider } from "../src/ai/ollama-provider.js";
 import { updateCampaignOllamaContext } from "../src/ai/ollama-context-cache.js";
+import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import {
   approveJoinRequest,
   clearPendingTurnInputs,
@@ -159,6 +160,9 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    // Campaign CRUD still lives here because the desktop app and same-network
+    // guest page share this local process. Future target: campaign routes module
+    // that calls CampaignRepository without growing the main router.
     if (url.pathname === "/api/campaign" && request.method === "GET") {
       const payload = await loadActiveCampaign(projectRoot);
       sendJson(response, 200, {
@@ -265,11 +269,17 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    // Provider streaming remains in this server so local Ollama tokens can flow
+    // to the renderer. Future target: ProviderOrchestrator route module with
+    // explicit campaign/table/session envelopes on every generation request.
     if (url.pathname === "/api/provider/generate-turn" && request.method === "POST") {
       await streamProviderTurn(request, response);
       return;
     }
 
+    // Multiplayer routes intentionally keep identity validation near the HTTP
+    // boundary. Future target: MultiplayerSessionEngine owns the route handlers
+    // and exposes host/guest projections to this file.
     if (url.pathname === "/api/multiplayer/snapshot" && request.method === "GET") {
       const { campaign } = await loadActiveCampaign(projectRoot);
       sendJson(response, 200, createHostSnapshot(campaign));
@@ -709,6 +719,8 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    // Review commit is still a route-level mutation because provider import and
+    // manual review can both reach it. Future target: CanonReview service.
     if (url.pathname === "/api/review/commit" && request.method === "POST") {
       const body = await readJsonBody(request);
       const result = await commitReviewBatch(projectRoot, body.reviewBatch);
@@ -835,6 +847,15 @@ async function buildDiagnosticsBundle() {
     } : {
       error: active.error ?? "No active campaign loaded.",
     },
+    debugSnapshot: buildTableDebugSnapshot({
+      campaign,
+      multiplayer: campaign?.multiplayer,
+      providerActivity: {
+        state: "server_snapshot",
+        text: "Server diagnostics snapshot; renderer may have newer provider activity.",
+      },
+      recentErrors,
+    }),
     recentMessages,
     recentReviews,
     recentErrors,
