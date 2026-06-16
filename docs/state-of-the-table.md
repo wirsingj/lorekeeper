@@ -1,6 +1,6 @@
 # LoreKeeper State Of The Table
 
-Updated: 2026-06-15
+Updated: 2026-06-16
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
@@ -76,6 +76,7 @@ The user should not feel like they are debugging a model, managing queue machine
 27. The front door Host flow now requires choosing an existing campaign instead of dropping into the last active table.
 28. Generated Guest Links are scoped to campaign, table, and session identity so stale links do not silently join a different active campaign or table.
 29. Multiplayer waiting guests, invite links, guest snapshots, staged actions, combat joins, and table talk now carry table/session ownership and reject supplied identity mismatches.
+30. The right rail is split into Campaign Notes and Player Notes, with Table Talk anchored at the bottom of the table surface.
 
 ### Still Risky
 
@@ -92,7 +93,7 @@ The user should not feel like they are debugging a model, managing queue machine
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Context retrieval is still coarse and recent-message heavy compared with the desired actor/place/consequence/thread retrieval.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
-14. Pre-table guest lobby is not built yet: invited players should see the same setup state as the host, with only their own character editable.
+14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
 
 ## Live Acceptance Matrix
 
@@ -117,7 +118,7 @@ The user should not feel like they are debugging a model, managing queue machine
 
 1. Make common combat action resolution app-owned before provider narration: action validation, roll, check/save, damage/healing, HP/resource/condition updates, and initiative advancement.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Add scenario fixtures proving the provider cannot speak for host/remote PCs across social, combat, join-transfer, and AI-companion cases.
+3. Continue expanding scenario fixtures proving the provider cannot speak for host/remote PCs across combat, join-transfer, and AI-companion cases.
 
 ### High
 
@@ -155,7 +156,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Bad empty structured responses are rejected and logged.
 - [x] Hidden long/mid/short story threads are sent as private DM planning.
 - [x] Choice targeting supports party, character, subset, vote, combat actor, and free prompts.
-- [ ] Add provider-output fixtures for controlled-PC agency failures.
+- [x] Add provider-output fixtures for obvious controlled-PC agency failures.
 - [ ] Add fixtures for social, travel, mystery, downtime, combat, and recovery scenes.
 - [ ] Improve context retrieval beyond recent history/context pack breadth.
 - [ ] Add hidden-story scenario tests for adaptation without leaking future twists.
@@ -243,7 +244,7 @@ The user should not feel like they are debugging a model, managing queue machine
 
 - [x] Raw provider meta hidden during normal play.
 - [x] Debug meta toggle available in Settings diagnostics.
-- [x] Binder can collapse to give play surface more room.
+- [x] Right rail separates Campaign Notes from Player Notes, with Table Talk kept at the bottom.
 - [x] Empty states use more table-shaped language.
 - [x] Main menu separates Host, Join, and Provider Setup from the in-campaign rails.
 - [x] Main menu hides last-table rails, binder, and command input until a flow is chosen.
@@ -253,7 +254,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.
-- [ ] Consider context-sensitive binder sections or tabs after playtest.
+- [ ] Consider context-sensitive note sections or tabs after playtest.
 - [x] Make Table Talk harder to miss without making it noisy.
 
 ### Storage, Diagnostics, And Safety

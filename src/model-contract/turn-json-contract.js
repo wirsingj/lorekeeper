@@ -462,6 +462,7 @@ export function validateTurnResponse(response, options = {}) {
   }
 
   validateCombatResolution(response, options, errors);
+  validateControlledPartyAgency(response, options, errors);
   validateArray(response.warnings, "warnings", errors);
   return { valid: errors.length === 0, errors };
 }
@@ -600,6 +601,154 @@ function combatActorName(request, actorId) {
     request?.context?.rulesLedger?.actors?.find((actor) => actor.id === actorId)?.name ||
     actorId
   );
+}
+
+function validateControlledPartyAgency(response, options = {}, errors = []) {
+  const request = options.request;
+  if (!request?.context) {
+    return;
+  }
+
+  const controlledActors = controlledPartyActorsFromRequest(request);
+  if (!controlledActors.length) {
+    return;
+  }
+
+  const submittedActorIds = submittedPartyActorIds(request, controlledActors);
+  const submittedActorNames = new Set(
+    controlledActors
+      .filter((actor) => submittedActorIds.has(actor.id))
+      .map((actor) => normalizeHumanName(actor.name).toLowerCase())
+      .filter(Boolean),
+  );
+
+  for (const [index, entry] of (response.table ?? []).entries()) {
+    const speakerActor = actorForTableSpeaker(entry, controlledActors);
+    if (speakerActor) {
+      const hasSubmittedInput = submittedActorIds.has(speakerActor.id) || submittedActorNames.has(normalizeHumanName(speakerActor.name).toLowerCase());
+      if (entry.role === "dm") {
+        errors.push(`table[${index}] uses DM role for controlled party member ${speakerActor.name}; render this as that party member only when their controller submitted input`);
+        continue;
+      }
+      if ((entry.role === "party" || entry.role === "player") && !hasSubmittedInput) {
+        errors.push(`table[${index}] speaks as controlled party member ${speakerActor.name} without submitted controller input`);
+      }
+      continue;
+    }
+
+    if (entry.role !== "dm") {
+      continue;
+    }
+    const text = String(entry.text || "");
+    for (const actor of controlledActors) {
+      if (submittedActorIds.has(actor.id) || submittedActorNames.has(normalizeHumanName(actor.name).toLowerCase())) {
+        continue;
+      }
+      if (dmTextPilotsControlledActor(text, actor.name)) {
+        errors.push(`table[${index}] appears to speak, decide, or act for controlled party member ${actor.name} without submitted controller input`);
+        break;
+      }
+    }
+  }
+}
+
+function controlledPartyActorsFromRequest(request) {
+  const partyById = new Map();
+  for (const member of request?.context?.party ?? []) {
+    if (!member?.id) {
+      continue;
+    }
+    partyById.set(member.id, {
+      id: String(member.id),
+      name: normalizeHumanName(member.name || member.id),
+      controllerKind: normalizeControlledControllerKind(member.controllerKind || member.controller || member.agency),
+    });
+  }
+  for (const voice of request?.context?.tableVoices ?? []) {
+    if (!voice?.id) {
+      continue;
+    }
+    const existing = partyById.get(voice.id) || {};
+    partyById.set(voice.id, {
+      id: String(voice.id),
+      name: normalizeHumanName(voice.name || existing.name || voice.id),
+      controllerKind: normalizeControlledControllerKind(voice.controllerKind || existing.controllerKind || voice.agency),
+    });
+  }
+  return [...partyById.values()]
+    .filter((actor) => actor.id && actor.name && ["host", "remote_player", "unassigned"].includes(actor.controllerKind));
+}
+
+function normalizeControlledControllerKind(value) {
+  const normalized = normalizeToken(value || "");
+  if (normalized === "remote_player" || normalized === "remote" || normalized === "guest") {
+    return "remote_player";
+  }
+  if (normalized === "host" || normalized === "player" || normalized === "human") {
+    return "host";
+  }
+  if (normalized === "unassigned" || /unassigned/.test(normalized)) {
+    return "unassigned";
+  }
+  if (/remote_player_controlled/.test(normalized)) {
+    return "remote_player";
+  }
+  if (/host_controlled/.test(normalized)) {
+    return "host";
+  }
+  return normalized;
+}
+
+function submittedPartyActorIds(request, controlledActors = []) {
+  const submitted = new Set();
+  const controlledByName = new Map(controlledActors.map((actor) => [normalizeHumanName(actor.name).toLowerCase(), actor]));
+  for (const input of request?.user?.playerInputs ?? []) {
+    const actorId = input?.characterId || input?.actorId || input?.speakerId || "";
+    if (actorId) {
+      submitted.add(String(actorId));
+    }
+    const actorName = normalizeHumanName(input?.characterName || input?.actor || input?.speaker || "").toLowerCase();
+    if (actorName && controlledByName.has(actorName)) {
+      submitted.add(controlledByName.get(actorName).id);
+    }
+  }
+
+  const hostText = String(request?.user?.inWorld || request?.user?.raw || "");
+  for (const actor of controlledActors) {
+    if (actor.controllerKind !== "host" || !actor.name || actor.name.length < 3) {
+      continue;
+    }
+    if (new RegExp(`\\b${escapeRegExp(actor.name)}\\b`, "i").test(hostText)) {
+      submitted.add(actor.id);
+    }
+  }
+  return submitted;
+}
+
+function actorForTableSpeaker(entry, controlledActors = []) {
+  const speakerId = String(entry?.speakerId || entry?.actorId || "").trim();
+  if (speakerId) {
+    const byId = controlledActors.find((actor) => actor.id === speakerId);
+    if (byId) {
+      return byId;
+    }
+  }
+  const speaker = normalizeHumanName(entry?.speaker || "").toLowerCase();
+  if (!speaker || speaker === "dm" || speaker === "dungeon master") {
+    return null;
+  }
+  return controlledActors.find((actor) => normalizeHumanName(actor.name).toLowerCase() === speaker) || null;
+}
+
+function dmTextPilotsControlledActor(text, actorName) {
+  const name = normalizeHumanName(actorName);
+  if (!name || name.length < 3) {
+    return false;
+  }
+  const activeVerb = "(?:says?|asks?|replies?|answers?|shouts?|whispers?|signals?|gestures?|nods?|steps?|moves?|backs?|runs?|draws?|readies?|raises?|attacks?|strikes?|shoots?|casts?|touches?|grabs?|throws?|scans?|searches?|notices?|realizes?|thinks?|decides?|chooses?|insists?|refuses?)";
+  const namedAction = new RegExp(`\\b${escapeRegExp(name)}\\b(?:[^.!?]{0,80})\\b${activeVerb}\\b`, "i");
+  const possessiveAction = new RegExp(`\\b${escapeRegExp(name)}'?s\\b(?:[^.!?]{0,80})\\b(?:hand|eyes?|voice|weapon|bow|blade|staff|spell|attention|grip)\\b(?:[^.!?]{0,80})\\b${activeVerb}\\b`, "i");
+  return namedAction.test(text) || possessiveAction.test(text);
 }
 
 function createResponseFormatSchema() {

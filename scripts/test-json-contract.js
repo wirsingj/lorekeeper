@@ -766,6 +766,82 @@ const mismatchedPartySpeakerRole = parseTurnJsonResponse(JSON.stringify(validTur
 const renderedMismatchedPartySpeaker = renderTurnResponseForImport(mismatchedPartySpeakerRole.response);
 assert.match(renderedMismatchedPartySpeaker, /^Tilli: I signal Mira/m);
 
+const remoteAgencyCampaign = {
+  ...testCampaign(),
+  scene: {
+    ...testCampaign().scene,
+    presentPartyMemberIds: ["jarin", "mira"],
+  },
+  party: [
+    {
+      id: "jarin",
+      name: "Jarin",
+      type: "player_character",
+      controllerKind: "host",
+      role: "Player character ranger",
+    },
+    {
+      id: "mira",
+      name: "Mira",
+      type: "player_character",
+      controllerKind: "remote_player",
+      role: "Remote player fighter",
+    },
+  ],
+};
+const remoteAgencyContext = buildContextPack(remoteAgencyCampaign);
+const remoteAgencyRequest = buildTurnRequestEnvelope({
+  campaign: remoteAgencyCampaign,
+  contextPack: remoteAgencyContext,
+  playerTurn: "Jarin asks the guard what is happening on the road.",
+  parsedMessage: {
+    raw: "Jarin asks the guard what is happening on the road.",
+    inWorldText: "Jarin asks the guard what is happening on the road.",
+    metaInstructions: [],
+  },
+});
+const pilotedRemoteNarration = validTurnResponse({
+  table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "The guard spits in the dust. Mira draws her blade and steps between Jarin and the guard." }],
+});
+assert.equal(validateTurnResponse(pilotedRemoteNarration, { request: remoteAgencyRequest }).valid, false);
+assert.match(validateTurnResponse(pilotedRemoteNarration, { request: remoteAgencyRequest }).errors.join(" "), /Mira/);
+
+const remoteSpeakerWithoutInput = validTurnResponse({
+  table: [{ speaker: "Mira", speakerId: "mira", role: "party", kind: "dialogue", visibility: "table", text: "Back away from him." }],
+});
+assert.equal(validateTurnResponse(remoteSpeakerWithoutInput, { request: remoteAgencyRequest }).valid, false);
+assert.match(validateTurnResponse(remoteSpeakerWithoutInput, { request: remoteAgencyRequest }).errors.join(" "), /without submitted controller input/);
+
+const remoteDmRoleMixup = validTurnResponse({
+  table: [{ speaker: "Mira", speakerId: "mira", role: "dm", kind: "dialogue", visibility: "table", text: "Back away from him." }],
+});
+assert.equal(validateTurnResponse(remoteDmRoleMixup, { request: remoteAgencyRequest }).valid, false);
+assert.match(validateTurnResponse(remoteDmRoleMixup, { request: remoteAgencyRequest }).errors.join(" "), /uses DM role for controlled party member Mira/);
+
+const remoteAgencySubmittedRequest = buildTurnRequestEnvelope({
+  campaign: remoteAgencyCampaign,
+  contextPack: remoteAgencyContext,
+  playerTurn: "Jarin waits for Mira's signal.",
+  parsedMessage: {
+    raw: "Jarin waits for Mira's signal.",
+    inWorldText: "Jarin waits for Mira's signal.",
+    metaInstructions: [],
+  },
+  options: {
+    playerInputs: [
+      {
+        playerId: "guest-mira",
+        playerName: "Jess",
+        characterId: "mira",
+        characterName: "Mira",
+        text: "Mira draws her blade and steps between Jarin and the guard.",
+        ready: true,
+      },
+    ],
+  },
+});
+assert.equal(validateTurnResponse(pilotedRemoteNarration, { request: remoteAgencySubmittedRequest }).valid, true);
+
 const narrationFirstChoiceSpam = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Garin continues his patrol. The night air hangs cool and quiet over the wall." }],
   mechanics: [],
