@@ -6,6 +6,7 @@ Start with:
 
 - `docs/state-of-the-table.md`: current product state, priorities, and checklist.
 - `docs/ARCHITECTURE.md`: durable ownership boundaries and important files.
+- `docs/living-world.md`: world-memory and goal-horizon model.
 
 This guide is the practical "what do I run and where do I look?" map.
 
@@ -54,6 +55,7 @@ npm run cleanup
 - Local server/routes: `scripts/serve.js`
 - Table phase projection: `src/engine/table-session-engine.js`
 - Copyable debug summary: `src/engine/table-debug-snapshot.js`
+- Living world continuity: `src/engine/living-world-engine.js`, `docs/living-world.md`
 - Turn lifecycle: `src/engine/turn-engine.js`, `app/turn-flow-runtime.js`
 - Provider orchestration: `src/engine/provider-orchestrator.js`, `src/ai/provider-service.js`
 - Provider contract/agency: `src/model-contract/turn-json-contract.js`

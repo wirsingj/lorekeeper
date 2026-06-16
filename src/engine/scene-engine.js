@@ -1,4 +1,5 @@
 import { activeConsequencesForScene } from "./consequence-engine.js";
+import { buildGoalHorizon, buildLivingWorldMemory, goalIdsFromHorizon } from "./living-world-engine.js";
 
 export const sceneTypes = Object.freeze({
   RP: "rp",
@@ -134,24 +135,38 @@ export function currentScene(campaign) {
 
 export function buildSceneRetrieval(campaign, options = {}) {
   const scene = currentScene(campaign);
+  const goalHorizon = buildGoalHorizon(campaign, { scene });
+  const goalIds = goalIdsFromHorizon(goalHorizon);
   const participantIds = new Set([
     ...(scene?.participantIds ?? []),
     ...(scene?.partyMemberIds ?? []),
     ...(scene?.peopleIds ?? []),
   ]);
-  const activeConsequences = activeConsequencesForScene(campaign, scene, { limit: options.consequenceLimit ?? 6 });
+  const activeConsequences = activeConsequencesForScene(campaign, scene, {
+    limit: options.consequenceLimit ?? 6,
+    goalIds,
+  });
   const consequenceThreadIds = activeConsequences.flatMap((consequence) => consequence.threadIds ?? []);
-  const threadIds = new Set([...(scene?.threadIds ?? []), ...consequenceThreadIds]);
+  const threadIds = new Set([...(scene?.threadIds ?? []), ...consequenceThreadIds, ...goalIds]);
   const focusIds = sceneFocusIds(scene, activeConsequences, threadIds);
+  const livingWorld = buildLivingWorldMemory(campaign, {
+    scene,
+    goalHorizon,
+    focusIds: [...focusIds],
+    consequenceLimit: options.consequenceLimit ?? 6,
+    relationshipLimit: options.relationshipLimit ?? 8,
+  });
 
   return {
     scene,
+    goalHorizon,
+    livingWorld,
     participants: [...participantIds].map((id) => lookupEntity(campaign, id)).filter(Boolean),
     activeConsequences,
     relevantRelationships: relevantRelationships(campaign, focusIds, activeConsequences, options.relationshipLimit ?? 8),
     activeThreads: (campaign?.quests ?? [])
       .filter((quest) => quest.status !== "completed")
-      .filter((quest) => threadIds.has(quest.id) || !threadIds.size)
+      .filter((quest) => threadIds.has(quest.id) || goalIds.includes(quest.id) || !threadIds.size)
       .slice(0, options.threadLimit ?? 6),
     relevantRecentEvents: relevantRecentEvents(campaign, focusIds, options.eventLimit ?? 5),
   };
@@ -191,6 +206,26 @@ export function buildSceneIntentPack(campaign, options = {}) {
       unresolvedQuestions: scene.unresolvedQuestions ?? [],
       participantIds: scene.participantIds ?? [],
     } : null,
+    goalHorizon: retrieval.goalHorizon,
+    livingWorld: {
+      score: retrieval.livingWorld.score,
+      retrievalPriority: retrieval.livingWorld.retrievalPriority,
+      people: retrieval.livingWorld.people.slice(0, 4).map((person) => ({
+        id: person.id,
+        name: person.name,
+        memory: asText(person.memory ?? person.memories ?? person.notes ?? person.summary),
+      })),
+      factions: retrieval.livingWorld.factions.slice(0, 3).map((faction) => ({
+        id: faction.id,
+        name: faction.name,
+        memory: asText(faction.memory ?? faction.notes ?? faction.summary),
+      })),
+      places: retrieval.livingWorld.places.slice(0, 3).map((place) => ({
+        id: place.id,
+        name: place.name,
+        memory: asText(place.memory ?? place.scars ?? place.notes ?? place.summary),
+      })),
+    },
     consequences: retrieval.activeConsequences.map((consequence) => ({
       id: consequence.id,
       title: consequence.title,
@@ -199,6 +234,7 @@ export function buildSceneIntentPack(campaign, options = {}) {
       description: consequence.description,
       participantIds: consequence.participantIds ?? [],
       threadIds: consequence.threadIds ?? [],
+      goalIds: consequence.goalIds ?? [],
     })),
     relationships: retrieval.relevantRelationships.map((relationship) => ({
       id: relationship.id ?? null,

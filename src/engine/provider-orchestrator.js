@@ -25,6 +25,8 @@ export function buildProviderTaskRequest({ task, campaign, turn, context = {}, a
       scene: summarizeScene(campaign, sceneRetrieval),
       sceneIntent,
       escalationPolicy: sceneIntent.escalationPolicy,
+      goalHorizon: sceneRetrieval.goalHorizon,
+      livingWorld: summarizeLivingWorld(sceneRetrieval.livingWorld),
       activeConsequences: sceneRetrieval.activeConsequences.map(summarizeConsequence),
       relevantRelationships: sceneRetrieval.relevantRelationships.map(summarizeRelationship),
       activeThreads: sceneRetrieval.activeThreads.map(summarizeThread),
@@ -264,6 +266,28 @@ function summarizeThread(thread) {
   };
 }
 
+function summarizeLivingWorld(memory = {}) {
+  return {
+    score: memory.score ?? null,
+    retrievalPriority: memory.retrievalPriority ?? [],
+    people: (memory.people ?? []).slice(0, 5).map((person) => ({
+      id: person.id,
+      name: person.name ?? person.title ?? person.id,
+      memory: asText(person.memory ?? person.memories ?? person.notes ?? person.summary).slice(0, 500),
+    })),
+    factions: (memory.factions ?? []).slice(0, 4).map((faction) => ({
+      id: faction.id,
+      name: faction.name ?? faction.title ?? faction.id,
+      memory: asText(faction.memory ?? faction.beliefs ?? faction.notes ?? faction.summary).slice(0, 500),
+    })),
+    places: (memory.places ?? []).slice(0, 4).map((place) => ({
+      id: place.id,
+      name: place.name ?? place.title ?? place.id,
+      memory: asText(place.memory ?? place.scars ?? place.history ?? place.notes ?? place.summary).slice(0, 500),
+    })),
+  };
+}
+
 function asText(value) {
   if (Array.isArray(value)) {
     return value.filter(Boolean).map((entry) => String(entry).trim()).filter(Boolean).join(" ");
@@ -312,7 +336,9 @@ function dmQualityPolicyForTask(task) {
     role: "creative_tabletop_dm_assistant",
     priorities: [
       "react to the latest table action",
+      "serve the active short, medium, and long-term goal horizons",
       "prefer existing context before new content",
+      "make NPCs, factions, locations, and consequences remember prior play",
       "make NPCs act from motives, fears, relationships, and leverage",
       "create consequences that follow naturally",
       "avoid random escalation unless established danger demands it",

@@ -21,6 +21,8 @@ export const entityTypes = Object.freeze({
 
 export const contextPackKinds = Object.freeze({
   SCENE_FOCUS: "scene_focus",
+  GOAL_HORIZON: "goal_horizon",
+  WORLD_MEMORY: "world_memory",
   SCENE: "current_scene",
   CONSEQUENCES: "active_consequences",
   HISTORY: "recent_play_history",

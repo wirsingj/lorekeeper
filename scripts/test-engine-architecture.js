@@ -25,6 +25,7 @@ import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startC
 import { createCampaignStateStore } from "../src/engine/campaign-state-store.js";
 import { addConsequence, resolveConsequence } from "../src/engine/consequence-engine.js";
 import { rollD20, rollFormula } from "../src/engine/dice-engine.js";
+import { buildGoalHorizon, buildLivingWorldMemory } from "../src/engine/living-world-engine.js";
 import { buildProviderTaskRequest, acceptProviderResponseForTurn, createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneIntentPack, buildSceneRetrieval, transitionScene } from "../src/engine/scene-engine.js";
 import { applyStateEffects } from "../src/engine/state-effects.js";
@@ -966,6 +967,111 @@ function testSceneRetrievalRanksFocusUnderLongCampaignNoise() {
   const retrieval = buildSceneRetrieval(campaign, { relationshipLimit: 4, eventLimit: 4 });
   assert.equal(retrieval.relevantRelationships[0].id, "rel-tavern-quest-thor");
   assert.equal(retrieval.relevantRecentEvents[0].id, "event-threaded-stool");
+}
+
+function testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise() {
+  const base = campaignFixture();
+  base.people.push({
+    id: "merchant-osric",
+    name: "Osric",
+    role: "merchant the party escorted",
+    memory: ["Thor saved Osric from bandits and refused extra coin.", "Osric will vouch for Thor in trade towns."],
+  });
+  base.factions = [{
+    id: "river-guild",
+    name: "River Guild",
+    memory: ["Guild factors heard the party protected Osric without extorting him."],
+    goalIds: ["quest-escort"],
+  }];
+  base.places.push({
+    id: "ford-market",
+    name: "Ford Market",
+    summary: "A market town where caravan gossip moves quickly.",
+    scars: ["A collapsed bridge still slows trade after last session's flood."],
+    goalIds: ["quest-escort"],
+  });
+  base.quests = [
+    ...base.quests,
+    {
+      id: "quest-lich-return",
+      title: "Stop the Lich King's return",
+      status: "active",
+      horizon: "long",
+      stakes: "A distant cult is buying river relics.",
+    },
+    {
+      id: "quest-escort",
+      title: "Discover who is funding the river raids",
+      status: "active",
+      horizon: "mid",
+      stakes: "Merchant testimony points toward the River Guild.",
+      linkedIds: ["merchant-osric", "river-guild", "ford-market"],
+    },
+  ];
+  base.relationships.push({
+    id: "rel-osric-thor",
+    sourceId: "merchant-osric",
+    targetId: "thor",
+    type: "grateful_debt",
+    notes: ["Osric remembers the rescue and trusts Thor with sensitive trade rumors."],
+    goalIds: ["quest-escort"],
+  });
+  base.timeline = Array.from({ length: 80 }, (_, index) => ({
+    id: `old-event-${index}`,
+    title: `Old unrelated beat ${index}`,
+    summary: "Noise from many sessions ago.",
+    relatedIds: index % 2 ? ["tavern"] : ["barkeep"],
+  }));
+  base.sessionLog.messages = Array.from({ length: 55 }, (_, index) => ({
+    role: index % 2 ? "player" : "dm",
+    title: index % 2 ? "Player" : "DM",
+    text: `Long campaign noise message ${index}.`,
+  }));
+
+  let campaign = transitionScene(base, {
+    id: "scene-ford-market-return",
+    title: "Return to Ford Market",
+    type: "social",
+    locationId: "ford-market",
+    presentPartyMemberIds: ["thor"],
+    presentPeopleIds: ["merchant-osric"],
+    activeQuestIds: ["quest-escort"],
+    goals: ["Ask Osric who is buying river relics."],
+    immediateSituation: "Ten sessions later, Osric spots Thor near the flood-damaged bridge.",
+  });
+  campaign = addConsequence(campaign, {
+    id: "consequence-osric-debt",
+    title: "Osric owes Thor a favor",
+    description: "Osric will offer a useful rumor because Thor protected him during the bandit ambush.",
+    sourceSceneId: "scene-bandit-ambush",
+    participantIds: ["merchant-osric", "thor"],
+    linkedGoalId: "quest-escort",
+    importance: "high",
+    scope: "person",
+  });
+
+  const goals = buildGoalHorizon(campaign);
+  assert.equal(goals.longTerm[0].id, "quest-lich-return");
+  assert.equal(goals.mediumTerm[0].id, "quest-escort");
+  assert.match(goals.shortTerm[0].title, /Ask Osric/);
+
+  const memory = buildLivingWorldMemory(campaign, { scene: buildSceneRetrieval(campaign).scene, goalHorizon: goals });
+  assert.equal(memory.score.verdict, "world_memory_present");
+  assert.equal(memory.people[0].id, "merchant-osric");
+  assert.equal(memory.factions[0].id, "river-guild");
+  assert.equal(memory.places[0].id, "ford-market");
+  assert.equal(memory.consequences[0].id, "consequence-osric-debt");
+
+  const retrieval = buildSceneRetrieval(campaign, { relationshipLimit: 4, eventLimit: 4 });
+  assert.equal(retrieval.activeConsequences[0].id, "consequence-osric-debt");
+  assert.equal(retrieval.relevantRelationships[0].id, "rel-osric-thor");
+  assert.equal(retrieval.livingWorld.people[0].id, "merchant-osric");
+
+  const contextPack = buildContextPack(campaign);
+  const goalSection = contextPack.sections.find((section) => section.kind === "goal_horizon");
+  const memorySection = contextPack.sections.find((section) => section.kind === "world_memory");
+  assert.match(goalSection.entries.join(" "), /Discover who is funding the river raids|Ask Osric/);
+  assert.match(memorySection.entries.join(" "), /Osric owes Thor a favor|River Guild|collapsed bridge/);
 }
 
 function testLargeCampaignContextPackStaysBounded() {
@@ -2144,6 +2250,7 @@ testCombatTrackerView();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
+testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise();
 testLargeCampaignContextPackStaysBounded();
 testContextPackFormatsStructuredSheetDetails();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();

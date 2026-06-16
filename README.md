@@ -83,6 +83,7 @@ dumps.
 - `docs/ARCHITECTURE.md`: current architecture, ownership boundaries, and code landmarks.
 - `docs/state-of-the-table.md`: working product state, priorities, and checklist.
 - `docs/MAINTAINER_GUIDE.md`: practical commands, debug map, and failure playbooks.
+- `docs/living-world.md`: consequence, memory, relationship, faction, location, and goal-horizon continuity model.
 - `electron/`: desktop window, local server launch, and desktop protocol handling.
 - `scripts/serve.js`: local HTTP/API surface for the desktop host and same-network guests.
 - `app/`: Vite app shell, renderer orchestration, UI controllers, and styles.

@@ -2,7 +2,7 @@
 
 Updated: 2026-06-16
 
-This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers.
+This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers, and `docs/living-world.md` explains long-term continuity memory.
 
 ## Product Shape
 
@@ -137,6 +137,13 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Captures campaign/table/session identity, table phase, active turn/actor/controller, provider state, combat state, staged guest inputs, review/recovery state, and recent errors.
 - This should stay pure and redaction-friendly so it remains safe to copy during a stuck session.
 
+`LivingWorldEngine`
+
+- Lives in `src/engine/living-world-engine.js`.
+- Derives long, medium, and short-term goal horizons from explicit goals, quest/thread records, hidden DM story arcs, and current scene goals.
+- Projects NPC, faction, location, relationship, and consequence memory so provider requests can use durable world facts before recent-message noise.
+- Produces an internal living-world score: if the same NPC, faction, or place appears later, would they react differently because of prior play?
+
 `MultiplayerSessionEngine` target:
 
 - Not yet a single explicit module, but `src/multiplayer/local-table.js` is the current authority center.
@@ -227,6 +234,7 @@ Start here when making changes:
 - UI shell/layout: `app/App.jsx`, `app/styles.css`
 - Main UI behavior: `app/app.js`
 - Maintainer commands/playbooks: `docs/MAINTAINER_GUIDE.md`
+- Living world continuity model: `docs/living-world.md`, `src/engine/living-world-engine.js`
 - One-blob state debugging: `src/engine/table-debug-snapshot.js`, diagnostics `debugSnapshot`
 - Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
 - Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`

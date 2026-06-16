@@ -121,7 +121,12 @@ assert.equal(requestEnvelope.generation.narrationTarget.words, "320-700");
 assert.match(requestEnvelope.generation.dmQuality.philosophy, /skilled long-running tabletop DM/);
 assert.ok(requestEnvelope.generation.dmQuality.avoid.includes("random encounter generation"));
 assert.ok(requestEnvelope.generation.dmQuality.beforeAddingNewContent.some((rule) => /Prefer existing people/.test(rule)));
+assert.ok(requestEnvelope.generation.dmQuality.beforeAddingNewContent.some((rule) => /short, medium, or long-term goal/.test(rule)));
 assert.equal(requestEnvelope.context.tableVoices[0].name, "Jarin");
+assert.equal(requestEnvelope.context.goalHorizon.longTerm.length, 1);
+assert.equal(requestEnvelope.context.goalHorizon.mediumTerm.length, 1);
+assert.equal(requestEnvelope.context.goalHorizon.shortTerm.length, 1);
+assert.equal(requestEnvelope.context.livingWorld.retrievalPriority[0], "current scene");
 assert.equal(requestEnvelope.context.hiddenDmStory.length, 3);
 assert.equal(requestEnvelope.context.hiddenDmStory[0].horizon, "long");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
@@ -138,6 +143,7 @@ const narrationFirstPrompt = buildTurnJsonPrompt({
 });
 assert.match(narrationFirstPrompt, /If generation\.choicePolicy\.choicesAllowed is false, leave choices\.options empty/);
 assert.match(narrationFirstPrompt, /choices\.options must be \[\]/);
+assert.match(narrationFirstPrompt, /serves a short, medium, or long-term goal/);
 
 const combatChoiceEnvelope = buildTurnRequestEnvelope({
   campaign: {

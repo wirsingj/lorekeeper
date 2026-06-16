@@ -4,7 +4,7 @@ Updated: 2026-06-16
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
-This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The long-lived companion docs are `docs/ARCHITECTURE.md` for ownership boundaries and `docs/MAINTAINER_GUIDE.md` for commands, debugging, and failure playbooks.
+This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The long-lived companion docs are `docs/ARCHITECTURE.md` for ownership boundaries, `docs/MAINTAINER_GUIDE.md` for commands/debugging/failure playbooks, and `docs/living-world.md` for continuity memory.
 
 Status legend:
 
@@ -135,6 +135,10 @@ Every table surface should answer the same practical questions a real table answ
 96. Focused npm test commands now exist for engine, contract, multiplayer, storage, security, regression, and all checks.
 97. A high-risk regression pack now covers provider rejection without state carryover, stale guest session rejection, controlled-PC agency, combat narration-only guardrails, staged input preservation, campaign-switch wiring, and delete recycling.
 98. Major remaining `app.js` and `serve.js` responsibilities now have danger-zone comments and intended extraction targets.
+99. LivingWorldEngine now derives long/mid/short goal horizons from existing goals, quests, hidden story arcs, and scene goals.
+100. Context packs now include DM Goal Horizon and Living World Memory sections before recent history, giving the provider narrative gravity and durable NPC/faction/location/consequence memory.
+101. Consequences can link to goals, and scene retrieval can pull goal-linked consequences back into focus many turns later.
+102. Provider JSON requests now include `context.goalHorizon` and `context.livingWorld`, plus continuity rules that ask whether new content serves active goals before inventing threats.
 
 ### Still Risky
 
@@ -159,6 +163,8 @@ Every table surface should answer the same practical questions a real table answ
 19. TableSessionEngine is currently a projection layer. More UI surfaces still need to consume it directly before the table fully stops combining local flags.
 20. `app/app.js` and `scripts/serve.js` are better marked, but still large enough that future fixes can accidentally create hidden coupling if new decisions are added there.
 21. `debugSnapshot` summarizes current runtime state, but it is not yet a persisted session recorder or replay tool.
+22. Living-world memory now has projections and fixtures, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
+23. Relationship evolution is retrievable, but there is not yet a dedicated relationship-state transition helper for neutral -> friendly -> loyal style shifts.
 
 ## Live Acceptance Matrix
 
@@ -186,18 +192,19 @@ Every table surface should answer the same practical questions a real table answ
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
 3. Continue long-campaign scaling: play-log rendering and core SQLite query helpers are bounded, but more live paths still need to stop hydrating whole snapshots as campaigns age.
 4. Keep future changes out of `app/app.js` and `scripts/serve.js` unless they are glue; extract policy/authority decisions into tested modules first.
+5. Continue strengthening living-world capture after scene endings: consequences, relationship shifts, faction memory, and location scars should be proposed when something meaningful changes.
 
 ### High
 
-5. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
-6. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-7. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before the paste/use fallback.
-8. Run the two-machine playtest checklist and log every friction point.
-9. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
-10. Soak-test host-side "guest is waiting on you" affordance on two machines.
-11. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
-12. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
-13. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
+6. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
+7. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
+8. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before the paste/use fallback.
+9. Run the two-machine playtest checklist and log every friction point.
+10. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
+11. Soak-test host-side "guest is waiting on you" affordance on two machines.
+12. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
+13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
+14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
 
 ### Medium
 
@@ -367,6 +374,8 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add a compact table debug snapshot to renderer/server diagnostics.
 - [x] Add high-risk regression pack for authority/recovery/combat/storage promises.
 - [x] Add focused npm test scripts so future maintainers can run subsystem checks without memorizing file names.
+- [x] Add living-world goal horizons and memory retrieval so consequences, relationships, NPCs, factions, and locations can influence later scenes.
+- [x] Add living-world documentation and long-campaign-noise fixture for recurring NPC/location/faction memory.
 
 ## Two-Machine Playtest Checklist
 

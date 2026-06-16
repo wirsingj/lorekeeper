@@ -6,6 +6,8 @@ import { isHiddenStoryThread } from "./story-threads.js";
 
 const DEFAULT_PACK_KINDS = [
   contextPackKinds.SCENE_FOCUS,
+  contextPackKinds.GOAL_HORIZON,
+  contextPackKinds.WORLD_MEMORY,
   contextPackKinds.SCENE,
   contextPackKinds.CONSEQUENCES,
   contextPackKinds.HISTORY,
@@ -67,6 +69,10 @@ function buildSection(kind, campaign, options) {
   switch (kind) {
     case contextPackKinds.SCENE_FOCUS:
       return buildSceneFocusSection(campaign);
+    case contextPackKinds.GOAL_HORIZON:
+      return buildGoalHorizonSection(campaign);
+    case contextPackKinds.WORLD_MEMORY:
+      return buildWorldMemorySection(campaign);
     case contextPackKinds.SCENE:
       return buildSceneSection(campaign);
     case contextPackKinds.CONSEQUENCES:
@@ -127,9 +133,64 @@ function buildSceneFocusSection(campaign) {
       consequences.length ? `Active consequences: ${consequences.map((entry) => compactText(entry, SHORT_ENTRY_LIMIT)).join(" | ")}` : null,
       threads.length ? `Open threads: ${threads.map((entry) => compactText(entry, SHORT_ENTRY_LIMIT)).join(" | ")}` : null,
       events.length ? `Recent relevant events: ${events.map((entry) => compactText(entry, SHORT_ENTRY_LIMIT)).join(" | ")}` : null,
-      "Use this focus before inventing new people, places, threats, or option panels.",
+      "Use this focus and the goal horizon before inventing new people, places, threats, or option panels.",
     ].filter(Boolean),
   };
+}
+
+function buildGoalHorizonSection(campaign) {
+  const retrieval = buildSceneRetrieval(campaign);
+  const goals = retrieval.goalHorizon;
+  const entries = [
+    ...formatGoalList("Long-term", goals.longTerm),
+    ...formatGoalList("Medium-term", goals.mediumTerm),
+    ...formatGoalList("Short-term", goals.shortTerm),
+    "Narrative gravity: before adding new content, ask whether it serves a short, medium, or long-term goal. If not, prefer existing consequences, relationships, NPC motives, or location memory.",
+  ];
+
+  return {
+    kind: contextPackKinds.GOAL_HORIZON,
+    title: "DM Goal Horizon",
+    entries,
+  };
+}
+
+function buildWorldMemorySection(campaign) {
+  const retrieval = buildSceneRetrieval(campaign);
+  const memory = retrieval.livingWorld;
+  const people = memory.people.slice(0, 4).map((person) =>
+    `NPC memory: ${person.name ?? person.id}: ${formatCompactList(person.memory ?? person.memories ?? person.notes ?? person.summary, 3)}`,
+  );
+  const factions = memory.factions.slice(0, 3).map((faction) =>
+    `Faction memory: ${faction.name ?? faction.id}: ${formatCompactList(faction.memory ?? faction.beliefs ?? faction.notes ?? faction.summary, 3)}`,
+  );
+  const places = memory.places.slice(0, 3).map((place) =>
+    `Location memory: ${place.name ?? place.id}: ${formatCompactList(place.memory ?? place.scars ?? place.history ?? place.notes ?? place.summary, 3)}`,
+  );
+  const consequences = memory.consequences.slice(0, 5).map((consequence) =>
+    `Consequence: ${consequence.title}: ${consequence.description}`,
+  );
+  const relationships = memory.relationships.slice(0, 4).map((relationship) =>
+    `Relationship: ${labelEntity(campaign, relationship.sourceId)} -> ${labelEntity(campaign, relationship.targetId)} (${relationship.type}): ${formatCompactList(relationship.notes, 3)}`,
+  );
+
+  return {
+    kind: contextPackKinds.WORLD_MEMORY,
+    title: "Living World Memory",
+    entries: [
+      `Living world score: ${memory.score.value}/100 (${memory.score.verdict}). ${memory.score.question}`,
+      ...[...people, ...factions, ...places, ...consequences, ...relationships]
+        .map((entry) => compactText(entry, MEDIUM_ENTRY_LIMIT)),
+    ].filter(Boolean),
+  };
+}
+
+function formatGoalList(label, goals = []) {
+  return goals.slice(0, 4).map((goal) => {
+    const stakes = goal.stakes ? ` Stakes: ${goal.stakes}` : "";
+    const nextBeat = goal.nextBeat ? ` Next: ${goal.nextBeat}` : "";
+    return compactText(`${label}: ${goal.title} (${goal.status}).${stakes}${nextBeat}`, MEDIUM_ENTRY_LIMIT);
+  });
 }
 
 function buildHistorySection(campaign) {

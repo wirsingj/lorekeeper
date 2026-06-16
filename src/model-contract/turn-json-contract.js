@@ -1,4 +1,5 @@
 import { compactHiddenStoryThreads } from "../context-packs/story-threads.js";
+import { buildGoalHorizon, buildLivingWorldMemory } from "../engine/living-world-engine.js";
 
 // Provider I/O contract.
 // The app sends this request envelope to a model, then validates the returned
@@ -47,6 +48,8 @@ const allowedImportance = new Set(["minor", "normal", "major"]);
 const allowedVisibility = new Set(["player_visible", "dm_only", "system_only"]);
 const allowedSectionKinds = new Set([
   "scene_focus",
+  "goal_horizon",
+  "world_memory",
   "current_scene",
   "recent_history",
   "recent_play_history",
@@ -80,6 +83,7 @@ export function buildTurnJsonPrompt({ campaign, contextPack, playerTurn, parsedM
     "If user.inWorld addresses an NPC or asks another character to act, narrate that character's immediate response or the visible consequence.",
     "Do not invent speech, thoughts, scouting, scanning, movement, or purposeful actions for remote/player-controlled party members unless their controller submitted that input.",
     "Before adding a new threat, NPC, or twist, use generation.dmQuality: existing context, natural consequences, NPC motivations, and campaign continuity come first.",
+    "Before adding new content, ask whether it serves a short, medium, or long-term goal. If not, prefer existing world memory.",
     "Do not be terse. For normal scene turns, write immersive DM narration with enough detail to feel like tabletop play.",
     "If generation.choicePolicy.choicesAllowed is false, leave choices.options empty. Continue the scene with narration, NPC/world reaction, consequences, and current situation instead of forcing an option panel.",
     "Use context.hiddenDmStory as private DM planning only. Never reveal those notes directly, but keep the campaign moving with long, mid, and short term purpose.",
@@ -978,6 +982,9 @@ function createResponseFormatSchema() {
       "Write to generation.narrationTarget. Normal turns should usually be 3-6 paragraphs and 320-700 words.",
       "Use sensory detail, NPC reaction, consequence, and one concrete new situation. Do not answer with only a single sentence unless generation.mode is fast.",
       "Act like a skilled long-running tabletop DM, not a generic story continuation engine.",
+      "Use context.goalHorizon as narrative gravity: short-term goals guide this scene, medium-term goals guide this chapter, long-term goals guide subtle campaign direction.",
+      "Use context.livingWorld before recent history. NPCs, factions, and places should remember favors, insults, debts, rescues, public events, and scars.",
+      "If a scene ends or a meaningful social/combat/exploration beat resolves, propose consequences, relationship shifts, location memory, faction memory, or thread updates when they will matter later.",
       "Prefer consequences over random events. Ask: what changed, who noticed, who cares, and what follows naturally?",
       "Use existing people, places, factions, relationships, and unresolved threads before creating new entities.",
       "Do not introduce a new threat, ambush, monster, quest, or crisis unless it follows from current context, NPC motives, player action, or an active thread.",
@@ -1035,13 +1042,17 @@ function createDmQualityPolicy({ mode, responseMode } = {}) {
     philosophy: "Act as a skilled long-running tabletop DM. The app owns state; you create grounded narration, dialogue, consequences, and suggestions.",
     priorities: [
       "consequence of the latest player action",
+      "active short-term goal",
       "existing NPC motivations and relationships",
+      "living world memory: NPCs, factions, locations, promises, debts, rumors, scars",
+      "medium-term chapter direction",
       "hidden long, mid, and short term story direction",
       "world continuity and unresolved threads",
       "tension that follows naturally from the scene",
       "meaningful choices only when the scene truly branches",
     ],
     beforeAddingNewContent: [
+      "Does this serve a short, medium, or long-term goal? If not, prefer established memory.",
       "Prefer existing people, places, factions, items, relationships, and active threads.",
       "Ask why this event happens now. If the answer is weak, do not add it.",
       "A new enemy/crisis must follow from motive, consequence, danger, or established setup.",
@@ -1059,6 +1070,9 @@ function createDmQualityPolicy({ mode, responseMode } = {}) {
       ? "Combat should start or continue because goals conflict. Resolve active turns clearly, then advance or end combat."
       : "Let scenes breathe. Conversation, travel, investigation, planning, reflection, and social consequences can be the whole turn.",
     selfCheck: [
+      "Would the same NPC react differently because of prior play?",
+      "Did I preserve or create a retrievable consequence if something meaningful changed?",
+      "Does this serve the goal horizon?",
       "Am I using existing context?",
       "Am I creating a natural consequence?",
       "Am I respecting NPC motivations?",
@@ -1758,8 +1772,30 @@ function tableTextFromObject(value) {
 }
 
 function buildCompactContext(contextPack, campaign, options = {}) {
+  const goalHorizon = buildGoalHorizon(campaign);
+  const livingWorld = buildLivingWorldMemory(campaign, { goalHorizon });
   return {
     summary: compactText(campaign.summary, TEXT_LIMITS.summary),
+    goalHorizon,
+    livingWorld: {
+      score: livingWorld.score,
+      retrievalPriority: livingWorld.retrievalPriority,
+      people: livingWorld.people.slice(0, 5).map((person) => ({
+        id: person.id,
+        name: person.name ?? person.title ?? person.id,
+        memory: compactMemoryText(person.memory ?? person.memories ?? person.notes ?? person.summary, 260),
+      })),
+      factions: livingWorld.factions.slice(0, 4).map((faction) => ({
+        id: faction.id,
+        name: faction.name ?? faction.title ?? faction.id,
+        memory: compactMemoryText(faction.memory ?? faction.beliefs ?? faction.notes ?? faction.summary, 260),
+      })),
+      places: livingWorld.places.slice(0, 4).map((place) => ({
+        id: place.id,
+        name: place.name ?? place.title ?? place.id,
+        memory: compactMemoryText(place.memory ?? place.scars ?? place.history ?? place.notes ?? place.summary, 260),
+      })),
+    },
     scene: {
       status: campaign.scene?.status ?? "active",
       mode: inferSceneMode(campaign, options),
@@ -1851,6 +1887,16 @@ function compactRulesLedger(ledger, options = {}) {
       : [],
     rules: Array.isArray(ledger.rules) ? ledger.rules.slice(0, 4) : [],
   };
+}
+
+function compactMemoryText(value, limit) {
+  if (Array.isArray(value)) {
+    return compactText(value.map(compactListEntry).filter(Boolean).join("; "), limit);
+  }
+  if (value && typeof value === "object") {
+    return compactText(Object.entries(value).map(([key, entry]) => `${key}: ${compactListEntry(entry)}`).join("; "), limit);
+  }
+  return compactText(value, limit);
 }
 
 function compactPartyMember(member, options = {}) {

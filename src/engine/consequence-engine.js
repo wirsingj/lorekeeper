@@ -19,6 +19,12 @@ export function normalizeConsequence(input = {}, options = {}) {
     relatedEntityIds: uniqueStrings(input.relatedEntityIds ?? input.relatedIds ?? []),
     relationshipIds: uniqueStrings(input.relationshipIds ?? []),
     threadIds: uniqueStrings(input.threadIds ?? input.questIds ?? []),
+    goalIds: uniqueStrings([
+      input.linkedGoal,
+      input.linkedGoalId,
+      ...(input.goalIds ?? []),
+      ...(input.linkedGoalIds ?? []),
+    ]),
     tags: uniqueStrings(input.tags ?? []),
     createdAt: input.createdAt ?? now,
     updatedAt: input.updatedAt ?? now,
@@ -103,6 +109,7 @@ export function activeConsequencesForScene(campaign, sceneOrId = campaign?.scene
   ]);
   const currentPlaceId = sceneOrId?.locationId ?? campaign?.scene?.currentPlaceId ?? null;
   const activeIds = new Set(campaign?.scene?.activeConsequenceIds ?? []);
+  const goalIds = new Set(options.goalIds ?? []);
   const limit = options.limit ?? 6;
 
   return (campaign?.consequences ?? [])
@@ -111,6 +118,8 @@ export function activeConsequencesForScene(campaign, sceneOrId = campaign?.scene
       if (activeIds.has(consequence.id)) return true;
       if (sceneId && (consequence.sourceSceneId === sceneId || consequence.relatedSceneIds?.includes(sceneId))) return true;
       if (currentPlaceId && consequence.relatedEntityIds?.includes(currentPlaceId)) return true;
+      if ((consequence.goalIds ?? []).some((id) => goalIds.has(id))) return true;
+      if ((consequence.threadIds ?? []).some((id) => goalIds.has(id))) return true;
       return (consequence.participantIds ?? []).some((id) => participantIds.has(id));
     })
     .sort((left, right) => importanceRank(right.importance) - importanceRank(left.importance))
