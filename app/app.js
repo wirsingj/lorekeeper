@@ -17,6 +17,7 @@ import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } fr
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
 import { randomDevJumpStart } from "./dev-jump-start.js";
+import { buildHostResponseReviewProjection, renderHostResponseReview } from "./host-response-review-controller.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
@@ -378,6 +379,7 @@ const elements = {
   pasteResponse: document.querySelector("#paste-response"),
   importResponse: document.querySelector("#import-response"),
   commandResizeHandle: document.querySelector("#command-resize-handle"),
+  hostResponseReview: document.querySelector("#host-response-review"),
   reviewList: document.querySelector("#review-list"),
   reviewCount: document.querySelector("#review-count"),
   recordDialog: document.querySelector("#record-dialog"),
@@ -10391,6 +10393,10 @@ function renderContextPack(contextPack) {
 }
 
 function renderReviewBatch() {
+  renderHostResponseReview(elements.hostResponseReview, buildHostResponseReviewProjection({
+    repair: activeTurnRepair(),
+    reviewBatch: state.reviewBatch,
+  }));
   renderReviewPanel({
     elements,
     projection: buildReviewPanelProjection({

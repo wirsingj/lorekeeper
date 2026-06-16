@@ -125,12 +125,13 @@ Every table surface should answer the same practical questions a real table answ
 74. Common combat actions now cover app-owned Attack, Dodge, Help, Dash, Disengage, Hide, Ready, checks/contests, simple spells, healing, saves, concentration, reactions, surrender, and retreat fixtures.
 75. Staged input recovery policy now lives in a small controller that decides whether approved/remote inputs are submitted, cleared, or kept staged after a DM run.
 76. Agency validation now distinguishes neutral controlled-PC presence from piloting, and host name mentions only authorize that character when the submitted text actually gives them an action.
+77. The Review DM Response section now starts with a host-facing table-check summary projection before the paste/use controls, so repair state is framed as a table decision instead of raw diagnostics first.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches are now rejected.
 2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy and staged input recovery decisions are now extracted.
-3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
+3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, and host review summary, but the underlying manual review textarea still exists as a fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
@@ -175,7 +176,7 @@ Every table surface should answer the same practical questions a real table answ
 
 4. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
 5. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-6. Replace the remaining manual review textarea escape hatch with a guided host review flow after retry/use-anyway wording improvements.
+6. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before the paste/use fallback.
 7. Run the two-machine playtest checklist and log every friction point.
 8. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 9. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -232,6 +233,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
+- [x] Add a host-facing DM response review summary before raw pasted-response fallback controls.
 - [x] Extract turn repair display/use-anyway policy out of `app/app.js`.
 - [x] Ensure every stuck state answers who is waiting and what the host can do next.
 

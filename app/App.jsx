@@ -830,6 +830,11 @@ function SetupDialog() {
             <h3>Review DM Response</h3>
             <span id="review-count" className="count-pill">0</span>
           </div>
+          <div id="host-response-review" className="host-response-review" aria-live="polite">
+            <strong>No DM Response Waiting</strong>
+            <p>When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.</p>
+            <p className="review-next-step">Use the paste box only for an intentionally copied DM response.</p>
+          </div>
           <textarea id="response-import" className="rail-textarea" spellCheck="false"></textarea>
           <div className="button-stack two-up">
             <button id="paste-response" type="button">Paste</button>

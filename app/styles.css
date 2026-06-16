@@ -2377,7 +2377,8 @@ textarea::placeholder {
 }
 
 .session-health-summary,
-.table-timeline-summary {
+.table-timeline-summary,
+.host-response-review {
   display: grid;
   gap: 6px;
   overflow: auto;
@@ -2389,6 +2390,10 @@ textarea::placeholder {
 
 .session-health-summary {
   max-height: 150px;
+}
+
+.host-response-review {
+  max-height: 170px;
 }
 
 .table-timeline-summary {
@@ -2407,9 +2412,29 @@ textarea::placeholder {
   border-color: rgba(222, 188, 120, 0.32);
 }
 
-.session-health-summary strong {
+.host-response-review[data-state="repair"] {
+  border-color: rgba(206, 118, 105, 0.42);
+}
+
+.host-response-review[data-state="changes"] {
+  border-color: rgba(222, 188, 120, 0.34);
+}
+
+.session-health-summary strong,
+.host-response-review strong {
   color: #eef3f5;
   font-size: 0.8rem;
+}
+
+.host-response-review p {
+  margin: 0;
+  color: #cbd6db;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.host-response-review .review-next-step {
+  color: #aebbc2;
 }
 
 .session-health-summary ul {

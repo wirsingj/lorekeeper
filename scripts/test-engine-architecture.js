@@ -7,6 +7,7 @@ import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-ut
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
+import { buildHostResponseReviewProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
@@ -1539,6 +1540,34 @@ function testStagedInputRecoveryController() {
   assert.equal(failed.pendingRemote.action, stagedInputRecoveryActions.KEEP_STAGED);
 }
 
+function testHostResponseReviewProjection() {
+  const idle = buildHostResponseReviewProjection();
+  assert.equal(idle.state, "idle");
+  assert.match(idle.nextStep, /paste box/i);
+
+  const repair = buildHostResponseReviewProjection({
+    repair: {
+      reason: "choices.options[0] must be string",
+      responseText: "The scene continues.",
+    },
+  });
+  assert.equal(repair.state, "repair");
+  assert.match(repair.title, /Table Check/);
+  assert.match(repair.body, /table checks/);
+  assert.doesNotMatch(`${repair.title} ${repair.body} ${repair.nextStep}`, /JSON|contract|import/i);
+  assert.match(repair.nextStep, /Try Again/);
+  assert.match(repair.nextStep, /Use Anyway/);
+
+  const changes = buildHostResponseReviewProjection({
+    reviewBatch: {
+      proposedChanges: [{ status: "pending" }, { status: "committed" }],
+    },
+  });
+  assert.equal(changes.state, "changes");
+  assert.equal(changes.pendingChanges, 1);
+  assert.match(changes.body, /1 proposed state change/);
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -1759,6 +1788,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Table Diagnostics/);
   assert.match(appShell, /Copy Details/);
   assert.match(appShell, /Review DM Response/);
+  assert.match(appShell, /host-response-review/);
+  assert.match(appShell, /No DM Response Waiting/);
   assert.doesNotMatch(appShell, /raw provider JSON/);
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appJs, /renderRightRailState/);
@@ -1814,6 +1845,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /turn-repair-controller\.js/, "repair display policy should live outside the main app renderer");
   assert.match(appJs, /turnRepairStatusText/, "repair status should come from the repair controller");
   assert.match(appJs, /turnRepairImportOptions/, "Use Anyway import packaging should come from the repair controller");
+  assert.match(appJs, /host-response-review-controller\.js/, "host response review guidance should live outside the main app renderer");
+  assert.match(appJs, /buildHostResponseReviewProjection/, "review summary should come from a small projection");
+  assert.match(styles, /\.host-response-review/);
   assert.match(turnRepairController, /the DM response did not pass LoreKeeper's table checks/, "technical repair reasons should be softened for live play");
   assert.match(appJs, /Opening scene needs review; use Try Again or Details before starting play\./);
   assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);
@@ -1857,6 +1891,7 @@ testProviderBoundary();
 testStructuredInputsDoNotMergeIntoHostMessage();
 testTurnRepairController();
 testStagedInputRecoveryController();
+testHostResponseReviewProjection();
 testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();
