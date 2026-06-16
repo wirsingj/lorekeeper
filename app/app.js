@@ -119,6 +119,8 @@ const state = {
   lastAutoResumedMessageId: "",
   repairingCombatPromptTurn: false,
   lastCombatPromptRepairKey: "",
+  lastTableTalkCount: null,
+  unreadTableTalkCount: 0,
   rightRailCollapsed: loadRightRailCollapsed(),
   homeFlow: clientMode ? "join" : "",
 };
@@ -689,8 +691,12 @@ elements.resolvePartyInputs.addEventListener("click", async () => {
 
 elements.tableTalkForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  clearTableTalkUnread();
   await sendTableTalkFromUi();
 });
+
+elements.tableTalkInput?.addEventListener("focus", () => clearTableTalkUnread());
+elements.tableTalkLog?.addEventListener("click", () => clearTableTalkUnread());
 
 elements.closeJoinCampaignDialog.addEventListener("click", () => {
   elements.joinCampaignDialog.close();
@@ -8832,7 +8838,19 @@ function renderTableTalk() {
     return;
   }
   const messages = currentTableTalkMessages();
-  elements.tableTalkCount.textContent = String(messages.length);
+  const previousCount = state.lastTableTalkCount;
+  if (previousCount != null && messages.length > previousCount && document.activeElement !== elements.tableTalkInput) {
+    state.unreadTableTalkCount += messages.length - previousCount;
+  }
+  state.lastTableTalkCount = messages.length;
+  const tableTalkSection = elements.tableTalkLog.closest(".table-talk-section");
+  tableTalkSection?.classList.toggle("has-new-table-talk", state.unreadTableTalkCount > 0);
+  elements.tableTalkCount.textContent = state.unreadTableTalkCount > 0
+    ? `${messages.length} +${state.unreadTableTalkCount}`
+    : String(messages.length);
+  elements.tableTalkCount.title = state.unreadTableTalkCount > 0
+    ? `${state.unreadTableTalkCount} new side chat ${state.unreadTableTalkCount === 1 ? "message" : "messages"}`
+    : `${messages.length} side chat ${messages.length === 1 ? "message" : "messages"}`;
   if (!messages.length) {
     const empty = document.createElement("p");
     empty.className = "table-talk-empty";
@@ -8874,6 +8892,15 @@ function renderTableTalk() {
   }
   if (elements.tableTalkSend) {
     elements.tableTalkSend.disabled = Boolean(elements.tableTalkInput?.disabled);
+  }
+}
+
+function clearTableTalkUnread() {
+  state.unreadTableTalkCount = 0;
+  state.lastTableTalkCount = currentTableTalkMessages().length;
+  elements.tableTalkLog?.closest(".table-talk-section")?.classList.remove("has-new-table-talk");
+  if (elements.tableTalkCount) {
+    elements.tableTalkCount.textContent = String(state.lastTableTalkCount);
   }
 }
 

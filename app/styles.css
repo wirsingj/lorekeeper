@@ -419,6 +419,19 @@ h3 {
   margin-bottom: 4px;
 }
 
+.table-talk-section.has-new-table-talk {
+  border-color: rgba(125, 213, 201, 0.34);
+  background:
+    linear-gradient(180deg, rgba(125, 213, 201, 0.08), rgba(16, 19, 21, 0.42) 42%),
+    rgba(16, 19, 21, 0.42);
+}
+
+.table-talk-section.has-new-table-talk .section-count {
+  color: #eaf8f4;
+  background: rgba(125, 213, 201, 0.18);
+  border-color: rgba(125, 213, 201, 0.38);
+}
+
 .table-talk-log {
   min-height: 0;
   overflow: auto;

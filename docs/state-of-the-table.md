@@ -64,6 +64,7 @@ The user should not feel like they are debugging a model, managing queue machine
 18. Host/table mode has a Main Menu return control so the front door is reachable after entering a campaign.
 19. Guest action lifecycle now uses clearer sent/waiting/queued/resolved language on both guest and host surfaces.
 20. Session health now names the waiting party member and distinguishes host approval, grouped turns, queued DM actions, passes, and guest sent state.
+21. Table Talk now gets a subtle unread cue when new side-chat messages arrive.
 
 ### Still Risky
 
@@ -74,7 +75,7 @@ The user should not feel like they are debugging a model, managing queue machine
 5. Party-vote collection is only schema/UI-labeled. Guests cannot yet cast separate votes with host tie-break resolution.
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
-8. Table Talk can be missed during active play.
+8. Table Talk has a subtle unread cue, but should still be checked during two-machine play.
 9. Provider narration can still restate the player's action or lean on option panels too much.
 10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
@@ -228,7 +229,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.
 - [ ] Consider context-sensitive binder sections or tabs after playtest.
-- [ ] Make Table Talk harder to miss without making it noisy.
+- [x] Make Table Talk harder to miss without making it noisy.
 
 ### Storage, Diagnostics, And Safety
 
