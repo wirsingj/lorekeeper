@@ -103,12 +103,13 @@ Every table surface should answer the same practical questions a real table answ
 52. Server HTTP integration tests now prove stale public guest actions and choice votes reject wrong table/session identity through real routes.
 53. CombatEngine fixtures now cover chase positioning, intimidation contests, readied reactions, concentration conditions, healing spells, and half-damage-on-save spells.
 54. AI companion nudge beats can now be staged, passed, or resolved immediately as structured companion input.
+55. Diagnostics/manual review labels now say Table Diagnostics, Copy Details, and Review DM Response instead of exposing JSON/import/state-sync language during ordinary recovery.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
-3. Recovery is more table-shaped in the live status strip, but diagnostics/manual import flows still expose software-shaped concepts.
+3. Recovery is more table-shaped in the live status strip and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, but combat-turn-specific approval still needs polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
@@ -204,7 +205,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Make repair retry lifecycle as table-shaped as auto-resume.
 - [ ] Move remaining recovery/import decisions out of `app/app.js`.
 - [x] Replace technical wording in live recovery controls.
-- [ ] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
+- [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [ ] Ensure every stuck state answers who is waiting and what the host can do next.
 
 ### Combat

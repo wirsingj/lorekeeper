@@ -752,7 +752,7 @@ function SetupDialog() {
 
         <section className="setup-section diagnostics-section">
           <div className="section-title">
-            <h3>Diagnostics</h3>
+            <h3>Table Diagnostics</h3>
             <span id="diagnostics-status" className="count-pill">Idle</span>
           </div>
           <label className="check-row" title="Show provider/model metadata under play messages for troubleshooting. Leave this off during normal play.">
@@ -760,8 +760,8 @@ function SetupDialog() {
             Show debug meta in play log
           </label>
           <div className="button-stack two-up">
-            <button id="refresh-diagnostics" type="button">Refresh Diagnostics</button>
-            <button id="copy-diagnostics" type="button">Copy JSON</button>
+            <button id="refresh-diagnostics" type="button">Refresh Details</button>
+            <button id="copy-diagnostics" type="button">Copy Details</button>
           </div>
           <div id="session-health-summary" className="session-health-summary" aria-live="polite">
             <strong>Table ready</strong>
@@ -775,7 +775,7 @@ function SetupDialog() {
             className="rail-textarea diagnostics-output"
             spellCheck="false"
             readOnly
-            placeholder="Open diagnostics after a weird turn to inspect logs, recent messages, raw provider JSON, contract warnings, scene/combat state, and runtime details."
+            placeholder="Open this after a weird turn to review table health, recent messages, DM response issues, combat state, and logs."
           ></textarea>
         </section>
 
@@ -827,13 +827,13 @@ function SetupDialog() {
 
         <section className="setup-section">
           <div className="section-title">
-            <h3>Manual State Sync</h3>
+            <h3>Review DM Response</h3>
             <span id="review-count" className="count-pill">0</span>
           </div>
           <textarea id="response-import" className="rail-textarea" spellCheck="false"></textarea>
           <div className="button-stack two-up">
             <button id="paste-response" type="button">Paste</button>
-            <button id="import-response" type="button">Import + Save</button>
+            <button id="import-response" type="button">Use Pasted Response</button>
           </div>
           <div id="review-list" className="review-stack"></div>
         </section>

@@ -7904,32 +7904,32 @@ async function importLatestProviderResponse({
   requireNewerThanLastImport = false,
   quietIfUnchanged = false,
 } = {}) {
-  setProviderActivity("Reading latest ChatGPT response...", "working");
+  setProviderActivity("Reading latest DM response...", "working");
   const latest = await readLatestCompanionResponse();
   const latestText = latest?.text?.trim() ?? "";
 
   if (!latestText) {
-    elements.bridgeStatus.textContent = "No provider response found to import";
-    setProviderActivity("No provider response found", "idle");
+    elements.bridgeStatus.textContent = "No DM response found";
+    setProviderActivity("No DM response found", "idle");
     return { imported: false, reason: "empty" };
   }
 
   if (newerThanText && latestText === newerThanText.trim()) {
     if (!quietIfUnchanged) {
-      elements.bridgeStatus.textContent = "Latest provider response has not changed";
-      setProviderActivity("Latest provider response has not changed", "idle");
+      elements.bridgeStatus.textContent = "Latest DM response has not changed";
+      setProviderActivity("Latest DM response has not changed", "idle");
     }
     return { imported: false, reason: "unchanged" };
   }
 
   if (requireNewerThanLastImport && latestText === state.bridge.lastImportedProviderText?.trim()) {
-    elements.bridgeStatus.textContent = "Latest provider response is already imported";
-    setProviderActivity("Latest provider response already imported", "idle");
+    elements.bridgeStatus.textContent = "Latest DM response is already in the table";
+    setProviderActivity("Latest DM response is already in the table", "idle");
     return { imported: false, reason: "duplicate" };
   }
 
-  elements.bridgeStatus.textContent = "Importing latest ChatGPT response...";
-  setProviderActivity("Importing latest ChatGPT response...", "working");
+  elements.bridgeStatus.textContent = "Adding latest DM response...";
+  setProviderActivity("Adding latest DM response...", "working");
   await importProviderResponse(latestText);
   return { imported: true, response: latest };
 }
@@ -8007,10 +8007,10 @@ async function copyDiagnosticsToClipboard() {
       throw new Error("Clipboard write failed.");
     }
     elements.diagnosticsStatus.textContent = "Copied";
-    setProviderActivity("Diagnostics JSON copied", "idle");
+    setProviderActivity("Table details copied", "idle");
   } catch {
     elements.diagnosticsStatus.textContent = "Copy blocked";
-    setProviderActivity("Diagnostics copy blocked; JSON is visible in Settings", "error");
+    setProviderActivity("Copy blocked; table details are visible in Settings", "error");
   }
 }
 

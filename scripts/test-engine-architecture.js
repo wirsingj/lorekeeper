@@ -1427,6 +1427,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Try Again/);
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);
+  assert.match(appShell, /Table Diagnostics/);
+  assert.match(appShell, /Copy Details/);
+  assert.match(appShell, /Review DM Response/);
+  assert.doesNotMatch(appShell, /raw provider JSON/);
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
