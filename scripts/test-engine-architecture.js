@@ -1236,7 +1236,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /notifyHostGuestLeaving/);
   assert.match(appJs, /choice-vote-count/);
   assert.match(appJs, /choiceVoteSummaryText/);
+  assert.match(appJs, /leadingChoiceVoteEntry/);
   assert.match(appJs, /choice-vote-summary/);
+  assert.match(appJs, /choice-vote-action/);
+  assert.match(appJs, /Use leading choice \$\{leadingVote\.label\}/);
   assert.match(appJs, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderWaitingGuestCue/);

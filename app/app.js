@@ -1276,16 +1276,7 @@ function choiceVoteSummaryText(block = {}) {
   if (!isPartyVoteChoiceBlock(block)) {
     return "";
   }
-  const counts = choiceVoteCounts(block);
-  const entries = (block.items ?? [])
-    .map((_, index) => {
-      const optionId = choiceOptionId(block, index);
-      return {
-        label: choiceLabelForIndex(index),
-        count: counts.get(optionId) || 0,
-      };
-    })
-    .filter((entry) => entry.count > 0);
+  const entries = choiceVoteEntries(block).filter((entry) => entry.count > 0);
   if (!entries.length) {
     return "";
   }
@@ -1296,6 +1287,32 @@ function choiceVoteSummaryText(block = {}) {
     return `Votes - ${votesText}. Tie: host chooses.`;
   }
   return `Votes - ${votesText}. Leading: ${leaders[0].label}.`;
+}
+
+function choiceVoteEntries(block = {}) {
+  const counts = choiceVoteCounts(block);
+  return (block.items ?? []).map((_, index) => {
+    const optionId = choiceOptionId(block, index);
+    return {
+      index,
+      optionId,
+      label: choiceLabelForIndex(index),
+      count: counts.get(optionId) || 0,
+    };
+  });
+}
+
+function leadingChoiceVoteEntry(block = {}) {
+  if (!isPartyVoteChoiceBlock(block) || isRemoteTableClient()) {
+    return null;
+  }
+  const entries = choiceVoteEntries(block).filter((entry) => entry.count > 0);
+  if (!entries.length) {
+    return null;
+  }
+  const maxCount = Math.max(...entries.map((entry) => entry.count));
+  const leaders = entries.filter((entry) => entry.count === maxCount);
+  return leaders.length === 1 ? leaders[0] : null;
 }
 
 function currentGuestVoteForChoice(block = {}) {
@@ -10349,6 +10366,15 @@ function messageBodyElements(text, role = "dm", data = {}) {
         voteSummary.className = "choice-vote-summary";
         voteSummary.textContent = voteSummaryText;
         panel.append(voteSummary);
+      }
+      const leadingVote = leadingChoiceVoteEntry(block);
+      if (leadingVote) {
+        const voteAction = document.createElement("button");
+        voteAction.type = "button";
+        voteAction.className = "mini-action choice-vote-action";
+        voteAction.textContent = `Use leading choice ${leadingVote.label}`;
+        voteAction.addEventListener("click", () => chooseVisibleOption(block, leadingVote.index));
+        panel.append(voteAction);
       }
 
       const hint = document.createElement("small");

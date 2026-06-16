@@ -1741,6 +1741,11 @@ button:disabled {
   font-size: 0.74rem;
 }
 
+.choice-vote-action {
+  justify-self: start;
+  margin: 0;
+}
+
 .choice-option:hover,
 .choice-option:focus-visible {
   color: #f5fbf7;

@@ -91,6 +91,7 @@ Every table surface should answer the same practical questions a real table answ
 40. Server security tests now exercise the API-token authorization decision for public guest routes, protected host routes, unknown API routes, and local assets.
 41. JSON contract fixtures now prove narration-first choice suppression across social, travel, exploration/mystery, downtime, and recovery-like scene beats.
 42. Left rail layout now constrains party/combat records and action rows so long names/buttons wrap locally instead of forcing horizontal panel scroll.
+43. Party-vote panels now give the host a "Use leading choice" action when remote votes have a clear leader.
 
 ### Still Risky
 
@@ -98,7 +99,7 @@ Every table surface should answer the same practical questions a real table answ
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
 3. Repair/retry/import still exposes some software-shaped concepts.
 4. AI companion approval is still a button/badge flow, not yet a smooth table beat.
-5. Party-vote collection now works for remote guests, but host resolution is still lightweight: the host sees votes and chooses, without a dedicated tie-break/confirm modal.
+5. Party-vote collection now works for remote guests, and clear leaders can be selected by the host from the panel. Tied votes and final confirmation are still lightweight, without a dedicated tie-break/confirm modal.
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
 8. Table Talk has a subtle unread cue, but should still be checked during two-machine play.
@@ -248,7 +249,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
-- [ ] Add explicit host tie-break/confirm flow for party votes. Current state: vote counters and host-facing vote summary exist, but host confirmation is still the normal Send Turn path.
+- [ ] Add explicit host tie-break/confirm flow for party votes. Current state: vote counters, host-facing vote summary, and "Use leading choice" action exist, but tied votes and final confirmation are still the normal Send Turn path.
 - [x] Show party-choice vote counters and let guests switch their vote.
 - [ ] Add disconnect/reconnect/campaign-switch soak tests.
 - [ ] Consider WebSocket/broadcast later after polling semantics are solid.
