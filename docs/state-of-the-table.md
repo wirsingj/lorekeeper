@@ -134,6 +134,7 @@ Every table surface should answer the same practical questions a real table answ
 83. Imported bundle assets are copied into `data/assets/<campaign>/...` when loaded, and campaign asset records point at the app-owned copy while preserving the original source path.
 84. Agency validation fixtures now cover cinematic body-language overreach for remote PCs, such as a model tightening Mira's grip or leaning her into action without submitted input, while still allowing hostile NPC focus on her.
 85. Local multiplayer regression coverage now includes stale guest snapshot/action rejection after host campaign switch, in addition to disconnect, reconnect, stale table, and stale session cases.
+86. Character auto-complete now lives in a small controller and uses explicit campaign/draft party context, preserving user-supplied facts while filling missing details from party theme.
 
 ### Still Risky
 
@@ -320,7 +321,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Auto-complete preserves supplied fields and fills missing details.
 - [ ] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character.
 - [ ] Let Host New remote-invite slots seat waiting-room guests before campaign start.
-- [ ] Make auto-complete campaign-aware without overriding user facts.
+- [x] Make auto-complete campaign-aware without overriding user facts.
 - [ ] Add party-template flow for repeated related companions.
 - [ ] Improve class/spell/equipment depth beyond shallow 5E-lite starts.
 

@@ -4,6 +4,7 @@ import { performance } from "node:perf_hooks";
 import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
+import { completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
@@ -1619,6 +1620,43 @@ function testProviderImportOutcomeProjection() {
   assert.equal(newLatest.activityState, "working");
 }
 
+function testCharacterAutocompleteProjection() {
+  assert.deepEqual(splitAncestryClass("Dwarf Soldier"), { ancestry: "Dwarf", characterClass: "Soldier" });
+
+  const preserved = completeCharacterSeed({
+    name: "Thor",
+    ancestry: "Dwarf",
+    characterClass: "Scout",
+    concept: "Keeps watch for the company.",
+  }, {
+    campaign: {
+      summary: "A dwarf soldier company guards a dangerous road.",
+      party: [{ id: "oskar", name: "Oskar", ancestry: "Dwarf", characterClass: "Soldier", level: 2 }],
+    },
+  });
+  assert.equal(preserved.name, "Thor");
+  assert.equal(preserved.ancestry, "Dwarf");
+  assert.equal(preserved.characterClass, "Scout");
+  assert.match(preserved.integrationPrompt, /Oskar/);
+
+  const themed = completeCharacterSeed({
+    ancestry: "Dwarf",
+  }, {
+    campaign: {
+      summary: "A small dwarf soldier party keeps the pass open.",
+      party: [
+        { id: "oskar", name: "Oskar", ancestry: "Dwarf", characterClass: "Soldier", level: 3 },
+        { id: "ingrid", name: "Ingrid", ancestry: "Dwarf", characterClass: "Soldier", level: 3 },
+      ],
+    },
+  });
+  assert.equal(themed.ancestry, "Dwarf");
+  assert.equal(themed.characterClass, "Soldier");
+  assert.equal(themed.level, 3);
+  assert.match(themed.backstory, /dwarf soldier theme/i);
+  assert.match(themed.integrationPrompt, /Oskar, Ingrid/);
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -1949,6 +1987,7 @@ testTurnRepairController();
 testStagedInputRecoveryController();
 testHostResponseReviewProjection();
 testProviderImportOutcomeProjection();
+testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();

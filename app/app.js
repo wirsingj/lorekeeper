@@ -13,6 +13,7 @@ import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
+import { completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
@@ -2392,7 +2393,10 @@ function compactCharacterFormRefs(kind, root = document) {
 }
 
 function autocompleteCompactCharacterForm(refs = {}) {
-  const completed = completeCharacterSeed(compactCharacterSeedFromRefs(refs));
+  const completed = completeCharacterSeed(compactCharacterSeedFromRefs(refs), {
+    campaign: characterAutocompleteCampaignContext(),
+    startingPartyMembers: characterAutocompleteStartingPartyMembers(),
+  });
   setIfBlank(refs.name, completed.name);
   setIfBlank(refs.ancestry, completed.ancestry);
   setIfBlank(refs.characterClass, completed.characterClass);
@@ -2404,6 +2408,28 @@ function autocompleteCompactCharacterForm(refs = {}) {
   setIfBlank(refs.integrationPrompt, completed.integrationPrompt);
   setIfBlank(refs.hostIntegrationPrompt, completed.hostIntegrationPrompt);
   setProviderActivity(`${completed.name} filled out`, "idle");
+}
+
+function characterAutocompleteCampaignContext() {
+  if (elements.newCampaignDialog?.open) {
+    return {
+      title: elements.newCampaignTitle?.value,
+      summary: elements.newCampaignPremise?.value,
+      tone: elements.newCampaignTone?.value,
+      startingLocation: elements.newCampaignStartingLocation?.value,
+    };
+  }
+  return state.campaign;
+}
+
+function characterAutocompleteStartingPartyMembers() {
+  if (!elements.newCampaignDialog?.open) {
+    return [];
+  }
+  return [
+    compactCharacterSeedFromRefs(compactCharacterFormRefs("new-character")),
+    ...collectWizardAdditionalCharacters(),
+  ].filter((member) => [member.name, member.ancestry, member.characterClass, member.concept].some((value) => String(value ?? "").trim()));
 }
 
 function compactCharacterSeedFromRefs(refs = {}) {
@@ -2419,43 +2445,6 @@ function compactCharacterSeedFromRefs(refs = {}) {
     integrationPrompt: refs.integrationPrompt?.value,
     hostIntegrationPrompt: refs.hostIntegrationPrompt?.value,
     controllerKind: typeof refs.controllerKind === "string" ? refs.controllerKind : refs.controllerKind?.value,
-  };
-}
-
-function completeCharacterSeed(seed = {}) {
-  const text = [
-    seed.name,
-    seed.ancestry,
-    seed.characterClass,
-    seed.roleIntent,
-    seed.appearance,
-    seed.backstory,
-    seed.concept,
-    seed.integrationPrompt,
-  ].filter(Boolean).join(" ");
-  const ancestry = String(seed.ancestry || inferAncestryFromText(text) || "Human").trim();
-  const characterClass = String(seed.characterClass || inferClassFromText(text) || "Adventurer").trim();
-  const name = String(seed.name || suggestCharacterName(ancestry, characterClass)).trim();
-  const roleIntent = String(seed.roleIntent || inferRoleIntent(characterClass, text)).trim();
-  const level = clampLevel(parseOptionalNumber(seed.level) ?? 1);
-  const profile = classifyCharacterProfile(`${characterClass} ${roleIntent} ${seed.backstory || seed.concept || ""}`);
-  const appearance = `${name} is a ${compactAncestryAdjective(ancestry)} ${profile.label} with practical travel-worn gear and a steady, readable presence.`;
-  const backstory = `${name} is a ${ancestry} ${characterClass} known for ${roleIntent.toLowerCase()}. They are dependable under pressure, but carry a personal reason to keep moving with the party.`;
-  const integrationPrompt = seed.integrationPrompt || defaultPartyIntegration(name);
-  const hostIntegrationPrompt = seed.hostIntegrationPrompt || `${name} should support the party's current goal without taking control of the main decision.`;
-
-  return {
-    ...seed,
-    name,
-    ancestry,
-    characterClass,
-    level,
-    roleIntent,
-    appearance: seed.appearance || appearance,
-    backstory: seed.backstory || seed.concept || backstory,
-    concept: seed.concept || seed.backstory || backstory,
-    integrationPrompt,
-    hostIntegrationPrompt,
   };
 }
 
@@ -2586,80 +2575,6 @@ function setFormValue(input, value) {
 
 function virtualFormValue(value = "") {
   return { value: String(value ?? "") };
-}
-
-function inferAncestryFromText(text = "") {
-  const match = String(text).match(/\b(dwarf|dwarven|elf|elven|human|halfling|gnome|orc|half-orc|tiefling|dragonborn|fairy|fae)\b/i);
-  if (!match) return "";
-  return {
-    dwarven: "Dwarf",
-    elven: "Elf",
-    fae: "Fairy",
-  }[match[1].toLowerCase()] || titleCase(match[1]);
-}
-
-function inferClassFromText(text = "") {
-  const value = String(text);
-  const matches = [
-    [/scout|archer|tracker|hunter|ranger/i, "Scout"],
-    [/soldier|guard|fighter|warrior|knight/i, "Soldier"],
-    [/cleric|priest|healer|paladin/i, "Cleric"],
-    [/rogue|thief|burglar|spy/i, "Rogue"],
-    [/wizard|mage|arcane|scholar/i, "Wizard"],
-    [/druid|warden|nature/i, "Druid"],
-    [/bard|performer|envoy/i, "Bard"],
-  ].find(([regex]) => regex.test(value));
-  return matches?.[1] || "";
-}
-
-function inferRoleIntent(characterClass = "", text = "") {
-  const value = `${characterClass} ${text}`;
-  if (/scout|ranger|tracker|hunter/i.test(value)) return "Scout and pathfinder";
-  if (/soldier|fighter|warrior|guard|knight/i.test(value)) return "Front-line soldier";
-  if (/cleric|healer|priest|paladin/i.test(value)) return "Healer and steady counsel";
-  if (/rogue|thief|spy|burglar/i.test(value)) return "Quiet problem-solver";
-  if (/wizard|mage|arcane|scholar/i.test(value)) return "Arcane specialist";
-  if (/bard|performer|envoy/i.test(value)) return "Face and morale";
-  return "Reliable adventuring support";
-}
-
-function suggestCharacterName(ancestry = "", characterClass = "") {
-  const key = `${ancestry} ${characterClass}`.toLowerCase();
-  if (/dwarf/.test(key)) {
-    return ["Oskar", "Bram", "Tilli", "Ingrid"][Math.floor(Math.random() * 4)];
-  }
-  if (/elf|fairy|fae/.test(key)) {
-    return ["Mira", "Elaris", "Thistle", "Liora"][Math.floor(Math.random() * 4)];
-  }
-  return ["Rowan", "Jarin", "Evelynn", "Corin"][Math.floor(Math.random() * 4)];
-}
-
-function compactAncestryAdjective(ancestry = "") {
-  return String(ancestry || "adventuring").toLowerCase();
-}
-
-function defaultPartyIntegration(name = "This character") {
-  const partyNames = (state.campaign?.party ?? []).map((member) => member.name).filter(Boolean).slice(0, 3);
-  if (partyNames.length) {
-    return `${name} already has a practical reason to trust ${partyNames.join(", ")} and backs them up without taking over the scene.`;
-  }
-  return `${name} begins in the same immediate situation as the primary character and has a reason to stay with the group.`;
-}
-
-function splitAncestryClass(value = "") {
-  const words = String(value ?? "").trim().split(/\s+/).filter(Boolean);
-  const ancestryIndex = words.findIndex((word) => /\b(dwarf|dwarven|elf|elven|human|halfling|gnome|orc|tiefling|dragonborn|fairy|fae)\b/i.test(word));
-  if (ancestryIndex === -1) {
-    return { ancestry: "", characterClass: words.join(" ") };
-  }
-  const ancestry = inferAncestryFromText(words[ancestryIndex]);
-  const characterClass = words.filter((_, index) => index !== ancestryIndex).join(" ");
-  return { ancestry, characterClass };
-}
-
-function titleCase(value = "") {
-  const text = String(value);
-  return text ? `${text.slice(0, 1).toUpperCase()}${text.slice(1).toLowerCase()}` : "";
 }
 
 function normalizeList(value) {
