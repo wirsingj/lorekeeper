@@ -1043,6 +1043,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /add-wizard-party-member/);
   assert.match(appShell, /Remote Invite/);
   assert.match(appShell, /new-character-controller/);
+  assert.match(appShell, /Back to previous screen/);
   assert.match(appShell, /data-character-field="controllerKind"/);
   assert.match(appShell, /new-joiner-integration/);
   assert.match(appShell, /new-joiner-host-context/);
@@ -1064,6 +1065,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /wizardControllerSheetFields/);
   assert.match(appJs, /inviteIntent:\s*"remote_player"/);
   assert.match(appJs, /campaign-wizard-mode/);
+  assert.match(appJs, /campaignWizardReturnHome/);
+  assert.match(appJs, /dismissCampaignWizard/);
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited player/);
   assert.match(appJs, /renderDebugMetaControl/);

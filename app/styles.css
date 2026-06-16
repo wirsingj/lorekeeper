@@ -94,15 +94,32 @@ summary,
   visibility: hidden;
 }
 
+.handheld-shell.campaign-wizard-mode {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "screen";
+  padding: 0;
+}
+
 .handheld-shell.campaign-wizard-mode .left-panel,
 .handheld-shell.campaign-wizard-mode .right-panel,
 .handheld-shell.campaign-wizard-mode .command-deck {
-  visibility: hidden;
+  display: none;
+}
+
+.handheld-shell.campaign-wizard-mode .play-screen {
+  min-height: 100vh;
+}
+
+.handheld-shell.campaign-wizard-mode .screen-bezel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .handheld-shell.campaign-wizard-mode .provider-activity,
 .handheld-shell.campaign-wizard-mode .play-log {
-  opacity: 0;
+  visibility: hidden;
 }
 
 .panel-rail,
@@ -1012,12 +1029,10 @@ button:disabled {
   border: 0;
   border-radius: 0;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
-    linear-gradient(145deg, rgba(99, 124, 111, 0.12), transparent 38%),
-    linear-gradient(315deg, rgba(168, 132, 91, 0.1), transparent 42%),
-    linear-gradient(135deg, #141819, #20272a 54%, #111516);
-  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+    linear-gradient(115deg, rgba(125, 213, 201, 0.08), transparent 34%),
+    linear-gradient(300deg, rgba(192, 168, 120, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 26%),
+    linear-gradient(135deg, #111719, #1d2426 56%, #0f1315);
 }
 
 .home-panel[hidden] {
@@ -1124,12 +1139,10 @@ button:disabled {
   overflow: auto;
   padding: 48px 20px;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
-    linear-gradient(145deg, rgba(99, 124, 111, 0.12), transparent 38%),
-    linear-gradient(315deg, rgba(168, 132, 91, 0.1), transparent 42%),
-    linear-gradient(135deg, #141819, #20272a 54%, #111516);
-  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+    linear-gradient(115deg, rgba(125, 213, 201, 0.08), transparent 34%),
+    linear-gradient(300deg, rgba(192, 168, 120, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 26%),
+    linear-gradient(135deg, #111719, #1d2426 56%, #0f1315);
 }
 
 .thin-join-card {
@@ -2042,21 +2055,23 @@ textarea::placeholder {
 }
 
 .campaign-dialog {
-  width: min(1360px, calc(100vw - 40px));
-  height: min(860px, calc(100vh - 40px));
-  max-height: calc(100vh - 40px);
+  width: calc(100vw - 24px);
+  height: calc(100vh - 24px);
+  max-width: 1540px;
+  max-height: 940px;
   overflow: hidden;
 }
 
 .campaign-dialog::backdrop {
   background:
-    linear-gradient(135deg, rgba(17, 21, 24, 0.98), rgba(26, 31, 35, 0.96)),
-    rgba(17, 21, 26, 0.98);
+    linear-gradient(115deg, rgba(125, 213, 201, 0.07), transparent 34%),
+    linear-gradient(300deg, rgba(192, 168, 120, 0.07), transparent 38%),
+    linear-gradient(135deg, rgba(13, 18, 20, 0.99), rgba(24, 30, 33, 0.99));
 }
 
 .campaign-dialog form {
   height: 100%;
-  max-height: calc(100vh - 40px);
+  max-height: calc(100vh - 24px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;

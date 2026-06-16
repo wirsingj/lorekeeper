@@ -123,6 +123,7 @@ const state = {
   unreadTableTalkCount: 0,
   rightRailCollapsed: loadRightRailCollapsed(),
   homeFlow: clientMode ? "join" : "",
+  campaignWizardReturnHome: false,
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
@@ -425,7 +426,7 @@ elements.joinBackHome?.addEventListener("click", () => {
 
 elements.homeNewCampaign?.addEventListener("click", () => {
   chooseHomeFlow("host");
-  openCampaignDialog();
+  openCampaignDialog({ returnToMainMenu: true });
 });
 
 elements.homeProviderSetup?.addEventListener("click", () => {
@@ -757,11 +758,20 @@ elements.closeRecordDialog.addEventListener("click", () => {
 });
 
 elements.closeCampaignDialog.addEventListener("click", () => {
-  elements.campaignDialog.close();
+  dismissCampaignWizard();
 });
 
 elements.campaignDialog?.addEventListener("close", () => {
   closeCampaignWizardWorkspace();
+  state.campaignWizardReturnHome = false;
+});
+
+elements.campaignDialog?.addEventListener("cancel", (event) => {
+  if (!state.campaignWizardReturnHome) {
+    return;
+  }
+  event.preventDefault();
+  dismissCampaignWizard();
 });
 
 elements.devJumpStartCampaign?.addEventListener("click", () => {
@@ -2378,6 +2388,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
 
     seedPlayLog();
     render();
+    state.campaignWizardReturnHome = false;
     elements.campaignDialog.close();
     elements.campaignForm.reset();
     resetCampaignWizardDefaults();
@@ -2437,12 +2448,21 @@ function providerSettingsForNewCampaign() {
   };
 }
 
-function openCampaignDialog() {
+function openCampaignDialog({ returnToMainMenu = false } = {}) {
   resetCampaignWizardDefaults();
+  state.campaignWizardReturnHome = Boolean(returnToMainMenu);
   openCampaignWizardWorkspace();
   elements.campaignDialog.showModal();
   elements.newCampaignTitle.focus();
   elements.newCampaignTitle.select();
+}
+
+function dismissCampaignWizard() {
+  const shouldReturnHome = state.campaignWizardReturnHome;
+  elements.campaignDialog.close();
+  if (shouldReturnHome) {
+    returnToMainMenu();
+  }
 }
 
 function openCampaignWizardWorkspace() {

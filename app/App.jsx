@@ -411,7 +411,12 @@ function CampaignDialog() {
             <p className="eyebrow">Campaign</p>
             <h2>New Campaign</h2>
           </div>
-          <button id="close-campaign-dialog" className="icon-action" type="button" title="Close">x</button>
+          <button id="close-campaign-dialog" className="secondary-action back-home-action" type="button" title="Back to previous screen">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M15 18l-6-6l6-6"></path>
+            </svg>
+            <span>Back</span>
+          </button>
         </header>
 
         <div className="campaign-wizard-layout">

@@ -188,7 +188,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [ ] Make AI companion suggestions appear as approve/resolve/decline table beats.
 - [ ] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
 - [ ] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
-- [ ] Let host choose host/AI/unassigned during additional character creation.
+- [x] Let host choose host/AI/unassigned during additional character creation.
 
 ### Multiplayer And LoreKeeper Join
 
@@ -213,6 +213,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Campaign creation supports `+` additional characters.
 - [x] Host New hides the previous table and uses a full setup workspace.
 - [x] Campaign creation can mark seats as Host, AI, or Remote Invite.
+- [x] Host New has an explicit Back action and no stale table rails while setup is open.
 - [x] Post-start host-created character flow uses same compact creator.
 - [x] Guest join and LoreKeeper Join use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
