@@ -68,6 +68,8 @@ export function resolveCombatAction(campaign, action, options = {}) {
     ? resolveAttack(normalized, actor, base, action, options)
     : actionType === combatActionTypes.SPELL
       ? resolveSpell(normalized, actor, base, action, options)
+    : actionType === combatActionTypes.HIDE
+      ? resolveHide(normalized, actor, base, action, options)
     : actionType === combatActionTypes.CHECK || hasCheckResolution(action)
       ? resolveCombatCheck(normalized, actor, base, action, options)
     : resolveNonAttack(normalized, actor, base, action);
@@ -259,6 +261,28 @@ function resolveCombatCheck(campaign, actor, base, action, options) {
   };
 }
 
+function resolveHide(campaign, actor, base, action, options) {
+  return resolveCombatCheck(campaign, actor, base, {
+    ...action,
+    declaredText: base.declaredText || action.declaredText || "hide",
+    skill: action.skill || "stealth",
+    ability: action.ability || "DEX",
+    dc: action.dc ?? action.check?.dc ?? 10,
+    successEffects: action.successEffects ?? [{
+      type: "condition_add",
+      targetId: actor.id,
+      condition: "hidden",
+      reason: "Successful Hide action",
+    }],
+    failureEffects: action.failureEffects ?? [{
+      type: "position_note",
+      targetId: actor.id,
+      note: "Failed to find enough cover or timing to hide.",
+    }],
+    summary: action.summary || `${actor.name} tried to hide.`,
+  }, options);
+}
+
 function resolveSpell(campaign, actor, base, action, options) {
   const spell = findSpellOption(campaign, actor.id, action);
   const spellName = action.spellName || spellNameFromOption(spell) || base.declaredText || "spell";
@@ -362,6 +386,13 @@ function resolveNonAttack(campaign, actor, base, action) {
     effects.push({ type: "condition_add", targetId: actor.id, condition: "helping", reason: "Help action declared" });
   } else if (base.actionType === combatActionTypes.DISENGAGE) {
     effects.push({ type: "position_note", targetId: actor.id, note: action.positionNote || "Disengaged without provoking immediate pressure." });
+  } else if (base.actionType === combatActionTypes.DASH) {
+    effects.push({ type: "position_note", targetId: actor.id, note: action.positionNote || "Dashed to cover more ground this turn." });
+  } else if (base.actionType === combatActionTypes.READY) {
+    effects.push({ type: "condition_add", targetId: actor.id, condition: "readied_action", reason: action.trigger ? `Ready action: ${action.trigger}` : "Ready action declared" });
+    if (action.positionNote) {
+      effects.push({ type: "position_note", targetId: actor.id, note: action.positionNote });
+    }
   } else if (action.positionNote) {
     effects.push({ type: "position_note", targetId: actor.id, note: action.positionNote });
   }

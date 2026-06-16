@@ -284,6 +284,8 @@ function testCombatEngine() {
 
   const actions = legalActionsForActor(campaign, "thor");
   assert.equal(actions.some((action) => action.type === "attack"), true);
+  assert.ok(actions.some((action) => action.id === "hide"), "common combat options should include Hide");
+  assert.ok(actions.some((action) => action.id === "ready"), "common combat options should include Ready");
   const greataxeOption = actions.find((action) => action.type === "attack");
   assert.ok(greataxeOption?.id);
 
@@ -379,6 +381,21 @@ function testCombatEngine() {
   assert.ok(disengaged.campaign.party.find((member) => member.id === "thor").positionNotes.includes("Backed toward the doorway without provoking."));
   assert.equal(disengaged.campaign.combat.currentTurnId, "sy");
 
+  const dashCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const dashed = resolveCombatAction(dashCampaign, {
+    turnId: "combat-dash-turn",
+    actorId: "thor",
+    actionType: "dash",
+    legalOptionId: "dash",
+    declaredText: "Dash across the bridge.",
+  }, { seed: "dash-seed" });
+  assert.equal(dashed.actionRecord.rolls.length, 0);
+  assert.ok(dashed.campaign.party.find((member) => member.id === "thor").positionNotes.includes("Dashed to cover more ground this turn."));
+  assert.equal(dashed.campaign.combat.currentTurnId, "sy");
+
   const checkCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
     initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
@@ -435,6 +452,26 @@ function testCombatEngine() {
   assert.equal(hidden.actionRecord.rolls[0].label, "Stealth check");
   assert.ok(hidden.campaign.party.find((member) => member.id === "thor").conditions.includes("hidden"));
   assert.equal(hidden.campaign.combat.currentTurnId, "sy");
+
+  const defaultHideCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor" ? { ...member, skills: ["Stealth"] } : member),
+  }, {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const defaultHidden = resolveCombatAction(defaultHideCampaign, {
+    turnId: "combat-default-hide-turn",
+    actorId: "thor",
+    actionType: "hide",
+    legalOptionId: "hide",
+    declaredText: "Hide behind the overturned bar.",
+    modifier: 20,
+    dc: 10,
+  }, { seed: "combat-default-hide-seed" });
+  assert.equal(defaultHidden.actionRecord.rolls[0].label, "Stealth check");
+  assert.ok(defaultHidden.campaign.party.find((member) => member.id === "thor").conditions.includes("hidden"));
+  assert.equal(defaultHidden.campaign.combat.currentTurnId, "sy");
 
   const contestCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
@@ -523,6 +560,21 @@ function testCombatEngine() {
   const thorAfterReady = readiedReaction.campaign.party.find((member) => member.id === "thor");
   assert.equal(thorAfterReady.resources.reaction.used, 1);
   assert.ok(thorAfterReady.conditions.includes("readied_reaction"));
+
+  const defaultReadyCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const defaultReadied = resolveCombatAction(defaultReadyCampaign, {
+    turnId: "combat-default-ready-turn",
+    actorId: "thor",
+    actionType: "ready",
+    legalOptionId: "ready",
+    declaredText: "Ready an action if the miner rushes Sy.",
+    trigger: "the miner rushes Sy",
+  }, { seed: "combat-default-ready-seed" });
+  assert.ok(defaultReadied.campaign.party.find((member) => member.id === "thor").conditions.includes("readied_action"));
+  assert.equal(defaultReadied.campaign.combat.currentTurnId, "sy");
 
   const spellCampaign = startCombat({
     ...campaignFixture(),

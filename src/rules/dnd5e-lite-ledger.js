@@ -298,6 +298,28 @@ function commonActionOptions(sheet) {
       source: "dnd5e.common_actions",
       legal: true,
     },
+    {
+      id: "hide",
+      label: "Hide",
+      type: "skill",
+      cost: { action: 1 },
+      requirements: ["can take an action", "cover, concealment, or distraction makes hiding plausible"],
+      roll: { type: "ability_check", ability: "DEX", skill: "stealth" },
+      effect: "Attempt to become hidden until discovered or revealed.",
+      source: "dnd5e.common_actions",
+      legal: true,
+    },
+    {
+      id: "ready",
+      label: "Ready an action",
+      type: "feature",
+      cost: { action: 1 },
+      requirements: ["can take an action", "clear trigger and intended response"],
+      roll: null,
+      effect: "Prepare a specific response to a visible trigger before your next turn.",
+      source: "dnd5e.common_actions",
+      legal: true,
+    },
   ];
 }
 

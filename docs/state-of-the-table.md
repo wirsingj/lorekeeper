@@ -122,6 +122,7 @@ Every table surface should answer the same practical questions a real table answ
 71. Long play logs now render through a bounded projection with a Show Earlier control, so old transcript entries remain reachable without repainting the entire campaign log every turn.
 72. Hosts can drop stale staged guest actions without falsely marking them as DM-resolved; dropped inputs get their own transcript lifecycle.
 73. SQLite storage now has bounded recent-message and record-query helpers, with a long-campaign fixture proving transcript paging and campaign-record reads stay capped.
+74. Common combat actions now cover app-owned Attack, Dodge, Help, Dash, Disengage, Hide, Ready, checks/contests, simple spells, healing, saves, concentration, reactions, surrender, and retreat fixtures.
 
 ### Still Risky
 
@@ -153,7 +154,7 @@ Every table surface should answer the same practical questions a real table answ
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters, tie language, and host draft action exist. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
-| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, simple spell saves, and legal-option validation have coverage. Richer spell/effect rules are still open. |
+| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. Common app-owned combat actions now have fixtures. Richer spell/effect rules and live-play polish are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression and rich full-turn fixtures now cover social, travel, mystery, downtime, combat, and recovery. Needs real-model soak for repeated turns. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist, are private, and have non-leakage fixtures. Still needs pacing/adaptation scenario testing over longer sessions. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
@@ -239,7 +240,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Provider is instructed not to resolve the next actor in one response.
 - [x] Party-member combat turns are input turns, including AI companions.
 - [x] Surrender/de-escalation can end combat without only HP defeat.
-- [ ] Make common combat resolution app-owned.
+- [x] Make common combat resolution app-owned.
 - [x] Add fixtures for app-owned attack, dodge, surrender, de-escalation, DC check, and opposed skill contest.
 - [x] Add fixtures for app-owned simple spell save, spell-slot spending, and save-gated conditions.
 - [x] Add fixture for app-owned enemy attack turn.
