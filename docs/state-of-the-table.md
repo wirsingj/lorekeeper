@@ -126,6 +126,7 @@ Every table surface should answer the same practical questions a real table answ
 75. Staged input recovery policy now lives in a small controller that decides whether approved/remote inputs are submitted, cleared, or kept staged after a DM run.
 76. Agency validation now distinguishes neutral controlled-PC presence from piloting, and host name mentions only authorize that character when the submitted text actually gives them an action.
 77. The Review DM Response section now starts with a host-facing table-check summary projection before the paste/use controls, so repair state is framed as a table decision instead of raw diagnostics first.
+78. Campaign delete now removes the campaign from LoreKeeper but recycles the SQLite/WAL/SHM files into `data/campaigns/.deleted/...` for manual recovery.
 
 ### Still Risky
 
@@ -198,7 +199,7 @@ Every table surface should answer the same practical questions a real table answ
 19. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
 20. Add campaign-aware character auto-complete that uses party theme/premise/existing characters without overriding supplied fields.
 21. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
-22. Add backup/export/recycle affordances before destructive delete in release builds.
+22. Add fuller backup/export/restore affordances before release; delete now recycles local SQLite files, but there is not yet a restore UI.
 
 ## Working Checklist
 
@@ -344,7 +345,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [ ] Add migration modules before public release.
-- [ ] Add backup/export/recycle story before destructive delete in release builds.
+- [x] Add backup/export/recycle story before destructive delete in release builds. Current state: delete recycles SQLite files to `data/campaigns/.deleted`; restore UI remains future polish.
 - [ ] Move imported assets into app-owned portable asset storage.
 
 ## Two-Machine Playtest Checklist

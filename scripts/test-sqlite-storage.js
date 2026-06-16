@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
@@ -242,6 +242,11 @@ try {
     sqlitePath: second.sqlitePath,
   });
   assert.equal(existsSync(second.sqlitePath), false);
+  assert.ok(afterDelete.deletedCampaignBackup?.directory);
+  assert.ok(existsSync(afterDelete.deletedCampaignBackup.directory));
+  assert.ok(afterDelete.deletedCampaignBackup.files.some((filePath) => path.basename(filePath) === path.basename(second.sqlitePath)));
+  const deletedFolders = await readdir(path.join(repoRoot, "data", "campaigns", ".deleted"));
+  assert.equal(deletedFolders.length, 1);
   assert.equal(afterDelete.campaign.title, "Delete Target");
 
   const campaigns = await listCampaigns(repoRoot);

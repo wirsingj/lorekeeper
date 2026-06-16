@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeCampaign } from "../campaign-state/schema.js";
 import { createStarterCampaign } from "../campaign-state/starter-campaign.js";
@@ -189,7 +189,7 @@ export async function deleteCampaign(projectRoot, { sqlitePath }) {
 
   const campaign = await readCampaignFromSqliteFile(resolvedPath);
   const index = await loadCampaignIndex(projectRoot);
-  await deleteSqliteStoreFiles(resolvedPath);
+  const deletedCampaignBackup = await recycleSqliteStoreFiles(projectRoot, resolvedPath, campaign);
   const nextCampaigns = index.campaigns.filter((entry) =>
     path.resolve(entry.sqlitePath) !== resolvedPath &&
     entry.id !== campaign.id
@@ -201,13 +201,44 @@ export async function deleteCampaign(projectRoot, { sqlitePath }) {
     hiddenCampaignPaths: nextHiddenPaths,
   });
 
-  return loadActiveCampaign(projectRoot);
+  return {
+    ...(await loadActiveCampaign(projectRoot)),
+    deletedCampaignBackup,
+  };
 }
 
-async function deleteSqliteStoreFiles(sqlitePath) {
-  await rm(sqlitePath, { force: true });
-  await rm(`${sqlitePath}-wal`, { force: true });
-  await rm(`${sqlitePath}-shm`, { force: true });
+async function recycleSqliteStoreFiles(projectRoot, sqlitePath, campaign) {
+  const recycleDir = await uniqueDeletedCampaignDir(projectRoot, campaign);
+  await mkdir(recycleDir, { recursive: true });
+  const moved = [];
+  for (const sourcePath of [sqlitePath, `${sqlitePath}-wal`, `${sqlitePath}-shm`]) {
+    if (!existsSync(sourcePath)) {
+      continue;
+    }
+    const targetPath = path.join(recycleDir, path.basename(sourcePath));
+    await rename(sourcePath, targetPath);
+    moved.push(targetPath);
+  }
+  return {
+    campaignId: campaign.id,
+    title: campaign.title,
+    directory: recycleDir,
+    files: moved,
+    deletedAt: new Date().toISOString(),
+  };
+}
+
+async function uniqueDeletedCampaignDir(projectRoot, campaign) {
+  const baseDir = path.join(getCampaignsDir(projectRoot), ".deleted");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const baseName = `${stamp}-${slugify(campaign.title || campaign.id || "campaign") || "campaign"}`;
+  let candidate = path.join(baseDir, baseName);
+  let counter = 2;
+  while (existsSync(candidate)) {
+    candidate = path.join(baseDir, `${baseName}-${counter}`);
+    counter += 1;
+  }
+  return candidate;
 }
 
 export async function saveActiveCampaign(projectRoot, campaign) {

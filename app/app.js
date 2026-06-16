@@ -6441,7 +6441,7 @@ function openDeleteCampaignDialog() {
 
   elements.deleteCampaignTitle.textContent = `Delete ${state.campaign.title}`;
   elements.deleteCampaignMessage.textContent =
-    `This will permanently delete "${state.campaign.title}" from this device, remove its SQLite file, and clean up the campaign index.`;
+    `This will remove "${state.campaign.title}" from LoreKeeper and move its SQLite files into the local deleted-campaigns folder for manual recovery.`;
   elements.confirmDeleteCampaign.disabled = false;
   elements.deleteCampaignDialog.showModal();
   elements.confirmDeleteCampaign.focus();
@@ -6470,7 +6470,9 @@ async function deleteActiveCampaign() {
     seedPlayLog();
     render();
     elements.deleteCampaignDialog.close();
-    elements.bridgeStatus.textContent = "Campaign deleted";
+    elements.bridgeStatus.textContent = payload.deletedCampaignBackup?.directory
+      ? "Campaign removed; local backup kept"
+      : "Campaign removed";
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `Delete failed: ${error.message}` : "Delete failed";
   }
