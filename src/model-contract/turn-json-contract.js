@@ -125,6 +125,11 @@ export function buildTurnRequestEnvelope({ campaign, contextPack, playerTurn, pa
       choicePolicy: inferChoicePolicy(campaign, parsedMessage, { mode, responseMode }),
       narrationTarget: inferNarrationTarget({ mode, responseMode }),
       dmQuality: createDmQualityPolicy({ mode, responseMode }),
+      companionInterjectionPolicy: buildCompanionInterjectionPolicy(campaign, parsedMessage, {
+        mode,
+        responseMode,
+        playerInputs: options.playerInputs ?? parsedMessage?.playerInputs ?? [],
+      }),
       allowMechanics: true,
       allowProposedChanges: true,
       hiddenStoryPolicy: {
@@ -871,6 +876,7 @@ function createResponseFormatSchema() {
       "If the DM asks several specific party members, set choices.scope to subset and set choices.forActorIds plus choices.forActor.",
       "If the DM asks the whole table to decide a direction, set choices.scope to party. If it should be voted on, set choices.scope to vote and allowVote true; the host breaks ties.",
       "Do not make every prompt a party prompt. A real table alternates between party questions, targeted character spotlights, and occasional companion/NPC interjections.",
+      "Use generation.companionInterjectionPolicy before adding an idle AI companion table post. If allowedThisTurn is false, do not add one unless explicitly nudged or submitted as user.playerInputs.",
       "When context.rulesLedger.actors[].legalOptions exists and a tactical decision is needed, build choices from those options and include legalOptionId.",
       "Narration/dialogue/feelings may be freeform table text. Stats, rolls, choices, lore, history, relationships, inventory, and character facts must be structured data.",
       "Put checks, rolls, DCs, HP/resource notes, and outcomes in mechanics, not only in narration.",
@@ -895,6 +901,7 @@ function createResponseFormatSchema() {
       "Never put party-member speech or chosen action in table entries unless it came from user.playerInputs or user.inWorld, or it is clearly labeled as a non-binding suggestion.",
       "Remote/player-controlled party members may be described as present only in neutral staging; do not narrate what they think, notice, scan, say, decide, or do without submitted input.",
       "AI companions may suggest one concise low-stakes contribution outside their own combat turn when nudged or when the table is idle, but their combat turn should still be presented for controller/host input before resolution.",
+      "Idle AI companion interjections are rare color beats: at most one companion, one short line, no major choice, no resource spend, no combat start, and no replacement for a player/host decision.",
       "Do not silently change HP, inventory, relationships, quests, or major canon.",
       "If stats are missing, suggest a pending check instead of inventing exact math.",
     ],
@@ -1763,6 +1770,92 @@ function describePartyAgency(member = {}) {
   if (kind === "ai_companion") return "ai_companion_may_offer_low_stakes_rp_when_nudged_but_requires_turn_input_for_major_actions";
   if (kind === "unassigned") return "unassigned_party_member_requires_host_input";
   return "party_member_requires_controller_input";
+}
+
+function buildCompanionInterjectionPolicy(campaign = {}, parsedMessage = {}, options = {}) {
+  const companions = (campaign.party ?? [])
+    .filter((member) => normalizeControllerKind(member) === "ai_companion")
+    .filter((member) => member.id || member.name)
+    .slice(0, 4);
+  const constraints = [
+    "one short table post from one AI companion only",
+    "low-stakes reaction, question, small observation, or brief helpful color",
+    "no major party decision, no combat start, no resource spend, no HP/canon change",
+    "do not speak, think, scan, move, or act for host/remote/unassigned party members",
+  ];
+  const base = {
+    enabled: companions.length > 0,
+    allowedThisTurn: false,
+    reason: "no_ai_companions",
+    rarity: "at_most_once_every_four_table_beats",
+    cooldownTurns: 6,
+    maxCompanions: 1,
+    maxWords: 35,
+    candidateActorIds: companions.map((member) => member.id).filter(Boolean),
+    candidateNames: companions.map((member) => member.name).filter(Boolean),
+    constraints,
+  };
+  if (!companions.length) {
+    return base;
+  }
+
+  const raw = [parsedMessage?.raw, parsedMessage?.inWorldText, ...(parsedMessage?.metaInstructions ?? [])].join(" ");
+  const explicitlyNudged = /\bAI companion nudge\b/i.test(raw);
+  if (explicitlyNudged) {
+    return {
+      ...base,
+      allowedThisTurn: true,
+      reason: "explicit_companion_nudge",
+      rarity: "host_requested_now",
+    };
+  }
+
+  const inCombat = Boolean(
+    campaign.combat?.inCombat ||
+    options.mode === "combat" ||
+    options.responseMode === "resolve_combat",
+  );
+  if (inCombat) {
+    return { ...base, reason: "combat_turns_need_controller_input" };
+  }
+
+  const submittedInputs = normalizePlayerInputs(options.playerInputs ?? parsedMessage?.playerInputs ?? []);
+  if (submittedInputs.some((input) => input.characterId && !base.candidateActorIds.includes(input.characterId))) {
+    return { ...base, reason: "human_or_remote_input_has_priority" };
+  }
+
+  const recentMessages = Array.isArray(campaign.sessionLog?.messages)
+    ? campaign.sessionLog.messages
+    : [];
+  const recentWindow = recentMessages.slice(-base.cooldownTurns);
+  if (recentWindow.some((message) => isCompanionSessionMessage(message, companions))) {
+    return { ...base, reason: "cooldown_recent_companion_post" };
+  }
+
+  const tableBeatCount = recentMessages.filter((message) =>
+    /^(dm|user|player|party)$/i.test(String(message.role ?? ""))
+  ).length;
+  const rarityWindowOpen = tableBeatCount >= 3 && tableBeatCount % 4 === 0;
+  if (!rarityWindowOpen) {
+    return { ...base, reason: "rarity_gate_closed" };
+  }
+
+  return {
+    ...base,
+    allowedThisTurn: true,
+    reason: "idle_table_color_beat_allowed",
+  };
+}
+
+function isCompanionSessionMessage(message = {}, companions = []) {
+  const companionIds = new Set(companions.map((member) => String(member.id ?? "").toLowerCase()).filter(Boolean));
+  const companionNames = new Set(companions.map((member) => String(member.name ?? "").trim().toLowerCase()).filter(Boolean));
+  const actorId = String(message.characterId ?? message.speakerId ?? message.actorId ?? message.data?.characterId ?? "").toLowerCase();
+  const speaker = String(message.speaker ?? message.speakerName ?? message.name ?? "").trim().toLowerCase();
+  return Boolean(
+    (actorId && companionIds.has(actorId)) ||
+    (speaker && companionNames.has(speaker))
+  );
 }
 
 function inferActionIntent(value) {

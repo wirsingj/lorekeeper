@@ -923,6 +923,69 @@ const lowStakesAiCompanionVoice = validTurnResponse({
   table: [{ speaker: "Sy", speakerId: "sy", role: "party", kind: "dialogue", visibility: "table", text: "Maybe ask who ordered the road closed before we draw blades." }],
 });
 assert.equal(validateTurnResponse(lowStakesAiCompanionVoice, { request: aiCompanionAgencyRequest }).valid, true);
+assert.equal(aiCompanionAgencyRequest.generation.companionInterjectionPolicy.enabled, true);
+assert.equal(aiCompanionAgencyRequest.generation.companionInterjectionPolicy.allowedThisTurn, false);
+assert.equal(aiCompanionAgencyRequest.generation.companionInterjectionPolicy.reason, "rarity_gate_closed");
+
+const idleCompanionCampaign = {
+  ...aiCompanionAgencyCampaign,
+  combat: { inCombat: false },
+  sessionLog: {
+    messages: [
+      { role: "dm", speaker: "DM", body: "The road grows quiet." },
+      { role: "player", speaker: "Host", body: "Jarin waits." },
+      { role: "dm", speaker: "DM", body: "The guard watches back." },
+      { role: "player", speaker: "Host", body: "Jarin keeps his hands visible." },
+    ],
+  },
+};
+const idleCompanionRequest = buildTurnRequestEnvelope({
+  campaign: idleCompanionCampaign,
+  contextPack: buildContextPack(idleCompanionCampaign),
+  playerTurn: "I wait to see what the guard does.",
+  parsedMessage: {
+    raw: "I wait to see what the guard does.",
+    inWorldText: "I wait to see what the guard does.",
+    metaInstructions: [],
+  },
+});
+assert.equal(idleCompanionRequest.generation.companionInterjectionPolicy.allowedThisTurn, true);
+assert.equal(idleCompanionRequest.generation.companionInterjectionPolicy.reason, "idle_table_color_beat_allowed");
+assert.ok(idleCompanionRequest.generation.companionInterjectionPolicy.constraints.some((rule) => /low-stakes/.test(rule)));
+
+const cooldownCompanionRequest = buildTurnRequestEnvelope({
+  campaign: {
+    ...idleCompanionCampaign,
+    sessionLog: {
+      messages: [
+        ...idleCompanionCampaign.sessionLog.messages,
+        { role: "party", speaker: "Sy", speakerId: "sy", body: "Something about this road feels staged." },
+      ],
+    },
+  },
+  contextPack: buildContextPack(idleCompanionCampaign),
+  playerTurn: "I wait another moment.",
+  parsedMessage: {
+    raw: "I wait another moment.",
+    inWorldText: "I wait another moment.",
+    metaInstructions: [],
+  },
+});
+assert.equal(cooldownCompanionRequest.generation.companionInterjectionPolicy.allowedThisTurn, false);
+assert.equal(cooldownCompanionRequest.generation.companionInterjectionPolicy.reason, "cooldown_recent_companion_post");
+
+const nudgedCompanionRequest = buildTurnRequestEnvelope({
+  campaign: aiCompanionAgencyCampaign,
+  contextPack: aiCompanionAgencyContext,
+  playerTurn: "(AI companion nudge: Sy may offer a brief low-stakes reaction.)",
+  parsedMessage: {
+    raw: "(AI companion nudge: Sy may offer a brief low-stakes reaction.)",
+    inWorldText: "(AI companion nudge: Sy may offer a brief low-stakes reaction.)",
+    metaInstructions: [],
+  },
+});
+assert.equal(nudgedCompanionRequest.generation.companionInterjectionPolicy.allowedThisTurn, true);
+assert.equal(nudgedCompanionRequest.generation.companionInterjectionPolicy.reason, "explicit_companion_nudge");
 
 const remoteAgencySubmittedRequest = buildTurnRequestEnvelope({
   campaign: remoteAgencyCampaign,

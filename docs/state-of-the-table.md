@@ -105,6 +105,7 @@ Every table surface should answer the same practical questions a real table answ
 54. AI companion nudge beats can now be staged, passed, or resolved immediately as structured companion input.
 55. Diagnostics/manual review labels now say Table Diagnostics, Copy Details, and Review DM Response instead of exposing JSON/import/state-sync language during ordinary recovery.
 56. Session health now prioritizes a `Next:` line for stuck/waiting states, including repair, provider wait, guest seating/approval, queued guest input, combat ownership, and companion combat turns.
+57. Provider turn requests now include an app-owned AI companion interjection policy with rarity/cooldown gates, explicit nudge bypass, and low-stakes constraints.
 
 ### Still Risky
 
@@ -234,7 +235,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Nudge prompts ask for brief low-stakes RP only.
 - [x] Choice prompts can target individual party members.
 - [x] Make AI companion suggestions appear as approve/resolve/decline table beats.
-- [ ] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
+- [x] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
 - [x] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
 - [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration.
 - [x] Let host choose host/AI/unassigned during additional character creation.
