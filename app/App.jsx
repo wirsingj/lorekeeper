@@ -112,11 +112,21 @@ export function LorekeeperShell() {
                     <button id="home-join-flow" type="button">Join</button>
                   </div>
                 </article>
+                <article className="home-flow-card">
+                  <div>
+                    <p className="eyebrow">Provider</p>
+                    <h3>Set Up The DM</h3>
+                    <p>Choose Ollama or bridge mode, test the model, and tune generation before play.</p>
+                  </div>
+                  <div className="home-flow-actions">
+                    <button id="home-provider-setup" type="button">Provider Setup</button>
+                  </div>
+                </article>
               </div>
               <div className="home-library-strip" aria-label="Local library summary">
                 <span id="home-active-campaign">Campaigns loading...</span>
                 <span id="home-character-count">Party library coming next</span>
-                <button id="home-settings" className="secondary-action" type="button">Settings</button>
+                <button id="home-settings" className="secondary-action" type="button">App Settings</button>
               </div>
             </div>
           </section>
@@ -534,14 +544,14 @@ function SetupDialog() {
         <header className="dialog-header">
           <div>
             <p className="eyebrow">Settings</p>
-            <h2>LoreKeeper Mode And Sync</h2>
+            <h2>LoreKeeper Preferences</h2>
           </div>
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
 
-        <section className="setup-section app-mode-section">
+        <section id="app-preferences-section" className="setup-section app-mode-section">
           <div className="section-title">
-            <h3>App Mode</h3>
+            <h3>App Preferences</h3>
           </div>
           <label>
             <span>Mode</span>
@@ -553,9 +563,9 @@ function SetupDialog() {
           <p id="app-mode-note" className="setup-note">Host runs campaigns and providers. Join connects to a hosted table without local provider setup.</p>
         </section>
 
-        <section className="setup-section">
+        <section id="provider-setup-section" className="setup-section provider-setup-section">
           <div className="section-title">
-            <h3>Provider</h3>
+            <h3>Provider Setup</h3>
           </div>
           <label>
             <span>Provider Mode</span>
@@ -628,7 +638,7 @@ function SetupDialog() {
           </details>
         </section>
 
-        <section className="setup-section">
+        <section className="setup-section campaign-settings-section">
           <div className="section-title">
             <h3>Campaign Tools</h3>
           </div>

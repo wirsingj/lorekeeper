@@ -184,6 +184,7 @@ const elements = {
   homePanel: document.querySelector("#home-panel"),
   homeHostFlow: document.querySelector("#home-host-flow"),
   homeJoinFlow: document.querySelector("#home-join-flow"),
+  homeProviderSetup: document.querySelector("#home-provider-setup"),
   homeNewCampaign: document.querySelector("#home-new-campaign"),
   homeSettings: document.querySelector("#home-settings"),
   homeActiveCampaign: document.querySelector("#home-active-campaign"),
@@ -199,6 +200,7 @@ const elements = {
   nudgeDm: document.querySelector("#nudge-dm"),
   setupDialog: document.querySelector("#setup-dialog"),
   closeSetup: document.querySelector("#close-setup"),
+  providerSetupSection: document.querySelector("#provider-setup-section"),
   appModeSelect: document.querySelector("#app-mode-select"),
   appModeNote: document.querySelector("#app-mode-note"),
   characterSheetDialog: document.querySelector("#character-sheet-dialog"),
@@ -419,23 +421,18 @@ elements.homeNewCampaign?.addEventListener("click", () => {
   openCampaignDialog();
 });
 
+elements.homeProviderSetup?.addEventListener("click", () => {
+  chooseHomeFlow("host");
+  openSetupDialog({ focusProvider: true });
+});
+
 elements.homeSettings?.addEventListener("click", () => {
   chooseHomeFlow("host");
-  elements.setupDialog.showModal();
-  if (clientMode) {
-    refreshGuestSnapshot({ explicit: false }).catch(() => {});
-    return;
-  }
-  refreshProviderStatus({ quiet: true });
+  openSetupDialog();
 });
 
 elements.openSetup.addEventListener("click", () => {
-  elements.setupDialog.showModal();
-  if (clientMode) {
-    refreshGuestSnapshot({ explicit: false }).catch(() => {});
-    return;
-  }
-  refreshProviderStatus({ quiet: true });
+  openSetupDialog();
 });
 
 elements.nudgeDm?.addEventListener("click", async () => {
@@ -718,6 +715,24 @@ elements.pasteResponse.addEventListener("click", async () => {
     elements.bridgeStatus.textContent = "Clipboard paste unavailable";
   }
 });
+
+function openSetupDialog({ focusProvider = false } = {}) {
+  elements.setupDialog.showModal();
+  if (focusProvider) {
+    window.setTimeout(() => {
+      elements.providerSetupSection?.scrollIntoView({ block: "start", behavior: "smooth" });
+      elements.providerSetupSection?.classList.add("setup-section-focused");
+      window.setTimeout(() => {
+        elements.providerSetupSection?.classList.remove("setup-section-focused");
+      }, 1400);
+    }, 50);
+  }
+  if (clientMode) {
+    refreshGuestSnapshot({ explicit: false }).catch(() => {});
+    return;
+  }
+  refreshProviderStatus({ quiet: true });
+}
 
 document.querySelectorAll("[data-add-domain]").forEach((button) => {
   button.addEventListener("click", () => openRecordDialog(button.dataset.addDomain));

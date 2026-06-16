@@ -57,6 +57,7 @@ The user should not feel like they are debugging a model, managing queue machine
 11. Guest inputs can drive provider turns through structured `user.playerInputs[]`.
 12. Failed provider turns preserve approved/remote inputs as visibly staged rather than silently consuming them.
 13. CombatEngine can now resolve app-owned DC checks and opposed checks/contests with logged rolls, success/failure effects, and initiative advancement.
+14. The unified front door now treats Host, Join, and Provider Setup as first-class app-level flows.
 
 ### Still Risky
 
@@ -72,6 +73,7 @@ The user should not feel like they are debugging a model, managing queue machine
 10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Context retrieval is still coarse and recent-message heavy compared with the desired actor/place/consequence/thread retrieval.
+13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
 
 ## Live Acceptance Matrix
 
@@ -186,6 +188,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Guest snapshots redact hidden DM notes and enemy HP.
 - [x] Remote-to-AI/host controller transfer clears stale guest links.
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
+- [x] Provider Setup is reachable as a first-class front-door flow.
 - [ ] Run first real two-machine playtest.
 - [ ] Make guest sent/received/resolving/resolved states clearer.
 - [ ] Make host "guest waiting" state harder to miss.
@@ -210,6 +213,8 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Debug meta toggle available in Settings diagnostics.
 - [x] Binder can collapse to give play surface more room.
 - [x] Empty states use more table-shaped language.
+- [x] Main menu separates Host, Join, and Provider Setup from the in-campaign rails.
+- [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.
 - [ ] Consider context-sensitive binder sections or tabs after playtest.
