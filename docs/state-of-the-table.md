@@ -61,6 +61,7 @@ The user should not feel like they are debugging a model, managing queue machine
 15. The app starts in a neutral lobby mode instead of visibly sitting at the last active table.
 16. Join before connection is now a lobby flow with a Back control, not an in-campaign table view.
 17. Provider/App Settings open from the lobby without implicitly entering the last campaign.
+18. Host/table mode has a Main Menu return control so the front door is reachable after entering a campaign.
 
 ### Still Risky
 
@@ -219,6 +220,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Main menu separates Host, Join, and Provider Setup from the in-campaign rails.
 - [x] Main menu hides last-table rails, binder, and command input until a flow is chosen.
 - [x] Join setup hides table rails and command input until connected to a host table.
+- [x] Campaign/table view can return to the main menu without closing the app.
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.

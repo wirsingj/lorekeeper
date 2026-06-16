@@ -195,6 +195,7 @@ const elements = {
   repairInspect: document.querySelector("#repair-inspect"),
   repairImportAnyway: document.querySelector("#repair-import-anyway"),
   saveStatus: document.querySelector("#save-status"),
+  returnMainMenu: document.querySelector("#return-main-menu"),
   openSetup: document.querySelector("#open-setup"),
   nudgeDm: document.querySelector("#nudge-dm"),
   setupDialog: document.querySelector("#setup-dialog"),
@@ -417,10 +418,7 @@ elements.homeJoinFlow?.addEventListener("click", () => {
 });
 
 elements.joinBackHome?.addEventListener("click", () => {
-  state.homeFlow = "";
-  renderHomePanel();
-  renderThinJoinPanel();
-  setProviderActivity("Choose Host, Join, or Provider Setup.", "idle");
+  returnToMainMenu();
 });
 
 elements.homeNewCampaign?.addEventListener("click", () => {
@@ -438,6 +436,10 @@ elements.homeSettings?.addEventListener("click", () => {
 
 elements.openSetup.addEventListener("click", () => {
   openSetupDialog();
+});
+
+elements.returnMainMenu?.addEventListener("click", () => {
+  returnToMainMenu();
 });
 
 elements.nudgeDm?.addEventListener("click", async () => {
@@ -5188,6 +5190,13 @@ function chooseHomeFlow(flow) {
     return;
   }
   setProviderActivity("LoreKeeper Host ready.", "idle");
+}
+
+function returnToMainMenu() {
+  state.homeFlow = "";
+  renderHomePanel();
+  renderThinJoinPanel();
+  setProviderActivity("Choose Host, Join, or Provider Setup.", "idle");
 }
 
 function renderHomePanel() {

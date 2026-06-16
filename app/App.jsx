@@ -9,6 +9,13 @@ export function LorekeeperShell() {
               <h1 id="campaign-title" className="visually-hidden">Loading campaign...</h1>
             </div>
             <div className="title-actions">
+              <button id="return-main-menu" className="icon-action" type="button" title="Main menu" aria-label="Main menu">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M3 11l9-7l9 7"></path>
+                  <path d="M5 10v10h14V10"></path>
+                  <path d="M9 20v-6h6v6"></path>
+                </svg>
+              </button>
               <button id="nudge-dm" className="icon-action labeled-action nudge-action" type="button" title="Nudge DM" aria-label="Nudge DM">
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7L8 5Z"></path>
