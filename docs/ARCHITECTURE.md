@@ -238,6 +238,7 @@ Start here when making changes:
 - Living world continuity model: `docs/living-world.md`, `src/engine/living-world-engine.js`
 - One-blob state debugging: `src/engine/table-debug-snapshot.js`, diagnostics `debugSnapshot`
 - Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
+- Stale combat prompt repair: `app/combat-prompt-repair-controller.js`
 - Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`
 - Character creation/autocomplete: `app/character-autocomplete-controller.js`
 - Local multiplayer: `src/multiplayer/local-table.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`

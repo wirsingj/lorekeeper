@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
+import { createImplicitCombatActorPromptChange, latestDmNarration } from "../app/combat-prompt-repair-controller.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
@@ -836,6 +837,55 @@ function testCombatEndsWhenSideDrops() {
   assert.equal(resolved.campaign.combat.currentTurnId, null, "ended combat should not point at a stale active actor");
   assert.equal(resolved.campaign.combat.lastOutcome, "enemies_defeated");
   assert.equal(resolved.campaign.engineState.mode, "rp");
+}
+
+function testCombatPromptRepairController() {
+  const campaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { miner: 20, thor: 12, sy: 7, karl: 6 },
+  });
+  assert.equal(campaign.combat.currentTurnId, "miner");
+
+  const choiceRepair = createImplicitCombatActorPromptChange({
+    campaign,
+    turnResponse: {
+      sceneStatus: { mode: "combat" },
+      choices: { forActorId: "thor", options: [] },
+    },
+  });
+  assert.equal(choiceRepair.data.promptedActorId, "thor");
+  assert.equal(choiceRepair.data.onlyFromNonParty, true);
+  assert.equal(choiceRepair.confidence, "high");
+
+  const proseRepair = createImplicitCombatActorPromptChange({
+    campaign,
+    tableMessages: [
+      { role: "dm", body: "Thor's turn. What do you do?" },
+    ],
+  });
+  assert.equal(proseRepair.data.promptedActorId, "thor");
+
+  const blockedByExistingCombatUpdate = createImplicitCombatActorPromptChange({
+    campaign,
+    turnResponse: { choices: { forActorId: "thor" } },
+    proposedChanges: [{ domain: "combat", data: { advanceTurn: true, resolvedActorId: "miner" } }],
+  });
+  assert.equal(blockedByExistingCombatUpdate, null);
+
+  const partyAlreadyActive = createImplicitCombatActorPromptChange({
+    campaign: {
+      ...campaign,
+      combat: { ...campaign.combat, currentTurnId: "sy" },
+    },
+    turnResponse: { choices: { forActorId: "thor" } },
+  });
+  assert.equal(partyAlreadyActive, null);
+
+  assert.equal(latestDmNarration([
+    { role: "dm", body: "First prompt." },
+    { role: "party", body: "Thor waits." },
+    { role: "dm", body: "Latest prompt." },
+  ]), "Latest prompt.");
 }
 
 function testCombatTrackerView() {
@@ -2062,6 +2112,7 @@ function testReviewPanelProjection() {
 
 async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
@@ -2129,6 +2180,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.doesNotMatch(appJs, /function shouldAutoApproveChange/, "renderer should not own provider auto-approval policy");
   assert.match(appJs, /buildTableSessionProjection/, "renderer should consume the table session projection");
   assert.match(appJs, /dataset\.tablePhase/, "status strip should expose the unified table phase");
+  assert.match(appJs, /combat-prompt-repair-controller\.js/, "combat prompt repair policy should live outside the main app renderer");
+  assert.match(combatPromptRepairController, /promptedCombatActorIdFromTurnResponse/, "combat prompt repair controller should own actor prompt detection");
+  assert.doesNotMatch(appJs, /function promptedCombatActorIdFromTurnResponse/, "renderer should not own combat prompt actor detection");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
@@ -2280,6 +2334,7 @@ testTurnEngine();
 testStateEffects();
 testCombatEngine();
 testCombatEndsWhenSideDrops();
+testCombatPromptRepairController();
 testCombatTrackerView();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
