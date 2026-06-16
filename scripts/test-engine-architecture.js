@@ -424,6 +424,68 @@ function testCombatEngine() {
   assert.equal(contested.actionRecord.effects.some((effect) => effect.condition === "prone"), true);
   assert.equal(contested.campaign.combat.currentTurnId, "sy");
 
+  const intimidationCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10, stats: { abilityScores: { WIS: 8 } } }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const intimidated = resolveCombatAction(intimidationCampaign, {
+    turnId: "combat-intimidation-contest-turn",
+    actorId: "thor",
+    actionType: "improvise",
+    declaredText: "Thor cracks the greataxe haft against the floor and demands the miner stand down.",
+    targetIds: ["miner"],
+    contest: {
+      actorSkill: "Intimidation",
+      actorModifier: 20,
+      targetAbility: "WIS",
+      targetModifier: -5,
+    },
+    successEffects: [{ type: "condition_add", targetId: "miner", condition: "shaken", reason: "Intimidated into hesitation" }],
+    failureEffects: [{ type: "position_note", targetId: "thor", note: "The miner is not cowed." }],
+  }, { seed: "combat-intimidation-contest-seed" });
+  assert.equal(intimidated.actionRecord.rolls[0].label, "Contest Intimidation check");
+  assert.equal(intimidated.actionRecord.rolls[1].label, "Opposed WIS check");
+  assert.ok(intimidated.campaign.combat.enemies.find((enemy) => enemy.id === "miner").conditions.includes("shaken"));
+
+  const chaseCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor" ? { ...member, skills: ["Athletics"] } : member),
+  }, {
+    enemies: [{ id: "miner", name: "Fleeing miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const chased = resolveCombatAction(chaseCampaign, {
+    turnId: "combat-chase-turn",
+    actorId: "thor",
+    actionType: "check",
+    declaredText: "Sprint across the slick alley to keep the fleeing miner in reach.",
+    skill: "Athletics",
+    modifier: 20,
+    dc: 12,
+    successEffects: [{ type: "position_note", targetId: "thor", note: "Kept pace with the fleeing miner." }],
+    failureEffects: [{ type: "position_note", targetId: "thor", note: "Lost ground in the chase." }],
+  }, { seed: "combat-chase-seed" });
+  assert.equal(chased.actionRecord.rolls[0].label, "Athletics check");
+  assert.ok(chased.campaign.party.find((member) => member.id === "thor").positionNotes.includes("Kept pace with the fleeing miner."));
+
+  const reactionCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const readiedReaction = resolveCombatAction(reactionCampaign, {
+    turnId: "combat-ready-reaction-turn",
+    actorId: "thor",
+    actionType: "ready",
+    declaredText: "Ready a reaction to block the doorway if the miner bolts.",
+    effects: [
+      { type: "resource_delta", targetId: "thor", resource: "reaction.used", amount: 1, reason: "Reaction reserved for readied block" },
+      { type: "condition_add", targetId: "thor", condition: "readied_reaction", reason: "Ready action declared" },
+    ],
+  }, { seed: "combat-ready-reaction-seed" });
+  const thorAfterReady = readiedReaction.campaign.party.find((member) => member.id === "thor");
+  assert.equal(thorAfterReady.resources.reaction.used, 1);
+  assert.ok(thorAfterReady.conditions.includes("readied_reaction"));
+
   const spellCampaign = startCombat({
     ...campaignFixture(),
     party: campaignFixture().party.map((member) => member.id === "thor"
@@ -476,6 +538,82 @@ function testCombatEngine() {
   assert.equal(thorAfterSpell.resources.spellSlots[1].used, 1);
   assert.equal(thorAfterSpell.stats.spellSlots[1].used, 1);
   assert.equal(entangled.campaign.combat.currentTurnId, "sy");
+
+  const concentrationSpellCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor"
+      ? {
+        ...member,
+        ancestryClass: "Dwarf Cleric",
+        resources: { spellSlots: { 1: { max: 2, used: 0 } } },
+        stats: { ...member.stats, spellSaveDc: 13 },
+      }
+      : member),
+  }, {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const concentrated = resolveCombatAction(concentrationSpellCampaign, {
+    turnId: "combat-concentration-spell-turn",
+    actorId: "thor",
+    actionType: "spell",
+    spellName: "Shielding Mist",
+    slotLevel: 1,
+    targetIds: ["thor"],
+    effects: [
+      { type: "condition_add", targetId: "thor", condition: "concentrating: Shielding Mist", reason: "Concentration spell active" },
+      { type: "condition_add", targetId: "thor", condition: "shielded", reason: "Shielding Mist active" },
+    ],
+  }, { seed: "combat-concentration-spell-seed" });
+  const thorAfterConcentration = concentrated.campaign.party.find((member) => member.id === "thor");
+  assert.ok(thorAfterConcentration.conditions.includes("concentrating: Shielding Mist"));
+  assert.ok(thorAfterConcentration.conditions.includes("shielded"));
+  assert.equal(thorAfterConcentration.resources.spellSlots[1].used, 1);
+
+  const healingCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor"
+      ? {
+        ...member,
+        stats: { ...member.stats, hp: { current: 4, max: 12 } },
+        resources: { spellSlots: { 1: { max: 2, used: 0 } } },
+      }
+      : member),
+  }, {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const healed = resolveCombatAction(healingCampaign, {
+    turnId: "combat-healing-spell-turn",
+    actorId: "thor",
+    actionType: "spell",
+    spellName: "Cure Wounds",
+    slotLevel: 1,
+    targetIds: ["thor"],
+    healingFormula: "1d4+3",
+  }, { seed: "combat-healing-spell-seed" });
+  assert.equal(healed.actionRecord.rolls.some((roll) => roll.label === "Cure Wounds healing"), true);
+  assert.ok(healed.campaign.party.find((member) => member.id === "thor").stats.hp.current > 4);
+
+  const halfDamageCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 30, max: 30 }, armorClass: 10, stats: { abilityScores: { DEX: 18 } } }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  const halfDamaged = resolveCombatAction(halfDamageCampaign, {
+    turnId: "combat-half-damage-save-turn",
+    actorId: "thor",
+    actionType: "spell",
+    spellName: "Sacred Flame",
+    targetIds: ["miner"],
+    save: { ability: "DEX", dc: 1 },
+    damageFormula: "2d6",
+    halfDamageOnSave: true,
+  }, { seed: "combat-half-damage-save-seed" });
+  const damageRoll = halfDamaged.actionRecord.rolls.find((roll) => roll.label === "Sacred Flame damage");
+  const damageEffect = halfDamaged.actionRecord.effects.find((effect) => effect.type === "hp_delta" && effect.targetId === "miner");
+  assert.ok(damageRoll.total > 0);
+  assert.ok(damageEffect.amount < 0);
+  assert.ok(Math.abs(damageEffect.amount) <= Math.floor(damageRoll.total / 2));
 
   const enemyTurnCampaign = startCombat(campaignFixture(), {
     enemies: [{

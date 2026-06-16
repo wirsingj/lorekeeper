@@ -101,6 +101,7 @@ Every table surface should answer the same practical questions a real table answ
 50. AI companion nudge approvals now read as table beats: Stage For DM, Pass, and staged-for-next-Send-Turn status.
 51. Server HTTP integration tests now run against a temporary campaign root and prove API-token protection plus stale campaign-pin rejection on a real mutation route.
 52. Server HTTP integration tests now prove stale public guest actions and choice votes reject wrong table/session identity through real routes.
+53. CombatEngine fixtures now cover chase positioning, intimidation contests, readied reactions, concentration conditions, healing spells, and half-damage-on-save spells.
 
 ### Still Risky
 
@@ -216,7 +217,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add fixtures for app-owned attack, dodge, surrender, de-escalation, DC check, and opposed skill contest.
 - [x] Add fixtures for app-owned simple spell save, spell-slot spending, and save-gated conditions.
 - [x] Add fixture for app-owned enemy attack turn.
-- [ ] Add fixtures for chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases. Current state: app-owned Help, Disengage, Hide, and Flee/escape fixtures exist.
+- [x] Add fixtures for chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases.
 - [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
 - [ ] Add crisp AI companion combat approval flow.
 - [x] Reject provider combat responses that resolve the wrong active actor.
