@@ -33,6 +33,8 @@ The party members are the people around the table. The DM is the app plus the AI
 
 The user should not feel like they are debugging a model, managing queue machinery, or translating software concepts while trying to play.
 
+Every table surface should answer the same practical questions a real table answers without explanation: where are we, whose attention is needed, who controls this character, what just happened, what can I do now, and what is remembered as true.
+
 ## Table Model
 
 1. The DM voice is app/provider owned. It describes the world, NPCs, consequences, rules calls, and combat outcomes.
@@ -68,8 +70,8 @@ The user should not feel like they are debugging a model, managing queue machine
 19. Guest action lifecycle now uses clearer sent/waiting/queued/resolved language on both guest and host surfaces.
 20. Session health now names the waiting party member and distinguishes host approval, grouped turns, queued DM actions, passes, and guest sent state.
 21. Table Talk now gets a subtle unread cue when new side-chat messages arrive.
-22. Host New is becoming a real pre-table setup workspace with party controller intent instead of a small modal over the last table.
-23. Browser guests can open `/guest`, enter a waiting room, and be seated by the host without a packaged client or pasted invite link.
+22. Host New is now a full pre-table setup workspace with party controller intent instead of a small modal over the last table.
+23. Same-network guests can open `/guest`, enter a waiting room, and be seated by the host without a packaged client or pasted invite link.
 24. Host Local Table now exposes a copyable Guest Link built from the detected LAN IP and port.
 25. Waiting-room guests now surface from the live host snapshot in Local Table, party seating actions, session health, and the table status strip.
 26. Waiting-room presence now uses guest heartbeat/stale filtering so old guest names do not linger after campaign switches or closed tabs.
@@ -77,6 +79,8 @@ The user should not feel like they are debugging a model, managing queue machine
 28. Generated Guest Links are scoped to campaign, table, and session identity so stale links do not silently join a different active campaign or table.
 29. Multiplayer waiting guests, invite links, guest snapshots, staged actions, combat joins, and table talk now carry table/session ownership and reject supplied identity mismatches.
 30. The right rail is split into Campaign Notes and Player Notes, with Table Talk anchored at the bottom of the table surface.
+31. Controlled-party agency validation now rejects obvious model output that speaks or acts for a host/remote/unassigned party member without submitted controller input.
+32. Route classification tests now cover the guest-public vs host-protected API boundary.
 
 ### Still Risky
 
@@ -94,6 +98,8 @@ The user should not feel like they are debugging a model, managing queue machine
 12. Context retrieval is still coarse and recent-message heavy compared with the desired actor/place/consequence/thread retrieval.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
 14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
+15. Player Notes are local UI convenience notes, not yet campaign-SQLite-backed, shared, exported, or portable across devices.
+16. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 
 ## Live Acceptance Matrix
 
@@ -101,14 +107,15 @@ The user should not feel like they are debugging a model, managing queue machine
 | --- | --- | --- |
 | Player can tell whose turn it is. | Improved | Combat tracker and input placeholder cover basic cases. Long encounters need richer context. |
 | Player can tell who controls each character. | Improved | Badges/actions exist. Language still needs user testing. |
-| DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, and suppression help. Needs scenario fixtures. |
+| DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, suppression, and obvious output validation help. Needs broader scenario fixtures. |
 | AI companions feel like party members. | Improved | Nudge flow and creation defaults help. Approval flow still needs polish. |
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Full vote flow is open. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned resolution needs broader coverage. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression improved. Needs social/travel/downtime fixtures. |
-| DM has story beyond current scene. | Improved | Hidden arcs exist and are private. Needs scenario testing for adaptation and non-leakage. |
+| DM has story beyond current scene. | Improved | Hidden arcs exist and are private. Needs scenario testing for adaptation, pacing, and non-leakage. |
+| Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are not yet portable/canonical. |
 | Recovery after provider failure is understandable. | Improved | Player echoes and staged inputs show lifecycle. Repair/retry still needs table-shaped flow. |
 | Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place. |
 
@@ -118,7 +125,7 @@ The user should not feel like they are debugging a model, managing queue machine
 
 1. Make common combat action resolution app-owned before provider narration: action validation, roll, check/save, damage/healing, HP/resource/condition updates, and initiative advancement.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Continue expanding scenario fixtures proving the provider cannot speak for host/remote PCs across combat, join-transfer, and AI-companion cases.
+3. Continue expanding scenario fixtures proving the provider cannot speak for host/remote/unassigned PCs across combat, join-transfer, and AI-companion cases.
 
 ### High
 
@@ -136,7 +143,7 @@ The user should not feel like they are debugging a model, managing queue machine
 12. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
 13. Improve context retrieval around present actors, active place, relationships, consequences, unresolved threads, and private story arcs.
 14. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
-15. Add route-level API/security tests for LAN/private route classification.
+15. Expand route-level API/security tests beyond classification into request/response integration under API-token, LAN origin, and stale identity cases.
 16. Add long-campaign performance fixtures and eventually virtualize long play logs.
 
 ### Low
@@ -157,6 +164,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Hidden long/mid/short story threads are sent as private DM planning.
 - [x] Choice targeting supports party, character, subset, vote, combat actor, and free prompts.
 - [x] Add provider-output fixtures for obvious controlled-PC agency failures.
+- [x] Reject obvious controlled-PC agency violations during response validation.
 - [ ] Add fixtures for social, travel, mystery, downtime, combat, and recovery scenes.
 - [ ] Improve context retrieval beyond recent history/context pack breadth.
 - [ ] Add hidden-story scenario tests for adaptation without leaking future twists.
@@ -199,6 +207,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [ ] Make AI companion suggestions appear as approve/resolve/decline table beats.
 - [ ] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
 - [ ] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
+- [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration.
 - [x] Let host choose host/AI/unassigned during additional character creation.
 
 ### Multiplayer And LoreKeeper Join
@@ -247,7 +256,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Right rail separates Campaign Notes from Player Notes, with Table Talk kept at the bottom.
 - [x] Empty states use more table-shaped language.
 - [x] Main menu separates Host, Join, and Provider Setup from the in-campaign rails.
-- [x] Main menu hides last-table rails, binder, and command input until a flow is chosen.
+- [x] Main menu hides last-table rails, notes, and command input until a flow is chosen.
 - [x] Host on the main menu opens a selected campaign instead of implicitly resuming the last active campaign.
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
@@ -255,6 +264,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.
 - [ ] Consider context-sensitive note sections or tabs after playtest.
+- [ ] Persist Player Notes to campaign SQLite or an explicit per-user notes store before relying on them for long campaigns.
 - [x] Make Table Talk harder to miss without making it noisy.
 
 ### Storage, Diagnostics, And Safety
@@ -264,6 +274,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add route-level tests for private/guest API split.
+- [ ] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [ ] Add migration modules before public release.
 - [ ] Add backup/export/recycle story before destructive delete in release builds.
 - [ ] Move imported assets into app-owned portable asset storage.
@@ -335,6 +346,8 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-15: The DM should be able to target individual party members or the whole party, and party votes should become an actual table flow with host tie-breaks.
 - 2026-06-15: AI companions should occasionally feel alive with brief unprompted contributions, but not every response cycle and not for major decisions.
 - 2026-06-15: App-owned combat resolution now covers DC checks and opposed contests. Next combat slice should connect these records to actual UI/provider turn intake or add saves/spells/enemy-turn bounding.
+- 2026-06-16: Player Notes should not remain only local device state if they become part of long-campaign play. Decide whether they are per-user private notes, host-visible table notes, or both.
+- 2026-06-16: Pre-table guest seating needs a draft table/session identity before it can be safely supported for unsaved Host New campaigns.
 
 ## How To Use This Doc
 
