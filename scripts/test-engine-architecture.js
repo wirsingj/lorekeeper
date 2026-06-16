@@ -12,7 +12,7 @@ import { buildHostResponseReviewProjection } from "../app/host-response-review-c
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
-import { buildProviderImportOutcome, decideLatestProviderImport } from "../app/provider-import-controller.js";
+import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
@@ -1643,6 +1643,26 @@ function testProviderImportOutcomeProjection() {
   assert.equal(newLatest.action, "import");
   assert.equal(newLatest.text, "new answer");
   assert.equal(newLatest.activityState, "working");
+
+  assert.equal(shouldAutoApproveProviderChange({ importance: "minor", visibility: "player_visible" }), true);
+  assert.equal(shouldAutoApproveProviderChange({ importance: "major", visibility: "player_visible" }), false);
+  assert.equal(shouldAutoApproveProviderChange({ status: "rejected", importance: "minor" }), false);
+  assert.equal(shouldAutoApproveProviderChange({ validation: { valid: false }, importance: "minor" }), false);
+  assert.equal(shouldAutoApproveProviderChange({
+    domain: "quests",
+    visibility: "dm_only",
+    data: { threadType: "story_arc" },
+  }), true);
+  const safeBatch = prepareAutoCommitReviewBatch({
+    id: "review-1",
+    proposedChanges: [
+      { id: "minor", importance: "minor", visibility: "player_visible", status: "pending" },
+      { id: "major", importance: "major", visibility: "player_visible", status: "pending" },
+    ],
+  });
+  assert.equal(safeBatch.proposedChanges.find((change) => change.id === "minor").status, "approved");
+  assert.equal(safeBatch.proposedChanges.find((change) => change.id === "major").status, "pending");
+  assert.equal(prepareAutoCommitReviewBatch({ proposedChanges: [{ importance: "major" }] }), null);
 }
 
 function testCharacterAutocompleteProjection() {
@@ -1875,6 +1895,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.doesNotMatch(appJs, /else if \(inputs\.length && !runResult\?\.imported\)/, "pending input recovery branching should live in staged-input-recovery-controller");
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
+  assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
+  assert.doesNotMatch(appJs, /function shouldAutoApproveChange/, "renderer should not own provider auto-approval policy");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {

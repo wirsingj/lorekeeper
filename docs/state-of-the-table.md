@@ -137,6 +137,7 @@ Every table surface should answer the same practical questions a real table answ
 86. Character auto-complete now lives in a small controller and uses explicit campaign/draft party context, preserving user-supplied facts while filling missing details from party theme.
 87. Host New now has an Add Party Set action that creates three related AI companion cards from the primary character/draft party theme for quick "four dwarf soldiers" style setup.
 88. Generated 5E-lite sheets now include class-appropriate equipment/inventory and structured spell metadata, while context packs and sheet text areas render those details as readable names.
+89. Provider review auto-commit policy now lives in `provider-import-controller.js`, including hidden story-arc auto-approval and major/invalid/rejected change blocking.
 
 ### Still Risky
 
@@ -241,7 +242,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Diagnostics include table timeline and session health summary.
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions, provider import outcome copy, and latest-response import gating are extracted; broader provider/import orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions, provider import outcome copy, latest-response import gating, and provider review auto-commit policy are extracted; broader provider/import orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.

@@ -82,3 +82,52 @@ export function decideLatestProviderImport({
     text: trimmedLatest,
   };
 }
+
+export function prepareAutoCommitReviewBatch(reviewBatch) {
+  if (!reviewBatch?.proposedChanges?.length) {
+    return null;
+  }
+
+  const safeBatch = {
+    ...reviewBatch,
+    proposedChanges: reviewBatch.proposedChanges.map((change) => ({
+      ...change,
+      status: shouldAutoApproveProviderChange(change) ? "approved" : change.status,
+    })),
+  };
+
+  return safeBatch.proposedChanges.some((change) => change.status === "approved")
+    ? safeBatch
+    : null;
+}
+
+export function shouldAutoApproveProviderChange(change = {}) {
+  if (change.validation?.valid === false || change.status === "rejected") {
+    return false;
+  }
+  if (isHiddenStoryChange(change)) {
+    return true;
+  }
+  if (change.importance === "major" || change.visibility === "dm_only" || change.visibility === "system_only") {
+    return false;
+  }
+  return true;
+}
+
+function isHiddenStoryChange(change = {}) {
+  return (
+    normalizeChangeDomain(change.domain) === "quests" &&
+    change.visibility === "dm_only" &&
+    (change.data?.threadType === "story_arc" ||
+      change.data?.thread_type === "story_arc" ||
+      change.data?.kind === "story_arc" ||
+      change.data?.type === "story_arc")
+  );
+}
+
+function normalizeChangeDomain(domain) {
+  if (domain === "party_member" || domain === "player_character") {
+    return "party";
+  }
+  return domain;
+}

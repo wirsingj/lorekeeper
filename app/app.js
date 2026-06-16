@@ -23,7 +23,7 @@ import { buildInputComposerProjection, applyInputComposerProjection } from "./in
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
-import { buildProviderImportOutcome, decideLatestProviderImport } from "./provider-import-controller.js";
+import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
@@ -6659,47 +6659,8 @@ function schedulePostImportAutomation() {
 }
 
 async function autoCommitReviewBatch(reviewBatch) {
-  if (!reviewBatch?.proposedChanges?.length) {
-    return null;
-  }
-
-  const safeBatch = {
-    ...reviewBatch,
-    proposedChanges: reviewBatch.proposedChanges.map((change) => ({
-      ...change,
-      status: shouldAutoApproveChange(change) ? "approved" : change.status,
-    })),
-  };
-
-  if (!safeBatch.proposedChanges.some((change) => change.status === "approved")) {
-    return null;
-  }
-
-  return commitExtractedChanges(safeBatch);
-}
-
-function shouldAutoApproveChange(change) {
-  if (change.validation?.valid === false || change.status === "rejected") {
-    return false;
-  }
-  if (isHiddenStoryChange(change)) {
-    return true;
-  }
-  if (change.importance === "major" || change.visibility === "dm_only" || change.visibility === "system_only") {
-    return false;
-  }
-  return true;
-}
-
-function isHiddenStoryChange(change = {}) {
-  return (
-    normalizeChangeDomain(change.domain) === "quests" &&
-    change.visibility === "dm_only" &&
-    (change.data?.threadType === "story_arc" ||
-      change.data?.thread_type === "story_arc" ||
-      change.data?.kind === "story_arc" ||
-      change.data?.type === "story_arc")
-  );
+  const safeBatch = prepareAutoCommitReviewBatch(reviewBatch);
+  return safeBatch ? commitExtractedChanges(safeBatch) : null;
 }
 
 function createImplicitSceneProgressChange(tableMessages = [], proposedChanges = []) {
