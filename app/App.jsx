@@ -558,7 +558,10 @@ function CampaignDialog() {
                 <span>Additional Characters</span>
                 <p>Build the pre-table party. Host and AI seats are ready immediately; Remote Invite seats are held open for a player.</p>
               </div>
-              <button id="add-wizard-party-member" className="icon-action" type="button" title="Add character">+</button>
+              <div className="wizard-heading-actions">
+                <button id="add-party-template" className="mini-action" type="button">Add Party Set</button>
+                <button id="add-wizard-party-member" className="icon-action" type="button" title="Add character">+</button>
+              </div>
             </div>
             <div id="wizard-additional-characters" className="wizard-additional-characters">
               <article className="wizard-character-card" data-wizard-character-card="0">

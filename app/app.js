@@ -13,7 +13,7 @@ import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
-import { completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
+import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
@@ -413,6 +413,7 @@ const elements = {
   newCharacterAutocomplete: document.querySelector("#new-character-autocomplete"),
   wizardAdditionalCharacters: document.querySelector("#wizard-additional-characters"),
   addWizardPartyMember: document.querySelector("#add-wizard-party-member"),
+  addPartyTemplate: document.querySelector("#add-party-template"),
   newJoinerName: document.querySelector("#new-joiner-name"),
   newJoinerAncestry: document.querySelector("#new-joiner-ancestry"),
   newJoinerClass: document.querySelector("#new-joiner-class"),
@@ -518,6 +519,10 @@ elements.newCharacterAutocomplete?.addEventListener("click", () => {
 
 elements.addWizardPartyMember?.addEventListener("click", () => {
   addWizardPartyMemberCard();
+});
+
+elements.addPartyTemplate?.addEventListener("click", () => {
+  addPartyTemplateCharactersToWizard();
 });
 
 elements.wizardAdditionalCharacters?.addEventListener("click", (event) => {
@@ -2493,6 +2498,45 @@ function addWizardPartyMemberCard(input = {}) {
   setWizardControllerKind(card, input.controllerKind || "ai_companion");
   refs.name?.focus();
   return card;
+}
+
+function addPartyTemplateCharactersToWizard() {
+  const primarySeed = compactCharacterSeedFromRefs(compactCharacterFormRefs("new-character"));
+  const characters = buildPartyTemplateCharacters(primarySeed, {
+    campaign: characterAutocompleteCampaignContext(),
+    startingPartyMembers: characterAutocompleteStartingPartyMembers(),
+    count: 3,
+  });
+  for (const character of characters) {
+    const card = nextEmptyWizardCharacterCard() || addWizardPartyMemberCard();
+    fillWizardPartyMemberCard(card, character);
+  }
+  renumberWizardPartyMemberCards();
+  setProviderActivity("Party set added; review names and seats", "idle");
+}
+
+function nextEmptyWizardCharacterCard() {
+  return [...(elements.wizardAdditionalCharacters?.querySelectorAll("[data-wizard-character-card]") ?? [])]
+    .find((card) => {
+      const input = wizardCharacterInputFromRefs(compactCharacterFormRefs("wizard-card", card));
+      return ![input.name, input.ancestry, input.characterClass, input.concept, input.integrationPrompt, input.hostIntegrationPrompt]
+        .some((value) => String(value ?? "").trim());
+    }) || null;
+}
+
+function fillWizardPartyMemberCard(card, character = {}) {
+  const refs = compactCharacterFormRefs("wizard-card", card);
+  setFormValue(refs.name, character.name);
+  setFormValue(refs.ancestry, character.ancestry);
+  setFormValue(refs.characterClass, character.characterClass);
+  setFormValue(refs.level, character.level ?? "1");
+  setFormValue(refs.concept, character.concept || character.backstory);
+  setFormValue(refs.integrationPrompt, character.integrationPrompt);
+  setFormValue(refs.hostIntegrationPrompt, character.hostIntegrationPrompt);
+  if (refs.autoSheet) {
+    refs.autoSheet.checked = true;
+  }
+  setWizardControllerKind(card, character.controllerKind || "ai_companion");
 }
 
 function renumberWizardPartyMemberCards() {

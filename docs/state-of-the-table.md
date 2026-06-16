@@ -135,6 +135,7 @@ Every table surface should answer the same practical questions a real table answ
 84. Agency validation fixtures now cover cinematic body-language overreach for remote PCs, such as a model tightening Mira's grip or leaning her into action without submitted input, while still allowing hostile NPC focus on her.
 85. Local multiplayer regression coverage now includes stale guest snapshot/action rejection after host campaign switch, in addition to disconnect, reconnect, stale table, and stale session cases.
 86. Character auto-complete now lives in a small controller and uses explicit campaign/draft party context, preserving user-supplied facts while filling missing details from party theme.
+87. Host New now has an Add Party Set action that creates three related AI companion cards from the primary character/draft party theme for quick "four dwarf soldiers" style setup.
 
 ### Still Risky
 
@@ -322,7 +323,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character.
 - [ ] Let Host New remote-invite slots seat waiting-room guests before campaign start.
 - [x] Make auto-complete campaign-aware without overriding user facts.
-- [ ] Add party-template flow for repeated related companions.
+- [x] Add party-template flow for repeated related companions.
 - [ ] Improve class/spell/equipment depth beyond shallow 5E-lite starts.
 
 ### UI Comfort

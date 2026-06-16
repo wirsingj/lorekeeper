@@ -45,6 +45,40 @@ export function completeCharacterSeed(seed = {}, options = {}) {
   };
 }
 
+export function buildPartyTemplateCharacters(seed = {}, options = {}) {
+  const count = Math.max(1, Math.min(Number(options.count) || 3, 8));
+  const campaign = options.campaign || {};
+  const startingPartyMembers = Array.isArray(options.startingPartyMembers) ? [...options.startingPartyMembers] : [];
+  const primary = completeCharacterSeed(seed, {
+    campaign,
+    startingPartyMembers,
+  });
+  const characters = [];
+  for (let index = 0; index < count; index += 1) {
+    const completed = completeCharacterSeed({
+      ancestry: primary.ancestry,
+      characterClass: primary.characterClass,
+      level: primary.level,
+      roleIntent: primary.roleIntent,
+      concept: `${primary.ancestry} ${primary.characterClass} companion connected to ${primary.name}.`,
+      controllerKind: "ai_companion",
+    }, {
+      campaign,
+      startingPartyMembers: [
+        ...startingPartyMembers,
+        primary,
+        ...characters,
+      ],
+    });
+    characters.push({
+      ...completed,
+      controllerKind: "ai_companion",
+      hostIntegrationPrompt: `${completed.name} should reinforce the party theme and stay available for host direction.`,
+    });
+  }
+  return characters;
+}
+
 export function splitAncestryClass(value = "") {
   const words = String(value ?? "").trim().split(/\s+/).filter(Boolean);
   const ancestryIndex = words.findIndex((word) => /\b(dwarf|dwarven|elf|elven|human|halfling|gnome|orc|tiefling|dragonborn|fairy|fae)\b/i.test(word));

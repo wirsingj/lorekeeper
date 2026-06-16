@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
-import { completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
+import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
@@ -1655,6 +1655,25 @@ function testCharacterAutocompleteProjection() {
   assert.equal(themed.level, 3);
   assert.match(themed.backstory, /dwarf soldier theme/i);
   assert.match(themed.integrationPrompt, /Oskar, Ingrid/);
+
+  const partySet = buildPartyTemplateCharacters({
+    name: "Oskar",
+    ancestry: "Dwarf",
+    characterClass: "Soldier",
+    level: 2,
+  }, {
+    campaign: {
+      summary: "A dwarf soldier company opens a mountain road.",
+      party: [{ id: "oskar", name: "Oskar", ancestry: "Dwarf", characterClass: "Soldier", level: 2 }],
+    },
+    count: 3,
+  });
+  assert.equal(partySet.length, 3);
+  assert.ok(partySet.every((member) => member.ancestry === "Dwarf"));
+  assert.ok(partySet.every((member) => member.characterClass === "Soldier"));
+  assert.ok(partySet.every((member) => member.controllerKind === "ai_companion"));
+  assert.equal(new Set(partySet.map((member) => member.name)).size, 3);
+  assert.match(partySet[0].integrationPrompt, /Oskar/);
 }
 
 function testMultiplayerSessionProjection() {
@@ -1842,6 +1861,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   const localTable = await readFile(path.join("src", "multiplayer", "local-table.js"), "utf8");
   const server = await readFile(path.join("scripts", "serve.js"), "utf8");
   assert.match(appShell, /Additional Characters/);
+  assert.match(appShell, /Add Party Set/);
+  assert.match(appShell, /add-party-template/);
   assert.match(appShell, /add-wizard-party-member/);
   assert.match(appShell, /Remote Invite/);
   assert.match(appShell, /new-character-controller/);
@@ -1892,6 +1913,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /persistPlayerNotes/);
   assert.match(appJs, /savePlayerNotesFromUi/);
   assert.match(appJs, /collectWizardAdditionalCharacters/);
+  assert.match(appJs, /addPartyTemplateCharactersToWizard/);
+  assert.match(appJs, /buildPartyTemplateCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /Additional starting party members/);
