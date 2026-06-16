@@ -68,6 +68,7 @@ The user should not feel like they are debugging a model, managing queue machine
 22. Host New is becoming a real pre-table setup workspace with party controller intent instead of a small modal over the last table.
 23. Browser guests can open `/guest`, enter a waiting room, and be seated by the host without a packaged client or pasted invite link.
 24. Host Local Table now exposes a copyable Guest Link built from the detected LAN IP and port.
+25. Waiting-room guests now surface from the live host snapshot in Local Table, party seating actions, session health, and the table status strip.
 
 ### Still Risky
 
@@ -204,6 +205,7 @@ The user should not feel like they are debugging a model, managing queue machine
 - [x] Provider Setup is reachable as a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
 - [x] Host can copy a same-network Guest Link from Local Table.
+- [x] Waiting-room guests are visible to the host without digging through diagnostics.
 - [ ] Run first real two-machine playtest.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.

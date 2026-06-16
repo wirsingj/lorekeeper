@@ -928,6 +928,23 @@ function testMultiplayerSessionProjection() {
   assert.match(hostProjection.flowSummary, /queued/i);
   assert.match(hostProjection.pendingInputs[0].statusLabel, /Queued for DM/);
 
+  const liveWaitingProjection = buildMultiplayerSessionProjection({
+    campaign: {
+      ...campaign,
+      multiplayer: {
+        ...campaign.multiplayer,
+        waitingGuests: [],
+      },
+    },
+    hostSnapshot: {
+      ...campaign.multiplayer,
+      waitingGuests: [{ id: "wait-1", displayName: "Nora", status: "waiting" }],
+    },
+    locationPort: "4173",
+  });
+  assert.equal(liveWaitingProjection.waitingGuests.length, 1);
+  assert.equal(liveWaitingProjection.waitingGuests[0].displayName, "Nora");
+
   const stoppedProjection = buildMultiplayerSessionProjection({
     campaign: {
       ...campaign,
@@ -1056,6 +1073,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /local-table-guidance/);
   assert.match(appShell, /local-table-guest-link/);
   assert.match(appShell, /copy-guest-link/);
+  assert.match(appShell, /seat-waiting-guest/);
   assert.match(appShell, /id="right-rail-toggle"/);
   assert.match(appShell, /guest-waiting-room-panel/);
   assert.match(appShell, /Ask To Join/);
@@ -1079,6 +1097,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /guestWaitingRoomMode/);
   assert.match(appJs, /apiMultiplayerWaitingRegisterUrl/);
   assert.match(appJs, /seatWaitingGuestAtTable/);
+  assert.match(appJs, /renderWaitingGuestCue/);
+  assert.match(appJs, /announceWaitingGuestsIfNeeded/);
+  assert.match(appJs, /effectiveWaitingGuests/);
   assert.match(appJs, /copyGuestLinkFromUi/);
   assert.match(appJs, /currentLocalGuestLink/);
   assert.match(appJs, /partyControllerDetail/);

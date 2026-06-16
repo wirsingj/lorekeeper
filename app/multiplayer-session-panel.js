@@ -3,9 +3,10 @@ export function buildMultiplayerSessionProjection({
   clientMode = false,
   guestSession = null,
   guestSnapshot = null,
+  hostSnapshot = null,
   locationPort = "",
 } = {}) {
-  const multiplayer = campaign?.multiplayer ?? {};
+  const multiplayer = !clientMode && hostSnapshot?.localTable ? hostSnapshot : campaign?.multiplayer ?? {};
   const table = multiplayer.localTable ?? {};
   if (clientMode) {
     return {

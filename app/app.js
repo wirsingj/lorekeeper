@@ -126,6 +126,7 @@ const state = {
   repairingCombatPromptTurn: false,
   lastCombatPromptRepairKey: "",
   lastTableTalkCount: null,
+  lastWaitingGuestSignature: "",
   unreadTableTalkCount: 0,
   rightRailCollapsed: loadRightRailCollapsed(),
   homeFlow: clientMode ? "join" : "",
@@ -203,6 +204,7 @@ const elements = {
   repairRetry: document.querySelector("#repair-retry"),
   repairInspect: document.querySelector("#repair-inspect"),
   repairImportAnyway: document.querySelector("#repair-import-anyway"),
+  seatWaitingGuest: document.querySelector("#seat-waiting-guest"),
   saveStatus: document.querySelector("#save-status"),
   returnMainMenu: document.querySelector("#return-main-menu"),
   openSetup: document.querySelector("#open-setup"),
@@ -594,6 +596,10 @@ elements.repairInspect?.addEventListener("click", async () => {
 
 elements.repairImportAnyway?.addEventListener("click", async () => {
   await importTurnRepairAnyway();
+});
+
+elements.seatWaitingGuest?.addEventListener("click", () => {
+  openLocalTableSeating();
 });
 
 elements.providerMode.addEventListener("change", async () => {
@@ -1700,9 +1706,10 @@ function startMultiplayerPolling() {
         }
         const payload = await response.json();
         setCampaignFromPayload(payload, "local_table_poll");
-        state.multiplayerSnapshot = payload.campaign?.multiplayer ?? state.multiplayerSnapshot;
+        await refreshMultiplayerSnapshot({ quiet: true });
         seedPlayLog();
         render();
+        announceWaitingGuestsIfNeeded();
         schedulePostTurnRecovery("local_table_poll");
       }
     } catch (error) {
@@ -3630,6 +3637,7 @@ function renderMultiplayerPanel() {
       clientMode,
       guestSession: state.guestSession,
       guestSnapshot: state.guestSnapshot,
+      hostSnapshot: state.multiplayerSnapshot,
       locationPort: location.port,
     }),
     labelById: (id) => labelById(state.campaign, id),
@@ -5589,6 +5597,67 @@ function render() {
   renderProviderControls();
   renderDebugMetaControl();
   renderMultiplayerPanel();
+  renderWaitingGuestCue();
+}
+
+function renderWaitingGuestCue() {
+  if (!elements.seatWaitingGuest) {
+    return;
+  }
+  const waitingGuests = waitingGuestsForSeating();
+  if (!waitingGuests.length || clientMode) {
+    elements.seatWaitingGuest.hidden = true;
+    elements.seatWaitingGuest.disabled = true;
+    elements.seatWaitingGuest.textContent = "Seat Guest";
+    return;
+  }
+  const firstGuest = waitingGuests[0];
+  elements.seatWaitingGuest.hidden = false;
+  elements.seatWaitingGuest.disabled = false;
+  elements.seatWaitingGuest.textContent = waitingGuests.length === 1
+    ? `Seat ${firstGuest.displayName || "Guest"}`
+    : `Seat ${waitingGuests.length} Guests`;
+  elements.seatWaitingGuest.title = waitingGuests.length === 1
+    ? `${firstGuest.displayName || "A guest"} is waiting for a character seat`
+    : `${waitingGuests.length} guests are waiting for character seats`;
+}
+
+function announceWaitingGuestsIfNeeded() {
+  const waitingGuests = waitingGuestsForSeating();
+  const signature = waitingGuests.map((guest) => `${guest.id}:${guest.displayName || "Guest"}`).join("|");
+  if (signature === state.lastWaitingGuestSignature) {
+    return;
+  }
+  state.lastWaitingGuestSignature = signature;
+  if (!waitingGuests.length || clientMode) {
+    return;
+  }
+  const stateName = elements.providerActivity?.dataset.state || "idle";
+  if (stateName === "working" || stateName === "error") {
+    return;
+  }
+  const firstGuest = waitingGuests[0];
+  setProviderActivity(waitingGuests.length === 1
+    ? `${firstGuest.displayName || "A guest"} is waiting for a seat.`
+    : `${waitingGuests.length} guests are waiting for seats.`,
+  "waiting");
+}
+
+function openLocalTableSeating() {
+  if (elements.setupDialog && !elements.setupDialog.open) {
+    try {
+      elements.setupDialog.showModal();
+      if (!clientMode) {
+        refreshProviderStatus({ quiet: true });
+      }
+    } catch {
+      // If the dialog cannot open, the party cards still expose seating actions.
+    }
+  }
+  const section = document.querySelector(".local-table-section");
+  section?.scrollIntoView({ block: "start" });
+  section?.classList.add("setup-section-focused");
+  window.setTimeout(() => section?.classList.remove("setup-section-focused"), 1800);
 }
 
 function chooseHomeFlow(flow) {
@@ -7558,19 +7627,21 @@ function buildSessionHealthSummary() {
   const providerState = elements.providerActivity?.dataset.state || "idle";
   const providerText = (elements.providerActivityLabel?.textContent || "").trim();
   const campaign = state.campaign;
+  const multiplayer = effectiveMultiplayerState();
   const repair = activeTurnRepair();
-  const pendingInputs = campaign?.multiplayer?.pendingTurnInputs ?? [];
+  const pendingInputs = multiplayer.pendingTurnInputs ?? [];
   const readyInputs = pendingInputs.filter((input) => input.ready && !input.passed && input.text);
   const waitingInputs = pendingInputs.filter((input) => !input.ready || input.passed || !input.text);
-  const pendingGuests = (campaign?.multiplayer?.connections ?? []).filter((connection) => connection.status === "pending");
-  const multiplayerSettings = campaign?.multiplayer?.settings ?? {};
+  const pendingGuests = (multiplayer.connections ?? []).filter((connection) => connection.status === "pending");
+  const waitingGuests = effectiveWaitingGuests().filter((guest) => guest.status === "waiting");
+  const multiplayerSettings = multiplayer.settings ?? {};
   const guestPendingInput = state.guestSnapshot?.pendingInput ?? null;
   const combat = campaign?.combat;
   const activeCombatant = combat?.inCombat
     ? normalizedCombatTurnOrder(campaign).find((entry) => entry.id === combat.currentTurnId)
     : null;
   const reviewCount = state.reviewBatch?.proposals?.filter((proposal) => proposal.status !== "committed")?.length ?? 0;
-  const tableRunning = Boolean(state.multiplayerSnapshot?.localTable?.running || campaign?.multiplayer?.localTable?.running);
+  const tableRunning = Boolean(multiplayer.localTable?.running);
   const providerSettings = currentProviderSettings();
 
   if (providerState === "working") {
@@ -7605,6 +7676,12 @@ function buildSessionHealthSummary() {
       : `${pendingGuests.length} guests are waiting for host approval.`);
   }
 
+  if (waitingGuests.length) {
+    lines.push(waitingGuests.length === 1
+      ? `${waitingGuests[0].displayName || "A guest"} is waiting for a character seat.`
+      : `${waitingGuests.length} guests are waiting for character seats.`);
+  }
+
   if (reviewCount) {
     lines.push(`${reviewCount} proposed state ${reviewCount === 1 ? "change is" : "changes are"} waiting for review.`);
   }
@@ -7631,7 +7708,7 @@ function buildSessionHealthSummary() {
     ? "attention"
     : providerState === "working"
       ? "working"
-      : providerState === "waiting" || readyInputs.length || waitingInputs.length || pendingGuests.length || reviewCount
+      : providerState === "waiting" || readyInputs.length || waitingInputs.length || pendingGuests.length || waitingGuests.length || reviewCount
         ? "waiting"
         : "ready";
   const headline = tone === "attention"
@@ -8824,8 +8901,23 @@ function partyControllerActions(member, pendingConnection = null) {
 }
 
 function waitingGuestsForSeating() {
-  return (state.campaign?.multiplayer?.waitingGuests ?? state.multiplayerSnapshot?.waitingGuests ?? [])
+  return effectiveWaitingGuests()
     .filter((guest) => guest.status === "waiting");
+}
+
+function effectiveMultiplayerState() {
+  if (!clientMode && state.multiplayerSnapshot?.localTable) {
+    return state.multiplayerSnapshot;
+  }
+  return state.campaign?.multiplayer ?? {};
+}
+
+function effectiveWaitingGuests() {
+  const snapshotGuests = state.multiplayerSnapshot?.waitingGuests;
+  if (Array.isArray(snapshotGuests)) {
+    return snapshotGuests;
+  }
+  return state.campaign?.multiplayer?.waitingGuests ?? [];
 }
 
 function openCharacterSheet(member) {

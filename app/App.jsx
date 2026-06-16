@@ -156,6 +156,9 @@ export function LorekeeperShell() {
               <button id="recheck-provider" className="mini-action" type="button" title="Check the latest DM chat response" hidden>
                 Read Latest
               </button>
+              <button id="seat-waiting-guest" className="mini-action" type="button" title="Open Local Table seating controls" hidden>
+                Seat Guest
+              </button>
             </div>
           </div>
           <section id="thin-join-panel" className="thin-join-panel" hidden>
