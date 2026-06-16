@@ -1629,6 +1629,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /markApprovedPartyInputsStillStaged/, "failed DM turns should keep approved party inputs visibly staged");
   assert.match(appJs, /markRemoteInputsStillStaged/, "failed DM turns should keep remote party inputs visibly staged");
   assert.match(appJs, /dm_failed_still_staged[\s\S]*?label:\s*"Still staged"/, "failed staged inputs should use table-facing retry wording");
+  assert.match(appJs, /dropPendingRemoteInput/, "host should be able to drop a stale staged guest action");
+  assert.match(appJs, /label:\s*"Dropped"/, "dropped staged guest actions should not read as DM-resolved");
+  assert.match(appJs, /Remove this staged guest action without sending it to the DM/);
   assert.match(
     appJs,
     /else if \(inputs\.length && !runResult\?\.imported\) {\s*await markRemoteInputsStillStaged\(inputs, runResult\);/,
@@ -1642,6 +1645,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
+  const localTable = await readFile(path.join("src", "multiplayer", "local-table.js"), "utf8");
+  const server = await readFile(path.join("scripts", "serve.js"), "utf8");
   assert.match(appShell, /Additional Characters/);
   assert.match(appShell, /add-wizard-party-member/);
   assert.match(appShell, /Remote Invite/);
@@ -1747,6 +1752,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /clearGuestSession\(\{\s*keepRecent:\s*false\s*\}\)/);
   assert.match(appJs, /Invite loaded\. Enter your name/);
   assert.match(appJs, /Enter the name the host should see at the table/);
+  assert.match(localTable, /disposition === "dropped"/);
+  assert.match(localTable, /guest_input_dropped/);
+  assert.match(server, /disposition: body\.disposition/);
   assert.match(electronMain, /findJoinLinkArg\(process\.argv\)/);
   assert.match(electronMain, /setAsDefaultProtocolClient\("lorekeeper"\)/);
   assert.match(electronMain, /query\.inviteLink = pendingJoinLink/);

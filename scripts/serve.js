@@ -663,7 +663,9 @@ const server = createServer(async (request, response) => {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
         assertRequestOwnsActiveTable(campaign, body);
-        return { campaign: clearPendingTurnInputs(campaign, body.inputIds) };
+        return { campaign: clearPendingTurnInputs(campaign, body.inputIds, {
+          disposition: body.disposition,
+        }) };
       });
       sendJson(response, 200, {
         ...payload,

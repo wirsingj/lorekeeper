@@ -448,7 +448,13 @@ assert.match(hostProjection.flowSummary, /Kevric held for the grouped host turn/
 assert.equal(hostProjection.resolvePartyInputsLabel, "Resolve Group Turn");
 assert.match(hostProjection.pendingInputs[0].statusLabel, /Held for group turn; guest is waiting for the host/i);
 
-campaign = clearPendingTurnInputs(campaign, [campaign.multiplayer.pendingTurnInputs[0].id]);
+const heldInputId = campaign.multiplayer.pendingTurnInputs[0].id;
+campaign = clearPendingTurnInputs(campaign, [heldInputId], { disposition: "dropped" });
+assert.equal(campaign.multiplayer.pendingTurnInputs.length, 0);
+const droppedHeldMessage = campaign.sessionLog.messages.find((message) => message.data?.pendingInputId === heldInputId);
+assert.equal(droppedHeldMessage.data.status, "guest_input_dropped");
+assert.equal(droppedHeldMessage.data.lifecycle, "dropped");
+assert.equal(droppedHeldMessage.meta, "Dropped by host before the DM resolved it");
 campaign = updateMultiplayerSettings(campaign, { requireGuestActionApproval: true });
 assert.equal(campaign.multiplayer.settings.requireGuestActionApproval, true);
 assert.equal(campaign.multiplayer.settings.holdGuestActionsForGroupInput, true);

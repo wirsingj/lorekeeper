@@ -1026,15 +1026,17 @@ export function buildAggregatedPlayerTurn(campaign, { hostText = "" } = {}) {
   return buildAggregatedPlayerTurnPure(normalizeMultiplayerCampaign(campaign), { hostText });
 }
 
-export function clearPendingTurnInputs(campaign, inputIds = null) {
+export function clearPendingTurnInputs(campaign, inputIds = null, options = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   const ids = Array.isArray(inputIds) && inputIds.length ? new Set(inputIds) : null;
   const clearedIds = ids ?? new Set(next.multiplayer.pendingTurnInputs.map((input) => input.id));
   next.multiplayer.pendingTurnInputs = ids
     ? next.multiplayer.pendingTurnInputs.filter((input) => !ids.has(input.id))
     : [];
-  markSubmittedMessages(next, clearedIds);
-  next.multiplayer.hostTurnState = hostTurnStates.RESOLVING_TURN;
+  markClearedPendingMessages(next, clearedIds, options);
+  next.multiplayer.hostTurnState = options.disposition === "dropped"
+    ? hostTurnStates.COLLECTING_PARTY_INPUTS
+    : hostTurnStates.RESOLVING_TURN;
   return touchCampaign(next);
 }
 
@@ -2094,11 +2096,12 @@ function appendVisibleRemoteMessage(campaign, input, { requireApproval = false, 
   };
 }
 
-function markSubmittedMessages(campaign, clearedIds) {
+function markClearedPendingMessages(campaign, clearedIds, options = {}) {
   const messages = campaign.sessionLog?.messages;
   if (!Array.isArray(messages)) {
     return;
   }
+  const dropped = options.disposition === "dropped";
   campaign.sessionLog.messages = messages.map((message) => {
     const pendingInputId = message.data?.pendingInputId;
     if (!pendingInputId || !clearedIds.has(pendingInputId)) {
@@ -2106,13 +2109,14 @@ function markSubmittedMessages(campaign, clearedIds) {
     }
     return {
       ...message,
-      meta: "Resolved by DM",
+      meta: dropped ? "Dropped by host before the DM resolved it" : "Resolved by DM",
       data: {
         ...(message.data ?? {}),
-        status: "submitted_to_model",
-        lifecycle: "resolved",
+        status: dropped ? "guest_input_dropped" : "submitted_to_model",
+        lifecycle: dropped ? "dropped" : "resolved",
         hostStaged: false,
-        submittedAt: nowIso(),
+        submittedAt: dropped ? message.data?.submittedAt ?? null : nowIso(),
+        droppedAt: dropped ? nowIso() : message.data?.droppedAt,
       },
     };
   });

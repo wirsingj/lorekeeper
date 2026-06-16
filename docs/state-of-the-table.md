@@ -120,6 +120,7 @@ Every table surface should answer the same practical questions a real table answ
 69. Narration-first prompt policy now explicitly tells local models to leave `choices.options` empty on ordinary scene turns, while preserving combat/immediate-danger choices.
 70. Multiplayer regression coverage now proves a guest snapshot with a previous local-table session id is rejected after host table restart.
 71. Long play logs now render through a bounded projection with a Show Earlier control, so old transcript entries remain reachable without repainting the entire campaign log every turn.
+72. Hosts can drop stale staged guest actions without falsely marking them as DM-resolved; dropped inputs get their own transcript lifecycle.
 
 ### Still Risky
 
@@ -132,7 +133,7 @@ Every table surface should answer the same practical questions a real table answ
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
 8. Table Talk has a subtle unread cue, but should still be checked during two-machine play.
 9. Provider narration can still restate the player's action or lean on option panels too much in real-model soak, though the contract now has stronger narration-first instructions.
-10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
+10. Failed staged inputs now remain visible and can be dropped by the host, but broader retry/cleanup guidance still needs real-session polish.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Context retrieval now has scene-focus, noisy ranking, and thousands-record load fixtures, and play-log rendering is bounded; persistence/query scaling for very old campaigns still needs work.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
@@ -218,6 +219,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Submitted player bubbles show waiting/answered/review/failed lifecycle.
 - [x] Auto-resumed unresolved turns mark the original bubble as recovering.
 - [x] Failed provider turns keep approved/remote inputs visibly staged.
+- [x] Let hosts drop stale staged guest inputs without marking them DM-resolved.
 - [x] Diagnostics include table timeline and session health summary.
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.

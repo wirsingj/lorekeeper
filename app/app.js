@@ -1739,6 +1739,22 @@ async function clearSubmittedRemoteInputs(inputs) {
   render();
 }
 
+async function dropPendingRemoteInput(inputId) {
+  if (!inputId) {
+    return;
+  }
+  const result = await postJson(apiMultiplayerClearPendingUrl, {
+    inputIds: [inputId],
+    disposition: "dropped",
+    ...localTableAuthorityPayload(),
+  });
+  setCampaignFromPayload(result, "local_table_pending_dropped");
+  state.multiplayerSnapshot = result.multiplayer;
+  seedPlayLog();
+  setProviderActivity("Staged guest action dropped", "idle");
+  render();
+}
+
 function playerInputsFromChoiceSelection(selection) {
   if (!selection?.choices?.length) {
     return [];
@@ -8937,6 +8953,15 @@ function renderPlayLog() {
           status.className = "message-action-status";
           status.textContent = message.data?.holdForGroup ? "Holding for group turn" : "Queued for DM";
           actionRow.append(status);
+          if (!clientMode) {
+            const dropButton = document.createElement("button");
+            dropButton.type = "button";
+            dropButton.className = "mini-action secondary-action";
+            dropButton.textContent = "Drop";
+            dropButton.title = "Remove this staged guest action without sending it to the DM";
+            dropButton.addEventListener("click", () => dropPendingRemoteInput(pendingAction.id));
+            actionRow.append(dropButton);
+          }
         } else {
           const stageButton = document.createElement("button");
           stageButton.type = "button";
@@ -9305,6 +9330,16 @@ function messageLifecycleForMessage(message) {
       turn_canceled: {
         label: "Canceled",
         title: "This DM response was canceled.",
+        tone: "muted",
+      },
+      dropped: {
+        label: "Dropped",
+        title: "The host removed this staged action before the DM resolved it.",
+        tone: "muted",
+      },
+      guest_input_dropped: {
+        label: "Dropped",
+        title: "The host removed this staged action before the DM resolved it.",
         tone: "muted",
       },
       failed: {
