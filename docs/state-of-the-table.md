@@ -119,6 +119,7 @@ Every table surface should answer the same practical questions a real table answ
 68. Turn repair display/use-anyway policy is extracted into a small recovery controller with direct tests instead of living only as renderer string handling.
 69. Narration-first prompt policy now explicitly tells local models to leave `choices.options` empty on ordinary scene turns, while preserving combat/immediate-danger choices.
 70. Multiplayer regression coverage now proves a guest snapshot with a previous local-table session id is rejected after host table restart.
+71. Long play logs now render through a bounded projection with a Show Earlier control, so old transcript entries remain reachable without repainting the entire campaign log every turn.
 
 ### Still Risky
 
@@ -133,7 +134,7 @@ Every table surface should answer the same practical questions a real table answ
 9. Provider narration can still restate the player's action or lean on option panels too much in real-model soak, though the contract now has stronger narration-first instructions.
 10. Pending input cleanup still depends on successful provider import and can leave intent queued after failure.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
-12. Context retrieval now has scene-focus, noisy ranking, and thousands-record load fixtures, but long play-log rendering/persistence still needs scaling work.
+12. Context retrieval now has scene-focus, noisy ranking, and thousands-record load fixtures, and play-log rendering is bounded; persistence/query scaling for very old campaigns still needs work.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
 14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
 15. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
@@ -163,7 +164,7 @@ Every table surface should answer the same practical questions a real table answ
 
 1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Add long-play-log rendering and persistence scaling fixtures so old campaigns stay fast after hundreds of hours.
+3. Continue long-campaign scaling: play-log rendering is bounded, but persistence/query scaling fixtures are still needed so old campaigns stay fast after hundreds of hours.
 
 ### High
 
@@ -183,7 +184,7 @@ Every table surface should answer the same practical questions a real table answ
 14. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
 15. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
 16. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
-17. Add long-campaign performance fixtures and eventually virtualize long play logs.
+17. Add long-campaign persistence/query performance fixtures and eventually upgrade the play log from chunked rendering to true virtualization if needed.
 
 ### Low
 
@@ -317,6 +318,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
+- [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.
 - [ ] Consider context-sensitive note sections or tabs after playtest.

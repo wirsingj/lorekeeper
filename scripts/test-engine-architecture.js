@@ -9,6 +9,7 @@ import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyComb
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
+import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
@@ -1421,6 +1422,23 @@ function testTableStatusVocabulary() {
   assert.equal(event.at, "2026-01-01T00:00:00.000Z");
 }
 
+function testPlayLogProjectionBoundsLongSessions() {
+  const messages = Array.from({ length: defaultPlayLogVisibleLimit + 75 }, (_, index) => ({
+    id: `msg-${index + 1}`,
+    body: `Message ${index + 1}`,
+  }));
+  const projection = buildPlayLogProjection(messages);
+  assert.equal(projection.visibleMessages.length, defaultPlayLogVisibleLimit);
+  assert.equal(projection.visibleMessages[0].id, "msg-76");
+  assert.equal(projection.hiddenCount, 75);
+  assert.equal(projection.hasEarlierMessages, true);
+  assert.equal(projection.nextVisibleLimit, defaultPlayLogVisibleLimit + playLogPageSize);
+
+  const expanded = buildPlayLogProjection(messages, { visibleLimit: projection.nextVisibleLimit });
+  assert.equal(expanded.hiddenCount, 0);
+  assert.equal(expanded.visibleMessages[0].id, "msg-1");
+}
+
 function testTurnRepairController() {
   const technicalRepair = {
     reason: "sceneStatus.awaitingPlayer must be boolean.",
@@ -1566,6 +1584,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     "local provider runner must accept remote-only structured player inputs",
   );
   assert.match(appJs, /tableTimeline: state\.tableTimeline\.slice\(-80\)/, "renderer diagnostics should include the table-facing timeline");
+  assert.match(appJs, /buildPlayLogProjection/, "play log rendering should use a bounded projection for long sessions");
+  assert.match(appJs, /renderLoadEarlierMessages/, "older play log entries should remain reachable on demand");
   assert.match(appJs, /messageLifecycleForMessage/, "play bubbles should surface turn lifecycle state");
   assert.match(appJs, /turn_waiting_for_dm/, "submitted turns should be visibly marked while waiting for the DM");
   assert.match(appJs, /updatePlayerTurnEchoLifecycle/, "submitted turn bubbles should update after provider completion or failure");
@@ -1757,6 +1777,7 @@ testTurnRepairController();
 testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();
+testPlayLogProjectionBoundsLongSessions();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 

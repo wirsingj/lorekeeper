@@ -1524,6 +1524,24 @@ button:disabled {
   grid-row: 3;
 }
 
+.play-log-load-earlier {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 12px;
+  padding: 8px 10px;
+  max-width: min(86ch, calc(100% - 40px));
+  border: 1px solid rgba(174, 191, 202, 0.14);
+  border-radius: 8px;
+  background: rgba(14, 18, 21, 0.44);
+  color: #b8c5cc;
+  font-size: 0.76rem;
+}
+
+.play-log-load-earlier .mini-action {
+  flex: 0 0 auto;
+}
+
 .play-message {
   display: grid;
   grid-template-columns: 32px minmax(0, min(86ch, calc(100% - 40px)));

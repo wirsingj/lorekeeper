@@ -20,6 +20,7 @@ import { randomDevJumpStart } from "./dev-jump-start.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
+import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
@@ -114,6 +115,7 @@ const state = {
   tableTimeline: [],
   lastTableStatusText: "",
   pendingChoiceSelection: null,
+  playLogVisibleLimit: defaultPlayLogVisibleLimit,
   forceScrollToBottom: false,
   multiplayerSnapshot: null,
   guestSession: loadGuestSession(),
@@ -5195,6 +5197,7 @@ function setCampaignFromPayload(payload, contextPurpose) {
   state.reviewBatch = null;
   if (previousCampaignId && previousCampaignId !== state.campaign.id) {
     state.turnFlow.reset({ reason: "campaign_changed" });
+    state.playLogVisibleLimit = defaultPlayLogVisibleLimit;
   }
   scheduleAutoResolveGuestInputs(contextPurpose);
 }
@@ -8876,9 +8879,13 @@ function renderPlayLog() {
   const visibleMessages = dedupeProviderPartySuggestions(
     messages.filter((message) => !shouldHideAutonomousHostMessage(message)),
   );
+  const projection = buildPlayLogProjection(visibleMessages, {
+    visibleLimit: state.playLogVisibleLimit,
+  });
 
   playLog.replaceChildren(
-    ...visibleMessages.map((message) => {
+    ...(projection.hasEarlierMessages ? [renderLoadEarlierMessages(projection)] : []),
+    ...projection.visibleMessages.map((message) => {
       const wrapper = document.createElement("article");
       wrapper.className = [
         "play-message",
@@ -8955,6 +8962,28 @@ function renderPlayLog() {
     playLog.scrollTop = Math.max(0, playLog.scrollHeight - previousScrollBottom);
   }
   state.forceScrollToBottom = false;
+}
+
+function renderLoadEarlierMessages(projection) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "play-log-load-earlier";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "mini-action";
+  const count = Math.min(playLogPageSize, projection.hiddenCount);
+  button.textContent = `Show ${count} earlier ${count === 1 ? "message" : "messages"}`;
+  button.title = `${projection.hiddenCount} earlier ${projection.hiddenCount === 1 ? "message is" : "messages are"} still available in this campaign.`;
+  button.addEventListener("click", () => {
+    state.playLogVisibleLimit = projection.nextVisibleLimit;
+    renderPlayLog();
+  });
+
+  const summary = document.createElement("span");
+  summary.textContent = `${projection.hiddenCount} older ${projection.hiddenCount === 1 ? "message" : "messages"} hidden for table speed.`;
+
+  wrapper.append(button, summary);
+  return wrapper;
 }
 
 function shouldShowDebugMessageMeta() {
