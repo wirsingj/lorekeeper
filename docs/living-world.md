@@ -34,11 +34,13 @@ Faction memory:
 
 - stored on faction records and linked consequences/relationships,
 - tracks what a faction knows, believes, wants, fears, or blames the party for.
+- normalized through `src/engine/world-memory-engine.js` for reviewed changes.
 
 Location memory:
 
 - stored on place records and linked consequences,
 - tracks scars, repairs, public history, discoveries, collapses, saved villages, explored mines, and other visible continuity.
+- normalized through `src/engine/world-memory-engine.js` for reviewed changes.
 
 ## Goal Horizons
 
@@ -116,6 +118,7 @@ The score is diagnostic guidance, not a player-facing grade.
 
 - `src/engine/living-world-engine.js`: goal horizons, memory projection, score.
 - `src/engine/relationship-engine.js`: relationship normalization and durable state transitions.
+- `src/engine/world-memory-engine.js`: faction beliefs/memory and location scars/history.
 - `src/engine/consequence-engine.js`: consequence normalization, storage links, scene retrieval.
 - `src/engine/scene-engine.js`: current scene retrieval and scene intent.
 - `src/context-packs/build-context-pack.js`: DM Goal Horizon and Living World Memory sections.

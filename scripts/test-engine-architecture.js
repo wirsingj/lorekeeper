@@ -29,6 +29,7 @@ import { addConsequence, resolveConsequence } from "../src/engine/consequence-en
 import { rollD20, rollFormula } from "../src/engine/dice-engine.js";
 import { buildGoalHorizon, buildLivingWorldMemory } from "../src/engine/living-world-engine.js";
 import { applyRelationshipTransition } from "../src/engine/relationship-engine.js";
+import { applyFactionMemory, applyLocationMemory } from "../src/engine/world-memory-engine.js";
 import { buildProviderTaskRequest, acceptProviderResponseForTurn, createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildSceneIntentPack, buildSceneRetrieval, transitionScene } from "../src/engine/scene-engine.js";
 import { applyStateEffects } from "../src/engine/state-effects.js";
@@ -1220,6 +1221,73 @@ function testRelationshipEvolutionEngine() {
   assert.ok(newRelationship.relatedIds.includes("river-guild"));
 }
 
+function testFactionAndLocationMemoryEngine() {
+  const base = {
+    ...campaignFixture(),
+    factions: [{
+      id: "river-guild",
+      name: "River Guild",
+      memory: ["The guild knows Thor helped Osric."],
+    }],
+    places: [{
+      id: "ford-market",
+      name: "Ford Market",
+      memory: ["A flood damaged the lower dock."],
+    }],
+  };
+
+  const factionMemory = applyFactionMemory(base, {
+    id: "river-guild",
+    memory: "The guild suspects someone in Thor's party knows about relic smuggling.",
+    beliefs: ["Thor is useful but disruptive."],
+    linkedGoalId: "quest-escort",
+    placeIds: ["ford-market"],
+  }, { now: "2026-01-01T00:00:00.000Z" });
+  assert.ok(factionMemory.faction.memory.includes("The guild suspects someone in Thor's party knows about relic smuggling."));
+  assert.ok(factionMemory.faction.beliefs.includes("Thor is useful but disruptive."));
+  assert.ok(factionMemory.faction.goalIds.includes("quest-escort"));
+  assert.ok(factionMemory.faction.relatedIds.includes("ford-market"));
+
+  const locationMemory = applyLocationMemory(base, {
+    id: "ford-market",
+    memory: "The broken dock has become a visible reminder of the failed crossing.",
+    scars: ["Half the lower stairs are still missing."],
+    factionIds: ["river-guild"],
+  }, { now: "2026-01-01T00:00:00.000Z" });
+  assert.ok(locationMemory.place.memory.includes("The broken dock has become a visible reminder of the failed crossing."));
+  assert.ok(locationMemory.place.scars.includes("Half the lower stairs are still missing."));
+  assert.ok(locationMemory.place.relatedIds.includes("river-guild"));
+
+  const canonical = applyCanonicalChanges(base, [
+    {
+      id: "change-faction-memory",
+      operation: "update",
+      domain: "factions",
+      targetId: "river-guild",
+      summary: "The River Guild starts watching Thor's party.",
+      data: {
+        memory: "The River Guild starts watching Thor's party.",
+        beliefs: ["Thor may expose their smuggling route."],
+        linkedGoalId: "quest-escort",
+      },
+    },
+    {
+      id: "change-location-scar",
+      operation: "update",
+      domain: "places",
+      targetId: "ford-market",
+      summary: "The ferry landing is scarred by the flood.",
+      data: {
+        scars: ["The ferry landing stairs are cracked and slick."],
+        factionIds: ["river-guild"],
+      },
+    },
+  ]);
+  assert.equal(canonical.applied.length, 2);
+  assert.ok(canonical.campaign.factions.find((faction) => faction.id === "river-guild").beliefs.includes("Thor may expose their smuggling route."));
+  assert.ok(canonical.campaign.places.find((place) => place.id === "ford-market").scars.includes("The ferry landing stairs are cracked and slick."));
+}
+
 function testLargeCampaignContextPackStaysBounded() {
   const campaign = transitionScene({
     ...campaignFixture(),
@@ -2403,6 +2471,7 @@ testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
 testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise();
 testRelationshipEvolutionEngine();
+testFactionAndLocationMemoryEngine();
 testLargeCampaignContextPackStaysBounded();
 testContextPackFormatsStructuredSheetDetails();
 testSceneIntentDiscouragesRandomEscalationAfterSmallFight();

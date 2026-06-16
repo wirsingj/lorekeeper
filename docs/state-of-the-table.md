@@ -142,6 +142,7 @@ Every table surface should answer the same practical questions a real table answ
 103. CombatEngine now applies app-owned turn economy for resolved party combat actions: action, bonus action, reaction, and movement costs are validated, logged, and reflected in the combat tracker state.
 104. Stale combat-prompt repair policy now lives in `combat-prompt-repair-controller.js`, with tests proving DM prompts cannot silently hand initiative to the wrong party actor unless the persisted combat turn is stale and non-party-owned.
 105. RelationshipEngine now normalizes and applies relationship state transitions, so reviewed changes can durably shift relationships through states like neutral, respectful, friendly, loyal, distrustful, fearful, and hostile.
+106. WorldMemoryEngine now normalizes durable faction beliefs/memory and location scars/history, with canonical-change integration so reviewed DM proposals become retrievable world facts.
 
 ### Still Risky
 
@@ -166,8 +167,8 @@ Every table surface should answer the same practical questions a real table answ
 19. TableSessionEngine is currently a projection layer. More UI surfaces still need to consume it directly before the table fully stops combining local flags.
 20. `app/app.js` and `scripts/serve.js` are better marked, but still large enough that future fixes can accidentally create hidden coupling if new decisions are added there.
 21. `debugSnapshot` summarizes current runtime state, but it is not yet a persisted session recorder or replay tool.
-22. Living-world memory now has projections, fixtures, and relationship-state transitions, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
-23. Relationship evolution is now app-normalized for reviewed changes, but faction and location memory still need comparable transition helpers.
+22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
+23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 
 ## Live Acceptance Matrix
 
@@ -195,7 +196,7 @@ Every table surface should answer the same practical questions a real table answ
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
 3. Continue long-campaign scaling: play-log rendering and core SQLite query helpers are bounded, but more live paths still need to stop hydrating whole snapshots as campaigns age.
 4. Keep future changes out of `app/app.js` and `scripts/serve.js` unless they are glue; extract policy/authority decisions into tested modules first.
-5. Continue strengthening living-world capture after scene endings: consequences, faction memory, and location scars should be proposed when something meaningful changes; relationship shifts now have an app-owned transition helper.
+5. Continue strengthening living-world capture after scene endings: consequences, relationship shifts, faction memory, and location scars now have app-owned storage helpers, but meaningful post-scene capture still needs provider soak and eventual app-side summarization.
 
 ### High
 
@@ -381,6 +382,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add living-world goal horizons and memory retrieval so consequences, relationships, NPCs, factions, and locations can influence later scenes.
 - [x] Add living-world documentation and long-campaign-noise fixture for recurring NPC/location/faction memory.
 - [x] Add relationship-state transition helper and canonical-change integration for durable NPC/faction/party relationship shifts.
+- [x] Add faction/location memory helpers and canonical-change integration for durable beliefs, memory, scars, history, and related goal links.
 
 ## Two-Machine Playtest Checklist
 

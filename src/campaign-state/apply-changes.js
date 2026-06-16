@@ -1,6 +1,7 @@
 import { touchCampaign } from "./schema.js";
 import { advanceCombatTurn, ensureCombatTurnOrder, repairCombatTurnOwner } from "../rules/combat-turns.js";
 import { applyRelationshipTransition, normalizeRelationshipRecord } from "../engine/relationship-engine.js";
+import { applyFactionMemory, applyLocationMemory, normalizeFactionMemoryRecord, normalizeLocationMemoryRecord } from "../engine/world-memory-engine.js";
 
 const arrayDomains = new Set([
   "people",
@@ -90,6 +91,9 @@ function applyArrayChange(campaign, records, change, domain, operation) {
   const changeData = inferRevealedRecordData(change, domain, targetId);
   if (domain === "relationships" && isRelationshipTransitionChange(change, changeData, targetId)) {
     return applyRelationshipChange(campaign, records, change, changeData, targetId, operation);
+  }
+  if ((domain === "factions" || domain === "places") && operation !== "remove" && isDurableMemoryChange(changeData)) {
+    return applyDurableMemoryChange(campaign, change, changeData, targetId, domain);
   }
 
   if (operation === "add") {
@@ -189,6 +193,45 @@ function isRelationshipTransitionChange(change, data = {}, targetId = "") {
     data.shift ||
     data.delta ||
     data.transition
+  );
+}
+
+function applyDurableMemoryChange(campaign, change, changeData, targetId, domain) {
+  const input = {
+    ...changeData,
+    id: targetId || changeData.id || changeData.factionId || changeData.placeId || changeData.locationId,
+    summary: change.summary,
+    description: change.reason || changeData.description,
+  };
+  if (domain === "factions") {
+    const result = applyFactionMemory(campaign, input);
+    campaign.factions = result.campaign.factions;
+    applySceneHints(campaign, "factions", result.faction);
+    return { applied: true };
+  }
+  const result = applyLocationMemory(campaign, input);
+  campaign.places = result.campaign.places;
+  applySceneHints(campaign, "places", result.place);
+  return { applied: true };
+}
+
+function isDurableMemoryChange(data = {}) {
+  return Boolean(
+    data.memory ||
+    data.memories ||
+    data.beliefs ||
+    data.wants ||
+    data.fears ||
+    data.blame ||
+    data.scars ||
+    data.damage ||
+    data.history ||
+    data.discoveries ||
+    data.linkedGoal ||
+    data.linkedGoalId ||
+    data.goalIds ||
+    data.relatedIds ||
+    data.relatedEntityIds
   );
 }
 
@@ -680,18 +723,7 @@ function normalizeRecordForDomain(domain, record) {
   }
 
   if (domain === "places") {
-    const name = record.name || record.title || "Unnamed place";
-    return {
-      id: record.id || uniqueId("place", name),
-      name,
-      type: record.type || "location",
-      region: record.region || "",
-      summary: record.summary || record.description || normalizeNotes(record.notes)[0] || "",
-      notes: normalizeNotes(record.notes || record.summary || record.description),
-      connectedPlaceIds: normalizeList(record.connectedPlaceIds || record.connected_place_ids),
-      createdAt: record.createdAt || now,
-      updatedAt: now,
-    };
+    return normalizeLocationMemoryRecord(record, { now });
   }
 
   if (domain === "quests") {
@@ -715,6 +747,10 @@ function normalizeRecordForDomain(domain, record) {
 
   if (domain === "relationships") {
     return normalizeRelationshipRecord(record, { now });
+  }
+
+  if (domain === "factions") {
+    return normalizeFactionMemoryRecord(record, { now });
   }
 
   if (domain === "lore") {
