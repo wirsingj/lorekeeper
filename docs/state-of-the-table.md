@@ -98,13 +98,14 @@ Every table surface should answer the same practical questions a real table answ
 47. Player Notes now persist into the campaign SQLite snapshot with localStorage migration fallback, while remaining player scratch space rather than DM canon.
 48. Implicit combat turn advancement now requires visible resolved mechanics, so initiative cannot move forward from provider narration/phrasing alone.
 49. Party vote panels now distinguish table leaning from tied votes and make the host action draft the leading choice for final send.
+50. AI companion nudge approvals now read as table beats: Stage For DM, Pass, and staged-for-next-Send-Turn status.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
 3. Recovery is more table-shaped in the live status strip, but diagnostics/manual import flows still expose software-shaped concepts.
-4. AI companion approval is still a button/badge flow, not yet a smooth table beat.
+4. AI companion approval now has table-shaped language, but still needs a smoother resolve-now/combat-turn flow.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
@@ -125,7 +126,7 @@ Every table surface should answer the same practical questions a real table answ
 | Player can tell whose turn it is. | Improved | Combat tracker and input placeholder cover basic cases. Long encounters need richer context. |
 | Player can tell who controls each character. | Improved | Badges/actions exist. Language still needs user testing. |
 | DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, suppression, and obvious output validation help. Needs broader scenario fixtures. |
-| AI companions feel like party members. | Improved | Nudge flow and creation defaults help. Approval flow still needs polish. |
+| AI companions feel like party members. | Improved | Nudge flow, creation defaults, and table-shaped Stage/Pass language help. Combat-turn approval still needs polish. |
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters, tie language, and host draft action exist. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
@@ -226,7 +227,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] AI companion cards use Nudge, not Play.
 - [x] Nudge prompts ask for brief low-stakes RP only.
 - [x] Choice prompts can target individual party members.
-- [ ] Make AI companion suggestions appear as approve/resolve/decline table beats.
+- [ ] Make AI companion suggestions appear as approve/resolve/decline table beats. Current state: nudge suggestions now use Stage For DM / Pass table language and feed the next Send Turn, but there is not yet a true resolve-now companion beat.
 - [ ] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
 - [x] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
 - [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration.

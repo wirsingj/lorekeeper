@@ -7075,7 +7075,7 @@ function splitProviderTableMessages(text, campaign, proposedChanges = []) {
         title: speakerLine.name,
         body: speakerLine.body || "Acts at the table.",
         source: "provider_response",
-        meta: "Pending host approval",
+        meta: "Companion beat waiting for host",
         data: {
           status: "pending_party_approval",
           characterId: speakerLine.record?.id ?? null,
@@ -8882,15 +8882,15 @@ function renderPartyApprovalActions(message, approval) {
     const approveButton = document.createElement("button");
     approveButton.type = "button";
     approveButton.className = "mini-action message-approve-action";
-    approveButton.textContent = "Approve";
-    approveButton.title = "Approve this companion contribution for the next submitted turn";
+    approveButton.textContent = "Stage For DM";
+    approveButton.title = "Stage this companion beat for the next Send Turn";
     approveButton.addEventListener("click", () => setPartySuggestionStatus(message, "approved_party_input"));
 
     const rejectButton = document.createElement("button");
     rejectButton.type = "button";
     rejectButton.className = "mini-action secondary-action";
-    rejectButton.textContent = "Reject";
-    rejectButton.title = "Do not submit this companion contribution";
+    rejectButton.textContent = "Pass";
+    rejectButton.title = "Do not send this companion beat to the DM";
     rejectButton.addEventListener("click", () => setPartySuggestionStatus(message, "rejected_party_input"));
 
     actionRow.append(approveButton, rejectButton);
@@ -8900,9 +8900,9 @@ function renderPartyApprovalActions(message, approval) {
   const status = document.createElement("span");
   status.className = "message-action-status";
   status.textContent = {
-    approved_party_input: "Approved for next turn",
-    rejected_party_input: "Rejected",
-    submitted_party_input: "Submitted",
+    approved_party_input: "Staged for next Send Turn",
+    rejected_party_input: "Passed",
+    submitted_party_input: "Sent to DM",
   }[approval.status] || approval.status;
   actionRow.append(status);
 
@@ -8920,10 +8920,10 @@ function renderPartyApprovalActions(message, approval) {
 
 async function setPartySuggestionStatus(message, status) {
   const meta = {
-    pending_party_approval: "Pending host approval",
-    approved_party_input: "Approved for next turn",
-    rejected_party_input: "Rejected by host",
-    submitted_party_input: "Submitted to DM/model",
+    pending_party_approval: "Companion beat waiting for host",
+    approved_party_input: "Staged for next Send Turn",
+    rejected_party_input: "Passed by host",
+    submitted_party_input: "Sent to DM",
   }[status] || "";
 
   await patchPlayMessage(message.id, {
@@ -8933,7 +8933,10 @@ async function setPartySuggestionStatus(message, status) {
       decidedAt: new Date().toISOString(),
     },
   });
-  setProviderActivity(meta || "Party suggestion updated", status === "approved_party_input" ? "waiting" : "idle");
+  const activity = status === "approved_party_input"
+    ? "Companion beat staged; add host text or press Send Turn when ready."
+    : meta || "Companion beat updated";
+  setProviderActivity(activity, status === "approved_party_input" ? "waiting" : "idle");
 }
 
 async function patchPlayMessage(messageId, patch = {}) {
