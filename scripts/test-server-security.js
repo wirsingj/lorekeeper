@@ -32,6 +32,7 @@ for (const [method, pathname] of publicGuestRoutes) {
 const protectedHostRoutes = [
   ["POST", "/api/campaign/record"],
   ["POST", "/api/campaign/delete"],
+  ["POST", "/api/campaign/player-notes"],
   ["POST", "/api/provider/generate-turn"],
   ["POST", "/api/multiplayer/start"],
   ["POST", "/api/multiplayer/stop"],

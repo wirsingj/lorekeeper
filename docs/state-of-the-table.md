@@ -95,6 +95,7 @@ Every table surface should answer the same practical questions a real table answ
 44. Live recovery controls now use table-facing labels: Try Again, Details, and Use Anyway instead of Retry/Inspect/Import.
 45. Agency fixtures now cover host-controlled, remote-controlled, unassigned, and AI companion boundaries.
 46. CombatEngine fixtures now cover app-owned Help, Disengage, Hide, and Flee/escape outcomes.
+47. Player Notes now persist into the campaign SQLite snapshot with localStorage migration fallback, while remaining player scratch space rather than DM canon.
 
 ### Still Risky
 
@@ -112,7 +113,7 @@ Every table surface should answer the same practical questions a real table answ
 12. Context retrieval is still coarse and recent-message heavy compared with the desired actor/place/consequence/thread retrieval.
 13. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
 14. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
-15. Player Notes are local UI convenience notes, not yet campaign-SQLite-backed, shared, exported, or portable across devices.
+15. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 16. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 
 ## Live Acceptance Matrix
@@ -129,7 +130,7 @@ Every table surface should answer the same practical questions a real table answ
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, and simple spell saves have coverage. Richer spell/effect rules are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression improved. Needs social/travel/downtime fixtures. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist and are private. Needs scenario testing for adaptation, pacing, and non-leakage. |
-| Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are not yet portable/canonical. |
+| Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
 | Recovery after provider failure is understandable. | Improved | Player echoes and staged inputs show lifecycle. Repair/retry still needs table-shaped flow. |
 | Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place. |
 
@@ -289,7 +290,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Soak-test scroll behavior during long sessions.
 - [ ] Keep debug/repair tools tucked away unless action is required.
 - [ ] Consider context-sensitive note sections or tabs after playtest.
-- [ ] Persist Player Notes to campaign SQLite or an explicit per-user notes store before relying on them for long campaigns.
+- [x] Persist Player Notes to campaign SQLite or an explicit per-user notes store before relying on them for long campaigns.
 - [x] Make Table Talk harder to miss without making it noisy.
 - [x] Keep the left rail stable when party cards and combat rows have long names/actions.
 

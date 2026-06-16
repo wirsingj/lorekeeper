@@ -1286,6 +1286,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
+  assert.match(appJs, /apiCampaignPlayerNotesUrl/);
+  assert.match(appJs, /playerNotesWithLocalFallback/);
+  assert.match(appJs, /persistPlayerNotes/);
   assert.match(appJs, /savePlayerNotesFromUi/);
   assert.match(appJs, /collectWizardAdditionalCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);

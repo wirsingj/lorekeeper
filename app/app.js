@@ -41,6 +41,7 @@ const apiCommitReviewUrl = "/api/review/commit";
 const apiCampaignRecordUrl = "/api/campaign/record";
 const apiCampaignMessageUrl = "/api/campaign/message";
 const apiCampaignMessageUpdateUrl = "/api/campaign/message/update";
+const apiCampaignPlayerNotesUrl = "/api/campaign/player-notes";
 const apiProviderConversationUrl = "/api/provider/conversation";
 const apiProviderStatusUrl = "/api/provider/status";
 const apiProviderSettingsUrl = "/api/provider/settings";
@@ -136,6 +137,7 @@ const state = {
   lastWaitingGuestSignature: "",
   unreadTableTalkCount: 0,
   playerNotesCampaignId: "",
+  playerNotesSaveTimer: null,
   homeFlow: clientMode ? "join" : "",
   campaignWizardReturnHome: false,
   launchInviteError: "",
@@ -9870,7 +9872,7 @@ function renderPlayerNotes(campaign) {
     return;
   }
   state.playerNotesCampaignId = campaignId;
-  const notes = loadPlayerNotes(campaignId);
+  const notes = playerNotesWithLocalFallback(campaign);
   if (elements.playerNotesPeople) {
     elements.playerNotesPeople.value = notes.people || "";
   }
@@ -9883,6 +9885,9 @@ function renderPlayerNotes(campaign) {
   if (elements.playerNotesScratch) {
     elements.playerNotesScratch.value = notes.scratch || "";
   }
+  if (notes.source === "localStorage" && hasPlayerNoteText(notes)) {
+    savePlayerNotesFromUi({ quiet: true });
+  }
 }
 
 function playerNoteInputs() {
@@ -9894,7 +9899,7 @@ function playerNoteInputs() {
   ];
 }
 
-function savePlayerNotesFromUi() {
+function savePlayerNotesFromUi({ quiet = false } = {}) {
   if (!state.campaign?.id) {
     return;
   }
@@ -9905,11 +9910,68 @@ function savePlayerNotesFromUi() {
     scratch: elements.playerNotesScratch?.value || "",
     updatedAt: new Date().toISOString(),
   };
+  state.campaign = {
+    ...state.campaign,
+    playerNotes: notes,
+  };
   try {
     localStorage.setItem(playerNotesStorageKey(state.campaign.id), JSON.stringify(notes));
   } catch {
-    // Player notes are a local convenience; failed persistence should not block play.
+    // Keep play moving even if the local migration fallback is unavailable.
   }
+  schedulePlayerNotesPersist(notes, { quiet });
+}
+
+function schedulePlayerNotesPersist(notes, { quiet = false } = {}) {
+  if (isRemoteTableClient() || clientMode) {
+    return;
+  }
+  if (state.playerNotesSaveTimer) {
+    window.clearTimeout(state.playerNotesSaveTimer);
+  }
+  state.playerNotesSaveTimer = window.setTimeout(() => {
+    state.playerNotesSaveTimer = null;
+    persistPlayerNotes(notes, { quiet });
+  }, 600);
+}
+
+async function persistPlayerNotes(notes, { quiet = false } = {}) {
+  if (!state.campaign?.id) {
+    return;
+  }
+  try {
+    const result = await postJson(apiCampaignPlayerNotesUrl, {
+      campaignId: state.campaign.id,
+      notes,
+    });
+    setCampaignFromPayload(result, "player_notes_saved");
+  } catch (error) {
+    if (!quiet) {
+      setProviderActivity(error instanceof Error ? `Notes were not saved: ${error.message}` : "Notes were not saved", "error");
+    }
+  }
+}
+
+function playerNotesWithLocalFallback(campaign) {
+  const campaignNotes = campaign?.playerNotes && typeof campaign.playerNotes === "object"
+    ? campaign.playerNotes
+    : {};
+  if (hasPlayerNoteText(campaignNotes)) {
+    return { ...campaignNotes, source: "campaign" };
+  }
+  return {
+    ...loadPlayerNotes(campaign?.id || "default"),
+    source: "localStorage",
+  };
+}
+
+function hasPlayerNoteText(notes = {}) {
+  return Boolean(
+    String(notes.people || "").trim()
+      || String(notes.places || "").trim()
+      || String(notes.things || "").trim()
+      || String(notes.scratch || "").trim(),
+  );
 }
 
 function loadPlayerNotes(campaignId) {

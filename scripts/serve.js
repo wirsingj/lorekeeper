@@ -19,7 +19,7 @@ import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { upsertProviderConversation } from "../src/campaign-state/provider-conversations.js";
 import { commitReviewBatch } from "../src/storage/review-commit.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
-import { contextPackKinds } from "../src/campaign-state/schema.js";
+import { contextPackKinds, normalizePlayerNotes } from "../src/campaign-state/schema.js";
 import { parsePlayerMessage } from "../src/play-loop/player-message.js";
 import {
   generateTurnWithProvider,
@@ -222,6 +222,13 @@ const server = createServer(async (request, response) => {
     if (url.pathname === "/api/campaign/message/update" && request.method === "POST") {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => updateCampaignMessage(campaign, body));
+      sendJson(response, 200, payload);
+      return;
+    }
+
+    if (url.pathname === "/api/campaign/player-notes" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => updateCampaignPlayerNotes(campaign, body));
       sendJson(response, 200, payload);
       return;
     }
@@ -1097,6 +1104,26 @@ function updateCampaignMessage(campaign, patch = {}) {
   };
 }
 
+function updateCampaignPlayerNotes(campaign, patch = {}) {
+  const expectedCampaignId = String(patch.campaignId || "").trim();
+  if (expectedCampaignId && expectedCampaignId !== campaign.id) {
+    const error = new Error("Player notes campaign mismatch.");
+    error.statusCode = 409;
+    error.publicMessage = "These notes belong to a different campaign. Reload and try again.";
+    throw error;
+  }
+
+  return {
+    campaign: {
+      ...campaign,
+      playerNotes: normalizePlayerNotes({
+        ...(patch.notes ?? patch),
+        updatedAt: new Date().toISOString(),
+      }),
+    },
+  };
+}
+
 function isCombatRelevant(parsedMessage) {
   const haystack = [
     parsedMessage.inWorldText,
@@ -1335,6 +1362,7 @@ export function requiresCampaignPin(pathname) {
     "/api/campaign/hide",
     "/api/campaign/message",
     "/api/campaign/message/update",
+    "/api/campaign/player-notes",
     "/api/provider/conversation",
     "/api/provider/settings",
     "/api/provider/generate-turn",

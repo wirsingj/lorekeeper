@@ -77,10 +77,22 @@ export function createEmptyCampaign(overrides = {}) {
           : overrides.providerSettings?.preferredProvider ?? createDefaultProviderSettings().preferredProvider,
     },
     multiplayer: normalizeMultiplayerState(overrides.multiplayer),
+    playerNotes: normalizePlayerNotes(overrides.playerNotes),
     sourceDocuments: arrayOrEmpty(overrides.sourceDocuments),
     assets: arrayOrEmpty(overrides.assets),
     reviewLog: arrayOrEmpty(overrides.reviewLog),
     rawImports: arrayOrEmpty(overrides.rawImports),
+  };
+}
+
+export function normalizePlayerNotes(playerNotes = {}) {
+  const source = playerNotes && typeof playerNotes === "object" ? playerNotes : {};
+  return {
+    people: boundedString(source.people, 8000),
+    places: boundedString(source.places, 8000),
+    things: boundedString(source.things, 8000),
+    scratch: boundedString(source.scratch, 12000),
+    updatedAt: source.updatedAt || null,
   };
 }
 
@@ -211,6 +223,10 @@ function normalizeSessionLog(sessionLog = {}) {
 
 function arrayOrEmpty(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function boundedString(value, maxLength) {
+  return String(value ?? "").slice(0, maxLength);
 }
 
 export function createEmptyProviderMemory() {

@@ -28,6 +28,13 @@ try {
     startingLocation: "Schema Gate",
   });
   campaign.engineState.mode = "combat";
+  campaign.playerNotes = {
+    people: "Captain Ellow owes us a straight answer.",
+    places: "Schema Gate has hidden murder holes.",
+    things: "Silver key, cracked seal.",
+    scratch: "Ask why the watch changed shifts early.",
+    updatedAt: campaign.createdAt,
+  };
   campaign.scene.activeSceneId = "scene-1";
   campaign.scene.tensions = ["The gate is quiet, but too quiet."];
   campaign.scene.activeConsequenceIds = ["consequence-1"];
@@ -170,6 +177,8 @@ try {
   assert.equal(roundTrip.stateEffectLog.length, 1);
   assert.equal(roundTrip.combatActionLog.length, 1);
   assert.equal(roundTrip.providerEventLog.length, 1);
+  assert.equal(roundTrip.playerNotes.people, "Captain Ellow owes us a straight answer.");
+  assert.equal(roundTrip.playerNotes.scratch, "Ask why the watch changed shifts early.");
 
   await writeCampaignSqliteFile(campaign, sqlitePath);
   const errorsAfterRewrite = await readCampaignErrorsFromSqliteFile(sqlitePath);
