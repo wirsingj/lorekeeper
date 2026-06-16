@@ -1251,16 +1251,28 @@ async function logCampaignError(event) {
 }
 
 function isAuthorizedRequest(request, url) {
-  if (!apiToken) {
+  return isAuthorizedRequestForToken(apiToken, {
+    pathname: url.pathname,
+    method: request.method,
+    headers: request.headers,
+    searchParams: url.searchParams,
+  });
+}
+
+export function isAuthorizedRequestForToken(token, { pathname, method = "GET", headers = {}, searchParams = new URLSearchParams() } = {}) {
+  const expectedToken = String(token || "");
+  if (!expectedToken) {
     return true;
   }
-  if (url.pathname === "/local-asset") {
-    return request.headers["x-lorekeeper-api-token"] === apiToken || url.searchParams.get("lkToken") === apiToken;
+  const headerToken = headers["x-lorekeeper-api-token"];
+  const queryToken = typeof searchParams.get === "function" ? searchParams.get("lkToken") : "";
+  if (pathname === "/local-asset") {
+    return headerToken === expectedToken || queryToken === expectedToken;
   }
-  if (!isProtectedApiPath(url.pathname, request.method)) {
+  if (!isProtectedApiPath(pathname, method)) {
     return true;
   }
-  return request.headers["x-lorekeeper-api-token"] === apiToken;
+  return headerToken === expectedToken;
 }
 
 export function isProtectedApiPath(pathname, method) {

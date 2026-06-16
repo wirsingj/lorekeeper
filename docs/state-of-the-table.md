@@ -88,6 +88,7 @@ Every table surface should answer the same practical questions a real table answ
 37. Fixed-seat guest joins now require a table-visible name instead of silently falling back to "Guest Player."
 38. Remote guests can vote on party-scoped choice prompts without drafting locked action text; vote counters and a host-facing vote summary are shown on the choice panel.
 39. Guest Leave now notifies the host, releases the remote controller to Host, and makes the vacated seat requestable again.
+40. Server security tests now exercise the API-token authorization decision for public guest routes, protected host routes, unknown API routes, and local assets.
 
 ### Still Risky
 
@@ -151,7 +152,7 @@ Every table surface should answer the same practical questions a real table answ
 12. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
 13. Improve context retrieval around present actors, active place, relationships, consequences, unresolved threads, and private story arcs.
 14. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
-15. Expand route-level API/security tests beyond classification into request/response integration under API-token, LAN origin, and stale identity cases.
+15. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
 16. Add long-campaign performance fixtures and eventually virtualize long play logs.
 
 ### Low
@@ -291,7 +292,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add route-level tests for private/guest API split.
-- [ ] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
+- [ ] Add route-level integration tests with API token enabled and stale campaign/table/session payloads. Current state: route classification plus API-token decision tests exist; full HTTP request/response stale-identity tests remain open.
 - [ ] Add migration modules before public release.
 - [ ] Add backup/export/recycle story before destructive delete in release builds.
 - [ ] Move imported assets into app-owned portable asset storage.

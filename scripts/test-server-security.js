@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { isProtectedApiPath, requiresCampaignPin } from "./serve.js";
+import { isAuthorizedRequestForToken, isProtectedApiPath, requiresCampaignPin } from "./serve.js";
 
 const publicGuestRoutes = [
   ["GET", "/api/runtime"],
@@ -21,6 +21,11 @@ for (const [method, pathname] of publicGuestRoutes) {
     isProtectedApiPath(pathname, method),
     false,
     `${method} ${pathname} should remain reachable from guest clients`,
+  );
+  assert.equal(
+    isAuthorizedRequestForToken("host-secret-token", { pathname, method, headers: {} }),
+    true,
+    `${method} ${pathname} should not require the host API token from guest clients`,
   );
 }
 
@@ -54,10 +59,40 @@ for (const [method, pathname] of protectedHostRoutes) {
     true,
     `${method} ${pathname} should reject stale campaign/table mutations`,
   );
+  assert.equal(
+    isAuthorizedRequestForToken("host-secret-token", { pathname, method, headers: {} }),
+    false,
+    `${method} ${pathname} should reject missing host API token`,
+  );
+  assert.equal(
+    isAuthorizedRequestForToken("host-secret-token", {
+      pathname,
+      method,
+      headers: { "x-lorekeeper-api-token": "host-secret-token" },
+    }),
+    true,
+    `${method} ${pathname} should accept the configured host API token`,
+  );
 }
 
 assert.equal(isProtectedApiPath("/api/unknown-host-only", "POST"), true);
+assert.equal(isAuthorizedRequestForToken("host-secret-token", { pathname: "/api/unknown-host-only", method: "POST" }), false);
+assert.equal(isAuthorizedRequestForToken("host-secret-token", {
+  pathname: "/api/unknown-host-only",
+  method: "POST",
+  headers: { "x-lorekeeper-api-token": "host-secret-token" },
+}), true);
 assert.equal(requiresCampaignPin("/api/runtime"), false);
 assert.equal(requiresCampaignPin("/api/multiplayer/waiting-room/register"), false);
+assert.equal(isAuthorizedRequestForToken("host-secret-token", {
+  pathname: "/local-asset",
+  method: "GET",
+  searchParams: new URLSearchParams({ lkToken: "host-secret-token" }),
+}), true);
+assert.equal(isAuthorizedRequestForToken("host-secret-token", {
+  pathname: "/local-asset",
+  method: "GET",
+  searchParams: new URLSearchParams({ lkToken: "wrong-token" }),
+}), false);
 
 console.log("Lorekeeper server security route tests passed.");
