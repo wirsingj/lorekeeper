@@ -469,8 +469,105 @@ export function validateTurnResponse(response, options = {}) {
 
   validateCombatResolution(response, options, errors);
   validateControlledPartyAgency(response, options, errors);
+  validateHiddenStoryLeakage(response, options, errors);
   validateArray(response.warnings, "warnings", errors);
   return { valid: errors.length === 0, errors };
+}
+
+function validateHiddenStoryLeakage(response, options = {}, errors = []) {
+  const hiddenPhrases = collectHiddenStoryLeakPhrases(options.request);
+  if (!hiddenPhrases.length) {
+    return;
+  }
+
+  const visibleText = collectVisibleResponseText(response);
+  if (!visibleText) {
+    return;
+  }
+
+  for (const phrase of hiddenPhrases) {
+    if (visibleText.includes(phrase.normalized)) {
+      errors.push(`visible response reveals hidden DM story phrase: "${phrase.label}"`);
+      return;
+    }
+  }
+}
+
+function collectHiddenStoryLeakPhrases(request) {
+  const hiddenStory = Array.isArray(request?.context?.hiddenDmStory) ? request.context.hiddenDmStory : [];
+  const phrases = [];
+  for (const thread of hiddenStory) {
+    for (const [label, value] of [
+      ["title", thread?.title],
+      ["stakes", thread?.stakes],
+      ["nextBeat", thread?.nextBeat],
+    ]) {
+      addHiddenStoryLeakPhrase(phrases, label, value);
+    }
+    for (const question of thread?.openQuestions ?? []) {
+      addHiddenStoryLeakPhrase(phrases, "open question", question);
+    }
+  }
+  return phrases;
+}
+
+function addHiddenStoryLeakPhrase(phrases, label, value) {
+  const normalized = normalizeLeakText(value);
+  if (!normalized || normalized.length < 12 || isGenericHiddenStoryPhrase(normalized)) {
+    return;
+  }
+  if (phrases.some((phrase) => phrase.normalized === normalized)) {
+    return;
+  }
+  phrases.push({ label: compactText(value, 80), normalized });
+}
+
+function isGenericHiddenStoryPhrase(normalized) {
+  return (
+    normalized.startsWith("the larger truth behind ") ||
+    normalized === "the next few sessions' pressure" ||
+    normalized === "the current table beat" ||
+    normalized === "seed one subtle clue or consequence only when it naturally fits" ||
+    normalized === "resolve the immediate action before introducing new branches" ||
+    normalized === "what changes right now because of the players' latest choice"
+  );
+}
+
+function collectVisibleResponseText(response) {
+  const chunks = [];
+  for (const entry of Array.isArray(response.table) ? response.table : []) {
+    if (entry?.visibility !== "dm_only") {
+      chunks.push(entry?.speaker, entry?.text);
+    }
+  }
+
+  chunks.push(response.choices?.prompt);
+  for (const option of Array.isArray(response.choices?.options) ? response.choices.options : []) {
+    chunks.push(option?.actor, option?.text);
+  }
+
+  for (const mechanic of Array.isArray(response.mechanics) ? response.mechanics : []) {
+    chunks.push(mechanic?.label, mechanic?.text, mechanic?.reason);
+  }
+
+  for (const change of Array.isArray(response.proposedChanges) ? response.proposedChanges : []) {
+    if (change?.visibility !== "dm_only") {
+      chunks.push(change?.summary, change?.reason, stringifyLeakData(change?.data));
+    }
+  }
+
+  return normalizeLeakText(chunks.filter(Boolean).join(" "));
+}
+
+function stringifyLeakData(data) {
+  if (!data || typeof data !== "object") {
+    return "";
+  }
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return "";
+  }
 }
 
 function validateCombatResolution(response, options = {}, errors = []) {
@@ -2177,6 +2274,13 @@ function compactText(value, limit) {
 
 function compactWhitespace(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeLeakText(value) {
+  return compactWhitespace(value)
+    .toLowerCase()
+    .replace(/[“”]/g, "\"")
+    .replace(/[‘’]/g, "'");
 }
 
 function normalizeToken(value) {

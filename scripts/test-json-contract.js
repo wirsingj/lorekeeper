@@ -160,6 +160,65 @@ const hiddenStoryEnvelope = buildTurnRequestEnvelope({
 assert.equal(hiddenStoryEnvelope.context.hiddenDmStory[0].title, "The baron is funding the raids");
 assert.equal(validateTurnRequest(hiddenStoryEnvelope).valid, true);
 
+const hiddenStoryVisibleLeak = validateTurnResponse(validTurnResponse({
+  table: [
+    {
+      speaker: "DM",
+      speakerId: null,
+      role: "dm",
+      kind: "narration",
+      visibility: "table",
+      text: "You realize the truth: The baron is funding the raids.",
+    },
+  ],
+}), { request: hiddenStoryEnvelope });
+assert.equal(hiddenStoryVisibleLeak.valid, false);
+assert.match(hiddenStoryVisibleLeak.errors.join(" "), /hidden DM story phrase/);
+
+const hiddenStoryChoiceLeak = validateTurnResponse(validTurnResponse({
+  choices: {
+    prompt: "What do you do?",
+    scope: "party",
+    options: [
+      {
+        id: "A",
+        legalOptionId: "investigate",
+        text: "Ask around about Who notices the coin trail?",
+      },
+    ],
+    allowOther: true,
+  },
+}), { request: hiddenStoryEnvelope });
+assert.equal(hiddenStoryChoiceLeak.valid, false);
+assert.match(hiddenStoryChoiceLeak.errors.join(" "), /hidden DM story phrase/);
+
+const hiddenStorySubtleClue = validateTurnResponse(validTurnResponse({
+  table: [
+    {
+      speaker: "DM",
+      speakerId: null,
+      role: "dm",
+      kind: "narration",
+      visibility: "table",
+      text: "A stamped coin glints in the mud, too clean for the road and too deliberate to be lost.",
+    },
+  ],
+  proposedChanges: [
+    {
+      ...validChange(),
+      domain: "quests",
+      visibility: "dm_only",
+      summary: "The baron is funding the raids",
+      data: {
+        threadType: "story_arc",
+        horizon: "long",
+        nextBeat: "Who notices the coin trail?",
+      },
+    },
+  ],
+}), { request: hiddenStoryEnvelope });
+assert.equal(hiddenStorySubtleClue.valid, true);
+
 const editedChoiceText = "I choose B: Try to hide Rowan behind some crates. I throw a blanket over the shopkeeper, balance a small box on top, and loudly bluff that I am looking for the shopkeep.";
 const editedChoiceEnvelope = buildTurnRequestEnvelope({
   campaign: testCampaign(),

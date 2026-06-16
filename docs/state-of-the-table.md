@@ -109,6 +109,7 @@ Every table surface should answer the same practical questions a real table answ
 58. Combat response validation now rejects wrong `resolvedActorId` and next-actor overreach for enemy turns as well as player turns.
 59. JSON contract fixtures now include richer full-turn social, travel, mystery, downtime, combat, and recovery scenes that render without forced option panels.
 60. Context packs now start with a Scene Focus section and scene retrieval includes current-place/thread/consequence-linked relationships and timeline events, not only recent chat or explicit participants.
+61. Hidden-story fixtures now reject visible narration/choice text that directly leaks private DM story phrases while allowing subtle public clues plus `dm_only` story updates.
 
 ### Still Risky
 
@@ -142,7 +143,7 @@ Every table surface should answer the same practical questions a real table answ
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, and simple spell saves have coverage. Richer spell/effect rules are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression and rich full-turn fixtures now cover social, travel, mystery, downtime, combat, and recovery. Needs real-model soak for repeated turns. |
-| DM has story beyond current scene. | Improved | Hidden arcs exist and are private. Needs scenario testing for adaptation, pacing, and non-leakage. |
+| DM has story beyond current scene. | Improved | Hidden arcs exist, are private, and have non-leakage fixtures. Still needs pacing/adaptation scenario testing over longer sessions. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
 | Recovery after provider failure is understandable. | Improved | Player echoes, staged inputs, table-facing labels, and session `Next:` guidance show lifecycle. Repair/retry still needs table-shaped flow. |
 | Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place. |
@@ -196,7 +197,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Reject obvious controlled-PC agency violations during response validation.
 - [x] Add richer provider-output fixtures for social, travel, mystery, downtime, combat, and recovery scenes.
 - [x] Improve context retrieval beyond recent history/context pack breadth.
-- [ ] Add hidden-story scenario tests for adaptation without leaking future twists.
+- [x] Add hidden-story scenario tests for adaptation without leaking future twists.
 - [ ] Tighten prompts so normal scene turns can be rich without always forcing choices.
 
 ### Table Flow And Recovery
