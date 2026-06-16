@@ -939,8 +939,18 @@ async function nudgeAiPartyMember(member) {
     return { providerReceived: false, reason: "unavailable" };
   }
   if (state.campaign?.combat?.inCombat) {
-    setProviderActivity(`${member.name} can be nudged for RP after combat, or on their own combat turn.`, "waiting");
-    return { providerReceived: false, reason: "combat" };
+    if (!isActiveAiCompanionCombatTurn(member)) {
+      setProviderActivity(`${member.name} can be nudged for RP after combat, or on their own combat turn.`, "waiting");
+      return { providerReceived: false, reason: "combat" };
+    }
+    const prompt = buildAiCompanionCombatNudgePrompt(member);
+    setProviderActivity(`Prompting ${member.name} for a companion combat suggestion...`, "working");
+    return submitPlayerTurnFromInput(prompt, {
+      skipPlayerEcho: true,
+      skipPartySeed: true,
+      skipChoiceExpansion: true,
+      preserveInput: true,
+    });
   }
   const prompt = [
     `Invite ${member.name} to make one brief AI companion RP contribution now.`,
@@ -956,6 +966,25 @@ async function nudgeAiPartyMember(member) {
     skipChoiceExpansion: true,
     preserveInput: true,
   });
+}
+
+function isActiveAiCompanionCombatTurn(member) {
+  return Boolean(
+    member?.id &&
+    state.campaign?.combat?.inCombat &&
+    state.campaign.combat.currentTurnId === member.id &&
+    partyControllerKind(member) === "ai_companion"
+  );
+}
+
+function buildAiCompanionCombatNudgePrompt(member) {
+  return [
+    `Invite ${member.name} to suggest their combat turn action now.`,
+    `(AI companion combat nudge: ${member.name} is the active initiative actor. Suggest exactly one concise combat action in ${member.name}'s voice or tactical posture.`,
+    "Do not roll dice, deal damage, spend resources, apply conditions, move initiative, resolve the action, or act for any other party member.",
+    "Render this as a party table entry from the companion so the host can Stage For DM, Resolve Now, or Pass.",
+    "If a rules choice is unclear, suggest the safest legal option and mention what the host should confirm.)",
+  ].join(" ");
 }
 
 function normalizeSubmittedPlayerMessage(originalInput, options = {}) {

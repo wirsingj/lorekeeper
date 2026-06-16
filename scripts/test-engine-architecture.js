@@ -1387,6 +1387,10 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /Next: host presses Resolve Inputs when ready for the DM\./, "host should get a clear next step for queued guest input");
   assert.match(appJs, /Next: wait for .*player to send a combat action/, "remote combat waits should name the controller's next step");
   assert.match(appJs, /Next: host nudges or resolves .*companion turn/, "AI companion combat waits should point back to host approval");
+  assert.match(appJs, /function isActiveAiCompanionCombatTurn/, "AI companion combat nudges should be scoped to their active initiative turn");
+  assert.match(appJs, /state\.campaign\.combat\.currentTurnId === member\.id/, "AI companion combat nudge must match the current initiative actor");
+  assert.match(appJs, /buildAiCompanionCombatNudgePrompt/, "AI companion combat nudges should request a suggestion, not resolution");
+  assert.match(appJs, /Do not roll dice, deal damage, spend resources, apply conditions, move initiative, resolve the action/, "AI companion combat suggestion must not resolve mechanics before host approval");
   assert.match(appJs, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
   assert.match(appJs, /stripInlineResponseJsonTail/, "table narration cleanup should remove inline provider JSON tails");
   assert.match(appJs, /choiceAudienceLabel/, "structured choice panels should surface party/character/vote audience metadata");

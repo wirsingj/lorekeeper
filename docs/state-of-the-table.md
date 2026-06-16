@@ -110,13 +110,14 @@ Every table surface should answer the same practical questions a real table answ
 59. JSON contract fixtures now include richer full-turn social, travel, mystery, downtime, combat, and recovery scenes that render without forced option panels.
 60. Context packs now start with a Scene Focus section and scene retrieval includes current-place/thread/consequence-linked relationships and timeline events, not only recent chat or explicit participants.
 61. Hidden-story fixtures now reject visible narration/choice text that directly leaks private DM story phrases while allowing subtle public clues plus `dm_only` story updates.
+62. AI companion combat nudges now work only on that companion's active initiative turn and request a host-approved suggestion rather than resolving mechanics.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
 3. Recovery is more table-shaped in the live status strip and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
-4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, but combat-turn-specific approval still needs polish.
+4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
@@ -154,18 +155,18 @@ Every table surface should answer the same practical questions a real table answ
 
 1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Improve context retrieval around present actors, active place, relationships, consequences, unresolved threads, and private story arcs so the DM is not mostly recent-history driven.
+3. Add long-campaign retrieval/ranking fixtures so Scene Focus stays useful when campaigns have hundreds of records.
 
 ### High
 
 4. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
-5. Add crisp AI companion combat approval flow.
-6. Add hidden-story scenario tests for adaptation without leaking future twists.
-7. Make repair retry lifecycle as table-shaped as auto-resume.
-8. Run the two-machine playtest checklist and log every friction point.
-9. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
-10. Soak-test host-side "guest is waiting on you" affordance on two machines.
-11. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
+5. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
+6. Make repair retry lifecycle as table-shaped as auto-resume.
+7. Run the two-machine playtest checklist and log every friction point.
+8. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
+9. Soak-test host-side "guest is waiting on you" affordance on two machines.
+10. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
+11. Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration.
 
 ### Medium
 
@@ -228,7 +229,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add fixtures for chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases.
 - [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
 - [x] Add enemy-turn and player-turn fixtures that verify one actor is resolved per provider response.
-- [ ] Add crisp AI companion combat approval flow.
+- [x] Add crisp AI companion combat approval flow.
 - [x] Reject provider combat responses that resolve the wrong active actor.
 - [x] Ensure initiative never advances by provider phrasing alone.
 
