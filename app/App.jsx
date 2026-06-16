@@ -176,7 +176,7 @@ export function LorekeeperShell() {
               <section id="guest-waiting-room-panel" className="guest-waiting-room-panel" hidden>
                 <label>
                   <span>Your table name</span>
-                  <input id="guest-waiting-player-name" autoComplete="name" placeholder="Jess" />
+                  <input id="guest-waiting-player-name" autoComplete="name" placeholder="Name" />
                 </label>
                 <button id="guest-waiting-register" type="button">Ask To Join</button>
                 <p id="guest-waiting-status" className="thin-join-status">Enter your name and ask to join.</p>
@@ -197,7 +197,7 @@ export function LorekeeperShell() {
                 </section>
                 <label>
                   <span>Your name</span>
-                  <input id="thin-join-player-name" autoComplete="off" placeholder="Jess" />
+                  <input id="thin-join-player-name" autoComplete="off" placeholder="Name" />
                 </label>
               </section>
               <div className="thin-join-character">
