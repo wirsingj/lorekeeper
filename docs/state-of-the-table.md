@@ -83,6 +83,7 @@ Every table surface should answer the same practical questions a real table answ
 32. Route classification tests now cover the guest-public vs host-protected API boundary.
 33. Auto-resolved enemy combat turns now run through CombatEngine and commit app-owned rolls/effects/initiative before narration.
 34. Enemy combat resolution glue is extracted from `app/app.js` into a focused combat-resolution controller with tests.
+35. Provider combat validation now rejects resolved combat changes whose `resolvedActorId` is not the active initiative actor.
 
 ### Still Risky
 
@@ -199,6 +200,7 @@ Every table surface should answer the same practical questions a real table answ
 - [ ] Add fixtures for help, disengage, hide, flee/chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases.
 - [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
 - [ ] Add crisp AI companion combat approval flow.
+- [x] Reject provider combat responses that resolve the wrong active actor.
 - [ ] Ensure initiative never advances by provider phrasing alone.
 
 ### Party Agency And AI Companions

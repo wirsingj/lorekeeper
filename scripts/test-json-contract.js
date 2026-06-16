@@ -1122,6 +1122,42 @@ const combatNextActorOverreach = parseTurnJsonResponse(JSON.stringify(validTurnR
 assert.equal(combatNextActorOverreach.ok, false);
 assert.match(combatNextActorOverreach.error, /must not narrate or resolve another combatant/);
 
+const combatResolvedActorMismatch = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  mechanics: [{ type: "attack", actor: "Mira", roll: "d20+1 = 16", damage: "1d6+2 = 6", outcome: "success", text: "Mira hits the wolf." }],
+  proposedChanges: [{
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Wrong combat actor resolves.",
+    data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "massive-wolf" },
+    confidence: "high",
+    reason: "This should not be accepted for Mira's turn.",
+  }],
+})), {
+  requestId: "combat-validation",
+  request: {
+    ...combatValidationRequest,
+    context: {
+      ...combatValidationRequest.context,
+      combat: {
+        ...combatValidationRequest.context.combat,
+        turnOrder: [
+          { id: "massive-wolf", name: "Massive wolf", type: "enemy", initiativeScore: 18 },
+          { id: "mira", name: "Mira", type: "party", initiativeScore: 11 },
+        ],
+        currentTurnId: "mira",
+      },
+    },
+    user: { ...combatValidationRequest.user, inWorld: "Mira stabs the wolf." },
+  },
+});
+assert.equal(combatResolvedActorMismatch.ok, false);
+assert.match(combatResolvedActorMismatch.error, /must resolve the active actor mira/);
+
 const combatWithAdvance = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   requestId: "combat-validation",
   sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },

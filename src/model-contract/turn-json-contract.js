@@ -488,6 +488,11 @@ function validateCombatResolution(response, options = {}, errors = []) {
     errors.push("resolved combat must include a combat proposedChange with data.turnResolved true or data.advanceTurn true");
   }
 
+  const resolvedActorMismatch = detectResolvedActorMismatch(response, request);
+  if (resolvedActorMismatch) {
+    errors.push(resolvedActorMismatch);
+  }
+
   const nextActorOverreach = detectNextActorCombatOverreach(response, request);
   if (nextActorOverreach) {
     errors.push(nextActorOverreach);
@@ -532,6 +537,24 @@ function hasCombatAdvanceChange(response) {
     change?.data &&
     (change.data.advanceTurn === true || change.data.turnResolved === true)
   );
+}
+
+function detectResolvedActorMismatch(response, request) {
+  const currentActorId = request?.context?.combat?.currentTurnId || "";
+  if (!currentActorId || !isPartyActorInRequest(request, currentActorId)) {
+    return "";
+  }
+
+  const mismatched = (response.proposedChanges ?? []).find((change) =>
+    change?.domain === "combat" &&
+    change?.data?.resolvedActorId &&
+    change.data.resolvedActorId !== currentActorId
+  );
+  if (!mismatched) {
+    return "";
+  }
+
+  return `resolved combat response must resolve the active actor ${currentActorId}, not ${mismatched.data.resolvedActorId}`;
 }
 
 function detectNextActorCombatOverreach(response, request) {
