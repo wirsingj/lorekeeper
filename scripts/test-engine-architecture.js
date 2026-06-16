@@ -281,11 +281,14 @@ function testCombatEngine() {
 
   const actions = legalActionsForActor(campaign, "thor");
   assert.equal(actions.some((action) => action.type === "attack"), true);
+  const greataxeOption = actions.find((action) => action.type === "attack");
+  assert.ok(greataxeOption?.id);
 
   const resolved = resolveCombatAction(campaign, {
     turnId: "combat-turn-1",
     actorId: "thor",
     actionType: "attack",
+    legalOptionId: greataxeOption.id,
     targetIds: ["miner"],
     declaredText: "Attack with Greataxe",
   }, { seed: "hit-seed" });
@@ -297,6 +300,38 @@ function testCombatEngine() {
   assert.equal(resolved.campaign.combatActionLog.length, 1, "combat action should be logged to campaign state");
   assert.equal(resolved.campaign.diceLog.length >= 1, true, "combat rolls should be logged to campaign state");
   assert.equal(resolved.campaign.stateEffectLog.length, resolved.actionRecord.effects.length, "applied effects should be logged to campaign state");
+
+  assert.throws(() => resolveCombatAction(campaign, {
+    turnId: "combat-wrong-option-type",
+    actorId: "thor",
+    actionType: "spell",
+    legalOptionId: greataxeOption.id,
+    targetIds: ["miner"],
+    declaredText: "Cast the greataxe somehow.",
+  }, { seed: "wrong-option-type" }), /cannot resolve as spell/);
+
+  const spentSlotCampaign = startCombat({
+    ...campaignFixture(),
+    party: campaignFixture().party.map((member) => member.id === "thor"
+      ? {
+        ...member,
+        ancestryClass: "Dwarf Cleric",
+        resources: { spellSlots: { 1: { max: 1, used: 1 } } },
+        spells: [{ name: "Entangle", level: 1 }],
+      }
+      : member),
+  }, {
+    enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
+  });
+  assert.throws(() => resolveCombatAction(spentSlotCampaign, {
+    turnId: "combat-unavailable-spell",
+    actorId: "thor",
+    actionType: "spell",
+    legalOptionId: "spell-entangle",
+    spellName: "Entangle",
+    targetIds: ["miner"],
+  }, { seed: "unavailable-spell" }), /no longer available/);
 
   const dodgeCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],

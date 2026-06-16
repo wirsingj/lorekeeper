@@ -50,14 +50,15 @@ export function resolveCombatAction(campaign, action, options = {}) {
   if (action.actorId && action.actorId !== actor.id) {
     throw new Error(`Stale combat action: ${action.actorId} is not active actor ${actor.id}`);
   }
-
   const actionType = normalizeActionType(action.actionType ?? action.type);
+  const explicitLegalOption = validateExplicitLegalOption(normalized, actor.id, action, actionType);
   const base = {
     turnId: action.turnId ?? `combat-${Date.now()}`,
     actorId: actor.id,
     actionType,
     targetIds: action.targetIds ?? [],
     declaredText: action.declaredText ?? action.label ?? "",
+    legalOptionId: explicitLegalOption?.id ?? explicitOptionId(action),
     rolls: [],
     effects: [],
     narration: action.narration ?? "",
@@ -399,6 +400,11 @@ function inferNonlethalOutcome(text = "") {
 
 function findAttackOption(campaign, actorId, action) {
   const actions = legalActionsForActor(campaign, actorId);
+  const selected = explicitOptionId(action);
+  if (selected) {
+    const option = actions.find((entry) => entry.id === selected);
+    return option?.type === combatActionTypes.ATTACK ? option : null;
+  }
   return actions.find((option) => option.id === action.optionId) ??
     actions.find((option) => option.type === combatActionTypes.ATTACK && String(action.declaredText ?? "").toLowerCase().includes(String(option.label ?? "").toLowerCase())) ??
     actions.find((option) => option.type === combatActionTypes.ATTACK);
@@ -406,10 +412,56 @@ function findAttackOption(campaign, actorId, action) {
 
 function findSpellOption(campaign, actorId, action) {
   const actions = legalActionsForActor(campaign, actorId);
+  const selected = explicitOptionId(action);
+  if (selected) {
+    const option = actions.find((entry) => entry.id === selected);
+    return option?.type === combatActionTypes.SPELL ? option : null;
+  }
   const desiredName = normalizeSkill(action.spellName || action.label || action.declaredText || "");
   return actions.find((option) => option.id === action.optionId) ??
     actions.find((option) => option.type === combatActionTypes.SPELL && desiredName && normalizeSkill(option.label || "").includes(desiredName)) ??
     actions.find((option) => option.type === combatActionTypes.SPELL);
+}
+
+function validateExplicitLegalOption(campaign, actorId, action, actionType) {
+  const optionId = explicitOptionId(action);
+  if (!optionId) {
+    return null;
+  }
+  const option = legalActionsForActor(campaign, actorId).find((entry) => entry.id === optionId);
+  if (!option) {
+    throw new Error(`Combat option is no longer available for the active actor: ${optionId}`);
+  }
+  if (option.legal === false) {
+    throw new Error(`Combat option is not legal for the active actor: ${optionId}`);
+  }
+  if (!isLegalOptionCompatibleWithAction(option, actionType)) {
+    throw new Error(`Combat option ${optionId} cannot resolve as ${actionType}`);
+  }
+  return option;
+}
+
+function explicitOptionId(action = {}) {
+  return String(action.legalOptionId || action.optionId || "").trim();
+}
+
+function isLegalOptionCompatibleWithAction(option, actionType) {
+  if (!option || !actionType || actionType === combatActionTypes.IMPROVISE) {
+    return true;
+  }
+  if (option.type === actionType || option.id === actionType) {
+    return true;
+  }
+  const aliases = {
+    [combatActionTypes.DODGE]: new Set(["defense"]),
+    [combatActionTypes.HELP]: new Set(["support"]),
+    [combatActionTypes.DASH]: new Set(["movement"]),
+    [combatActionTypes.DISENGAGE]: new Set(["movement"]),
+    [combatActionTypes.HIDE]: new Set(["skill", "check", "improvised"]),
+    [combatActionTypes.READY]: new Set(["feature", "improvised"]),
+    [combatActionTypes.CHECK]: new Set(["check", "skill", "improvised"]),
+  };
+  return aliases[actionType]?.has(option.type) === true;
 }
 
 function spellNameFromOption(option) {

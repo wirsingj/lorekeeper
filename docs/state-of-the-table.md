@@ -113,10 +113,11 @@ Every table surface should answer the same practical questions a real table answ
 62. AI companion combat nudges now work only on that companion's active initiative turn and request a host-approved suggestion rather than resolving mechanics.
 63. Try Again now marks the original player action as "Trying again" and updates that same bubble after the retry result lands.
 64. Scene retrieval now ranks actor/thread-linked relationships and events above noisy same-place history, with a long-campaign-noise fixture.
+65. CombatEngine now rejects explicit legal option IDs that are stale, unavailable, or incompatible with the requested action type.
 
 ### Still Risky
 
-1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths.
+1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches are now rejected.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, and Settings labels, but the underlying manual review textarea is still a developer-style escape hatch.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
@@ -144,7 +145,7 @@ Every table surface should answer the same practical questions a real table answ
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters, tie language, and host draft action exist. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
-| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, and simple spell saves have coverage. Richer spell/effect rules are still open. |
+| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, simple spell saves, and legal-option validation have coverage. Richer spell/effect rules are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression and rich full-turn fixtures now cover social, travel, mystery, downtime, combat, and recovery. Needs real-model soak for repeated turns. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist, are private, and have non-leakage fixtures. Still needs pacing/adaptation scenario testing over longer sessions. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
@@ -230,6 +231,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add fixtures for app-owned simple spell save, spell-slot spending, and save-gated conditions.
 - [x] Add fixture for app-owned enemy attack turn.
 - [x] Add fixtures for chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases.
+- [x] Reject stale/unavailable/mismatched explicit combat legal-option IDs.
 - [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
 - [x] Add enemy-turn and player-turn fixtures that verify one actor is resolved per provider response.
 - [x] Add crisp AI companion combat approval flow.
