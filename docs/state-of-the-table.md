@@ -135,15 +135,15 @@ Every table surface should answer the same practical questions a real table answ
 | Player can tell whose turn it is. | Improved | Combat tracker and input placeholder cover basic cases. Long encounters need richer context. |
 | Player can tell who controls each character. | Improved | Badges/actions exist. Language still needs user testing. |
 | DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, suppression, and obvious output validation help. Needs broader scenario fixtures. |
-| AI companions feel like party members. | Improved | Nudge flow, creation defaults, and table-shaped Stage/Pass/Resolve Now language help. Combat-turn approval still needs polish. |
+| AI companions feel like party members. | Improved | Nudge flow, creation defaults, table-shaped Stage/Pass/Resolve Now language, and idle rarity/cooldown policy help. Combat-turn approval still needs polish. |
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters, tie language, and host draft action exist. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. App-owned attacks, enemy turns, checks, contests, and simple spell saves have coverage. Richer spell/effect rules are still open. |
-| DM can continue scenes without forcing options. | Improved | Prompt/choice suppression improved. Needs social/travel/downtime fixtures. |
+| DM can continue scenes without forcing options. | Improved | Prompt/choice suppression and rich full-turn fixtures now cover social, travel, mystery, downtime, combat, and recovery. Needs real-model soak for repeated turns. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist and are private. Needs scenario testing for adaptation, pacing, and non-leakage. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
-| Recovery after provider failure is understandable. | Improved | Player echoes and staged inputs show lifecycle. Repair/retry still needs table-shaped flow. |
+| Recovery after provider failure is understandable. | Improved | Player echoes, staged inputs, table-facing labels, and session `Next:` guidance show lifecycle. Repair/retry still needs table-shaped flow. |
 | Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place. |
 
 ## Priority Queue
@@ -152,14 +152,14 @@ Every table surface should answer the same practical questions a real table answ
 
 1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, reactions, concentration, movement, and edge-case initiative handling.
 2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Continue expanding scenario fixtures proving the provider cannot speak for host/remote/unassigned PCs across combat, join-transfer, and AI-companion cases.
+3. Improve context retrieval around present actors, active place, relationships, consequences, unresolved threads, and private story arcs so the DM is not mostly recent-history driven.
 
 ### High
 
 4. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
-5. Make AI companion approval feel like a table beat: suggest, approve, resolve, or decline.
-6. Add enemy-turn and player-turn combat fixtures that verify one actor is resolved per provider response.
-7. Soak-test and keep strengthening the "what the table is waiting for" surface across real stuck states.
+5. Add crisp AI companion combat approval flow.
+6. Add hidden-story scenario tests for adaptation without leaking future twists.
+7. Make repair retry lifecycle as table-shaped as auto-resume.
 8. Run the two-machine playtest checklist and log every friction point.
 9. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 10. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -167,20 +167,20 @@ Every table surface should answer the same practical questions a real table answ
 
 ### Medium
 
-11. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
-12. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
-13. Improve context retrieval around present actors, active place, relationships, consequences, unresolved threads, and private story arcs.
-14. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
-15. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
-16. Add long-campaign performance fixtures and eventually virtualize long play logs.
+12. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
+13. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
+14. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
+15. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
+16. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
+17. Add long-campaign performance fixtures and eventually virtualize long play logs.
 
 ### Low
 
-17. Replace remaining overly specific placeholder text with neutral table examples.
-18. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
-19. Add campaign-aware character auto-complete that uses party theme/premise/existing characters without overriding supplied fields.
-20. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
-21. Add backup/export/recycle affordances before destructive delete in release builds.
+18. Replace remaining overly specific placeholder text with neutral table examples.
+19. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
+20. Add campaign-aware character auto-complete that uses party theme/premise/existing characters without overriding supplied fields.
+21. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
+22. Add backup/export/recycle affordances before destructive delete in release builds.
 
 ## Working Checklist
 
@@ -383,12 +383,12 @@ Pause and add a note below if any happen:
 Use this section for fresh observations before sorting them into the checklist.
 
 - 2026-06-15: Qwen3 gives much richer scene prose when run without Ollama JSON mode. Watch for role/agency drift because richer narration can make overreach more tempting.
-- 2026-06-15: The DM should be able to target individual party members or the whole party, and party votes should become an actual table flow with host tie-breaks.
-- 2026-06-15: AI companions should occasionally feel alive with brief unprompted contributions, but not every response cycle and not for major decisions.
-- 2026-06-15: App-owned combat resolution now covers DC checks and opposed contests. Next combat slice should connect these records to actual UI/provider turn intake or add saves/spells/enemy-turn bounding.
+- 2026-06-15: The DM should be able to target individual party members or the whole party, and party votes should become an actual table flow with host tie-breaks. Current state: targeting, votes, counters, and host draft action exist; two-machine feel testing remains.
+- 2026-06-15: AI companions should occasionally feel alive with brief unprompted contributions, but not every response cycle and not for major decisions. Current state: idle companion interjections are rarity/cooldown gated in the provider request.
+- 2026-06-15: App-owned combat resolution now covers DC checks and opposed contests. Current state: saves/spells/enemy-turn bounding and one-actor response validation have coverage; broader app-owned combat resolution remains open.
 - 2026-06-16: Player Notes should not remain only local device state if they become part of long-campaign play. Decide whether they are per-user private notes, host-visible table notes, or both.
 - 2026-06-16: Pre-table guest seating needs a draft table/session identity before it can be safely supported for unsaved Host New campaigns.
-- 2026-06-16: Remote party-choice voting is now usable, but host resolution should become more explicit than "read the counters and send the choice."
+- 2026-06-16: Remote party-choice voting is now usable, but host resolution should become more explicit than "read the counters and send the choice." Current state: leading vote can draft the host action; a dedicated confirmation flow may still be smoother.
 
 ## How To Use This Doc
 
