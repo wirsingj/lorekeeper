@@ -96,10 +96,11 @@ Every table surface should answer the same practical questions a real table answ
 45. Agency fixtures now cover host-controlled, remote-controlled, unassigned, and AI companion boundaries.
 46. CombatEngine fixtures now cover app-owned Help, Disengage, Hide, and Flee/escape outcomes.
 47. Player Notes now persist into the campaign SQLite snapshot with localStorage migration fallback, while remaining player scratch space rather than DM canon.
+48. Implicit combat turn advancement now requires visible resolved mechanics, so initiative cannot move forward from provider narration/phrasing alone.
 
 ### Still Risky
 
-1. Combat resolution is still partly provider-led for improvised/richer actions and some repair/import paths.
+1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths.
 2. `app/app.js` still owns too much orchestration around submit/import/repair/recovery/combat/multiplayer.
 3. Recovery is more table-shaped in the live status strip, but diagnostics/manual import flows still expose software-shaped concepts.
 4. AI companion approval is still a button/badge flow, not yet a smooth table beat.
@@ -215,7 +216,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
 - [ ] Add crisp AI companion combat approval flow.
 - [x] Reject provider combat responses that resolve the wrong active actor.
-- [ ] Ensure initiative never advances by provider phrasing alone.
+- [x] Ensure initiative never advances by provider phrasing alone.
 
 ### Party Agency And AI Companions
 

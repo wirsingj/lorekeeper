@@ -6707,6 +6707,9 @@ function createImplicitCombatAdvanceChange(proposedChanges = [], turnResponse = 
   if (!rawTurn || isNonResolvingCombatInput(rawTurn)) {
     return null;
   }
+  if (!hasResolvedMechanics(turnResponse)) {
+    return null;
+  }
   const combatChanges = proposedChanges.filter((change) => normalizeChangeDomain(change.domain) === "combat");
   if (combatChanges.some((change) =>
     change.data?.advanceTurn ||

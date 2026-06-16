@@ -1316,6 +1316,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /choice-vote-action/);
   assert.match(appJs, /Use leading choice \$\{leadingVote\.label\}/);
   assert.match(appJs, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
+  assert.match(
+    appJs,
+    /function createImplicitCombatAdvanceChange[\s\S]*!hasResolvedMechanics\(turnResponse\)[\s\S]*return null;/,
+    "implicit combat turn advancement must require resolved mechanics, not provider phrasing alone",
+  );
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderWaitingGuestCue/);
   assert.match(appJs, /announceWaitingGuestsIfNeeded/);
