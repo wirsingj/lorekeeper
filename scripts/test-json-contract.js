@@ -1337,6 +1337,102 @@ const combatResolvedActorMismatch = parseTurnJsonResponse(JSON.stringify(validTu
 assert.equal(combatResolvedActorMismatch.ok, false);
 assert.match(combatResolvedActorMismatch.error, /must resolve the active actor mira/);
 
+const enemyCombatValidationRequest = {
+  ...combatValidationRequest,
+  context: {
+    ...combatValidationRequest.context,
+    combat: {
+      ...combatValidationRequest.context.combat,
+      turnOrder: [
+        { id: "massive-wolf", name: "Massive wolf", type: "enemy", initiativeScore: 18 },
+        { id: "mira", name: "Mira", type: "party", initiativeScore: 11 },
+      ],
+      currentTurnId: "massive-wolf",
+    },
+  },
+  user: { ...combatValidationRequest.user, inWorld: "The app has resolved the Massive wolf's attack." },
+};
+const enemyCombatSingleActor = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  table: [{
+    speaker: "DM",
+    speakerId: null,
+    role: "dm",
+    kind: "narration",
+    visibility: "table",
+    text: "The Massive wolf snaps at Mira, forcing her back through the ferns.",
+  }],
+  mechanics: [{ type: "attack", actor: "Massive wolf", target: "Mira", roll: "d20+5 = 17", damage: "1d8+3 = 8", outcome: "success", text: "The wolf hits Mira for 8 piercing damage." }],
+  proposedChanges: [{
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Massive wolf's combat turn resolves.",
+    data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "massive-wolf" },
+    confidence: "high",
+    reason: "Enemy combat action resolved.",
+  }],
+})), {
+  requestId: "combat-validation",
+  request: enemyCombatValidationRequest,
+});
+assert.equal(enemyCombatSingleActor.ok, true);
+
+const enemyCombatNextActorOverreach = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  table: [{
+    speaker: "DM",
+    speakerId: null,
+    role: "dm",
+    kind: "narration",
+    visibility: "table",
+    text: "The Massive wolf snaps at Mira. Mira immediately stabs the wolf back before it can recover.",
+  }],
+  mechanics: [{ type: "attack", actor: "Massive wolf", target: "Mira", roll: "d20+5 = 17", damage: "1d8+3 = 8", outcome: "success", text: "The wolf hits Mira." }],
+  proposedChanges: [{
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Massive wolf's combat turn resolves.",
+    data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "massive-wolf" },
+    confidence: "high",
+    reason: "Enemy combat action resolved.",
+  }],
+})), {
+  requestId: "combat-validation",
+  request: enemyCombatValidationRequest,
+});
+assert.equal(enemyCombatNextActorOverreach.ok, false);
+assert.match(enemyCombatNextActorOverreach.error, /must not narrate or resolve another combatant/);
+
+const enemyCombatResolvedActorMismatch = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  requestId: "combat-validation",
+  sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+  mechanics: [{ type: "attack", actor: "Massive wolf", target: "Mira", roll: "d20+5 = 17", damage: "1d8+3 = 8", outcome: "success", text: "The wolf hits Mira." }],
+  proposedChanges: [{
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Wrong enemy combat actor resolves.",
+    data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "mira" },
+    confidence: "high",
+    reason: "This should not be accepted for the wolf's turn.",
+  }],
+})), {
+  requestId: "combat-validation",
+  request: enemyCombatValidationRequest,
+});
+assert.equal(enemyCombatResolvedActorMismatch.ok, false);
+assert.match(enemyCombatResolvedActorMismatch.error, /must resolve the active actor massive-wolf/);
+
 const combatWithAdvance = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   requestId: "combat-validation",
   sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },

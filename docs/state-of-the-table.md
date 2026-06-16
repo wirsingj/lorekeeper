@@ -106,6 +106,7 @@ Every table surface should answer the same practical questions a real table answ
 55. Diagnostics/manual review labels now say Table Diagnostics, Copy Details, and Review DM Response instead of exposing JSON/import/state-sync language during ordinary recovery.
 56. Session health now prioritizes a `Next:` line for stuck/waiting states, including repair, provider wait, guest seating/approval, queued guest input, combat ownership, and companion combat turns.
 57. Provider turn requests now include an app-owned AI companion interjection policy with rarity/cooldown gates, explicit nudge bypass, and low-stakes constraints.
+58. Combat response validation now rejects wrong `resolvedActorId` and next-actor overreach for enemy turns as well as player turns.
 
 ### Still Risky
 
@@ -223,6 +224,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add fixture for app-owned enemy attack turn.
 - [x] Add fixtures for chase, richer intimidation/de-escalation contests, reactions, concentration, and richer spell/effect cases.
 - [x] Make auto-resolved enemy turns app-bounded: app owns rolls/effects/initiative before narration.
+- [x] Add enemy-turn and player-turn fixtures that verify one actor is resolved per provider response.
 - [ ] Add crisp AI companion combat approval flow.
 - [x] Reject provider combat responses that resolve the wrong active actor.
 - [x] Ensure initiative never advances by provider phrasing alone.

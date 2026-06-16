@@ -546,7 +546,7 @@ function hasCombatAdvanceChange(response) {
 
 function detectResolvedActorMismatch(response, request) {
   const currentActorId = request?.context?.combat?.currentTurnId || "";
-  if (!currentActorId || !isPartyActorInRequest(request, currentActorId)) {
+  if (!currentActorId || !isCombatActorInRequest(request, currentActorId)) {
     return "";
   }
 
@@ -564,7 +564,7 @@ function detectResolvedActorMismatch(response, request) {
 
 function detectNextActorCombatOverreach(response, request) {
   const currentActorId = request?.context?.combat?.currentTurnId || "";
-  if (!currentActorId || !isPartyActorInRequest(request, currentActorId)) {
+  if (!currentActorId || !isCombatActorInRequest(request, currentActorId)) {
     return "";
   }
 
@@ -595,13 +595,18 @@ function detectNextActorCombatOverreach(response, request) {
     if (combatant.name.length < 3) {
       continue;
     }
-    const namePattern = new RegExp(`\\b${escapeRegExp(combatant.name)}\\b.{0,90}\\b(attacks?|lunges?|bites?|claws?|slashes?|stabs?|strikes?|shoots?|fires?|casts?|deals?\\s+\\d+|damage)\\b`, "i");
-    const possessivePattern = new RegExp(`\\b${escapeRegExp(combatant.name)}'?s\\b.{0,90}\\b(attack|bite|claws?|slash|stab|strike|shot|spell|damage)\\b`, "i");
+    const namePattern = new RegExp(`\\b${escapeRegExp(combatant.name)}\\b.{0,90}\\b(attacks?|lunges?|bites?|claws?|slashes?|stabs?|strikes?|shoots?|fires?|casts?|deals?\\s+\\d+)\\b`, "i");
+    const possessivePattern = new RegExp(`\\b${escapeRegExp(combatant.name)}'?s\\b.{0,90}\\b(attack|bite|claws?|slash|stab|strike|shot|spell)\\b`, "i");
     if (namePattern.test(combined) || possessivePattern.test(combined)) {
-      return `resolved party combat response must not narrate or resolve another combatant's action before initiative advances (${combatant.name})`;
+      return `resolved combat response must not narrate or resolve another combatant's action before initiative advances (${combatant.name})`;
     }
   }
   return "";
+}
+
+function isCombatActorInRequest(request, actorId) {
+  return (request?.context?.combat?.turnOrder ?? []).some((entry) => entry?.id === actorId) ||
+    (request?.context?.party ?? []).some((member) => member?.id === actorId);
 }
 
 function isPartyActorInRequest(request, actorId) {
