@@ -430,6 +430,9 @@ const elements = {
   playerForm: document.querySelector("#player-form"),
   playerInput: document.querySelector("#player-input"),
   buildTurn: document.querySelector("#build-turn"),
+  commandContext: document.querySelector("#command-context"),
+  commandContextPhase: document.querySelector("#command-context-phase"),
+  commandContextNext: document.querySelector("#command-context-next"),
   responseImport: document.querySelector("#response-import"),
   pasteResponse: document.querySelector("#paste-response"),
   importResponse: document.querySelector("#import-response"),
@@ -8133,7 +8136,24 @@ function refreshTableSessionProjection() {
     elements.providerActivity.dataset.tablePhase = state.tableSession.phase;
     elements.providerActivity.dataset.expectedActor = state.tableSession.expectedActor?.kind || "";
   }
+  renderCommandContext(state.tableSession);
   return state.tableSession;
+}
+
+function renderCommandContext(tableSession = null) {
+  if (!elements.commandContext) {
+    return;
+  }
+  const phase = tableSession?.headline || "Table Ready";
+  const nextStep = tableSession?.nextStep || "Continue the scene.";
+  elements.commandContext.dataset.phase = tableSession?.phase || "";
+  elements.commandContext.dataset.tone = tableSession?.tone || "ready";
+  if (elements.commandContextPhase) {
+    elements.commandContextPhase.textContent = `Now: ${phase}`;
+  }
+  if (elements.commandContextNext) {
+    elements.commandContextNext.textContent = `Next: ${nextStep}`;
+  }
 }
 
 function buildCurrentTableSessionProjection() {

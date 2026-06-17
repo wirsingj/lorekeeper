@@ -19,7 +19,7 @@
   --campaign-notes-height: 432px;
   --player-notes-height: 308px;
   --table-talk-height: 244px;
-  --command-deck-height: 104px;
+  --command-deck-height: 124px;
 }
 
 * {
@@ -2265,8 +2265,8 @@ button:disabled {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: minmax(0, 1fr);
-  column-gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px 10px;
   margin: 0 4px;
   padding: 13px 14px 14px;
   background:
@@ -2277,6 +2277,46 @@ button:disabled {
   min-height: 0;
   overflow: hidden;
   backdrop-filter: blur(12px);
+}
+
+.command-context {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  color: #b9c6cc;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.command-context span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-context span:first-child {
+  flex: 0 1 auto;
+  color: #f0f5f4;
+  font-weight: 850;
+}
+
+.command-context span:last-child {
+  flex: 1 1 auto;
+}
+
+.command-context[data-tone="attention"] span:first-child {
+  color: #f0b6ae;
+}
+
+.command-context[data-tone="working"] span:first-child {
+  color: #9be2dc;
+}
+
+.command-context[data-tone="waiting"] span:first-child {
+  color: #ddca94;
 }
 
 .command-resize-handle {
@@ -2398,7 +2438,7 @@ button:disabled {
 .player-form {
   display: grid;
   grid-column: 1 / -1;
-  grid-row: 1;
+  grid-row: 2;
   gap: 0;
   height: 100%;
   min-height: 0;

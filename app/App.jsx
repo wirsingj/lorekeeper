@@ -423,6 +423,10 @@ export function LorekeeperShell() {
           tabIndex="0"
           title="Resize input panel"
         ></div>
+        <div id="command-context" className="command-context" aria-live="polite">
+          <span id="command-context-phase">Now: Table ready</span>
+          <span id="command-context-next">Next: Continue the scene.</span>
+        </div>
         <form id="player-form" className="player-form">
           <label className="visually-hidden" htmlFor="player-input">Table Message</label>
           <div className="input-row">

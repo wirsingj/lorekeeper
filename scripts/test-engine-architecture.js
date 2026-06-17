@@ -2588,6 +2588,12 @@ async function testNewCampaignPreTableJoinerWiring() {
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
     "table status strip should live above the play log",
   );
+  assert.match(appShell, /id="command-context"/, "command deck should show the current table phase");
+  assert.match(appShell, /id="command-context-phase"/);
+  assert.match(appShell, /id="command-context-next"/);
+  assert.match(appJs, /function renderCommandContext\(tableSession = null\)/, "command deck phase copy should be rendered from table session projection");
+  assert.match(appJs, /renderCommandContext\(state\.tableSession\)/, "table session refresh should update the command deck cue");
+  assert.match(styles, /\.command-context/);
   assert.match(appShell, /Try Again/);
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);
