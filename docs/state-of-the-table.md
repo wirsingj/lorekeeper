@@ -264,6 +264,7 @@ Risks:
 134. Settings entry points are now intent-aware: front-door Preferences opens App Preferences, Check AI opens the DM Voice surface, and the in-table gear opens Friends And Seats instead of app-level options.
 135. The in-table settings gear is now a labeled Friends control, so normal play points hosts toward seating/share actions instead of generic configuration.
 136. The front door now gives primary weight to Continue Adventure and Join A Table, with Check AI demoted to the lower utility strip so setup no longer reads as a third play mode.
+137. Seat Guest now opens the Friends And Seats surface directly, so waiting-player prompts land on the relevant host action instead of a generic settings dialog.
 
 ### Still Risky
 

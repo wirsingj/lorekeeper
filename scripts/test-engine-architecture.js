@@ -2607,6 +2607,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appShell, /id="load-imported"/, "saved adventure loading belongs on the front door, not inside Preferences");
   assert.match(appJs, /function setSettingsTab\(tab = "app"\)/, "settings tab state should be explicit renderer state");
   assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
+  assert.match(appJs, /function openLocalTableSeating\(\) \{[\s\S]*openSetupDialog\(\{ tab: "friends" \}\)/, "Seat Guest should land on Friends And Seats");
   assert.match(appJs, /setupDialogTitle\.textContent = tabCopy\.title/);
   assert.match(appJs, /openSetupDialog\(\{ tab: "troubleshooting" \}\)/, "DM response details should open the Troubleshooting tab directly");
   assert.match(styles, /\.settings-tabs/);

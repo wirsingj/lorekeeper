@@ -6467,13 +6467,12 @@ function announceWaitingGuestsIfNeeded() {
 function openLocalTableSeating() {
   if (elements.setupDialog && !elements.setupDialog.open) {
     try {
-      elements.setupDialog.showModal();
-      if (!clientMode) {
-        refreshProviderStatus({ quiet: true });
-      }
+      openSetupDialog({ tab: "friends" });
     } catch {
       // If the dialog cannot open, the party cards still expose seating actions.
     }
+  } else {
+    setSettingsTab("friends");
   }
   const section = document.querySelector(".local-table-section");
   section?.scrollIntoView({ block: "start" });
