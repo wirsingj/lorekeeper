@@ -113,7 +113,7 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Owns app-resolved combat mechanics, legal actions, rolls, effects, HP, conditions, and initiative advancement.
 - Owns active-turn economy for resolved party combat turns: action, bonus action, reaction, and movement costs are validated before resolution and logged with the combat action.
 - Provider may narrate combat, but should not be the authority for app-owned mechanics.
-- Provider-import initiative fallback policy lives in `app/combat-import-controller.js`; it may synthesize an advance only when structured mechanics resolved the active actor, never from narration phrasing alone.
+- Provider-import combat fallback policy lives in `app/combat-import-controller.js`; it may synthesize combat start/sync/advance changes only from explicit hostile signals, inferred enemies, and resolved active-actor mechanics, never from loose narration phrasing alone.
 
 `AgencyController` and model contract validation:
 
@@ -254,7 +254,7 @@ Start here when making changes:
 - One-blob state debugging: `src/engine/table-debug-snapshot.js`, diagnostics `debugSnapshot`
 - Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
 - Stale combat prompt repair: `app/combat-prompt-repair-controller.js`
-- Provider-import combat advancement guardrails: `app/combat-import-controller.js`
+- Provider-import combat fallback guardrails: `app/combat-import-controller.js`
 - Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`
 - Character creation/autocomplete: `app/character-autocomplete-controller.js`
 - Local multiplayer: `src/multiplayer/local-table.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`

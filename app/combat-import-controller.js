@@ -1,7 +1,110 @@
+import { latestDmNarration } from "./combat-prompt-repair-controller.js";
+
 // Combat import policy lives outside app.js so provider-response imports cannot
-// weaken initiative ownership by accident. Provider narration may describe a
-// combat turn, but this controller only advances initiative when structured
-// mechanics show the active actor's turn actually resolved.
+// weaken combat ownership by accident. Provider narration may describe combat,
+// but this controller keeps the fallback rules explicit and testable.
+export function createImplicitCombatStartChange({
+  campaign,
+  tableMessages = [],
+  proposedChanges = [],
+  turnResponse = null,
+} = {}) {
+  if (campaign?.combat?.inCombat) {
+    return null;
+  }
+  if (proposedChanges.some((change) => normalizeChangeDomain(change.domain) === "combat")) {
+    return null;
+  }
+
+  const latestDmText = latestDmNarration(tableMessages);
+  const structuredCombatSignal = hasStructuredCombatSignal(turnResponse);
+  if (!structuredCombatSignal && !isCombatStartNarration(latestDmText)) {
+    return null;
+  }
+
+  const enemies = inferCombatEnemies(latestDmText);
+  if (!enemies.length) {
+    return null;
+  }
+  const immediateSituation = compactSceneSituation(latestDmText);
+  return {
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Combat started from latest DM narration.",
+    data: {
+      inCombat: true,
+      round: campaign?.combat?.round || 1,
+      stakes: immediateSituation,
+      enemies,
+      lastAction: "Combat started from DM narration.",
+    },
+    confidence: structuredCombatSignal ? "high" : "medium",
+    reason: "Keeps SQLite combat state aligned when a fight is visibly underway but the model omitted an explicit combat update.",
+  };
+}
+
+export function createImplicitCombatEnemySyncChange({
+  campaign,
+  tableMessages = [],
+  proposedChanges = [],
+  turnResponse = null,
+} = {}) {
+  const latestDmText = latestDmNarration(tableMessages);
+  const combatWillBeActive =
+    Boolean(campaign?.combat?.inCombat) ||
+    proposedChanges.some((change) => normalizeChangeDomain(change.domain) === "combat" && change.data?.inCombat === true) ||
+    hasStructuredCombatSignal(turnResponse) ||
+    isCombatStartNarration(latestDmText);
+  if (!combatWillBeActive) {
+    return null;
+  }
+
+  const inferredEnemies = inferCombatEnemies(latestDmText);
+  if (!inferredEnemies.length) {
+    return null;
+  }
+
+  const knownEnemies = [
+    ...(campaign?.combat?.enemies ?? []),
+    ...proposedChanges.flatMap((change) => {
+      if (normalizeChangeDomain(change.domain) !== "combat") {
+        return [];
+      }
+      return [
+        ...(Array.isArray(change.data?.enemies) ? change.data.enemies : []),
+        ...(Array.isArray(change.data?.enemyUpdates) ? change.data.enemyUpdates : []),
+      ];
+    }),
+  ];
+  const knownKeys = new Set(knownEnemies.flatMap(enemyIdentityKeys));
+  const missingEnemies = inferredEnemies.filter((enemy) =>
+    enemyIdentityKeys(enemy).every((key) => !knownKeys.has(key))
+  );
+  if (!missingEnemies.length) {
+    return null;
+  }
+
+  return {
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary: "Combatant inferred from latest DM narration.",
+    data: {
+      inCombat: true,
+      round: campaign?.combat?.round || 1,
+      enemyUpdates: missingEnemies,
+      lastAction: "Missing combatant added to initiative from DM narration.",
+    },
+    confidence: hasStructuredCombatSignal(turnResponse) ? "high" : "medium",
+    reason: "Keeps the 5E initiative tracker populated when the DM narration names an active hostile but the model omits it from combat state.",
+  };
+}
+
 export function createImplicitCombatAdvanceChange({
   campaign,
   proposedChanges = [],
@@ -85,6 +188,84 @@ export function hasResolvedMechanics(turnResponse = null) {
       mechanic.outcome,
     ].filter(Boolean).join(" "))
   );
+}
+
+export function hasStructuredCombatSignal(turnResponse = null) {
+  return Boolean(
+    turnResponse?.sceneStatus?.mode === "combat" ||
+    turnResponse?.sceneStatus?.danger === "combat" ||
+    turnResponse?.flags?.startsCombat === true
+  );
+}
+
+export function inferCombatEnemies(text = "") {
+  const lower = String(text).toLowerCase();
+  const enemies = [];
+  const addEnemy = (id, name, type = "enemy") => {
+    if (!enemies.some((enemy) => enemy.id === id || normalizeNameKey(enemy.name) === normalizeNameKey(name))) {
+      enemies.push({ id, name, type, hp: null, conditions: [] });
+    }
+  };
+
+  if (/\bwolf\b/.test(lower)) {
+    addEnemy("enemy-wolf", "Massive wolf", "beast");
+  } else if (/\bbeast\b/.test(lower)) {
+    addEnemy("enemy-beast", "Unknown beast", "beast");
+  } else if (/\bcreature\b/.test(lower)) {
+    addEnemy("enemy-creature", "Unknown creature", "creature");
+  } else if (/\bmonster\b/.test(lower)) {
+    addEnemy("enemy-monster", "Unknown monster", "monster");
+  }
+
+  if (/\bdrunk (?:miner|dwarf|mining dwarf)\b|\bminer dwarf\b|\bdwarven miner\b/.test(lower)) {
+    addEnemy("enemy-drunk-miner", "Drunk miner", "humanoid");
+  } else if (/\bminer\b/.test(lower) && /\b(bar fight|brawl|throws? (?:a )?punch|punch(?:es|ed|ing)?|attacks?|hostile|counterattack)\b/.test(lower)) {
+    addEnemy("enemy-hostile-miner", "Hostile miner", "humanoid");
+  }
+  if (/\b(?:bully|brawler|thug)\b/.test(lower)) {
+    addEnemy("enemy-brawler", "Brawler", "humanoid");
+  }
+  if (/\bbandit\b/.test(lower)) {
+    addEnemy("enemy-bandit", "Bandit", "humanoid");
+  }
+  return enemies;
+}
+
+function isCombatStartNarration(text = "") {
+  return /\b(under attack|roll initiative|initiative|enemy|monster|creature|beast|wolf|wounded beast|bar fight|brawl|throws? (?:a )?punch|punch(?:es|ed|ing)?|counterattack|crossbow bolt|blood|fangs|claws|charging|charges|attacks|attackers?|weapon drawn|readies? (?:a )?(?:weapon|crossbow|bow|spell))\b/i.test(text);
+}
+
+function enemyIdentityKeys(enemy = {}) {
+  return [
+    enemy.id,
+    enemy.enemyId,
+    enemy.name,
+    enemy.title,
+  ]
+    .map(normalizeNameKey)
+    .filter(Boolean);
+}
+
+function compactSceneSituation(text = "") {
+  const cleaned = String(text)
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line && !isChoiceLikeLine(line) && !/^what (?:does|do|would|will|should|can)\b/i.test(line))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) {
+    return "";
+  }
+  return cleaned.length > 520 ? `${cleaned.slice(0, 519).trimEnd()}...` : cleaned;
+}
+
+function isChoiceLikeLine(line) {
+  return /^\s*(?:[-*]\s*)?(?:[A-Ha-h]|\d{1,2})\s*[\).:-]\s+/.test(String(line ?? ""));
+}
+
+function normalizeNameKey(value) {
+  return String(value ?? "").trim().toLowerCase();
 }
 
 function isNonResolvingCombatInput(text = "") {

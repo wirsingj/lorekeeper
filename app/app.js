@@ -16,7 +16,7 @@ import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
-import { createImplicitCombatAdvanceChange } from "./combat-import-controller.js";
+import { createImplicitCombatAdvanceChange, createImplicitCombatEnemySyncChange, createImplicitCombatStartChange } from "./combat-import-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "./combat-prompt-repair-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
@@ -6555,13 +6555,23 @@ async function importProviderResponse(responseText, options = {}) {
     ? createImplicitSceneProgressChange(tableMessages, extraction.proposedChanges)
     : null;
   const implicitCombatChange = options.autoCommit
-    ? createImplicitCombatStartChange(tableMessages, extraction.proposedChanges, options.data?.turnResponse)
+    ? createImplicitCombatStartChange({
+      campaign: state.campaign,
+      tableMessages,
+      proposedChanges: extraction.proposedChanges,
+      turnResponse: options.data?.turnResponse,
+    })
     : null;
   const combatContextChanges = implicitCombatChange
     ? [...extraction.proposedChanges, implicitCombatChange]
     : extraction.proposedChanges;
   const implicitCombatEnemyChange = options.autoCommit
-    ? createImplicitCombatEnemySyncChange(tableMessages, combatContextChanges, options.data?.turnResponse)
+    ? createImplicitCombatEnemySyncChange({
+      campaign: state.campaign,
+      tableMessages,
+      proposedChanges: combatContextChanges,
+      turnResponse: options.data?.turnResponse,
+    })
     : null;
   const implicitCombatAdvanceChange = options.autoCommit
     ? createImplicitCombatAdvanceChange({
@@ -6714,154 +6724,6 @@ function createImplicitSceneProgressChange(tableMessages = [], proposedChanges =
     confidence: "high",
     reason: "Keeps SQLite scene state aligned with the imported DM beat so later turns do not repeat stale prompts.",
   };
-}
-
-function createImplicitCombatStartChange(tableMessages = [], proposedChanges = [], turnResponse = null) {
-  if (state.campaign?.combat?.inCombat) {
-    return null;
-  }
-  if (proposedChanges.some((change) => normalizeChangeDomain(change.domain) === "combat")) {
-    return null;
-  }
-
-  const latestDmText = latestDmNarration(tableMessages);
-  const structuredCombatSignal = hasStructuredCombatSignal(turnResponse);
-  if (!structuredCombatSignal && !isCombatStartNarration(latestDmText)) {
-    return null;
-  }
-
-  const enemies = inferCombatEnemies(latestDmText);
-  if (!enemies.length) {
-    return null;
-  }
-  const immediateSituation = compactSceneSituation(latestDmText);
-  return {
-    operation: "update",
-    domain: "combat",
-    targetId: null,
-    importance: "normal",
-    visibility: "player_visible",
-    summary: "Combat started from latest DM narration.",
-    data: {
-      inCombat: true,
-      round: state.campaign?.combat?.round || 1,
-      stakes: immediateSituation,
-      enemies,
-      lastAction: "Combat started from DM narration.",
-    },
-    confidence: structuredCombatSignal ? "high" : "medium",
-    reason: "Keeps SQLite combat state aligned when a fight is visibly underway but the model omitted an explicit combat update.",
-  };
-}
-
-function createImplicitCombatEnemySyncChange(tableMessages = [], proposedChanges = [], turnResponse = null) {
-  const latestDmText = latestDmNarration(tableMessages);
-  const combatWillBeActive =
-    Boolean(state.campaign?.combat?.inCombat) ||
-    proposedChanges.some((change) => normalizeChangeDomain(change.domain) === "combat" && change.data?.inCombat === true) ||
-    hasStructuredCombatSignal(turnResponse) ||
-    isCombatStartNarration(latestDmText);
-  if (!combatWillBeActive) {
-    return null;
-  }
-
-  const inferredEnemies = inferCombatEnemies(latestDmText);
-  if (!inferredEnemies.length) {
-    return null;
-  }
-
-  const knownEnemies = [
-    ...(state.campaign?.combat?.enemies ?? []),
-    ...proposedChanges.flatMap((change) => {
-      if (normalizeChangeDomain(change.domain) !== "combat") {
-        return [];
-      }
-      return [
-        ...(Array.isArray(change.data?.enemies) ? change.data.enemies : []),
-        ...(Array.isArray(change.data?.enemyUpdates) ? change.data.enemyUpdates : []),
-      ];
-    }),
-  ];
-  const knownKeys = new Set(knownEnemies.flatMap(enemyIdentityKeys));
-  const missingEnemies = inferredEnemies.filter((enemy) =>
-    enemyIdentityKeys(enemy).every((key) => !knownKeys.has(key))
-  );
-  if (!missingEnemies.length) {
-    return null;
-  }
-
-  return {
-    operation: "update",
-    domain: "combat",
-    targetId: null,
-    importance: "normal",
-    visibility: "player_visible",
-    summary: "Combatant inferred from latest DM narration.",
-    data: {
-      inCombat: true,
-      round: state.campaign?.combat?.round || 1,
-      enemyUpdates: missingEnemies,
-      lastAction: "Missing combatant added to initiative from DM narration.",
-    },
-    confidence: hasStructuredCombatSignal(turnResponse) ? "high" : "medium",
-    reason: "Keeps the 5E initiative tracker populated when the DM narration names an active hostile but the model omits it from combat state.",
-  };
-}
-
-function hasStructuredCombatSignal(turnResponse = null) {
-  return Boolean(
-    turnResponse?.sceneStatus?.mode === "combat" ||
-    turnResponse?.sceneStatus?.danger === "combat" ||
-    turnResponse?.flags?.startsCombat === true
-  );
-}
-
-function isCombatStartNarration(text = "") {
-  return /\b(under attack|roll initiative|initiative|enemy|monster|creature|beast|wolf|wounded beast|bar fight|brawl|throws? (?:a )?punch|punch(?:es|ed|ing)?|counterattack|crossbow bolt|blood|fangs|claws|charging|charges|attacks|attackers?|weapon drawn|readies? (?:a )?(?:weapon|crossbow|bow|spell))\b/i.test(text);
-}
-
-function inferCombatEnemies(text = "") {
-  const lower = String(text).toLowerCase();
-  const enemies = [];
-  const addEnemy = (id, name, type = "enemy") => {
-    if (!enemies.some((enemy) => enemy.id === id || normalizeNameKey(enemy.name) === normalizeNameKey(name))) {
-      enemies.push({ id, name, type, hp: null, conditions: [] });
-    }
-  };
-
-  if (/\bwolf\b/.test(lower)) {
-    addEnemy("enemy-wolf", "Massive wolf", "beast");
-  } else if (/\bbeast\b/.test(lower)) {
-    addEnemy("enemy-beast", "Unknown beast", "beast");
-  } else if (/\bcreature\b/.test(lower)) {
-    addEnemy("enemy-creature", "Unknown creature", "creature");
-  } else if (/\bmonster\b/.test(lower)) {
-    addEnemy("enemy-monster", "Unknown monster", "monster");
-  }
-
-  if (/\bdrunk (?:miner|dwarf|mining dwarf)\b|\bminer dwarf\b|\bdwarven miner\b/.test(lower)) {
-    addEnemy("enemy-drunk-miner", "Drunk miner", "humanoid");
-  } else if (/\bminer\b/.test(lower) && /\b(bar fight|brawl|throws? (?:a )?punch|punch(?:es|ed|ing)?|attacks?|hostile|counterattack)\b/.test(lower)) {
-    addEnemy("enemy-hostile-miner", "Hostile miner", "humanoid");
-  }
-  if (/\b(?:bully|brawler|thug)\b/.test(lower)) {
-    addEnemy("enemy-brawler", "Brawler", "humanoid");
-  }
-  if (/\bbandit\b/.test(lower)) {
-    addEnemy("enemy-bandit", "Bandit", "humanoid");
-  }
-  return enemies;
-}
-
-function enemyIdentityKeys(enemy = {}) {
-  return [
-    enemy.id,
-    enemy.enemyId,
-    enemy.name,
-    enemy.title,
-  ]
-    .map(normalizeNameKey)
-    .filter(Boolean);
 }
 
 function compactSceneSituation(text = "") {

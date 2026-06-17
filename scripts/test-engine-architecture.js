@@ -5,7 +5,14 @@ import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
-import { createImplicitCombatAdvanceChange, hasResolvedMechanics, submittedCombatTurnText } from "../app/combat-import-controller.js";
+import {
+  createImplicitCombatAdvanceChange,
+  createImplicitCombatEnemySyncChange,
+  createImplicitCombatStartChange,
+  hasResolvedMechanics,
+  inferCombatEnemies,
+  submittedCombatTurnText,
+} from "../app/combat-import-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "../app/combat-prompt-repair-controller.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
@@ -893,6 +900,34 @@ function testCombatPromptRepairController() {
 }
 
 function testCombatImportController() {
+  const startChange = createImplicitCombatStartChange({
+    campaign: campaignFixture(),
+    tableMessages: [{ role: "dm", body: "A massive wolf charges from the treeline. Roll initiative." }],
+    turnResponse: { sceneStatus: { mode: "combat" } },
+  });
+  assert.equal(startChange.data.inCombat, true);
+  assert.equal(startChange.data.enemies[0].id, "enemy-wolf");
+  assert.equal(startChange.confidence, "high");
+  assert.equal(createImplicitCombatStartChange({
+    campaign: campaignFixture(),
+    tableMessages: [{ role: "dm", body: "The tavern keeper asks what you want to drink." }],
+  }), null);
+
+  const activeCampaign = startCombat(campaignFixture(), {
+    enemies: [{ id: "enemy-wolf", name: "Massive wolf", hp: { current: 12, max: 12 }, armorClass: 12 }],
+    initiativeRolls: { thor: 20, sy: 7, karl: 6, "enemy-wolf": 1 },
+  });
+  const syncChange = createImplicitCombatEnemySyncChange({
+    campaign: activeCampaign,
+    tableMessages: [{ role: "dm", body: "A bandit joins the wolf at the treeline." }],
+  });
+  assert.equal(syncChange.data.enemyUpdates[0].id, "enemy-bandit");
+  assert.equal(createImplicitCombatEnemySyncChange({
+    campaign: activeCampaign,
+    tableMessages: [{ role: "dm", body: "The massive wolf circles closer." }],
+  }), null, "known enemies should not be duplicated");
+  assert.equal(inferCombatEnemies("A bandit and a hostile miner block the road.").length >= 2, true);
+
   const campaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
     initiativeRolls: { thor: 20, sy: 7, karl: 6, miner: 1 },
@@ -2334,7 +2369,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /state\.campaign\.combat\.currentTurnId === member\.id/, "AI companion combat nudge must match the current initiative actor");
   assert.match(appJs, /buildAiCompanionCombatNudgePrompt/, "AI companion combat nudges should request a suggestion, not resolution");
   assert.match(appJs, /Do not roll dice, deal damage, spend resources, apply conditions, move initiative, resolve the action/, "AI companion combat suggestion must not resolve mechanics before host approval");
-  assert.match(appJs, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
+  assert.match(combatImportController, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
   assert.match(appJs, /stripInlineResponseJsonTail/, "table narration cleanup should remove inline provider JSON tails");
   assert.match(appJs, /choiceAudienceLabel/, "structured choice panels should surface party/character/vote audience metadata");
   assert.match(appJs, /choice-audience/, "choice panels should render the selected audience near the prompt");
