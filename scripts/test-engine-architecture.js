@@ -24,6 +24,7 @@ import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } f
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
+import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
@@ -2486,6 +2487,27 @@ function testReviewPanelProjection() {
   assert.equal(committed.entries[0].body, "Added Karl.");
 }
 
+function testSettingsSurfaceProjection() {
+  const appSurface = buildSettingsSurfaceProjection({ tab: "app", mode: "app" });
+  assert.deepEqual(appSurface.allowedTabs, ["app", "ai"]);
+  assert.equal(appSurface.activeTab, "app");
+  assert.equal(appSurface.copy.title, "App Preferences");
+
+  const aiSurface = buildSettingsSurfaceProjection({ tab: "ai", mode: "ai" });
+  assert.deepEqual(aiSurface.allowedTabs, ["ai", "app"]);
+  assert.equal(aiSurface.activeTab, "ai");
+  assert.equal(aiSurface.copy.title, "DM Voice");
+
+  const tableSurface = buildSettingsSurfaceProjection({ tab: "friends", mode: "table" });
+  assert.deepEqual(tableSurface.allowedTabs, ["friends", "troubleshooting"]);
+  assert.equal(tableSurface.activeTab, "friends");
+  assert.equal(tableSurface.copy.title, "Friends And Seats");
+
+  const coerced = buildSettingsSurfaceProjection({ tab: "app", mode: "table" });
+  assert.equal(coerced.activeTab, "friends");
+  assert.equal(coerced.mode, "table");
+}
+
 async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
@@ -2578,6 +2600,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
+  const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
@@ -2657,15 +2680,16 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /data-settings-panel="troubleshooting" hidden/);
   assert.doesNotMatch(appShell, /id="new-campaign"/, "adventure creation belongs on the front door, not inside Preferences");
   assert.doesNotMatch(appShell, /id="load-imported"/, "saved adventure loading belongs on the front door, not inside Preferences");
-  assert.match(appJs, /const settingsModeTabs = Object\.freeze/, "settings surfaces should declare allowed tab groups");
-  assert.match(appJs, /app: \["app", "ai"\]/, "app preferences should only expose app-level tabs");
-  assert.match(appJs, /table: \["friends", "troubleshooting"\]/, "table settings should only expose friends and troubleshooting");
-  assert.match(appJs, /button\.hidden = !allowedTabs\.includes/, "irrelevant settings tabs should be hidden by surface mode");
+  assert.match(appJs, /settings-surface-controller\.js/, "settings surface policy should live outside the main app renderer");
+  assert.match(settingsSurfaceController, /settingsSurfaceModes = Object\.freeze/, "settings surfaces should declare allowed tab groups");
+  assert.match(settingsSurfaceController, /app: \["app", "ai"\]/, "app preferences should only expose app-level tabs");
+  assert.match(settingsSurfaceController, /table: \["friends", "troubleshooting"\]/, "table settings should only expose friends and troubleshooting");
+  assert.match(settingsSurfaceController, /button\.hidden = !projection\.allowedTabs\.includes/, "irrelevant settings tabs should be hidden by surface mode");
   assert.match(styles, /\.settings-tabs\[data-visible-tabs="2"\]/, "settings tab grid should collapse when only two tabs are visible");
   assert.match(appJs, /function setSettingsTab\(tab = "app", \{ mode = state\.settingsMode/, "settings tab state should be explicit renderer state");
   assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends", mode: "table" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
   assert.match(appJs, /function openLocalTableSeating\(\) \{[\s\S]*openSetupDialog\(\{ tab: "friends", mode: "table" \}\)/, "Seat Guest should land on Friends And Seats");
-  assert.match(appJs, /setupDialogTitle\.textContent = tabCopy\.title/);
+  assert.match(appJs, /applySettingsSurfaceProjection\(elements, projection\)/);
   assert.match(appJs, /openSetupDialog\(\{ tab: "troubleshooting" \}\)/, "DM response details should open the Troubleshooting tab directly");
   assert.match(styles, /\.settings-tabs/);
   assert.match(styles, /\.settings-tab\.active/);
@@ -2835,6 +2859,7 @@ testTableFocusProjection();
 testPlayLogProjectionBoundsLongSessions();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
+testSettingsSurfaceProjection();
 
 await testProviderExecutionLifecycle();
 await testInvalidProviderOutputIsRecoverable();

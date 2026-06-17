@@ -30,6 +30,7 @@ import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } f
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
+import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
@@ -873,13 +874,6 @@ elements.pasteResponse.addEventListener("click", async () => {
   }
 });
 
-const settingsModeTabs = Object.freeze({
-  app: ["app", "ai"],
-  ai: ["ai", "app"],
-  table: ["friends", "troubleshooting"],
-  troubleshooting: ["troubleshooting", "friends"],
-});
-
 function openSetupDialog({ focusProvider = false, tab = "", mode = "" } = {}) {
   const requestedTab = focusProvider ? "ai" : tab || "app";
   const requestedMode = mode || settingsModeForTab(requestedTab);
@@ -901,71 +895,10 @@ function openSetupDialog({ focusProvider = false, tab = "", mode = "" } = {}) {
   refreshProviderStatus({ quiet: true });
 }
 
-function settingsModeForTab(tab = "app") {
-  if (tab === "friends") {
-    return "table";
-  }
-  if (tab === "troubleshooting") {
-    return "troubleshooting";
-  }
-  if (tab === "ai") {
-    return "ai";
-  }
-  return "app";
-}
-
 function setSettingsTab(tab = "app", { mode = state.settingsMode || "app" } = {}) {
-  const validMode = settingsModeTabs[mode] ? mode : settingsModeForTab(tab);
-  const allowedTabs = settingsModeTabs[validMode] ?? settingsModeTabs.app;
-  const activeTab = allowedTabs.includes(tab) ? tab : allowedTabs[0];
-  state.settingsMode = validMode;
-  const tabCopy = {
-    app: {
-      eyebrow: "Preferences",
-      title: "App Preferences",
-      subtitle: "Choose how LoreKeeper starts and behaves before you sit down.",
-    },
-    ai: {
-      eyebrow: "AI Readiness",
-      title: "DM Voice",
-      subtitle: "Check or tune the storyteller before you host.",
-    },
-    friends: {
-      eyebrow: "Table Settings",
-      title: "Friends And Seats",
-      subtitle: "Open the guest page, share the table link, and seat friends.",
-    },
-    troubleshooting: {
-      eyebrow: "Troubleshooting",
-      title: "Table Diagnostics",
-      subtitle: "Use these only when the table is stuck or a DM response needs review.",
-    },
-  }[activeTab];
-  if (elements.setupDialog) {
-    elements.setupDialog.dataset.activeTab = activeTab;
-    elements.setupDialog.dataset.settingsMode = validMode;
-  }
-  if (elements.settingsTabsNav) {
-    elements.settingsTabsNav.dataset.visibleTabs = String(allowedTabs.length);
-  }
-  if (elements.setupDialogEyebrow) {
-    elements.setupDialogEyebrow.textContent = tabCopy.eyebrow;
-  }
-  if (elements.setupDialogTitle) {
-    elements.setupDialogTitle.textContent = tabCopy.title;
-  }
-  if (elements.setupDialogSubtitle) {
-    elements.setupDialogSubtitle.textContent = tabCopy.subtitle;
-  }
-  for (const button of elements.settingsTabs) {
-    const active = button.dataset.settingsTab === activeTab;
-    button.hidden = !allowedTabs.includes(button.dataset.settingsTab || "");
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-selected", active ? "true" : "false");
-  }
-  for (const panel of elements.settingsPanels) {
-    panel.hidden = panel.dataset.settingsPanel !== activeTab;
-  }
+  const projection = buildSettingsSurfaceProjection({ tab, mode });
+  state.settingsMode = projection.mode;
+  applySettingsSurfaceProjection(elements, projection);
 }
 
 document.querySelectorAll("[data-add-domain]").forEach((button) => {

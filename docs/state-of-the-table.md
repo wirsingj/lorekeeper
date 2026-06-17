@@ -271,6 +271,7 @@ Risks:
 141. New tables now open with a clearer multi-line setup beat: location, seated party, premise, and a direct Next instruction to Nudge the DM or type the first action.
 142. Table focus projection now lives in `app/table-focus-controller.js`, so phase-to-surface decisions are tested outside `app/app.js`; combat, party/waiting, and review states can visually elevate the right rail/section through a single `data-table-focus` hook.
 143. Preferences now open as scoped surfaces: App Preferences shows only App/AI, AI Readiness shows AI/App, and in-table Friends And Seats shows only Friends/Troubleshooting instead of exposing every settings tab at once.
+144. Settings surface mode/copy/tab visibility now lives in `app/settings-surface-controller.js` with direct tests, so future settings UX changes do not have to add more policy to `app/app.js`.
 
 ### Still Risky
 
@@ -490,7 +491,7 @@ Risks:
 - [x] Host on the main menu opens a selected campaign instead of implicitly resuming the last active campaign.
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
-- [ ] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog now uses mode-scoped App/AI/Table/Troubleshooting surfaces that hide irrelevant tabs per entry point, but it is not yet physically separate full screens.
+- [ ] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog now uses a tested `settings-surface-controller` for mode-scoped App/AI/Table/Troubleshooting surfaces that hide irrelevant tabs per entry point, but it is not yet physically separate full screens.
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
 - [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; rails and combat/recovery surfaces still need deeper phase-specific behavior.
