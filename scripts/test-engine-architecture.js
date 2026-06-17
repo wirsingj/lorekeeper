@@ -29,6 +29,7 @@ import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import { tableRepairReason, turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "../app/turn-repair-controller.js";
 import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
+import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
@@ -56,6 +57,7 @@ import {
   startRolling,
 } from "../src/engine/turn-engine.js";
 import { controllerKinds, gameModes, turnStates } from "../src/engine/types.js";
+import { joinableGuestSeats } from "../src/multiplayer/local-table.js";
 
 function campaignFixture() {
   return {
@@ -2510,6 +2512,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /addPartyTemplateCharactersToWizard/);
   assert.match(appJs, /buildPartyTemplateCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);
+  assert.match(appJs, /openRemoteInviteLobbyForNewCampaign/);
   assert.match(appJs, /equipmentForProfile/);
   assert.match(appJs, /inventory:\s*equipment\.inventory/);
   assert.match(appJs, /function spell\(name, level/);
@@ -2583,6 +2586,30 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(styles, /\.record\s*{\s*min-width:\s*0;/);
 }
 
+function testRemoteInviteWizardSeatPersistsAsJoinable() {
+  const result = addCampaignRecord(campaignFixture(), {
+    domain: "party",
+    id: "party-oskar",
+    name: "Oskar",
+    type: "player_character",
+    playerRole: "Remote invite seat",
+    ancestryClass: "Dwarf Fighter",
+    controllerKind: "unassigned",
+    controllerId: null,
+    fallbackControllerKind: "ai_companion",
+    inviteIntent: "remote_player",
+    integrationPrompt: "Oskar has a reason to travel with the party.",
+    hostIntegrationPrompt: "Let a guest claim Oskar before the first scene if possible.",
+  });
+  const oskar = result.campaign.party.find((member) => member.id === "party-oskar");
+  assert.equal(oskar.controllerKind, "unassigned");
+  assert.equal(oskar.controllerId, null);
+  assert.equal(oskar.fallbackControllerKind, "ai_companion");
+  assert.equal(oskar.inviteIntent, "remote_player");
+  assert.equal(oskar.integrationPrompt, "Oskar has a reason to travel with the party.");
+  assert.equal(joinableGuestSeats(result.campaign).some((seat) => seat.id === "party-oskar"), true);
+}
+
 testDiceEngine();
 await testClipboardFallback();
 testDevJumpStartSeed();
@@ -2626,5 +2653,6 @@ testCancelWithoutProviderAbortEventRecoversImmediately();
 testTurnFlowResetCancelsAndIgnoresStaleEvents();
 await testAppJsNoLongerOwnsExtractedStateMachines();
 await testNewCampaignPreTableJoinerWiring();
+testRemoteInviteWizardSeatPersistsAsJoinable();
 
 console.log("engine architecture tests passed");

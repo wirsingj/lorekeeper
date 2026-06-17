@@ -2691,6 +2691,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     for (const joinerSeed of joinerSeeds) {
       await seedWizardStartingPartyMember(joinerSeed);
     }
+    const remoteInviteLobby = await openRemoteInviteLobbyForNewCampaign([characterSeed, ...joinerSeeds]);
 
     seedPlayLog();
     render();
@@ -2701,10 +2702,45 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     elements.bridgeStatus.textContent = "New campaign saved to SQLite";
     elements.playerInput.value = "";
     await startNewCampaignOpening(openingPrompt);
+    if (remoteInviteLobby?.link) {
+      setProviderActivity(
+        remoteInviteLobby.copied
+          ? "Guest Link copied; Remote Invite seats are open"
+          : "Remote Invite seats are open; copy the Guest Link from Settings",
+        remoteInviteLobby.copied ? "idle" : "waiting",
+      );
+    }
   } catch (error) {
     render();
     elements.bridgeStatus.textContent = error instanceof Error ? `New campaign failed: ${error.message}` : "New campaign failed";
     setProviderActivity("New campaign failed", "error");
+  }
+}
+
+async function openRemoteInviteLobbyForNewCampaign(seeds = []) {
+  if (!seeds.some((seed) => normalizeWizardControllerKind(seed?.controllerKind) === "remote_invite")) {
+    return null;
+  }
+  try {
+    if (!state.campaign?.multiplayer?.localTable?.running) {
+      const started = await startLocalTableFromUi();
+      if (!started) {
+        return null;
+      }
+    }
+    const link = currentLocalGuestLink();
+    if (!link) {
+      return null;
+    }
+    showGuestLink(link);
+    const copied = await writeClipboardText(link);
+    return { link, copied };
+  } catch (error) {
+    pushDiagnosticsEvent("remote_invite_lobby_open_failed", {
+      message: error instanceof Error ? error.message : "Remote Invite lobby did not open.",
+    });
+    setProviderActivity(error instanceof Error ? `Remote Invite lobby failed: ${error.message}` : "Remote Invite lobby failed", "error");
+    return null;
   }
 }
 

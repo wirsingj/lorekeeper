@@ -558,7 +558,7 @@ function CampaignDialog() {
             <div className="wizard-heading">
               <div>
                 <span>Additional Characters</span>
-                <p>Build the pre-table party. Host and AI seats are ready immediately; Remote Invite seats are held open for a player.</p>
+                <p>Build the pre-table party. Host and AI seats are ready immediately; Remote Invite seats open the Guest Link when the campaign starts.</p>
               </div>
               <div className="wizard-heading-actions">
                 <button id="add-party-template" className="mini-action" type="button">Add Party Set</button>

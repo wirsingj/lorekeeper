@@ -152,6 +152,7 @@ Every table surface should answer the same practical questions a real table answ
 113. Remaining visible ThinLoreKeeper join wording in multiplayer-created character notes now uses the unified LoreKeeper Join identity.
 114. Guest table refresh copy now avoids "sync/resync" wording on ordinary table-facing controls and status messages.
 115. Pre-action DM nudges with living-world object memory no longer crash provider request construction when compacting NPC/faction/place memory.
+116. Host New Remote Invite seats now persist as unassigned remote-player seats, stay joinable after campaign creation, and automatically open/copy the Guest Link when the campaign starts.
 
 ### Still Risky
 
@@ -344,6 +345,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Campaign creation supports `+` additional characters.
 - [x] Host New hides the previous table and uses a full setup workspace.
 - [x] Campaign creation can mark seats as Host, AI, or Remote Invite.
+- [x] Remote Invite seat intent survives campaign record creation and appears as a joinable guest seat after Create And Start.
 - [x] Host New has an explicit Back action and no stale table rails while setup is open.
 - [x] Post-start host-created character flow uses same compact creator.
 - [x] Guest join and LoreKeeper Join use aligned compact fields.
