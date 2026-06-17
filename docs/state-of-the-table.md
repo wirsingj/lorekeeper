@@ -173,6 +173,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 122. Starting a fresh local table session now resets stale remote runtime state: old connected/pending guests are disconnected, waiting-room records are closed, remote controllers are released, and open seats become requestable again instead of silently reviving old approvals.
 123. Guest seating now updates live renderer session state, not only localStorage/snapshot state, and carries table/session identity forward so a seated guest does not see a "join first" command deck.
 124. Character panel Auto-Complete now re-seeds generated pitch, look/vibe, party integration, and DM-note text from the current basics instead of only filling blanks and leaving stale generated flavor behind.
+125. Create And Start no longer auto-runs the first DM generation; the host lands on a ready table with Nudge available, and waiting-guest cues refresh roughly once per second even while the DM is generating.
 
 ### Still Risky
 
@@ -211,7 +212,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 | DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, suppression, and obvious output validation help. Needs broader scenario fixtures. |
 | AI companions feel like party members. | Improved | Nudge flow, creation defaults, table-shaped Stage/Pass/Resolve Now language, and idle rarity/cooldown policy help. Combat-turn approval still needs polish. |
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters, tie language, and host draft action exist. |
-| Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording and message lifecycle are covered by tests. Needs two-machine soak. |
+| Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording, message lifecycle, and faster waiting-room visibility are covered by tests/static guards. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
 | Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. Common app-owned combat actions now have fixtures. Richer spell/effect rules and live-play polish are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression and rich full-turn fixtures now cover social, travel, mystery, downtime, combat, and recovery. Needs real-model soak for repeated turns. |

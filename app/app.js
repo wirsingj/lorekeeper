@@ -106,6 +106,8 @@ const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
 const guestWaitingRoomStorageKey = "lorekeeper.guestWaitingRoomSession";
 const waitingGuestHeartbeatTimeoutMs = 20000;
+const multiplayerPollIntervalMs = 1000;
+const preTableLobbyPollIntervalMs = 1000;
 const debugMetaStorageKey = "lorekeeper.showDebugMeta";
 const playerNotesStoragePrefix = "lorekeeper.playerNotes";
 const defaultCompanionOptions = {
@@ -1950,10 +1952,15 @@ async function bootRemoteClientMode() {
 
 function startMultiplayerPolling() {
   window.setInterval(async () => {
-    if (hasActiveGeneration()) {
-      return;
-    }
     try {
+      if (hasActiveGeneration()) {
+        if (!guestWaitingRoomMode && state.campaign?.multiplayer?.localTable?.running) {
+          await refreshMultiplayerSnapshot({ quiet: true });
+          renderWaitingGuestCue();
+          announceWaitingGuestsIfNeeded();
+        }
+        return;
+      }
       if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
         await refreshGuestSnapshot({ explicit: false });
         return;
@@ -1987,7 +1994,7 @@ function startMultiplayerPolling() {
         );
       }
     }
-  }, 2500);
+  }, multiplayerPollIntervalMs);
 }
 
 async function maybeAutoResolveEnemyCombatTurn() {
@@ -2678,14 +2685,6 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
   const trimmedTone = String(tone ?? "").trim();
   const characterSeed = normalizeWizardCharacter(playerCharacter);
   const joinerSeeds = normalizeWizardJoiners(startingPartyMembers ?? [startingPartyMember]);
-  const openingPrompt = buildCampaignOpeningPrompt({
-    title: trimmedTitle,
-    premise: trimmedPremise,
-    startingLocation: trimmedStartingLocation,
-    tone: trimmedTone,
-    character: characterSeed,
-    startingPartyMembers: joinerSeeds,
-  });
   const openingScene = buildOpeningSceneSummary({
     premise: trimmedPremise,
     startingLocation: trimmedStartingLocation,
@@ -2735,7 +2734,6 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     resetCampaignWizardDefaults();
     elements.bridgeStatus.textContent = "New campaign saved";
     elements.playerInput.value = "";
-    await startNewCampaignOpening(openingPrompt);
     if (remoteInviteLobby?.link) {
       setProviderActivity(
         remoteInviteLobby.copied
@@ -2743,6 +2741,8 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
           : "Remote Invite seats are open; copy the Guest Link from Preferences",
         remoteInviteLobby.copied ? "idle" : "waiting",
       );
+    } else {
+      setProviderActivity("Table ready. Use Nudge to have the DM frame the opening moment.", "idle");
     }
   } catch (error) {
     render();
@@ -2790,30 +2790,6 @@ async function adoptPreTableLobbyIntoActiveCampaign() {
       message: error instanceof Error ? error.message : "Pre-table lobby guests were not adopted.",
     });
     return null;
-  }
-}
-
-async function startNewCampaignOpening(openingPrompt) {
-  if (!openingPrompt.trim()) {
-    setProviderActivity("Campaign ready", "idle");
-    return;
-  }
-
-  elements.bridgeStatus.textContent = "Starting the opening scene...";
-  setProviderActivity("Asking DM to open the first scene...", "working");
-  const result = await submitPlayerTurnFromInput(openingPrompt, {
-    skipPlayerEcho: true,
-    skipPartySeed: true,
-    preserveInput: false,
-  });
-  elements.playerInput.value = "";
-  if (result?.needsRepair) {
-    elements.bridgeStatus.textContent = "Opening scene needs review; use Try Again or Details before starting play.";
-    return;
-  }
-  if (!result?.providerReceived) {
-    elements.bridgeStatus.textContent = "Campaign created; opening scene did not return yet.";
-    setProviderActivity("Campaign ready; use Nudge when the provider is ready", "waiting");
   }
 }
 
@@ -2906,7 +2882,7 @@ function startPreTableLobbyPolling() {
   stopPreTableLobbyPolling();
   preTableLobbyHostPollTimer = setInterval(() => {
     refreshPreTableLobbyHostSnapshot();
-  }, 2000);
+  }, preTableLobbyPollIntervalMs);
 }
 
 function stopPreTableLobbyPolling() {
@@ -4569,47 +4545,6 @@ function buildOpeningSceneSummary({ premise, startingLocation, character, starti
   ].filter(Boolean);
 
   return details.join(" ");
-}
-
-function buildCampaignOpeningPrompt({ title, premise, startingLocation, tone, character, startingPartyMembers = [] }) {
-  const joiners = normalizeList(startingPartyMembers);
-  const lines = [
-    `Start campaign: ${title}.`,
-    `Campaign seed: ${premise}`,
-  ];
-
-  if (startingLocation) {
-    lines.push(`Starting place: ${startingLocation}.`);
-  }
-  if (tone) {
-    lines.push(`Tone/style: ${tone}.`);
-  }
-  if (character?.name) {
-    lines.push(`Primary party character: ${formatCharacterBasics(character)}.`);
-  } else if (character?.concept || character?.characterClass || character?.ancestry) {
-    lines.push(`Primary party character draft: ${formatCharacterBasics(character)}. Ask for the missing name when it matters.`);
-  }
-  if (joiners.length) {
-    lines.push(`Additional starting party members: ${joiners.map(formatCharacterBasics).join("; ")}.`);
-    for (const member of joiners) {
-      if (member.integrationPrompt) {
-        lines.push(`${member.name} party integration: ${member.integrationPrompt}.`);
-      }
-      if (member.hostIntegrationPrompt) {
-        lines.push(`${member.name} host scene context: ${member.hostIntegrationPrompt}.`);
-      }
-    }
-    lines.push("Treat starting party members as already present or immediately introducible. Respect controller intent: host and remote-invite characters keep player agency; AI companions may contribute briefly when nudged or during low-stakes table beats.");
-  }
-
-  lines.push(
-    "Open with a playable first scene using full DM narration first. Do not force an option list unless combat or immediate danger starts.",
-    "Guide any missing character details through play instead of stopping for a long setup form.",
-    "Propose LoreKeeper updates for the player character, starting place, active thread, and any named party members or NPCs.",
-    "(meta: Return strict LoreKeeper JSON only. Make the first DM turn feel like actual play, not a setup note.)",
-  );
-
-  return lines.join("\n");
 }
 
 function formatCharacterBasics(character) {
