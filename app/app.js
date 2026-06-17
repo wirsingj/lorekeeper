@@ -273,6 +273,9 @@ const elements = {
   settingsPanels: [...document.querySelectorAll("[data-settings-panel]")],
   nudgeDm: document.querySelector("#nudge-dm"),
   setupDialog: document.querySelector("#setup-dialog"),
+  setupDialogEyebrow: document.querySelector("#setup-dialog-eyebrow"),
+  setupDialogTitle: document.querySelector("#setup-dialog-title"),
+  setupDialogSubtitle: document.querySelector("#setup-dialog-subtitle"),
   closeSetup: document.querySelector("#close-setup"),
   providerSetupSection: document.querySelector("#provider-setup-section"),
   appModeSelect: document.querySelector("#app-mode-select"),
@@ -535,7 +538,7 @@ elements.homeSettings?.addEventListener("click", () => {
 });
 
 elements.openSetup.addEventListener("click", () => {
-  openSetupDialog();
+  openSetupDialog({ tab: "friends" });
 });
 
 elements.returnMainMenu?.addEventListener("click", async () => {
@@ -643,11 +646,11 @@ elements.newProviderChat.addEventListener("click", async () => {
   await startNewProviderConversation();
 });
 
-elements.newCampaign.addEventListener("click", async () => {
+elements.newCampaign?.addEventListener("click", async () => {
   openCampaignDialog();
 });
 
-elements.loadImported.addEventListener("click", async () => {
+elements.loadImported?.addEventListener("click", async () => {
   const confirmed = await confirmInApp({
     title: "Load Saved Campaign",
     message: "This will open the bundled Veil of the Towers campaign and switch the active table.",
@@ -885,8 +888,39 @@ function openSetupDialog({ focusProvider = false, tab = "" } = {}) {
 
 function setSettingsTab(tab = "app") {
   const activeTab = ["app", "ai", "friends", "troubleshooting"].includes(tab) ? tab : "app";
+  const tabCopy = {
+    app: {
+      eyebrow: "Preferences",
+      title: "App Preferences",
+      subtitle: "Choose how LoreKeeper starts and behaves before you sit down.",
+    },
+    ai: {
+      eyebrow: "AI Readiness",
+      title: "DM Voice",
+      subtitle: "Check or tune the storyteller before you host.",
+    },
+    friends: {
+      eyebrow: "Table Settings",
+      title: "Friends And Seats",
+      subtitle: "Open the guest page, share the table link, and seat friends.",
+    },
+    troubleshooting: {
+      eyebrow: "Troubleshooting",
+      title: "Table Diagnostics",
+      subtitle: "Use these only when the table is stuck or a DM response needs review.",
+    },
+  }[activeTab];
   if (elements.setupDialog) {
     elements.setupDialog.dataset.activeTab = activeTab;
+  }
+  if (elements.setupDialogEyebrow) {
+    elements.setupDialogEyebrow.textContent = tabCopy.eyebrow;
+  }
+  if (elements.setupDialogTitle) {
+    elements.setupDialogTitle.textContent = tabCopy.title;
+  }
+  if (elements.setupDialogSubtitle) {
+    elements.setupDialogSubtitle.textContent = tabCopy.subtitle;
   }
   for (const button of elements.settingsTabs) {
     const active = button.dataset.settingsTab === activeTab;
@@ -5695,8 +5729,12 @@ function renderProviderControls() {
     elements.checkSidecar.disabled = true;
     elements.copyProviderPrompt.disabled = true;
     elements.newProviderChat.disabled = true;
-    elements.newCampaign.disabled = true;
-    elements.loadImported.disabled = true;
+    if (elements.newCampaign) {
+      elements.newCampaign.disabled = true;
+    }
+    if (elements.loadImported) {
+      elements.loadImported.disabled = true;
+    }
     elements.recheckProvider.hidden = true;
     elements.bridgeCard.hidden = true;
     elements.promptDrawer.hidden = true;

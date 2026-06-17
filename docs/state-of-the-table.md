@@ -261,6 +261,7 @@ Risks:
 131. Host New pre-lobby waiting guests now show seat buttons for every open Invite Friend slot, even when the guest did not pick a specific character before asking to join.
 132. Character Auto-Complete now behaves like a reroll for generated flavor: it preserves hard facts such as name, ancestry, class, and level, while rotating the pitch, party tie, and DM note on each click.
 133. Preferences now open as calmer App, AI, Friends, and Troubleshooting tabs, with local-table tools, diagnostics, and DM recovery hidden until that section is chosen.
+134. Settings entry points are now intent-aware: front-door Preferences opens App Preferences, Check AI opens the DM Voice surface, and the in-table gear opens Friends And Seats instead of app-level options.
 
 ### Still Risky
 
@@ -277,7 +278,7 @@ Risks:
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Rail containment is improved, but long-session scroll behavior still needs a real campaign soak with many party members, notes, and combatants.
 13. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
-14. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
+14. Settings are still physically one dialog, but entry points now route to App Preferences, DM Voice, Friends And Seats, or Troubleshooting. App-level preferences and campaign/table settings still need a fuller split after the front-door shell stabilizes.
 15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request and reserve Remote Invite seats before Create And Start, and the host can seat waiting guests from the draft lobby. Guests cannot yet edit their own character sheet in the shared draft lobby.
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
@@ -480,7 +481,7 @@ Risks:
 - [x] Host on the main menu opens a selected campaign instead of implicitly resuming the last active campaign.
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
-- [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
+- [ ] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog now has intent-aware entry points, but it is not yet physically separate surfaces.
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
 - [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once.

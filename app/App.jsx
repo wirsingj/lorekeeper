@@ -699,8 +699,9 @@ function SetupDialog() {
       <form method="dialog">
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">Preferences</p>
-            <h2>Table Options</h2>
+            <p id="setup-dialog-eyebrow" className="eyebrow">Preferences</p>
+            <h2 id="setup-dialog-title">App Preferences</h2>
+            <p id="setup-dialog-subtitle" className="setup-note">Choose how LoreKeeper starts and behaves before you sit down.</p>
           </div>
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
@@ -724,16 +725,6 @@ function SetupDialog() {
             </select>
           </label>
           <p id="app-mode-note" className="setup-note">Host runs the table. Join sits down at a friend's table.</p>
-        </section>
-
-        <section className="setup-section campaign-settings-section" data-settings-panel="app">
-          <div className="section-title">
-            <h3>Adventures</h3>
-          </div>
-          <div className="button-stack two-up">
-            <button id="new-campaign" type="button">New Adventure</button>
-            <button id="load-imported" type="button">Load Saved Adventure</button>
-          </div>
         </section>
 
         <section id="provider-setup-section" className="setup-section provider-setup-section" data-settings-panel="ai" hidden>

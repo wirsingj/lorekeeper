@@ -2585,6 +2585,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Use Anyway/);
   assert.match(appShell, /Troubleshooting/);
   assert.match(appShell, /className="settings-tabs"/, "settings should be grouped into top-level tabs instead of one dense panel");
+  assert.match(appShell, /id="setup-dialog-title"/);
+  assert.match(appShell, /id="setup-dialog-subtitle"/);
   assert.match(appShell, /data-settings-tab="app"/);
   assert.match(appShell, /data-settings-tab="ai"/);
   assert.match(appShell, /data-settings-tab="friends"/);
@@ -2593,7 +2595,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /data-settings-panel="ai" hidden/);
   assert.match(appShell, /data-settings-panel="friends" hidden/);
   assert.match(appShell, /data-settings-panel="troubleshooting" hidden/);
+  assert.doesNotMatch(appShell, /id="new-campaign"/, "adventure creation belongs on the front door, not inside Preferences");
+  assert.doesNotMatch(appShell, /id="load-imported"/, "saved adventure loading belongs on the front door, not inside Preferences");
   assert.match(appJs, /function setSettingsTab\(tab = "app"\)/, "settings tab state should be explicit renderer state");
+  assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
+  assert.match(appJs, /setupDialogTitle\.textContent = tabCopy\.title/);
   assert.match(appJs, /openSetupDialog\(\{ tab: "troubleshooting" \}\)/, "DM response details should open the Troubleshooting tab directly");
   assert.match(styles, /\.settings-tabs/);
   assert.match(styles, /\.settings-tab\.active/);
