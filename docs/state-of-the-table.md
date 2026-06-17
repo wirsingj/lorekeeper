@@ -257,12 +257,13 @@ Risks:
 127. Product hierarchy now treats notes as a notebook shelf instead of a permanent open binder: World and Player notes are collapsed by default, party cards clamp long descriptive text until hover/focus, Table Talk is smaller, and the center story surface receives more default space.
 128. The first visible silhouette pass removes the strongest developer-tool cues: the gridpaper background is gone from the main play surface, the front door now reads as a larger game-style launcher, side rails are narrower/translucent shelves, message bubbles are softer, and the command deck is less terminal-like.
 129. Table shelf sizing is now user-adjustable and saved locally: left Party shelf, right Notebook shelf, World notes, Your Notes, and Table Talk can be dragged without opening settings. Expanded right-rail panels scroll inside their own bodies when content exceeds the chosen size. Party cards no longer expand on hover, so their action buttons stay reachable.
+130. Use Anyway is now hard-blocked for DM responses that speak or act for controlled party members. Format/proposed-change weirdness can still be reviewed by the host, but controlled-character agency failures require Try Again or Details instead of becoming table text.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
 2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, and combat import fallback policies are now extracted.
-3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, and host review summary, but the underlying manual review textarea still exists as a fallback.
+3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, and host review summary, but the underlying manual review textarea still exists as a fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.

@@ -33,7 +33,14 @@ import { createImplicitSceneProgressChange } from "./scene-import-controller.js"
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
-import { turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "./turn-repair-controller.js";
+import {
+  isHardBlockedTurnRepair,
+  turnRepairActivityText,
+  turnRepairBlockedMessage,
+  turnRepairImportOptions,
+  turnRepairStatusText,
+  turnRepairUseAnywayDialog,
+} from "./turn-repair-controller.js";
 
 // Renderer orchestration map:
 // 1. constants/state/elements,
@@ -7747,6 +7754,11 @@ async function importTurnRepairAnyway() {
     setProviderActivity("No reviewed DM response is available", "error");
     return;
   }
+  if (isHardBlockedTurnRepair(repair)) {
+    setProviderActivity(turnRepairBlockedMessage(repair), "error");
+    await inspectTurnRepair();
+    return;
+  }
 
   const confirmed = await confirmInApp(turnRepairUseAnywayDialog());
   if (!confirmed) {
@@ -8231,6 +8243,8 @@ function updateNudgeAvailability() {
 function updateTurnRepairControls() {
   const projection = turnProjection();
   const active = projection.hasRepair;
+  const repair = activeTurnRepair();
+  const hardBlocked = isHardBlockedTurnRepair(repair);
   if (elements.repairRetry) {
     elements.repairRetry.hidden = !active;
     elements.repairRetry.disabled = projection.hasActiveGeneration;
@@ -8240,7 +8254,10 @@ function updateTurnRepairControls() {
   }
   if (elements.repairImportAnyway) {
     elements.repairImportAnyway.hidden = !active;
-    elements.repairImportAnyway.disabled = projection.hasActiveGeneration;
+    elements.repairImportAnyway.disabled = projection.hasActiveGeneration || hardBlocked;
+    elements.repairImportAnyway.title = hardBlocked
+      ? "Try Again: this response spoke or acted for a controlled character."
+      : "Use the visible DM text despite table-check warnings.";
   }
   if (elements.recheckProvider) {
     elements.recheckProvider.hidden = active || clientMode || isRemoteTableClient() || currentProviderSettings().preferredProvider !== "bridge";

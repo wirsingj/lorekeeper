@@ -27,7 +27,15 @@ import { createImplicitSceneProgressChange } from "../app/scene-import-controlle
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
-import { tableRepairReason, turnRepairActivityText, turnRepairImportOptions, turnRepairStatusText, turnRepairUseAnywayDialog } from "../app/turn-repair-controller.js";
+import {
+  isHardBlockedTurnRepair,
+  tableRepairReason,
+  turnRepairActivityText,
+  turnRepairBlockedMessage,
+  turnRepairImportOptions,
+  turnRepairStatusText,
+  turnRepairUseAnywayDialog,
+} from "../app/turn-repair-controller.js";
 import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
@@ -2065,6 +2073,19 @@ function testTurnRepairController() {
   assert.equal(turnRepairStatusText(technicalRepair), "DM response needs review: the DM response did not pass LoreKeeper's table checks");
   assert.match(turnRepairActivityText(technicalRepair), /Try Again, Details, or Use Anyway/);
   assert.equal(tableRepairReason("The DM contradicted the last seated guest."), "The DM contradicted the last seated guest.");
+  assert.equal(isHardBlockedTurnRepair(technicalRepair), false);
+
+  const agencyRepair = {
+    reason: "table[1] appears to speak, decide, or act for controlled party member Thora without submitted controller input",
+    validationErrors: [
+      "proposedChanges[0].operation must be one of: add, update, remove, note",
+      "table[1] appears to speak, decide, or act for controlled party member Thora without submitted controller input",
+    ],
+  };
+  assert.equal(isHardBlockedTurnRepair(agencyRepair), true);
+  assert.match(turnRepairActivityText(agencyRepair), /blocked it because it spoke or acted for a controlled character/);
+  assert.match(turnRepairBlockedMessage(agencyRepair), /controlled party member/);
+  assert.doesNotMatch(turnRepairActivityText(agencyRepair), /Use Anyway/);
 
   const dialog = turnRepairUseAnywayDialog();
   assert.equal(dialog.title, "Use This DM Response?");
@@ -2124,6 +2145,16 @@ function testHostResponseReviewProjection() {
   assert.doesNotMatch(`${repair.title} ${repair.body} ${repair.nextStep}`, /JSON|contract|import/i);
   assert.match(repair.nextStep, /Try Again/);
   assert.match(repair.nextStep, /Use Anyway/);
+
+  const agencyRepair = buildHostResponseReviewProjection({
+    repair: {
+      reason: "table[2] appears to speak, decide, or act for controlled party member Rowan without submitted controller input",
+      responseText: "Rowan decides for the party.",
+    },
+  });
+  assert.equal(agencyRepair.state, "repair");
+  assert.match(agencyRepair.nextStep, /without taking over a controlled character/);
+  assert.doesNotMatch(agencyRepair.nextStep, /Use Anyway/);
 
   const changes = buildHostResponseReviewProjection({
     reviewBatch: {

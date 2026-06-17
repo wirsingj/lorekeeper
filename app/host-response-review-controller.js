@@ -1,14 +1,17 @@
-import { tableRepairReason } from "./turn-repair-controller.js";
+import { isHardBlockedTurnRepair, tableRepairReason } from "./turn-repair-controller.js";
 
 export function buildHostResponseReviewProjection({ repair = null, reviewBatch = null } = {}) {
   const pendingChanges = (reviewBatch?.proposedChanges ?? reviewBatch?.proposals ?? [])
     .filter((change) => change?.status !== "committed");
   if (repair) {
+    const hardBlocked = isHardBlockedTurnRepair(repair);
     return {
       state: "repair",
       title: "DM Response Needs A Table Check",
       body: `LoreKeeper paused because ${tableRepairReason(repair.reason)}.`,
-      nextStep: "Try Again for a cleaner response, open Details to inspect what happened, or Use Anyway only if the visible table text is right.",
+      nextStep: hardBlocked
+        ? "Try Again so the DM can answer without taking over a controlled character, or open Details to inspect what happened."
+        : "Try Again for a cleaner response, open Details to inspect what happened, or Use Anyway only if the visible table text is right.",
       tone: "review",
       responseChars: repair.responseText?.length ?? repair.rawText?.length ?? 0,
       pendingChanges: pendingChanges.length,
