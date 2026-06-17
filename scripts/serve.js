@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { randomBytes } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -73,6 +74,7 @@ const apiToken = process.env.LOREKEEPER_API_TOKEN || "";
 const builtAppRoot = path.join(defaultProjectRoot, "dist", "app");
 const startedAt = new Date().toISOString();
 const maxJsonBodyBytes = 1024 * 1024;
+let preTableLobby = null;
 
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
@@ -286,6 +288,37 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/api/pretable-lobby/publish" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      preTableLobby = publishPreTableLobby(body);
+      sendJson(response, 200, preTableLobbyHostSnapshot(preTableLobby));
+      return;
+    }
+
+    if (url.pathname === "/api/pretable-lobby/close" && request.method === "POST") {
+      preTableLobby = null;
+      sendJson(response, 200, { open: false });
+      return;
+    }
+
+    if (url.pathname === "/api/pretable-lobby/host-snapshot" && request.method === "GET") {
+      sendJson(response, 200, preTableLobby ? preTableLobbyHostSnapshot(preTableLobby) : { open: false });
+      return;
+    }
+
+    if (url.pathname === "/api/pretable-lobby/adopt-active" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: adoptPreTableWaitingGuests(campaign) };
+      });
+      sendJson(response, 200, {
+        ...payload,
+        multiplayer: createHostSnapshot(payload.campaign),
+      });
+      return;
+    }
+
     if (url.pathname === "/api/multiplayer/start" && request.method === "POST") {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
@@ -395,6 +428,10 @@ const server = createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/multiplayer/join-preview" && request.method === "GET") {
+      if (preTableLobby?.open && !url.searchParams.get("inviteLink")) {
+        sendJson(response, 200, preTableLobbyGuestPreview(preTableLobby));
+        return;
+      }
       const { campaign } = await loadActiveCampaign(projectRoot);
       sendJson(response, 200, createJoinPreview(campaign, url.searchParams.get("inviteLink"), {
         campaignId: url.searchParams.get("campaignId") || url.searchParams.get("campaign") || "",
@@ -406,6 +443,17 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/waiting-room/register" && request.method === "POST") {
       const body = await readJsonBody(request);
+      if (preTableLobby?.open) {
+        const result = registerPreTableWaitingGuest(preTableLobby, body);
+        sendJson(response, 200, {
+          waitingGuest: publicPreTableWaitingGuest(result.waitingGuest),
+          waitingSecret: result.waitingSecret,
+          campaignTitle: preTableLobby.title,
+          campaignId: preTableLobby.campaignId,
+          localTable: preTableLobby.localTable,
+        });
+        return;
+      }
       let waitingResult = null;
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
         waitingResult = registerWaitingGuest(campaign, {
@@ -435,16 +483,35 @@ const server = createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/multiplayer/waiting-room/status" && request.method === "GET") {
+      if (preTableLobby?.open && preTableLobby.waitingGuests?.some((guest) => guest.id === url.searchParams.get("waitingGuestId"))) {
+        const snapshot = heartbeatPreTableWaitingGuest(preTableLobby, {
+          waitingGuestId: url.searchParams.get("waitingGuestId"),
+          clientId: url.searchParams.get("clientId"),
+          waitingSecret: url.searchParams.get("waitingSecret"),
+        });
+        sendJson(response, 200, snapshot);
+        return;
+      }
       let heartbeatResult = null;
       await updateActiveCampaign(projectRoot, (campaign) => {
+        const adoptedGuest = campaign.multiplayer?.waitingGuests?.find((guest) => guest.id === url.searchParams.get("waitingGuestId"));
+        const identity = adoptedGuest
+          ? {
+              campaignId: campaign.id,
+              tableId: campaign.multiplayer?.localTable?.tableId,
+              sessionId: campaign.multiplayer?.localTable?.sessionId,
+            }
+          : {
+              campaignId: url.searchParams.get("campaignId"),
+              tableId: url.searchParams.get("tableId"),
+              sessionId: url.searchParams.get("sessionId"),
+              tableSessionId: url.searchParams.get("tableSessionId"),
+            };
         heartbeatResult = heartbeatWaitingGuest(campaign, {
           waitingGuestId: url.searchParams.get("waitingGuestId"),
           clientId: url.searchParams.get("clientId"),
           waitingSecret: url.searchParams.get("waitingSecret"),
-          campaignId: url.searchParams.get("campaignId"),
-          tableId: url.searchParams.get("tableId"),
-          sessionId: url.searchParams.get("sessionId"),
-          tableSessionId: url.searchParams.get("tableSessionId"),
+          ...identity,
         });
         return { campaign: heartbeatResult.campaign };
       });
@@ -791,6 +858,258 @@ function shutdownServer(signal) {
 function activeServerPort() {
   const address = server.address();
   return address && typeof address === "object" ? address.port : port;
+}
+
+function publishPreTableLobby(input = {}) {
+  const existingWaiting = preTableLobby?.waitingGuests ?? [];
+  const title = compactLobbyLine(input.title || "New Campaign", 120);
+  const draftId = compactLobbyLine(input.draftId || `draft-${slugifyLobby(title)}`, 140);
+  const party = normalizePreTableParty(input.party ?? []);
+  const joinableSeatIds = new Set(party.filter((member) => member.inviteIntent === "remote_player").map((member) => member.id));
+  return {
+    open: true,
+    kind: "pre_table_lobby",
+    protocolVersion: 1,
+    revision: `draft-${Date.now().toString(36)}`,
+    campaignId: draftId,
+    title,
+    summary: compactLobbyLine(input.premise || input.summary || "", 1200),
+    startingLocation: compactLobbyLine(input.startingLocation || "", 180),
+    tone: compactLobbyLine(input.tone || "", 180),
+    localTable: {
+      running: true,
+      campaignId: draftId,
+      tableId: `draft-table-${draftId}`,
+      sessionId: `draft-session-${draftId}`,
+      host: "0.0.0.0",
+      port: activeServerPort(),
+      lanAddress: firstLanAddress() || "127.0.0.1",
+      startedAt: preTableLobby?.localTable?.startedAt || new Date().toISOString(),
+    },
+    party,
+    waitingGuests: existingWaiting
+      .filter((guest) => !guest.preferredPartyMemberId || joinableSeatIds.has(guest.preferredPartyMemberId))
+      .map((guest) => ({ ...guest, lastSeenAt: guest.lastSeenAt || new Date().toISOString() })),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function preTableLobbyHostSnapshot(lobby) {
+  return {
+    open: Boolean(lobby?.open),
+    campaignId: lobby?.campaignId || "",
+    campaignTitle: lobby?.title || "",
+    guestLink: lobby?.localTable ? localGuestUrl(lobby.localTable) : "",
+    localTable: lobby?.localTable ?? null,
+    joinableSeats: preTableJoinableSeats(lobby),
+    waitingGuests: (lobby?.waitingGuests ?? []).filter(isFreshPreTableGuest).map(publicPreTableWaitingGuest),
+  };
+}
+
+function preTableLobbyGuestPreview(lobby) {
+  return {
+    protocolVersion: 1,
+    kind: "pre_table_lobby",
+    revision: lobby.revision,
+    campaignId: lobby.campaignId,
+    campaignTitle: lobby.title,
+    campaignSummary: lobby.summary,
+    localTable: lobby.localTable,
+    invite: null,
+    scene: {
+      status: "pre_table",
+      immediateSituation: lobby.summary || "The host is preparing a new table.",
+      currentPlaceId: lobby.startingLocation || "",
+    },
+    party: lobby.party.map(publicPreTablePartyMember),
+    joinableSeats: preTableJoinableSeats(lobby),
+    people: [],
+    places: lobby.startingLocation ? [{ id: "draft-starting-place", name: lobby.startingLocation, summary: "Starting place" }] : [],
+    quests: [],
+    recentMessages: [],
+  };
+}
+
+function registerPreTableWaitingGuest(lobby, input = {}) {
+  const displayName = compactLobbyLine(input.playerName || "Guest Player", 80);
+  const clientId = compactLobbyLine(input.clientId || "", 120);
+  const preferredPartyMemberId = normalizePreTableSeatId(lobby, input.preferredPartyMemberId);
+  const existing = clientId
+    ? lobby.waitingGuests.find((guest) => guest.clientId === clientId && guest.status === "waiting")
+    : null;
+  if (existing) {
+    existing.displayName = displayName;
+    existing.preferredPartyMemberId = preferredPartyMemberId || existing.preferredPartyMemberId || null;
+    existing.lastSeenAt = new Date().toISOString();
+    existing.secret = existing.secret || randomLobbyToken(24);
+    return { waitingGuest: existing, waitingSecret: existing.secret };
+  }
+  const waitingGuest = {
+    id: `draft-wait-${randomLobbyToken(10)}`,
+    campaignId: lobby.campaignId,
+    tableId: lobby.localTable.tableId,
+    sessionId: lobby.localTable.sessionId,
+    displayName,
+    clientId,
+    status: "waiting",
+    secret: randomLobbyToken(24),
+    requestedAt: new Date().toISOString(),
+    lastSeenAt: new Date().toISOString(),
+    preferredPartyMemberId,
+  };
+  lobby.waitingGuests = [...(lobby.waitingGuests ?? []), waitingGuest];
+  return { waitingGuest, waitingSecret: waitingGuest.secret };
+}
+
+function heartbeatPreTableWaitingGuest(lobby, input = {}) {
+  const waitingGuest = lobby.waitingGuests.find((guest) => guest.id === input.waitingGuestId);
+  if (!waitingGuest) {
+    throwPublicRouteError("Waiting room session expired. Ask the host for the guest link, then click Ask To Join again.", 404);
+  }
+  if (waitingGuest.secret && compactLobbyLine(input.waitingSecret, 200) !== waitingGuest.secret) {
+    throwPublicRouteError("Waiting room session expired. Ask the host for the guest link, then click Ask To Join again.", 403);
+  }
+  const clientId = compactLobbyLine(input.clientId || "", 120);
+  if (waitingGuest.clientId && clientId && waitingGuest.clientId !== clientId) {
+    throwPublicRouteError("This waiting room session belongs to a different device.", 403);
+  }
+  waitingGuest.lastSeenAt = new Date().toISOString();
+  return {
+    protocolVersion: 1,
+    kind: "pre_table_lobby",
+    revision: lobby.revision,
+    campaignId: lobby.campaignId,
+    campaignTitle: lobby.title,
+    localTable: lobby.localTable,
+    waitingGuest: publicPreTableWaitingGuest(waitingGuest),
+    seated: false,
+    connection: null,
+    connectionSecret: "",
+    snapshot: null,
+  };
+}
+
+function adoptPreTableWaitingGuests(campaign) {
+  if (!preTableLobby?.open || !preTableLobby.waitingGuests?.length) {
+    preTableLobby = null;
+    return campaign;
+  }
+  const localTable = campaign.multiplayer?.localTable ?? {};
+  const waitingGuests = preTableLobby.waitingGuests
+    .filter(isFreshPreTableGuest)
+    .map((guest) => ({
+      ...guest,
+      campaignId: campaign.id,
+      tableId: localTable.tableId || guest.tableId,
+      sessionId: localTable.sessionId || guest.sessionId,
+      status: "waiting",
+      lastSeenAt: new Date().toISOString(),
+      connectionId: null,
+      partyMemberId: null,
+    }));
+  preTableLobby = null;
+  return {
+    ...campaign,
+    multiplayer: {
+      ...(campaign.multiplayer ?? {}),
+      waitingGuests: mergeWaitingGuests(campaign.multiplayer?.waitingGuests ?? [], waitingGuests),
+    },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function mergeWaitingGuests(existing = [], incoming = []) {
+  const byId = new Map(existing.map((guest) => [guest.id, guest]));
+  for (const guest of incoming) {
+    byId.set(guest.id, guest);
+  }
+  return [...byId.values()];
+}
+
+function normalizePreTableParty(party = []) {
+  return (Array.isArray(party) ? party : [])
+    .map((member) => {
+      const name = compactLobbyLine(member.name || "", 80);
+      if (!name) return null;
+      const controllerKind = compactLobbyLine(member.controllerKind || "ai_companion", 80);
+      const inviteIntent = controllerKind === "remote_invite" || member.inviteIntent === "remote_player" ? "remote_player" : "";
+      return {
+        id: compactLobbyLine(member.id || `party-${slugifyLobby(name)}`, 120),
+        name,
+        ancestryClass: compactLobbyLine([member.ancestry, member.characterClass].filter(Boolean).join(" ") || member.ancestryClass || "adventurer", 160),
+        level: member.level || "",
+        playerRole: inviteIntent === "remote_player" ? "Remote invite seat" : controllerKind === "host" ? "Host-controlled party member" : "AI party companion",
+        controllerKind: inviteIntent === "remote_player" ? "unassigned" : controllerKind,
+        inviteIntent,
+        summary: compactLobbyLine(member.concept || member.summary || "", 300),
+      };
+    })
+    .filter(Boolean);
+}
+
+function preTableJoinableSeats(lobby) {
+  return (lobby?.party ?? [])
+    .filter((member) => member.inviteIntent === "remote_player")
+    .map(publicPreTablePartyMember);
+}
+
+function normalizePreTableSeatId(lobby, preferredPartyMemberId) {
+  const requested = compactLobbyLine(preferredPartyMemberId || "", 120);
+  if (!requested) return null;
+  return preTableJoinableSeats(lobby).some((seat) => seat.id === requested) ? requested : null;
+}
+
+function publicPreTablePartyMember(member) {
+  return {
+    id: member.id,
+    name: member.name,
+    ancestryClass: member.ancestryClass,
+    level: member.level,
+    playerRole: member.playerRole,
+    summary: member.summary,
+  };
+}
+
+function publicPreTableWaitingGuest(guest) {
+  return {
+    id: guest.id,
+    displayName: guest.displayName,
+    status: guest.status,
+    preferredPartyMemberId: guest.preferredPartyMemberId ?? null,
+    requestedAt: guest.requestedAt,
+    lastSeenAt: guest.lastSeenAt,
+  };
+}
+
+function isFreshPreTableGuest(guest) {
+  const seenAt = Date.parse(guest?.lastSeenAt || guest?.requestedAt || "");
+  return Number.isFinite(seenAt) && Date.now() - seenAt <= 20000;
+}
+
+function localGuestUrl(table = {}) {
+  const host = table.lanAddress || "127.0.0.1";
+  const localPort = table.port || activeServerPort();
+  return localPort ? `http://${host}:${localPort}/guest` : `http://${host}/guest`;
+}
+
+function compactLobbyLine(value, limit = 240) {
+  const compact = String(value ?? "").replace(/\s+/g, " ").trim();
+  return compact.length <= limit ? compact : `${compact.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
+function randomLobbyToken(size = 12) {
+  return randomBytes(Math.ceil(size * 0.75)).toString("base64url").slice(0, size);
+}
+
+function slugifyLobby(value) {
+  return String(value || "table")
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "table";
 }
 
 async function buildDiagnosticsBundle() {
@@ -1417,6 +1736,7 @@ export function requiresCampaignPin(pathname) {
     "/api/multiplayer/controller/ai",
     "/api/multiplayer/controller/host",
     "/api/multiplayer/pending/clear",
+    "/api/pretable-lobby/adopt-active",
     "/api/multiplayer/combat/join",
     "/api/multiplayer/table-talk",
     "/api/review/commit",

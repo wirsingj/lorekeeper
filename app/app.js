@@ -94,6 +94,10 @@ const apiMultiplayerRevokeControllerUrl = "/api/multiplayer/controller/revoke";
 const apiMultiplayerAiControllerUrl = "/api/multiplayer/controller/ai";
 const apiMultiplayerHostControllerUrl = "/api/multiplayer/controller/host";
 const apiMultiplayerClearPendingUrl = "/api/multiplayer/pending/clear";
+const apiPreTableLobbyPublishUrl = "/api/pretable-lobby/publish";
+const apiPreTableLobbyCloseUrl = "/api/pretable-lobby/close";
+const apiPreTableLobbyHostSnapshotUrl = "/api/pretable-lobby/host-snapshot";
+const apiPreTableLobbyAdoptActiveUrl = "/api/pretable-lobby/adopt-active";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
 const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
@@ -108,6 +112,8 @@ const defaultCompanionOptions = {
   projectHint: "LoreKeeper",
   returnToCaller: true,
 };
+let preTableLobbyPublishTimer = null;
+let preTableLobbyHostPollTimer = null;
 const userSettingsStorageKey = "lorekeeper.lastProviderSettings";
 const appModeStorageKey = "lorekeeper.appMode";
 
@@ -444,6 +450,10 @@ const elements = {
   newJoinerIntegration: document.querySelector("#new-joiner-integration"),
   newJoinerHostContext: document.querySelector("#new-joiner-host-context"),
   newJoinerAutoSheet: document.querySelector("#new-joiner-auto-sheet"),
+  preTableLobbyPanel: document.querySelector("#pretable-lobby-panel"),
+  preTableGuestLink: document.querySelector("#pretable-guest-link"),
+  copyPreTableGuestLink: document.querySelector("#copy-pretable-guest-link"),
+  preTableWaitingGuests: document.querySelector("#pretable-waiting-guests"),
   closeCampaignDialog: document.querySelector("#close-campaign-dialog"),
   confirmDialog: document.querySelector("#confirm-dialog"),
   confirmForm: document.querySelector("#confirm-form"),
@@ -871,6 +881,19 @@ elements.campaignDialog?.addEventListener("cancel", (event) => {
 
 elements.devJumpStartCampaign?.addEventListener("click", () => {
   applyDevJumpStartSeed(randomDevJumpStart());
+  schedulePreTableLobbyPublish({ immediate: true });
+});
+
+elements.campaignDialog?.addEventListener("input", () => {
+  schedulePreTableLobbyPublish();
+});
+
+elements.campaignDialog?.addEventListener("change", () => {
+  schedulePreTableLobbyPublish({ immediate: true });
+});
+
+elements.copyPreTableGuestLink?.addEventListener("click", async () => {
+  await copyPreTableGuestLinkFromUi();
 });
 
 elements.campaignForm.addEventListener("submit", async (event) => {
@@ -2728,6 +2751,7 @@ async function openRemoteInviteLobbyForNewCampaign(seeds = []) {
         return null;
       }
     }
+    await adoptPreTableLobbyIntoActiveCampaign();
     const link = currentLocalGuestLink();
     if (!link) {
       return null;
@@ -2740,6 +2764,20 @@ async function openRemoteInviteLobbyForNewCampaign(seeds = []) {
       message: error instanceof Error ? error.message : "Remote Invite lobby did not open.",
     });
     setProviderActivity(error instanceof Error ? `Remote Invite lobby failed: ${error.message}` : "Remote Invite lobby failed", "error");
+    return null;
+  }
+}
+
+async function adoptPreTableLobbyIntoActiveCampaign() {
+  try {
+    const result = await postJson(apiPreTableLobbyAdoptActiveUrl, localTableAuthorityPayload());
+    setCampaignFromPayload(result, "pretable_lobby_adopted");
+    state.multiplayerSnapshot = result.multiplayer;
+    return result;
+  } catch (error) {
+    pushDiagnosticsEvent("pretable_lobby_adopt_failed", {
+      message: error instanceof Error ? error.message : "Pre-table lobby guests were not adopted.",
+    });
     return null;
   }
 }
@@ -2795,6 +2833,7 @@ function openCampaignDialog({ returnToMainMenu = false } = {}) {
   state.campaignWizardReturnHome = Boolean(returnToMainMenu);
   openCampaignWizardWorkspace();
   elements.campaignDialog.showModal();
+  schedulePreTableLobbyPublish({ immediate: true });
   elements.newCampaignTitle.focus();
   elements.newCampaignTitle.select();
 }
@@ -2809,10 +2848,152 @@ function dismissCampaignWizard() {
 
 function openCampaignWizardWorkspace() {
   elements.app?.classList.add("campaign-wizard-mode");
+  schedulePreTableLobbyPublish({ immediate: true });
+  startPreTableLobbyPolling();
 }
 
 function closeCampaignWizardWorkspace() {
   elements.app?.classList.remove("campaign-wizard-mode");
+  stopPreTableLobbyPolling();
+  closePreTableLobby();
+}
+
+function schedulePreTableLobbyPublish({ immediate = false } = {}) {
+  if (!elements.campaignDialog?.open || clientMode) {
+    return;
+  }
+  clearTimeout(preTableLobbyPublishTimer);
+  const run = () => {
+    preTableLobbyPublishTimer = null;
+    publishPreTableLobbyFromWizard();
+  };
+  if (immediate) {
+    run();
+    return;
+  }
+  preTableLobbyPublishTimer = setTimeout(run, 350);
+}
+
+async function publishPreTableLobbyFromWizard() {
+  if (!elements.campaignDialog?.open || clientMode) {
+    return null;
+  }
+  const payload = preTableLobbyPayloadFromWizard();
+  try {
+    const result = await postJson(apiPreTableLobbyPublishUrl, payload);
+    renderPreTableLobby(result);
+    return result;
+  } catch (error) {
+    if (elements.preTableWaitingGuests) {
+      elements.preTableWaitingGuests.textContent = error instanceof Error ? error.message : "Guest lobby is not available.";
+    }
+    return null;
+  }
+}
+
+function startPreTableLobbyPolling() {
+  stopPreTableLobbyPolling();
+  preTableLobbyHostPollTimer = setInterval(() => {
+    refreshPreTableLobbyHostSnapshot();
+  }, 2000);
+}
+
+function stopPreTableLobbyPolling() {
+  if (preTableLobbyHostPollTimer) {
+    clearInterval(preTableLobbyHostPollTimer);
+    preTableLobbyHostPollTimer = null;
+  }
+}
+
+async function refreshPreTableLobbyHostSnapshot() {
+  if (!elements.campaignDialog?.open || clientMode) {
+    return null;
+  }
+  try {
+    const snapshot = await fetchJson(apiPreTableLobbyHostSnapshotUrl);
+    if (snapshot.open) {
+      renderPreTableLobby(snapshot);
+    }
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
+function preTableLobbyPayloadFromWizard() {
+  const primary = compactCharacterSeedFromRefs(compactCharacterFormRefs("new-character"));
+  const party = [primary, ...collectWizardAdditionalCharacters()]
+    .filter((member) => [member.name, member.ancestry, member.characterClass, member.concept].some((value) => String(value ?? "").trim()))
+    .map((member) => ({
+      id: member.name ? `party-${slugify(member.name)}` : "",
+      name: member.name,
+      ancestry: member.ancestry,
+      characterClass: member.characterClass,
+      level: member.level,
+      concept: member.concept,
+      controllerKind: member.controllerKind,
+      inviteIntent: normalizeWizardControllerKind(member.controllerKind) === "remote_invite" ? "remote_player" : "",
+    }));
+  return {
+    draftId: `draft-${slugify(elements.newCampaignTitle?.value || "new-campaign")}`,
+    title: elements.newCampaignTitle?.value || "New Campaign",
+    premise: elements.newCampaignPremise?.value || "",
+    startingLocation: elements.newCampaignStartingLocation?.value || "",
+    tone: elements.newCampaignTone?.value || "",
+    party,
+  };
+}
+
+function renderPreTableLobby(snapshot = {}) {
+  if (elements.preTableLobbyPanel) {
+    elements.preTableLobbyPanel.hidden = false;
+  }
+  if (elements.preTableGuestLink) {
+    elements.preTableGuestLink.value = snapshot.guestLink || "";
+  }
+  if (!elements.preTableWaitingGuests) {
+    return;
+  }
+  const guests = Array.isArray(snapshot.waitingGuests) ? snapshot.waitingGuests : [];
+  const seats = new Map((snapshot.joinableSeats ?? []).map((seat) => [seat.id, seat.name]));
+  if (!guests.length) {
+    elements.preTableWaitingGuests.textContent = snapshot.joinableSeats?.length
+      ? "No guests waiting yet."
+      : "No Remote Invite seats yet.";
+    return;
+  }
+  elements.preTableWaitingGuests.replaceChildren(...guests.map((guest) => {
+    const row = document.createElement("div");
+    row.className = "pretable-waiting-guest";
+    const seatName = seats.get(guest.preferredPartyMemberId) || "a seat";
+    row.textContent = `${guest.displayName || "Guest"} requested ${seatName}.`;
+    return row;
+  }));
+}
+
+async function closePreTableLobby() {
+  clearTimeout(preTableLobbyPublishTimer);
+  preTableLobbyPublishTimer = null;
+  if (elements.preTableLobbyPanel) {
+    elements.preTableLobbyPanel.hidden = true;
+  }
+  try {
+    await postJson(apiPreTableLobbyCloseUrl, {});
+  } catch {
+    // Draft lobby state is best-effort; it is not canon.
+  }
+}
+
+async function copyPreTableGuestLinkFromUi() {
+  const snapshot = await publishPreTableLobbyFromWizard();
+  const link = snapshot?.guestLink || elements.preTableGuestLink?.value || currentLocalGuestLink();
+  if (!link) {
+    setProviderActivity("Guest link is not ready yet", "waiting");
+    return false;
+  }
+  const copied = await writeClipboardText(link);
+  setProviderActivity(copied ? "Guest link copied" : "Guest link ready in Host New", copied ? "idle" : "waiting");
+  return copied;
 }
 
 function resetCampaignWizardDefaults() {
@@ -3008,19 +3189,7 @@ function currentLocalGuestLink() {
   }
   const host = table.lanAddress || window.location.hostname || "127.0.0.1";
   const port = table.port || window.location.port;
-  const base = port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
-  if (!table.sessionId) {
-    return base;
-  }
-  const url = new URL(base);
-  if (state.campaign?.id) {
-    url.searchParams.set("campaign", state.campaign.id);
-  }
-  if (table.tableId) {
-    url.searchParams.set("table", table.tableId);
-  }
-  url.searchParams.set("session", table.sessionId);
-  return url.toString();
+  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
 }
 
 function localTableAuthorityPayload(overrides = {}) {
@@ -3207,19 +3376,6 @@ async function refreshGuestLobbyPreview({ quiet = false } = {}) {
   try {
     const hostBaseUrl = window.location.origin;
     const url = new URL(`${hostBaseUrl}${apiMultiplayerJoinPreviewUrl}`);
-    const campaignId = launchParams.get("campaign") || "";
-    const hasExplicitSession = launchParams.has("session");
-    const tableId = hasExplicitSession ? launchParams.get("table") || "" : "";
-    const sessionId = hasExplicitSession ? launchParams.get("session") || "" : launchParams.get("table") || "";
-    if (campaignId) {
-      url.searchParams.set("campaignId", campaignId);
-    }
-    if (tableId) {
-      url.searchParams.set("tableId", tableId);
-    }
-    if (sessionId) {
-      url.searchParams.set("sessionId", sessionId);
-    }
     const preview = await fetchJson(url.toString());
     state.guestLobbyPreview = preview;
     const seats = preview.joinableSeats ?? [];
@@ -3308,16 +3464,9 @@ async function registerGuestWaitingRoom() {
     }
     const clientId = guestClientId();
     const hostBaseUrl = window.location.origin;
-    const campaignId = launchParams.get("campaign") || "";
-    const hasExplicitSession = launchParams.has("session");
-    const tableId = hasExplicitSession ? launchParams.get("table") || "" : "";
-    const sessionId = hasExplicitSession ? launchParams.get("session") || "" : launchParams.get("table") || "";
     const result = await postJson(`${hostBaseUrl}${apiMultiplayerWaitingRegisterUrl}`, {
       playerName,
       clientId,
-      campaignId,
-      tableId,
-      sessionId,
       preferredPartyMemberId: state.selectedGuestSeatId || "",
     });
     saveWaitingRoomSession({
@@ -3325,9 +3474,9 @@ async function registerGuestWaitingRoom() {
       clientId,
       waitingGuestId: result.waitingGuest?.id,
       waitingSecret: result.waitingSecret || "",
-      campaignId: result.campaignId || campaignId,
-      tableId: result.localTable?.tableId || tableId,
-      sessionId: result.localTable?.sessionId || sessionId,
+      campaignId: result.campaignId || "",
+      tableId: result.localTable?.tableId || "",
+      sessionId: result.localTable?.sessionId || "",
       preferredPartyMemberId: result.waitingGuest?.preferredPartyMemberId || state.selectedGuestSeatId || "",
       playerName,
       campaignTitle: result.campaignTitle || "",

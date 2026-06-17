@@ -64,7 +64,7 @@ Every table surface should answer the same practical questions a real table answ
 25. Waiting-room guests now surface from the live host snapshot in Local Table, party seating actions, session health, and the table status strip.
 26. Waiting-room presence now uses guest heartbeat/stale filtering so old guest names do not linger after campaign switches or closed tabs.
 27. The front door Host flow now requires choosing an existing campaign instead of dropping into the last active table.
-28. Generated Guest Links are scoped to campaign, table, and session identity so stale links do not silently join a different active campaign or table.
+28. Normal Guest Links now use plain `/guest`; guest actions still receive table/session identity after waiting-room registration so stale requests cannot mutate a different active table.
 29. Multiplayer waiting guests, invite links, guest snapshots, staged actions, combat joins, and table talk now carry table/session ownership and reject supplied identity mismatches.
 30. The right rail is split into Campaign Notes and Player Notes, with Table Talk anchored at the bottom of the table surface.
 31. Controlled-party agency validation now rejects obvious model output that speaks or acts for a host/remote/unassigned party member without submitted controller input.
@@ -153,6 +153,8 @@ Every table surface should answer the same practical questions a real table answ
 114. Guest table refresh copy now avoids "sync/resync" wording on ordinary table-facing controls and status messages.
 115. Pre-action DM nudges with living-world object memory no longer crash provider request construction when compacting NPC/faction/place memory.
 116. Host New Remote Invite seats now persist as unassigned remote-player seats, stay joinable after campaign creation, and automatically open/copy the Guest Link when the campaign starts.
+117. Host New now publishes an in-memory pre-table lobby to `/guest`, so same-network guests can see the current draft table, request Remote Invite seats, and remain visible to the host before Create And Start.
+118. Stale detailed `/guest?...campaign/table/session...` URLs no longer drive the normal waiting-room preview; the guest page asks the host server what is currently joinable.
 
 ### Still Risky
 
@@ -170,7 +172,7 @@ Every table surface should answer the same practical questions a real table answ
 12. Rail containment is improved, but long-session scroll behavior still needs a real campaign soak with many party members, notes, and combatants.
 13. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
 14. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
-15. Pre-table guest lobby is only partially built: `/guest` waiting room works for an active table, but a brand-new unsaved campaign draft does not yet have its own safe table/session identity for seating guests.
+15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request Remote Invite seats before Create And Start and those requests are adopted into the active table, but guests cannot yet edit their own character sheet in the shared draft lobby.
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
@@ -328,7 +330,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Waiting-room guests are visible to the host without digging through diagnostics, including requested character seat.
 - [x] Stale waiting-room guests expire instead of lingering as broken seat buttons.
 - [x] Guest Leave notifies the host, releases the remote controller to Host, and makes the vacated seat requestable again.
-- [x] Generated Guest Links carry campaign/table/session identity to reject stale/wrong-table joins.
+- [x] Normal Guest Links use plain `/guest`; actions/snapshots still validate campaign/table/session identity after registration.
 - [x] Guest snapshots and staged actions reject wrong campaign/table/session identity when supplied.
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.
 - [x] Make guest sent/received/resolving/resolved states clearer.
@@ -351,7 +353,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Guest join and LoreKeeper Join use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
 - [ ] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character.
-- [ ] Let Host New remote-invite slots seat waiting-room guests before campaign start.
+- [x] Let Host New Remote Invite slots appear on `/guest` before campaign start and preserve waiting guest requests after Create And Start.
 - [x] Make auto-complete campaign-aware without overriding user facts.
 - [x] Add party-template flow for repeated related companions.
 - [x] Improve class/spell/equipment depth beyond shallow 5E-lite starts.
@@ -467,7 +469,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-15: AI companions should occasionally feel alive with brief unprompted contributions, but not every response cycle and not for major decisions. Current state: idle companion interjections are rarity/cooldown gated in the provider request.
 - 2026-06-15: App-owned combat resolution now covers DC checks and opposed contests. Current state: saves/spells/enemy-turn bounding and one-actor response validation have coverage; broader app-owned combat resolution remains open.
 - 2026-06-16: Player Notes should not remain only local device state if they become part of long-campaign play. Decide whether they are per-user private notes, host-visible table notes, or both.
-- 2026-06-16: Pre-table guest seating needs a draft table/session identity before it can be safely supported for unsaved Host New campaigns.
+- 2026-06-16: Pre-table guest seating now has a draft table/session identity and is published to the normal `/guest` page while Host New is open. Remaining work: guest-editable character draft state and live local-browser soak.
 - 2026-06-16: Remote party-choice voting is now usable, but host resolution should become more explicit than "read the counters and send the choice." Current state: leading vote can draft the host action; a dedicated confirmation flow may still be smoother.
 - 2026-06-16: Next local playtest target should be host app plus local browser guest through `/guest`: join waiting room, seat request, party vote, guest leave/rejoin, one combat turn, and one provider recovery.
 

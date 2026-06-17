@@ -27,6 +27,7 @@ Local HTTP server:
 
 - `scripts/serve.js` serves the app, campaign data APIs, provider APIs, local multiplayer APIs, guest pages, assets, diagnostics, and storage-backed mutations.
 - The server still has transitional active-campaign APIs, but multiplayer routes now validate explicit campaign/table/session identity before mutating.
+- Host New uses a temporary in-memory pre-table lobby owned by `scripts/serve.js` so plain `/guest` can show unsaved draft Remote Invite seats. This draft is not canon; waiting guests are adopted into the active campaign/table when Create And Start opens the real local table.
 
 Renderer:
 
@@ -66,6 +67,7 @@ Table:
 - `tableId`
 - active table for a campaign,
 - owns seats, invites, waiting guests, table talk, staged actions, and table-facing projections.
+- Host New drafts temporarily use draft table ids so guests can request seats before the campaign exists; those ids must be replaced by real active-table ids before any canonical mutation.
 
 Session:
 

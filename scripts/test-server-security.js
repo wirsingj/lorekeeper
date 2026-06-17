@@ -46,6 +46,10 @@ const protectedHostRoutes = [
   ["POST", "/api/multiplayer/controller/ai"],
   ["POST", "/api/multiplayer/controller/host"],
   ["POST", "/api/multiplayer/pending/clear"],
+  ["POST", "/api/pretable-lobby/publish"],
+  ["POST", "/api/pretable-lobby/close"],
+  ["GET", "/api/pretable-lobby/host-snapshot"],
+  ["POST", "/api/pretable-lobby/adopt-active"],
   ["POST", "/api/review/commit"],
 ];
 
@@ -57,8 +61,12 @@ for (const [method, pathname] of protectedHostRoutes) {
   );
   assert.equal(
     requiresCampaignPin(pathname),
-    true,
-    `${method} ${pathname} should reject stale campaign/table mutations`,
+    pathname === "/api/pretable-lobby/publish"
+      || pathname === "/api/pretable-lobby/close"
+      || pathname === "/api/pretable-lobby/host-snapshot"
+      ? false
+      : true,
+    `${method} ${pathname} should have the expected stale-campaign pin policy`,
   );
   assert.equal(
     isAuthorizedRequestForToken("host-secret-token", { pathname, method, headers: {} }),

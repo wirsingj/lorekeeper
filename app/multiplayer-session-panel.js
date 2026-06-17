@@ -111,20 +111,7 @@ function localGuestLink(table = {}, locationPort = "", { campaignId = "" } = {})
   }
   const host = table.lanAddress || "127.0.0.1";
   const port = table.port || locationPort;
-  const base = port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
-  if (!table.sessionId) {
-    return base;
-  }
-  const url = new URL(base);
-  const scopedCampaignId = table.campaignId || campaignId;
-  if (scopedCampaignId) {
-    url.searchParams.set("campaign", scopedCampaignId);
-  }
-  if (table.tableId) {
-    url.searchParams.set("table", table.tableId);
-  }
-  url.searchParams.set("session", table.sessionId);
-  return url.toString();
+  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
 }
 
 function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWaitingGuest } = {}) {

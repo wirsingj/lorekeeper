@@ -1383,6 +1383,37 @@ button:disabled {
   min-height: 38px;
 }
 
+.pretable-lobby-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(125, 213, 201, 0.2);
+  border-radius: 8px;
+  background: rgba(9, 21, 20, 0.28);
+}
+
+.pretable-lobby-panel[hidden] {
+  display: none;
+}
+
+.pretable-lobby-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #dfe7eb;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.pretable-waiting-guests,
+.pretable-waiting-guest {
+  color: #c8d2d8;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .guest-table-preview {
   margin-top: 0;
 }

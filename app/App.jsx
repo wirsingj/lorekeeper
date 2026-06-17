@@ -501,6 +501,14 @@ function CampaignDialog() {
                 placeholder="tense heist fantasy, cozy exploration, political intrigue..."
               />
             </label>
+            <div id="pretable-lobby-panel" className="pretable-lobby-panel" hidden>
+              <div className="pretable-lobby-heading">
+                <span>Guest Lobby</span>
+                <button id="copy-pretable-guest-link" className="mini-action" type="button">Copy Link</button>
+              </div>
+              <input id="pretable-guest-link" readOnly placeholder="Guest link appears here when the local lobby is visible." />
+              <div id="pretable-waiting-guests" className="pretable-waiting-guests">No guests waiting yet.</div>
+            </div>
           </section>
 
           <section className="campaign-wizard-section primary-character-section">

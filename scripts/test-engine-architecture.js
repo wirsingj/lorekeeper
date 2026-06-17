@@ -2264,7 +2264,7 @@ function testMultiplayerSessionProjection() {
   assert.equal(hostProjection.holdGuestActionsForGroupInput, false);
   assert.equal(hostProjection.connectedGuests.length, 1);
   assert.match(hostProjection.localTableAddress, /192\.168\.1\.24:7347/);
-  assert.equal(hostProjection.guestLink, "http://192.168.1.24:7347/guest?campaign=campaign-test&table=table-karl-campaign&session=session-test");
+  assert.equal(hostProjection.guestLink, "http://192.168.1.24:7347/guest");
   assert.equal(hostProjection.canCopyGuestLink, true);
   assert.match(hostProjection.flowSummary, /queued/i);
   assert.match(hostProjection.pendingInputs[0].statusLabel, /Queued for DM/);
