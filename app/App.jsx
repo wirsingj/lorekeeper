@@ -684,7 +684,10 @@ function CampaignDialog() {
         </div>
 
         <footer className="dialog-actions">
-          <button type="submit">Start Adventure</button>
+          <p id="campaign-wizard-status" className="campaign-wizard-status" aria-live="polite">
+            Ready when your table is.
+          </p>
+          <button id="start-campaign-submit" type="submit">Start Adventure</button>
         </footer>
       </form>
     </dialog>

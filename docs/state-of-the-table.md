@@ -272,6 +272,7 @@ Risks:
 142. Table focus projection now lives in `app/table-focus-controller.js`, so phase-to-surface decisions are tested outside `app/app.js`; combat, party/waiting, and review states can visually elevate the right rail/section through a single `data-table-focus` hook.
 143. Preferences now open as scoped surfaces: App Preferences shows only App/AI, AI Readiness shows AI/App, and in-table Friends And Seats shows only Friends/Troubleshooting instead of exposing every settings tab at once.
 144. Settings surface mode/copy/tab visibility now lives in `app/settings-surface-controller.js` with direct tests, so future settings UX changes do not have to add more policy to `app/app.js`.
+145. Start Adventure now has an in-wizard progress/error status and repeat-submit guard, so campaign creation failures no longer look like a dead button while the global table status is hidden.
 
 ### Still Risky
 

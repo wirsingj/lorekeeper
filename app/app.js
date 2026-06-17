@@ -191,6 +191,7 @@ const state = {
   playerNotesSaveTimer: null,
   homeFlow: clientMode ? "join" : "",
   campaignWizardReturnHome: false,
+  campaignWizardCreating: false,
   launchInviteError: "",
 };
 
@@ -474,6 +475,8 @@ const elements = {
   wizardAdditionalCharacters: document.querySelector("#wizard-additional-characters"),
   addWizardPartyMember: document.querySelector("#add-wizard-party-member"),
   addPartyTemplate: document.querySelector("#add-party-template"),
+  campaignWizardStatus: document.querySelector("#campaign-wizard-status"),
+  startCampaignSubmit: document.querySelector("#start-campaign-submit"),
   newJoinerName: document.querySelector("#new-joiner-name"),
   newJoinerAncestry: document.querySelector("#new-joiner-ancestry"),
   newJoinerClass: document.querySelector("#new-joiner-class"),
@@ -946,6 +949,9 @@ elements.copyPreTableGuestLink?.addEventListener("click", async () => {
 
 elements.campaignForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (state.campaignWizardCreating) {
+    return;
+  }
   await createNewCampaign({
     title: elements.newCampaignTitle.value,
     premise: elements.newCampaignPremise.value,
@@ -2505,7 +2511,7 @@ function autocompleteCompactCharacterForm(refs = {}) {
 }
 
 function characterAutocompleteCampaignContext() {
-  if (elements.newCampaignDialog?.open) {
+  if (elements.campaignDialog?.open) {
     return {
       title: elements.newCampaignTitle?.value,
       summary: elements.newCampaignPremise?.value,
@@ -2517,7 +2523,7 @@ function characterAutocompleteCampaignContext() {
 }
 
 function characterAutocompleteStartingPartyMembers() {
-  if (!elements.newCampaignDialog?.open) {
+  if (!elements.campaignDialog?.open) {
     return [];
   }
   return [
@@ -2718,6 +2724,23 @@ function virtualFormValue(value = "") {
   return { value: String(value ?? "") };
 }
 
+function setCampaignWizardStatus(message, status = "idle") {
+  if (!elements.campaignWizardStatus) {
+    return;
+  }
+  elements.campaignWizardStatus.textContent = message;
+  elements.campaignWizardStatus.dataset.state = status;
+}
+
+function setCampaignWizardBusy(isBusy) {
+  state.campaignWizardCreating = Boolean(isBusy);
+  if (!elements.startCampaignSubmit) {
+    return;
+  }
+  elements.startCampaignSubmit.disabled = state.campaignWizardCreating;
+  elements.startCampaignSubmit.textContent = state.campaignWizardCreating ? "Starting..." : "Start Adventure";
+}
+
 function normalizeList(value) {
   if (Array.isArray(value)) {
     return value.filter((entry) => entry !== undefined && entry !== null);
@@ -2726,6 +2749,11 @@ function normalizeList(value) {
 }
 
 async function createNewCampaign({ title, premise, startingLocation, tone, playerCharacter, startingPartyMember, startingPartyMembers }) {
+  if (state.campaignWizardCreating) {
+    return;
+  }
+  setCampaignWizardBusy(true);
+  setCampaignWizardStatus("Starting adventure...", "working");
   const trimmedTitle = String(title ?? "").trim() || "Untitled Campaign";
   const trimmedPremise = String(premise ?? "").trim() || "Start a new D&D 5e-lite campaign. Ask for missing essentials, then open with a playable scene.";
   const trimmedStartingLocation = String(startingLocation ?? "").trim();
@@ -2740,6 +2768,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
   });
   try {
     elements.bridgeStatus.textContent = "Creating new campaign...";
+    setCampaignWizardStatus("Creating adventure file...", "working");
     setProviderActivity("Creating campaign...", "working");
     const response = await fetch(apiNewCampaignUrl, {
       method: "POST",
@@ -2761,16 +2790,20 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     }
 
     const payload = await response.json();
+    setCampaignWizardStatus("Saving table...", "working");
     setCampaignFromPayload(payload, "new_campaign_start");
     state.reviewBatch = null;
     elements.responseImport.value = "";
 
     if (characterSeed.name) {
+      setCampaignWizardStatus(`Adding ${characterSeed.name}...`, "working");
       await seedWizardPlayerCharacter(characterSeed);
     }
     for (const joinerSeed of joinerSeeds) {
+      setCampaignWizardStatus(`Adding ${joinerSeed.name || "party member"}...`, "working");
       await seedWizardStartingPartyMember(joinerSeed);
     }
+    setCampaignWizardStatus("Opening friend seats...", "working");
     const remoteInviteLobby = await openRemoteInviteLobbyForNewCampaign([characterSeed, ...joinerSeeds]);
 
     seedPlayLog();
@@ -2780,6 +2813,8 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     elements.campaignForm.reset();
     resetCampaignWizardDefaults();
     elements.bridgeStatus.textContent = "New campaign saved";
+    setCampaignWizardStatus("Adventure started.", "idle");
+    setCampaignWizardBusy(false);
     elements.playerInput.value = "";
     if (remoteInviteLobby?.link) {
       setProviderActivity(
@@ -2793,8 +2828,11 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     }
   } catch (error) {
     render();
-    elements.bridgeStatus.textContent = error instanceof Error ? `New campaign failed: ${error.message}` : "New campaign failed";
-    setProviderActivity("New campaign failed", "error");
+    const message = error instanceof Error ? error.message : "Unknown error";
+    elements.bridgeStatus.textContent = `New campaign failed: ${message}`;
+    setCampaignWizardStatus(`Could not start: ${message}`, "error");
+    setCampaignWizardBusy(false);
+    setProviderActivity(`New campaign failed: ${message}`, "error");
   }
 }
 

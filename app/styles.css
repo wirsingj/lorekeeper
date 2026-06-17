@@ -3042,6 +3042,28 @@ textarea::placeholder {
   gap: 6px;
 }
 
+.campaign-dialog .dialog-actions {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.campaign-wizard-status {
+  margin: 0;
+  min-width: 0;
+  color: #b8c6ce;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.campaign-wizard-status[data-state="working"] {
+  color: #dcefb5;
+}
+
+.campaign-wizard-status[data-state="error"] {
+  color: #f1b3ab;
+}
+
 .character-autocomplete-action {
   justify-self: start;
   min-height: 30px;

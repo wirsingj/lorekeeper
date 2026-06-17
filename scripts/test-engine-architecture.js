@@ -2613,6 +2613,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /add-wizard-party-member/);
   assert.match(appShell, /Invite Friend/);
   assert.match(appShell, /new-character-controller/);
+  assert.match(appShell, /campaign-wizard-status/, "adventure creation should show progress and errors inside the wizard");
+  assert.match(appShell, /start-campaign-submit/, "adventure creation submit should be addressable for busy/disabled state");
   assert.match(appShell, /Back to previous screen/);
   assert.match(appShell, /data-character-field="controllerKind"/);
   assert.match(appShell, /new-joiner-integration/);
@@ -2736,6 +2738,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /inviteIntent:\s*"remote_player"/);
   assert.match(appJs, /campaign-wizard-mode/);
   assert.match(appJs, /campaignWizardReturnHome/);
+  assert.match(appJs, /campaignWizardCreating/);
+  assert.match(appJs, /setCampaignWizardStatus/);
+  assert.match(appJs, /setCampaignWizardBusy/);
+  assert.doesNotMatch(appJs, /newCampaignDialog/, "campaign wizard helpers should reference the real campaign dialog element");
   assert.match(appJs, /dismissCampaignWizard/);
   assert.match(appJs, /openSelectedHomeCampaign/);
   assert.match(appJs, /renderHomeCampaignPicker/);
