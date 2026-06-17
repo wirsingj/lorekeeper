@@ -705,7 +705,14 @@ function SetupDialog() {
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
 
-        <section id="app-preferences-section" className="setup-section app-mode-section">
+        <nav className="settings-tabs" aria-label="Table options sections" role="tablist">
+          <button className="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="app">App</button>
+          <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="ai">AI</button>
+          <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="friends">Friends</button>
+          <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="troubleshooting">Troubleshooting</button>
+        </nav>
+
+        <section id="app-preferences-section" className="setup-section app-mode-section" data-settings-panel="app">
           <div className="section-title">
             <h3>Startup</h3>
           </div>
@@ -719,7 +726,17 @@ function SetupDialog() {
           <p id="app-mode-note" className="setup-note">Host runs the table. Join sits down at a friend's table.</p>
         </section>
 
-        <section id="provider-setup-section" className="setup-section provider-setup-section">
+        <section className="setup-section campaign-settings-section" data-settings-panel="app">
+          <div className="section-title">
+            <h3>Adventures</h3>
+          </div>
+          <div className="button-stack two-up">
+            <button id="new-campaign" type="button">New Adventure</button>
+            <button id="load-imported" type="button">Load Saved Adventure</button>
+          </div>
+        </section>
+
+        <section id="provider-setup-section" className="setup-section provider-setup-section" data-settings-panel="ai" hidden>
           <div className="section-title">
             <h3>Local AI</h3>
           </div>
@@ -794,49 +811,7 @@ function SetupDialog() {
           </details>
         </section>
 
-        <section className="setup-section campaign-settings-section">
-          <div className="section-title">
-            <h3>Adventures</h3>
-          </div>
-          <div className="button-stack two-up">
-            <button id="new-campaign" type="button">New Adventure</button>
-            <button id="load-imported" type="button">Load Saved Adventure</button>
-          </div>
-        </section>
-
-        <section className="setup-section diagnostics-section">
-          <div className="section-title">
-            <h3>Troubleshooting</h3>
-            <span id="diagnostics-status" className="count-pill">Idle</span>
-          </div>
-          <label className="check-row" title="Show provider/model metadata under play messages for troubleshooting. Leave this off during normal play.">
-            <input id="show-debug-meta" type="checkbox" />
-            Show troubleshooting notes in play log
-          </label>
-          <div className="button-stack two-up">
-            <button id="refresh-diagnostics" type="button">Refresh Details</button>
-            <button id="copy-diagnostics" type="button">Copy Details</button>
-          </div>
-          <div id="session-health-summary" className="session-health-summary" aria-live="polite">
-            <strong>Table ready</strong>
-            <p>No blockers detected.</p>
-          </div>
-          <div id="table-timeline-summary" className="table-timeline-summary" aria-live="polite">
-            <p>No table timeline yet.</p>
-          </div>
-          <details className="raw-diagnostics-details">
-            <summary>Developer Details</summary>
-            <textarea
-              id="diagnostics-output"
-              className="rail-textarea diagnostics-output"
-              spellCheck="false"
-              readOnly
-              placeholder="Open this after a weird turn to review table health, recent messages, DM response issues, combat state, and logs."
-            ></textarea>
-          </details>
-        </section>
-
-        <section className="setup-section local-table-section">
+        <section className="setup-section local-table-section" data-settings-panel="friends" hidden>
           <div className="section-title">
             <h3>Friends</h3>
             <span id="local-table-state" className="count-pill">Off</span>
@@ -882,7 +857,39 @@ function SetupDialog() {
           <div id="pending-inputs" className="local-table-list"></div>
         </section>
 
-        <section className="setup-section">
+        <section className="setup-section diagnostics-section" data-settings-panel="troubleshooting" hidden>
+          <div className="section-title">
+            <h3>Troubleshooting</h3>
+            <span id="diagnostics-status" className="count-pill">Idle</span>
+          </div>
+          <label className="check-row" title="Show provider/model metadata under play messages for troubleshooting. Leave this off during normal play.">
+            <input id="show-debug-meta" type="checkbox" />
+            Show troubleshooting notes in play log
+          </label>
+          <div className="button-stack two-up">
+            <button id="refresh-diagnostics" type="button">Refresh Details</button>
+            <button id="copy-diagnostics" type="button">Copy Details</button>
+          </div>
+          <div id="session-health-summary" className="session-health-summary" aria-live="polite">
+            <strong>Table ready</strong>
+            <p>No blockers detected.</p>
+          </div>
+          <div id="table-timeline-summary" className="table-timeline-summary" aria-live="polite">
+            <p>No table timeline yet.</p>
+          </div>
+          <details className="raw-diagnostics-details">
+            <summary>Developer Details</summary>
+            <textarea
+              id="diagnostics-output"
+              className="rail-textarea diagnostics-output"
+              spellCheck="false"
+              readOnly
+              placeholder="Open this after a weird turn to review table health, recent messages, DM response issues, combat state, and logs."
+            ></textarea>
+          </details>
+        </section>
+
+        <section className="setup-section" data-settings-panel="troubleshooting" hidden>
           <div className="section-title">
             <h3>DM Recovery</h3>
             <span id="review-count" className="count-pill">0</span>

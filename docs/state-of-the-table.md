@@ -260,6 +260,7 @@ Risks:
 130. Use Anyway is now hard-blocked for DM responses that speak or act for controlled party members. Format/proposed-change weirdness can still be reviewed by the host, but controlled-character agency failures require Try Again or Details instead of becoming table text.
 131. Host New pre-lobby waiting guests now show seat buttons for every open Invite Friend slot, even when the guest did not pick a specific character before asking to join.
 132. Character Auto-Complete now behaves like a reroll for generated flavor: it preserves hard facts such as name, ancestry, class, and level, while rotating the pitch, party tie, and DM note on each click.
+133. Preferences now open as calmer App, AI, Friends, and Troubleshooting tabs, with local-table tools, diagnostics, and DM recovery hidden until that section is chosen.
 
 ### Still Risky
 
@@ -287,7 +288,7 @@ Risks:
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
-25. The app still has too many visible controls in Preferences and the table rails. The current passes improved wording, collapsed low-value note surfaces, compacted rail cards, made shelf sizes adjustable, and changed the visual silhouette, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and better separation between normal play and troubleshooting.
+25. The app still has too many visible controls across table rails and campaign/table management. Preferences are calmer now via top-level tabs, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and a fuller split between app preferences and table settings.
 
 ## Live Acceptance Matrix
 
@@ -481,7 +482,7 @@ Risks:
 - [x] Campaign/table view can return to the main menu without closing the app.
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
-- [ ] Reduce visible Preferences controls to App, AI, and Guests, with troubleshooting/manual fallback tucked behind an explicit advanced area.
+- [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
 - [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once.
 - [ ] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.

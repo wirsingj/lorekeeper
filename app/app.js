@@ -269,6 +269,8 @@ const elements = {
   saveStatus: document.querySelector("#save-status"),
   returnMainMenu: document.querySelector("#return-main-menu"),
   openSetup: document.querySelector("#open-setup"),
+  settingsTabs: [...document.querySelectorAll("[data-settings-tab]")],
+  settingsPanels: [...document.querySelectorAll("[data-settings-panel]")],
   nudgeDm: document.querySelector("#nudge-dm"),
   setupDialog: document.querySelector("#setup-dialog"),
   closeSetup: document.querySelector("#close-setup"),
@@ -551,6 +553,12 @@ for (const input of playerNoteInputs()) {
 elements.closeSetup.addEventListener("click", () => {
   elements.setupDialog.close();
 });
+
+for (const button of elements.settingsTabs) {
+  button.addEventListener("click", () => {
+    setSettingsTab(button.dataset.settingsTab || "app");
+  });
+}
 
 elements.closeCharacterSheet.addEventListener("click", () => {
   elements.characterSheetDialog.close();
@@ -856,7 +864,8 @@ elements.pasteResponse.addEventListener("click", async () => {
   }
 });
 
-function openSetupDialog({ focusProvider = false } = {}) {
+function openSetupDialog({ focusProvider = false, tab = "" } = {}) {
+  setSettingsTab(focusProvider ? "ai" : tab || "app");
   elements.setupDialog.showModal();
   if (focusProvider) {
     window.setTimeout(() => {
@@ -872,6 +881,21 @@ function openSetupDialog({ focusProvider = false } = {}) {
     return;
   }
   refreshProviderStatus({ quiet: true });
+}
+
+function setSettingsTab(tab = "app") {
+  const activeTab = ["app", "ai", "friends", "troubleshooting"].includes(tab) ? tab : "app";
+  if (elements.setupDialog) {
+    elements.setupDialog.dataset.activeTab = activeTab;
+  }
+  for (const button of elements.settingsTabs) {
+    const active = button.dataset.settingsTab === activeTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  for (const panel of elements.settingsPanels) {
+    panel.hidden = panel.dataset.settingsPanel !== activeTab;
+  }
 }
 
 document.querySelectorAll("[data-add-domain]").forEach((button) => {
@@ -7752,9 +7776,7 @@ async function inspectTurnRepair() {
   if (!activeTurnRepair()) {
     return;
   }
-  if (elements.setupDialog && !elements.setupDialog.open) {
-    elements.setupDialog.showModal();
-  }
+  openSetupDialog({ tab: "troubleshooting" });
   await refreshDiagnostics();
   setProviderActivity("DM response details are open in Troubleshooting", "waiting");
 }
