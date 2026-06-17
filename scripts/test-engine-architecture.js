@@ -25,6 +25,7 @@ import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoComm
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
+import { buildTableFocusProjection } from "../app/table-focus-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import {
@@ -2053,6 +2054,34 @@ function testTableSessionEnginePhases() {
   assert.match(guestSent.nextStep, /host table/i);
 }
 
+function testTableFocusProjection() {
+  const empty = buildTableFocusProjection();
+  assert.equal(empty.phase, "idle");
+  assert.equal(empty.focusRail, "none");
+  assert.equal(empty.nowText, "Now: Table Ready");
+  assert.equal(empty.nextText, "Next: Continue the scene.");
+
+  const combat = buildTableFocusProjection({
+    phase: tablePhases.COMBAT,
+    tone: "waiting",
+    headline: "Combat Round 2: Mira",
+    nextStep: "Mira takes the active combat turn.",
+  });
+  assert.equal(combat.focusRail, "combat");
+  assert.equal(combat.label, "Combat");
+  assert.equal(combat.nowText, "Now: Combat Round 2: Mira");
+  assert.equal(combat.nextText, "Next: Mira takes the active combat turn.");
+
+  const recovery = buildTableFocusProjection({
+    phase: tablePhases.RECOVERY,
+    tone: "attention",
+    headline: "Recovery Needed",
+    nextStep: "Host chooses Try Again, Details, or Use Anyway.",
+  });
+  assert.equal(recovery.focusRail, "review");
+  assert.equal(recovery.tone, "attention");
+}
+
 function testPlayLogProjectionBoundsLongSessions() {
   const messages = Array.from({ length: defaultPlayLogVisibleLimit + 75 }, (_, index) => ({
     id: `msg-${index + 1}`,
@@ -2462,6 +2491,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
+  const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
@@ -2529,6 +2559,10 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.doesNotMatch(appJs, /function shouldAutoApproveChange/, "renderer should not own provider auto-approval policy");
   assert.match(appJs, /buildTableSessionProjection/, "renderer should consume the table session projection");
   assert.match(appJs, /dataset\.tablePhase/, "status strip should expose the unified table phase");
+  assert.match(appJs, /table-focus-controller\.js/, "table focus UI policy should live outside the main app renderer");
+  assert.match(tableFocusController, /function buildTableFocusProjection/, "table focus controller should own phase-to-surface projection");
+  assert.match(tableFocusController, /focusRail/, "table focus controller should name the table surface that deserves attention");
+  assert.doesNotMatch(appJs, /function renderCommandContext/, "renderer should not own command context wording");
   assert.match(appJs, /combat-prompt-repair-controller\.js/, "combat prompt repair policy should live outside the main app renderer");
   assert.match(combatPromptRepairController, /promptedCombatActorIdFromTurnResponse/, "combat prompt repair controller should own actor prompt detection");
   assert.doesNotMatch(appJs, /function promptedCombatActorIdFromTurnResponse/, "renderer should not own combat prompt actor detection");
@@ -2600,11 +2634,12 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="command-context"/, "command deck should show the current table phase");
   assert.match(appShell, /id="command-context-phase"/);
   assert.match(appShell, /id="command-context-next"/);
-  assert.match(appJs, /function renderCommandContext\(tableSession = null\)/, "command deck phase copy should be rendered from table session projection");
-  assert.match(appJs, /renderCommandContext\(state\.tableSession\)/, "table session refresh should update the command deck cue");
-  assert.match(appJs, /elements\.app\.dataset\.tablePhase = state\.tableSession\.phase/, "app shell should expose table phase for phase-aware surfaces");
+  assert.match(appJs, /renderTableFocus\(state\.tableSession\)/, "table session refresh should update the table focus cue");
+  assert.match(appJs, /applyTableFocusProjection/, "command deck phase copy should be rendered through a focused projection");
+  assert.match(appJs, /buildTableFocusProjection/, "renderer should consume a tested table focus projection");
   assert.match(styles, /\.command-context/);
   assert.match(styles, /\[data-table-phase="combat"\] \.command-deck/);
+  assert.match(styles, /\[data-table-focus="combat"\] \.combat-tracker-section/);
   assert.match(appShell, /Try Again/);
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);
@@ -2791,6 +2826,7 @@ testCampaignStateStore();
 testInputComposerProjection();
 testTableStatusVocabulary();
 testTableSessionEnginePhases();
+testTableFocusProjection();
 testPlayLogProjectionBoundsLongSessions();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();

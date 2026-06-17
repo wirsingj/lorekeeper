@@ -269,6 +269,7 @@ Risks:
 139. The app shell now exposes `data-table-phase` and `data-table-tone`, giving the table screen a single phase hook for combat/recovery/waiting styling instead of scattered local flags.
 140. The default action prompt is now campaign-neutral instead of heist-specific, so new tables do not inherit an unrelated tone from placeholder copy.
 141. New tables now open with a clearer multi-line setup beat: location, seated party, premise, and a direct Next instruction to Nudge the DM or type the first action.
+142. Table focus projection now lives in `app/table-focus-controller.js`, so phase-to-surface decisions are tested outside `app/app.js`; combat, party/waiting, and review states can visually elevate the right rail/section through a single `data-table-focus` hook.
 
 ### Still Risky
 
@@ -290,7 +291,7 @@ Risks:
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
-19. TableSessionEngine is currently a projection layer. The status strip, diagnostics, and command deck now consume it, but more UI surfaces still need to consume it directly before the table fully stops combining local flags.
+19. TableSessionEngine is currently a projection layer. The status strip, diagnostics, command deck, and table-focus hook now consume it, but more UI surfaces still need to consume it directly before the table fully stops combining local flags.
 20. `app/app.js` and `scripts/serve.js` are better marked, but still large enough that future fixes can accidentally create hidden coupling if new decisions are added there.
 21. `debugSnapshot` summarizes current runtime state, but it is not yet a persisted session recorder or replay tool.
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
@@ -491,7 +492,7 @@ Risks:
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog now has intent-aware entry points, but it is not yet physically separate surfaces.
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
-- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue and the shell exposes `data-table-phase`, but rails and combat/recovery surfaces still need deeper phase-specific behavior.
+- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; rails and combat/recovery surfaces still need deeper phase-specific behavior.
 - [ ] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background. Current state: the primary grid now focuses on Continue Adventure and Join A Table, with Check AI in the lower utility strip.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.

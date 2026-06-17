@@ -31,6 +31,7 @@ import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoComm
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
+import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 import {
@@ -8133,32 +8134,16 @@ function buildSessionHealthSummary() {
 
 function refreshTableSessionProjection() {
   state.tableSession = buildCurrentTableSessionProjection();
-  if (elements.app) {
-    elements.app.dataset.tablePhase = state.tableSession.phase || "";
-    elements.app.dataset.tableTone = state.tableSession.tone || "ready";
-  }
   if (elements.providerActivity) {
     elements.providerActivity.dataset.tablePhase = state.tableSession.phase;
     elements.providerActivity.dataset.expectedActor = state.tableSession.expectedActor?.kind || "";
   }
-  renderCommandContext(state.tableSession);
+  renderTableFocus(state.tableSession);
   return state.tableSession;
 }
 
-function renderCommandContext(tableSession = null) {
-  if (!elements.commandContext) {
-    return;
-  }
-  const phase = tableSession?.headline || "Table Ready";
-  const nextStep = tableSession?.nextStep || "Continue the scene.";
-  elements.commandContext.dataset.phase = tableSession?.phase || "";
-  elements.commandContext.dataset.tone = tableSession?.tone || "ready";
-  if (elements.commandContextPhase) {
-    elements.commandContextPhase.textContent = `Now: ${phase}`;
-  }
-  if (elements.commandContextNext) {
-    elements.commandContextNext.textContent = `Next: ${nextStep}`;
-  }
+function renderTableFocus(tableSession = null) {
+  applyTableFocusProjection(elements, buildTableFocusProjection(tableSession));
 }
 
 function buildCurrentTableSessionProjection() {

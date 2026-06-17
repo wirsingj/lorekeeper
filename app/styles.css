@@ -878,6 +878,24 @@ h3 {
   border-color: rgba(179, 148, 88, 0.28);
 }
 
+.handheld-shell[data-table-focus="combat"] .combat-tracker-section {
+  border-color: rgba(222, 188, 120, 0.58);
+  background:
+    linear-gradient(180deg, rgba(85, 61, 28, 0.34), rgba(12, 15, 17, 0.34)),
+    rgba(12, 15, 17, 0.42);
+  box-shadow:
+    inset 3px 0 0 rgba(222, 188, 120, 0.72),
+    0 16px 34px rgba(0, 0, 0, 0.18);
+}
+
+.handheld-shell[data-table-focus="party"] .left-panel .rail-section:nth-of-type(2),
+.handheld-shell[data-table-focus="review"] .left-panel .campaign-section {
+  border-color: rgba(125, 213, 201, 0.22);
+  background:
+    linear-gradient(180deg, rgba(125, 213, 201, 0.07), transparent 58%),
+    rgba(12, 15, 17, 0.38);
+}
+
 .combat-active-actor {
   margin: 0 0 8px;
   padding: 7px 8px;
