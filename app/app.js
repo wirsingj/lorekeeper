@@ -8132,6 +8132,10 @@ function buildSessionHealthSummary() {
 
 function refreshTableSessionProjection() {
   state.tableSession = buildCurrentTableSessionProjection();
+  if (elements.app) {
+    elements.app.dataset.tablePhase = state.tableSession.phase || "";
+    elements.app.dataset.tableTone = state.tableSession.tone || "ready";
+  }
   if (elements.providerActivity) {
     elements.providerActivity.dataset.tablePhase = state.tableSession.phase;
     elements.providerActivity.dataset.expectedActor = state.tableSession.expectedActor?.kind || "";

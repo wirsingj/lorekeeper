@@ -2319,6 +2319,27 @@ button:disabled {
   color: #ddca94;
 }
 
+.handheld-shell[data-table-phase="combat"] .command-deck {
+  border-color: rgba(192, 168, 120, 0.3);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(192, 168, 120, 0.1);
+}
+
+.handheld-shell[data-table-phase="combat"] #build-turn {
+  background:
+    linear-gradient(180deg, rgba(192, 168, 120, 0.24), rgba(70, 81, 90, 0.92)),
+    #414239;
+}
+
+.handheld-shell[data-table-phase="recovery"] .command-deck,
+.handheld-shell[data-table-phase="host_review"] .command-deck {
+  border-color: rgba(179, 104, 98, 0.34);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(179, 104, 98, 0.1);
+}
+
 .command-resize-handle {
   position: absolute;
   top: 0;

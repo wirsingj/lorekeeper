@@ -266,6 +266,7 @@ Risks:
 136. The front door now gives primary weight to Continue Adventure and Join A Table, with Check AI demoted to the lower utility strip so setup no longer reads as a third play mode.
 137. Seat Guest now opens the Friends And Seats surface directly, so waiting-player prompts land on the relevant host action instead of a generic settings dialog.
 138. The command deck now shows a compact Now/Next cue from `TableSessionEngine`, making the input area reflect roleplay, combat, waiting, review, or recovery state instead of looking identical in every phase.
+139. The app shell now exposes `data-table-phase` and `data-table-tone`, giving the table screen a single phase hook for combat/recovery/waiting styling instead of scattered local flags.
 
 ### Still Risky
 
@@ -488,7 +489,7 @@ Risks:
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog now has intent-aware entry points, but it is not yet physically separate surfaces.
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
-- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, but rails and combat/recovery surfaces still need deeper phase-specific behavior.
+- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue and the shell exposes `data-table-phase`, but rails and combat/recovery surfaces still need deeper phase-specific behavior.
 - [ ] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background. Current state: the primary grid now focuses on Continue Adventure and Join A Table, with Check AI in the lower utility strip.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.

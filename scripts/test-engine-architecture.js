@@ -2593,7 +2593,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="command-context-next"/);
   assert.match(appJs, /function renderCommandContext\(tableSession = null\)/, "command deck phase copy should be rendered from table session projection");
   assert.match(appJs, /renderCommandContext\(state\.tableSession\)/, "table session refresh should update the command deck cue");
+  assert.match(appJs, /elements\.app\.dataset\.tablePhase = state\.tableSession\.phase/, "app shell should expose table phase for phase-aware surfaces");
   assert.match(styles, /\.command-context/);
+  assert.match(styles, /\[data-table-phase="combat"\] \.command-deck/);
   assert.match(appShell, /Try Again/);
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);
