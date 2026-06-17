@@ -2577,6 +2577,12 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Ask To Join/);
   assert.match(appShell, /home-campaign-select/);
   assert.match(appShell, /Saved adventure/);
+  assert.ok(
+    appShell.indexOf('className="home-library-strip"') < appShell.indexOf('id="home-provider-setup"'),
+    "AI readiness should live in the lower utility strip, not as a primary front-door mode",
+  );
+  assert.doesNotMatch(appShell, /home-flow-card-setup/);
+  assert.doesNotMatch(styles, /home-flow-card-setup/);
   assert.match(appShell, /id="waiting-guests"/);
   assert.ok(
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),

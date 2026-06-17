@@ -263,6 +263,7 @@ Risks:
 133. Preferences now open as calmer App, AI, Friends, and Troubleshooting tabs, with local-table tools, diagnostics, and DM recovery hidden until that section is chosen.
 134. Settings entry points are now intent-aware: front-door Preferences opens App Preferences, Check AI opens the DM Voice surface, and the in-table gear opens Friends And Seats instead of app-level options.
 135. The in-table settings gear is now a labeled Friends control, so normal play points hosts toward seating/share actions instead of generic configuration.
+136. The front door now gives primary weight to Continue Adventure and Join A Table, with Check AI demoted to the lower utility strip so setup no longer reads as a third play mode.
 
 ### Still Risky
 
@@ -331,7 +332,7 @@ Risks:
 12. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
 13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
-15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: first-pass table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
+15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door AI readiness is now secondary, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
 
 ### Medium
 
@@ -486,7 +487,7 @@ Risks:
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
 - [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once.
-- [ ] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background.
+- [ ] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background. Current state: the primary grid now focuses on Continue Adventure and Join A Table, with Check AI in the lower utility strip.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.
 - [x] Keep debug/repair tools tucked away unless action is required.

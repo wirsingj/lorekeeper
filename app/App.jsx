@@ -139,20 +139,11 @@ export function LorekeeperShell() {
                     <button id="home-join-flow" type="button">Find Table</button>
                   </div>
                 </article>
-                <article className="home-flow-card home-flow-card-setup">
-                  <div>
-                    <p className="eyebrow">DM Voice</p>
-                    <h3>AI Readiness</h3>
-                    <p>Check the storyteller before you host.</p>
-                  </div>
-                  <div className="home-flow-actions">
-                    <button id="home-provider-setup" type="button">Check AI</button>
-                  </div>
-                </article>
               </div>
               <div className="home-library-strip" aria-label="Local library summary">
                 <span id="home-active-campaign">Campaigns loading...</span>
                 <span id="home-character-count">Characters stay with their adventures</span>
+                <button id="home-provider-setup" className="secondary-action" type="button">Check AI</button>
                 <button id="home-settings" className="secondary-action" type="button">Preferences</button>
               </div>
             </div>
