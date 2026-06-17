@@ -262,6 +262,7 @@ Risks:
 132. Character Auto-Complete now behaves like a reroll for generated flavor: it preserves hard facts such as name, ancestry, class, and level, while rotating the pitch, party tie, and DM note on each click.
 133. Preferences now open as calmer App, AI, Friends, and Troubleshooting tabs, with local-table tools, diagnostics, and DM recovery hidden until that section is chosen.
 134. Settings entry points are now intent-aware: front-door Preferences opens App Preferences, Check AI opens the DM Voice surface, and the in-table gear opens Friends And Seats instead of app-level options.
+135. The in-table settings gear is now a labeled Friends control, so normal play points hosts toward seating/share actions instead of generic configuration.
 
 ### Still Risky
 

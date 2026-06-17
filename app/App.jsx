@@ -32,11 +32,14 @@ export function LorekeeperShell() {
                 </svg>
                 <span>Nudge</span>
               </button>
-              <button id="open-setup" className="icon-action" type="button" title="Table options" aria-label="Table options">
+              <button id="open-setup" className="icon-action labeled-action table-action" type="button" title="Friends and seats" aria-label="Friends and seats">
                 <svg aria-hidden="true" viewBox="0 0 24 24">
-                  <path d="M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 0 1 0-7Z"></path>
-                  <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5l-2-3.5l-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8 8 0 0 0 7 6.5l-2.4-1l-2 3.5l2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5l2 3.5l2.4-1a8 8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8 8 0 0 0 2.6-1.5l2.4 1l2-3.5l-2-1.5Z"></path>
+                  <path d="M16 11a4 4 0 1 0-8 0"></path>
+                  <path d="M4 21a8 8 0 0 1 16 0"></path>
+                  <path d="M19 8v6"></path>
+                  <path d="M16 11h6"></path>
                 </svg>
+                <span>Friends</span>
               </button>
             </div>
           </div>
@@ -706,7 +709,7 @@ function SetupDialog() {
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
 
-        <nav className="settings-tabs" aria-label="Table options sections" role="tablist">
+        <nav className="settings-tabs" aria-label="Preferences sections" role="tablist">
           <button className="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="app">App</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="ai">AI</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="friends">Friends</button>

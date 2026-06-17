@@ -2558,6 +2558,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /copy-guest-link/);
   assert.match(appShell, /Open Guest Page/);
   assert.match(appShell, /Send Friend Actions/);
+  assert.match(appShell, /id="open-setup"[\s\S]*Friends and seats/, "the in-table setup entry should read as friend seating, not generic settings");
+  assert.doesNotMatch(appShell, /title="Table options"/);
   assert.doesNotMatch(appShell, />Resync</);
   assert.doesNotMatch(appJs, /Guest resync/i);
   assert.match(appJs, /Guest table refresh/);
