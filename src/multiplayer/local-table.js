@@ -77,8 +77,10 @@ export function startLocalTable(campaign, options = {}) {
   const port = Number(options.port) || 4173;
   const lanAddress = options.lanAddress || firstLanAddress() || "127.0.0.1";
   const next = normalizeMultiplayerCampaign(campaign);
+  const previousSessionId = next.multiplayer.localTable?.sessionId || "";
   const tableId = options.tableId || next.multiplayer.localTable?.tableId || defaultTableId(next);
   const sessionId = options.sessionId || `table-${randomToken(12)}`;
+  const freshSession = sessionId !== previousSessionId;
   next.multiplayer.localTable = {
     running: true,
     tableId,
@@ -89,13 +91,43 @@ export function startLocalTable(campaign, options = {}) {
     startedAt: now,
     stoppedAt: null,
   };
-  reviveApprovedConnections(next);
+  if (freshSession) {
+    resetRuntimeForFreshTableSession(next, now);
+  } else {
+    reviveApprovedConnections(next);
+  }
   next.multiplayer.hostTurnState = hostTurnStates.COLLECTING_PARTY_INPUTS;
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "local_table_started",
     summary: `Local table started at ${lanAddress}:${port}.`,
   });
   return touchCampaign(next);
+}
+
+function resetRuntimeForFreshTableSession(campaign, now = nowIso()) {
+  campaign.multiplayer.connections = campaign.multiplayer.connections.map((connection) => ({
+    ...connection,
+    status: connection.status === "connected" || connection.status === "pending" ? "disconnected" : connection.status,
+    disconnectedAt: connection.disconnectedAt ?? now,
+    disconnectReason: connection.disconnectReason || "table_session_restarted",
+  }));
+  campaign.multiplayer.waitingGuests = campaign.multiplayer.waitingGuests.map((guest) => ({
+    ...guest,
+    status: guest.status === "waiting" || guest.status === "seated" ? "closed" : guest.status,
+    closedAt: guest.closedAt ?? now,
+  }));
+  campaign.party = campaign.party.map((member) => releaseRemoteControllerToHost(member));
+  campaign.multiplayer.seats = campaign.multiplayer.seats.map((seat) => {
+    const member = campaign.party.find((item) => item.id === seat.partyMemberId);
+    return {
+      ...seat,
+      controllerKind: member?.controllerKind ?? seat.controllerKind,
+      controllerId: member?.controllerId ?? null,
+      updatedAt: now,
+    };
+  });
+  campaign.multiplayer.pendingTurnInputs = [];
+  campaign.multiplayer.choiceVotes = [];
 }
 
 export function stopLocalTable(campaign) {

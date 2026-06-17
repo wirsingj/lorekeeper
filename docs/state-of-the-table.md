@@ -170,6 +170,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 119. Host New waiting guests can be seated before Create And Start; reserved draft seats are adopted into the real local table as remote controllers when the campaign launches.
 120. New campaign seed text no longer appears as the visible first DM bubble; the opening message now tells the host to Nudge the DM or type the first action.
 121. First-pass Steam-ready wording now makes the front door and preferences calmer: Continue/New Table/Join/AI Setup, Guests, Troubleshooting, Developer Details, and Saved locally replace more technical provider/SQLite/import wording in normal paths.
+122. Starting a fresh local table session now resets stale remote runtime state: old connected/pending guests are disconnected, waiting-room records are closed, remote controllers are released, and open seats become requestable again instead of silently reviving old approvals.
 
 ### Still Risky
 
@@ -347,6 +348,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 - [x] Waiting-room guests are visible to the host without digging through diagnostics, including requested character seat.
 - [x] Stale waiting-room guests expire instead of lingering as broken seat buttons.
 - [x] Guest Leave notifies the host, releases the remote controller to Host, and makes the vacated seat requestable again.
+- [x] Fresh local table sessions do not silently revive old approved guests from a previous session.
 - [x] Normal Guest Links use plain `/guest`; actions/snapshots still validate campaign/table/session identity after registration.
 - [x] Guest snapshots and staged actions reject wrong campaign/table/session identity when supplied.
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.

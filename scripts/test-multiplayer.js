@@ -131,6 +131,30 @@ const seatedStatus = createWaitingGuestSnapshot(campaign, {
 assert.equal(seatedStatus.seated, true);
 assert.equal(seatedStatus.snapshot.assignedCharacter.id, "lysa");
 assert.equal(campaign.party.find((member) => member.id === "lysa").controllerKind, controllerKinds.REMOTE_PLAYER);
+const restartedCampaign = startLocalTable(JSON.parse(JSON.stringify(campaign)), {
+  host: "0.0.0.0",
+  lanAddress: "192.168.1.24",
+  port: 7347,
+  sessionId: "table-fresh-session",
+});
+assert.equal(restartedCampaign.multiplayer.localTable.sessionId, "table-fresh-session");
+assert.equal(restartedCampaign.party.find((member) => member.id === "lysa").controllerKind, controllerKinds.HOST);
+assert.equal(restartedCampaign.party.find((member) => member.id === "lysa").inviteIntent, "remote_player");
+assert.equal(restartedCampaign.multiplayer.connections.find((connection) => connection.id === seatedStatus.connection.id).status, "disconnected");
+assert.equal(restartedCampaign.multiplayer.waitingGuests.find((guest) => guest.id === waitingResult.waitingGuest.id).status, "closed");
+assert.equal(joinableGuestSeats(restartedCampaign).some((seat) => seat.id === "lysa"), true);
+assert.equal(createJoinPreview(restartedCampaign, "").joinableSeats.some((seat) => seat.id === "lysa"), true);
+assert.throws(
+  () => heartbeatWaitingGuest(restartedCampaign, {
+    waitingGuestId: waitingResult.waitingGuest.id,
+    clientId: "waiting-client",
+    waitingSecret: waitingResult.waitingSecret,
+    campaignId: restartedCampaign.id,
+    tableId: restartedCampaign.multiplayer.localTable.tableId,
+    tableSessionId: restartedCampaign.multiplayer.localTable.sessionId,
+  }),
+  /no longer active/i,
+);
 assert.throws(
   () => createWaitingGuestSnapshot(campaign, {
     waitingGuestId: waitingResult.waitingGuest.id,
@@ -651,10 +675,10 @@ assert.throws(
   }),
   /session is no longer active/i,
 );
-const revivedSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client", connectionSecret });
-assert.equal(revivedSnapshot.connection.status, "connected");
-assert.equal(revivedSnapshot.assignedCharacter.name, "Kevric");
-assert.equal(tableStopCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
+const staleRestartSnapshot = createGuestSnapshot(tableStopCampaign, joinResult.connection.id, { clientId: "guest-client", connectionSecret });
+assert.equal(staleRestartSnapshot.connection.status, "disconnected");
+assert.notEqual(tableStopCampaign.party.find((member) => member.id === "kevric").controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(joinableGuestSeats(tableStopCampaign).some((seat) => seat.id === "kevric"), true);
 
 let joinAsCampaign = startLocalTable(testCampaign(), { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
 const characterInviteResult = createCharacterRequestInvite(joinAsCampaign, { host: "192.168.1.24", port: 7347 });
