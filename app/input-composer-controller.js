@@ -40,7 +40,7 @@ export function buildInputComposerProjection({
   return {
     inputDisabled: combatGate.inputDisabled,
     sendDisabled: !turnProjection.canSubmit || combatGate.sendDisabled,
-    placeholder: combatGate.placeholder || "I check the alley for watchers. (Keep this tense and heist-focused.)",
+    placeholder: combatGate.placeholder || "Describe what your character does, says, or asks.",
     buttonText: "Send Turn",
   };
 }

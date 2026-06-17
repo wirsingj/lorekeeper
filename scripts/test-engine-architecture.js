@@ -1905,6 +1905,15 @@ function testInputComposerProjection() {
   assert.equal(snapshotConnectedGuest.sendDisabled, false);
   assert.match(snapshotConnectedGuest.placeholder, /Type as Thor/);
 
+  const defaultHostProjection = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+  });
+  assert.equal(defaultHostProjection.inputDisabled, false);
+  assert.equal(defaultHostProjection.sendDisabled, false);
+  assert.equal(defaultHostProjection.placeholder, "Describe what your character does, says, or asks.");
+  assert.doesNotMatch(defaultHostProjection.placeholder, /heist|alley/i);
+
   campaign.combat = {
     ...campaign.combat,
     inCombat: true,

@@ -267,6 +267,7 @@ Risks:
 137. Seat Guest now opens the Friends And Seats surface directly, so waiting-player prompts land on the relevant host action instead of a generic settings dialog.
 138. The command deck now shows a compact Now/Next cue from `TableSessionEngine`, making the input area reflect roleplay, combat, waiting, review, or recovery state instead of looking identical in every phase.
 139. The app shell now exposes `data-table-phase` and `data-table-tone`, giving the table screen a single phase hook for combat/recovery/waiting styling instead of scattered local flags.
+140. The default action prompt is now campaign-neutral instead of heist-specific, so new tables do not inherit an unrelated tone from placeholder copy.
 
 ### Still Risky
 
@@ -348,7 +349,7 @@ Risks:
 
 ### Low
 
-18. Replace remaining overly specific placeholder text with neutral table examples.
+18. Replace remaining overly specific placeholder text with neutral table examples. Current state: the main command deck fallback is now campaign-neutral; secondary placeholders still need occasional review as screens evolve.
 19. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
 20. Continue improving campaign-aware character auto-complete quality; current behavior preserves supplied hard facts while letting the button regenerate derived pitch/integration text from party theme, premise, and existing characters.
 21. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
