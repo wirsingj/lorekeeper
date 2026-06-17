@@ -151,6 +151,7 @@ Every table surface should answer the same practical questions a real table answ
 112. Server integration coverage now proves arbitrary local asset reads require authorization, stay inside allowed asset roots, and do not allow built-asset path traversal.
 113. Remaining visible ThinLoreKeeper join wording in multiplayer-created character notes now uses the unified LoreKeeper Join identity.
 114. Guest table refresh copy now avoids "sync/resync" wording on ordinary table-facing controls and status messages.
+115. Pre-action DM nudges with living-world object memory no longer crash provider request construction when compacting NPC/faction/place memory.
 
 ### Still Risky
 
@@ -394,6 +395,7 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Add living-world documentation and long-campaign-noise fixture for recurring NPC/location/faction memory.
 - [x] Add relationship-state transition helper and canonical-change integration for durable NPC/faction/party relationship shifts.
 - [x] Add faction/location memory helpers and canonical-change integration for durable beliefs, memory, scars, history, and related goal links.
+- [x] Add model-contract coverage for pre-action nudge requests that include object-shaped living-world memory.
 
 ## Two-Machine Playtest Checklist
 

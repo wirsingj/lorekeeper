@@ -1899,6 +1899,50 @@ function compactMemoryText(value, limit) {
   return compactText(value, limit);
 }
 
+function compactListEntry(entry) {
+  if (entry === null || entry === undefined) {
+    return "";
+  }
+  if (Array.isArray(entry)) {
+    return entry.map(compactListEntry).filter(Boolean).join(", ");
+  }
+  if (typeof entry !== "object") {
+    return compactWhitespace(entry);
+  }
+
+  const fields = [
+    entry.name,
+    entry.title,
+    entry.label,
+    entry.summary,
+    entry.text,
+    entry.description,
+    entry.memory,
+    entry.note,
+    entry.status,
+  ];
+  const pieces = [];
+  for (const field of fields) {
+    const value = compactListEntry(field);
+    if (value && !pieces.includes(value)) {
+      pieces.push(compactText(value, 120));
+    }
+    if (pieces.length >= 2) {
+      break;
+    }
+  }
+  if (pieces.length) {
+    return pieces.join(" - ");
+  }
+
+  return Object.entries(entry)
+    .filter(([key]) => key !== "id")
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${compactText(compactListEntry(value), 80)}`)
+    .filter(Boolean)
+    .join("; ");
+}
+
 function compactPartyMember(member, options = {}) {
   const includeDetail = options.mode === "combat";
   return {

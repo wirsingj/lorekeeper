@@ -131,6 +131,45 @@ assert.equal(requestEnvelope.context.hiddenDmStory.length, 3);
 assert.equal(requestEnvelope.context.hiddenDmStory[0].horizon, "long");
 assert.equal(validateTurnRequest(requestEnvelope).valid, true);
 
+const nudgeWithObjectMemory = buildTurnRequestEnvelope({
+  campaign: {
+    ...testCampaign(),
+    scene: {
+      ...testCampaign().scene,
+      presentPeopleIds: ["merchant"],
+      currentPlaceId: "mining-road",
+    },
+    people: [{
+      id: "merchant",
+      name: "Garren",
+      memory: [
+        { title: "Road debt", summary: "Owes the mining road locals money and hides it behind bravado." },
+        { label: "Knows Thora", text: "Recognizes Thora as the steady shield-hand in the group." },
+      ],
+    }],
+    factions: [{
+      id: "rough-locals",
+      name: "Rough Locals",
+      beliefs: { debt: { summary: "The merchant wagon should not leave until the debt is answered." } },
+    }],
+    places: [{
+      id: "mining-road",
+      name: "Mining road",
+      scars: [{ title: "Blocked wagon", summary: "Rutted road churned by a tense standoff." }],
+    }],
+  },
+  contextPack: testContextPack(),
+  playerTurn: "(DM nudge: Continue from the current SQLite campaign state without inventing a player action.)",
+  parsedMessage: {
+    raw: "(DM nudge: Continue from the current SQLite campaign state without inventing a player action.)",
+    inWorldText: "(DM nudge: Continue from the current SQLite campaign state without inventing a player action.)",
+    metaInstructions: [],
+  },
+});
+assert.match(nudgeWithObjectMemory.context.livingWorld.people[0].memory, /Road debt/);
+assert.doesNotMatch(nudgeWithObjectMemory.context.livingWorld.people[0].memory, /\[object Object\]/);
+assert.equal(validateTurnRequest(nudgeWithObjectMemory).valid, true);
+
 const narrationFirstPrompt = buildTurnJsonPrompt({
   campaign: testCampaign(),
   contextPack: testContextPack(),
