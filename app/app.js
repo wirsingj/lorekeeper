@@ -3561,6 +3561,8 @@ async function refreshWaitingRoomStatus({ explicit = false } = {}) {
       clientId: session.clientId || guestClientId(),
       connectionSecret: status.connectionSecret,
       campaignId: status.campaignId,
+      tableId: status.localTable?.tableId || status.connection.tableId || session.tableId || "",
+      sessionId: status.localTable?.sessionId || status.connection.sessionId || session.sessionId || "",
       partyMemberId: status.connection.partyMemberId,
       playerName: status.connection.displayName || session.playerName || "",
       status: "connected",
@@ -4442,6 +4444,7 @@ function loadWaitingRoomSession() {
 }
 
 function saveGuestSession(session) {
+  state.guestSession = session;
   localStorage.setItem(guestSessionStorageKey, JSON.stringify(session));
   rememberGuestSession(session);
 }
@@ -5753,9 +5756,10 @@ function applyThinModeChrome() {
   }
   elements.resolvePartyInputs.hidden = true;
   elements.joinCampaign.hidden = false;
+  const guestConnected = state.guestSession?.status === "connected" || state.guestSnapshot?.connection?.status === "connected";
   if (elements.joinCampaignMain) {
-    elements.joinCampaignMain.hidden = false;
-    elements.joinCampaignMain.disabled = hasActiveGeneration();
+    elements.joinCampaignMain.hidden = guestConnected;
+    elements.joinCampaignMain.disabled = guestConnected || hasActiveGeneration();
   }
   if (elements.inviteNewCharacterMain) {
     elements.inviteNewCharacterMain.hidden = true;

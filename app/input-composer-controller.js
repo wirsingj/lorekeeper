@@ -10,9 +10,14 @@ export function buildInputComposerProjection({
   labelById = (_id) => "Unknown",
 } = {}) {
   if (clientMode) {
-    const connected = guestSession?.status === "connected";
+    const effectiveGuestSession = {
+      ...guestSession,
+      status: guestSession?.status ?? guestSnapshot?.connection?.status ?? "",
+      partyMemberId: guestSession?.partyMemberId ?? guestSnapshot?.connection?.partyMemberId ?? "",
+    };
+    const connected = effectiveGuestSession.status === "connected";
     const activeCombatTurn = campaign?.combat?.inCombat ? campaign.combat.currentTurnId : null;
-    const isGuestCombatTurn = !activeCombatTurn || activeCombatTurn === guestSession?.partyMemberId;
+    const isGuestCombatTurn = !activeCombatTurn || activeCombatTurn === effectiveGuestSession.partyMemberId;
     return {
       inputDisabled: !connected || !isGuestCombatTurn,
       sendDisabled: !connected || !isGuestCombatTurn,

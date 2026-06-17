@@ -1884,6 +1884,18 @@ function testInputComposerProjection() {
     campaign,
     guestSession: null,
   }).sendDisabled, true);
+  const snapshotConnectedGuest = buildInputComposerProjection({
+    clientMode: true,
+    campaign,
+    guestSession: null,
+    guestSnapshot: {
+      connection: { status: "connected", partyMemberId: "thor" },
+      assignedCharacter: { name: "Thor" },
+    },
+  });
+  assert.equal(snapshotConnectedGuest.inputDisabled, false);
+  assert.equal(snapshotConnectedGuest.sendDisabled, false);
+  assert.match(snapshotConnectedGuest.placeholder, /Type as Thor/);
 
   campaign.combat = {
     ...campaign.combat,
@@ -2518,6 +2530,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /seatPreTableWaitingGuest/);
   assert.match(appJs, /Seat as \$\{seatName\}/);
   assert.match(appJs, /Seat reserved\$\{status\.reservedSeat\?\.name/);
+  assert.match(appJs, /function saveGuestSession\(session\) \{\s*state\.guestSession = session/s);
+  assert.match(appJs, /tableId:\s*status\.localTable\?\.tableId/);
+  assert.match(appJs, /sessionId:\s*status\.localTable\?\.sessionId/);
   assert.match(appJs, /equipmentForProfile/);
   assert.match(appJs, /inventory:\s*equipment\.inventory/);
   assert.match(appJs, /function spell\(name, level/);
