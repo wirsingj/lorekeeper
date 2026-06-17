@@ -4624,20 +4624,21 @@ function buildOpeningSceneSummary({ premise, startingLocation, character, starti
     character?.name,
     ...joiners.map((member) => member.name),
   ].filter(Boolean);
+  const placeLine = startingLocation
+    ? `The table is set at ${startingLocation}.`
+    : "The table is set for the first scene.";
   const details = [
-    startingLocation
-      ? `The table is ready at ${startingLocation}.`
-      : "The table is ready for the first scene.",
+    placeLine,
     partyNames.length
       ? `${partyNames.join(", ")} ${partyNames.length === 1 ? "is" : "are"} at the table.`
       : "",
     premise
       ? `Premise: ${premise}`
       : "",
-    "Use Nudge to have the DM frame the opening moment, or type the first player action below.",
+    "Next: click Nudge to ask the DM for the opening moment, or type the first player action below.",
   ].filter(Boolean);
 
-  return details.join(" ");
+  return details.join("\n\n");
 }
 
 function formatCharacterBasics(character) {

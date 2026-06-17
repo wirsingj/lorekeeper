@@ -2662,7 +2662,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /function spell\(name, level/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /startingPartyMembers:\s*joinerSeeds/);
-  assert.match(appJs, /Use Nudge to have the DM frame the opening moment/);
+  assert.match(appJs, /Next: click Nudge to ask the DM for the opening moment/);
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Nudge must remain host-controlled");
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");
   assert.match(appJs, /const multiplayerPollIntervalMs = 1000/, "host guest-request polling should feel live");

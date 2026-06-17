@@ -268,6 +268,7 @@ Risks:
 138. The command deck now shows a compact Now/Next cue from `TableSessionEngine`, making the input area reflect roleplay, combat, waiting, review, or recovery state instead of looking identical in every phase.
 139. The app shell now exposes `data-table-phase` and `data-table-tone`, giving the table screen a single phase hook for combat/recovery/waiting styling instead of scattered local flags.
 140. The default action prompt is now campaign-neutral instead of heist-specific, so new tables do not inherit an unrelated tone from placeholder copy.
+141. New tables now open with a clearer multi-line setup beat: location, seated party, premise, and a direct Next instruction to Nudge the DM or type the first action.
 
 ### Still Risky
 
