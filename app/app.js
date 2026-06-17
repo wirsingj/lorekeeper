@@ -1958,7 +1958,7 @@ function startMultiplayerPolling() {
     } catch (error) {
       if (state.guestSession?.hostBaseUrl) {
         setProviderActivity(
-          error instanceof Error ? `Guest sync waiting: ${error.message}` : "Guest sync waiting on host",
+          error instanceof Error ? `Guest table refresh waiting: ${error.message}` : "Guest table refresh waiting on host",
           "waiting",
         );
       }
@@ -3709,7 +3709,7 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
     renderGuestSnapshot(snapshot);
 
     if (snapshot.tableStopped) {
-      setProviderActivity("Host local table is off. Ask the host to start it, then sync.", "waiting");
+      setProviderActivity("Host local table is off. Ask the host to start it, then refresh the table.", "waiting");
     } else if (snapshot.awaitingApproval) {
       setProviderActivity("Waiting for host approval", "waiting");
     } else if (snapshot.pendingInput?.passed) {
@@ -3723,7 +3723,7 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
     }
     return snapshot;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Guest resync failed";
+    const message = error instanceof Error ? error.message : "Guest table refresh failed";
     if (/connection secret/i.test(message) || (/connection/i.test(message) && /not found/i.test(message))) {
       clearGuestSession({ keepRecent: false });
       setProviderActivity("Guest session expired. Rejoin from a fresh invite.", "error");
@@ -3737,7 +3737,7 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
       return null;
     }
     if (explicit) {
-      setProviderActivity(`Guest resync failed: ${message}`, "error");
+      setProviderActivity(`Guest table refresh failed: ${message}`, "error");
     }
     throw error;
   } finally {
@@ -5367,7 +5367,7 @@ function renderAppModeControls() {
   }
   if (elements.appModeNote) {
     elements.appModeNote.textContent = clientMode
-      ? "Join connects to a host and syncs visible Table State without local provider setup."
+      ? "Join connects to a host and receives visible table state without local provider setup."
       : "Host runs campaigns, owns SQLite and AI providers, and can also join another host when needed.";
   }
 }

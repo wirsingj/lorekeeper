@@ -28,6 +28,17 @@ try {
   assert.equal(runtime.authRequired, true);
   assert.equal(runtime.port, port);
 
+  const unauthLocalAsset = await fetch(`${baseUrl}/local-asset?path=${encodeURIComponent(path.join(process.cwd(), "package.json"))}`);
+  assert.equal(unauthLocalAsset.status, 401);
+
+  const forbiddenLocalAsset = await fetch(`${baseUrl}/local-asset?path=${encodeURIComponent(path.join(process.cwd(), "package.json"))}&lkToken=${encodeURIComponent(token)}`);
+  assert.equal(forbiddenLocalAsset.status, 403);
+
+  const traversalAsset = await fetch(`${baseUrl}/..%2Fpackage.json`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  assert.notEqual(traversalAsset.status, 200, "built asset serving must not allow path traversal out of dist/app");
+
   const unauthorized = await fetch(`${baseUrl}/api/campaign/player-notes`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -127,6 +138,19 @@ try {
   });
   assert.equal(wrongTableVote.status, 409);
   assert.match(await wrongTableVote.text(), /different table/i);
+
+  const unauthHostCombatJoin = await fetch(`${baseUrl}/api/multiplayer/combat/join`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      partyMemberId: created.campaign.party?.[0]?.id || "party-host",
+      campaignId: created.campaign.id,
+      tableId: table.tableId,
+      sessionId: table.sessionId,
+    }),
+  });
+  assert.equal(unauthHostCombatJoin.status, 401);
+  assert.match(await unauthHostCombatJoin.text(), /Host combat join requires local app authorization/);
 } finally {
   if (child && !child.killed) {
     child.kill();

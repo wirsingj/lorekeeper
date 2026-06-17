@@ -1187,7 +1187,7 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
   if (connection.status !== "connected") {
     const tableStopped = !normalized.multiplayer.localTable?.running;
     const situation = tableStopped
-      ? "The host local table is off. Ask the host to start the local table again, then sync."
+      ? "The host local table is off. Ask the host to start the local table again, then refresh the table."
       : connection.status === "pending"
         ? "Waiting for the host to approve this local table seat."
         : `Guest connection is ${connection.status}.`;
@@ -2194,7 +2194,7 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "", options =
       armorClass: 12,
     },
     notes: [
-      "Created from a ThinLoreKeeper join-as character request.",
+      "Created from a LoreKeeper Join character request.",
       character.roleIntent ? `Table role: ${character.roleIntent}` : "",
       character.appearance ? `Look/vibe: ${character.appearance}` : "",
       character.backstory ? `Backstory: ${character.backstory}` : "",

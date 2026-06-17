@@ -146,6 +146,11 @@ Every table surface should answer the same practical questions a real table answ
 107. Implicit combat-turn advancement during provider import now lives in `combat-import-controller.js`, with direct tests proving provider narration alone cannot advance initiative without resolved mechanics for the active actor.
 108. Combat-start and missing-combatant import fallbacks now also live in `combat-import-controller.js`, with tests proving combat only auto-starts on a hostile signal with inferred enemies and enemy sync does not duplicate known combatants.
 109. Implicit scene-progress import fallback now lives in `scene-import-controller.js`, with tests proving it updates immediate situation only from DM narration, ignores choice-list text, and skips when a structured scene change already exists.
+110. Senior-dev/security/UX/DM review pass checked the main app shell, server routes, Electron boundary, engine ownership, multiplayer authority, provider authority, and table-flow docs against the current architecture.
+111. Host-style combat join mutations on the guest-public combat route now require local app authorization when no guest connection id is supplied.
+112. Server integration coverage now proves arbitrary local asset reads require authorization, stay inside allowed asset roots, and do not allow built-asset path traversal.
+113. Remaining visible ThinLoreKeeper join wording in multiplayer-created character notes now uses the unified LoreKeeper Join identity.
+114. Guest table refresh copy now avoids "sync/resync" wording on ordinary table-facing controls and status messages.
 
 ### Still Risky
 
@@ -172,6 +177,7 @@ Every table surface should answer the same practical questions a real table answ
 21. `debugSnapshot` summarizes current runtime state, but it is not yet a persisted session recorder or replay tool.
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
+24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
 
 ## Live Acceptance Matrix
 
@@ -219,7 +225,7 @@ Every table surface should answer the same practical questions a real table answ
 15. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
 16. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
 17. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
-18. Expand route-level API/security tests beyond classification/token-helper coverage into request/response integration under API-token, LAN origin, and stale identity cases.
+18. Continue expanding route-level API/security tests as new routes are added; current coverage includes classification, API-token protection, stale identity rejection, local asset blocking, and real mutation routes.
 19. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
 
 ### Low
@@ -375,6 +381,8 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
+- [x] Add local asset and path traversal integration coverage for the server.
+- [x] Gate host-style combat join mutations behind local app authorization when they share a guest-public route.
 - [x] Add migration modules before public release. Current state: versioned runner exists and unsupported schema/user_version combinations fail loudly; future schema changes still need explicit migration entries.
 - [x] Add backup/export/recycle story before destructive delete in release builds. Current state: delete recycles SQLite files to `data/campaigns/.deleted`; restore UI remains future polish.
 - [x] Move imported assets into app-owned portable asset storage. Current state: imported bundle assets are copied into `data/assets/<campaign>/...`; broader export/restore asset packaging remains future polish.
@@ -457,6 +465,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-16: Player Notes should not remain only local device state if they become part of long-campaign play. Decide whether they are per-user private notes, host-visible table notes, or both.
 - 2026-06-16: Pre-table guest seating needs a draft table/session identity before it can be safely supported for unsaved Host New campaigns.
 - 2026-06-16: Remote party-choice voting is now usable, but host resolution should become more explicit than "read the counters and send the choice." Current state: leading vote can draft the host action; a dedicated confirmation flow may still be smoother.
+- 2026-06-16: Next local playtest target should be host app plus local browser guest through `/guest`: join waiting room, seat request, party vote, guest leave/rejoin, one combat turn, and one provider recovery.
 
 ## How To Use This Doc
 

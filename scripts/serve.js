@@ -574,6 +574,10 @@ const server = createServer(async (request, response) => {
 
     if (url.pathname === "/api/multiplayer/combat/join" && request.method === "POST") {
       const body = await readJsonBody(request);
+      if (!body.connectionId && apiToken && request.headers["x-lorekeeper-api-token"] !== apiToken) {
+        sendText(response, 401, "Host combat join requires local app authorization.");
+        return;
+      }
       const payload = await updateActiveCampaign(projectRoot, (campaign) => ({
         campaign: joinPartyMemberCombat(campaign, body),
       }));

@@ -2449,6 +2449,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
   const localTable = await readFile(path.join("src", "multiplayer", "local-table.js"), "utf8");
   const server = await readFile(path.join("scripts", "serve.js"), "utf8");
+  assert.doesNotMatch(localTable, /ThinLoreKeeper/, "multiplayer-created character notes should use the unified LoreKeeper Join identity");
   assert.match(appShell, /Additional Characters/);
   assert.match(appShell, /Add Party Set/);
   assert.match(appShell, /add-party-template/);
@@ -2464,6 +2465,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /local-table-guidance/);
   assert.match(appShell, /local-table-guest-link/);
   assert.match(appShell, /copy-guest-link/);
+  assert.match(appShell, /Refresh Table/);
+  assert.doesNotMatch(appShell, />Resync</);
+  assert.doesNotMatch(appJs, /Guest resync/i);
+  assert.match(appJs, /Guest table refresh/);
   assert.match(appShell, /seat-waiting-guest/);
   assert.match(appShell, /id="campaign-notes-panel"/);
   assert.match(appShell, /id="player-notes-panel"/);

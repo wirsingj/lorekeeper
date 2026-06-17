@@ -817,7 +817,7 @@ function SetupDialog() {
             <button id="copy-guest-link" type="button">Copy Guest Link</button>
             <button id="copy-character-invite" type="button">Copy Join-As Link</button>
             <button id="join-campaign" type="button">Join Campaign</button>
-            <button id="sync-guest-table" type="button">Resync</button>
+            <button id="sync-guest-table" type="button">Refresh Table</button>
             <button id="resolve-party-inputs" type="button">Resolve Inputs</button>
           </div>
           <textarea
