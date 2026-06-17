@@ -2279,6 +2279,28 @@ function testCharacterAutocompleteProjection() {
   assert.match(regenerated.concept, /Thor/);
   assert.match(regenerated.integrationPrompt, /Oskar/);
 
+  const rerolled = completeCharacterSeed({
+    name: "Thor",
+    ancestry: "Dwarf",
+    characterClass: "Scout",
+    concept: regenerated.concept,
+    integrationPrompt: regenerated.integrationPrompt,
+    hostIntegrationPrompt: regenerated.hostIntegrationPrompt,
+  }, {
+    campaign: {
+      summary: "A dwarf soldier company guards a dangerous road.",
+      party: [{ id: "oskar", name: "Oskar", ancestry: "Dwarf", characterClass: "Soldier", level: 2 }],
+    },
+    regenerate: true,
+    regenerateNonce: 2,
+  });
+  assert.notEqual(rerolled.concept, regenerated.concept);
+  assert.notEqual(rerolled.integrationPrompt, regenerated.integrationPrompt);
+  assert.notEqual(rerolled.hostIntegrationPrompt, regenerated.hostIntegrationPrompt);
+  assert.equal(rerolled.name, "Thor");
+  assert.equal(rerolled.ancestry, "Dwarf");
+  assert.equal(rerolled.characterClass, "Scout");
+
   const themed = completeCharacterSeed({
     ancestry: "Dwarf",
   }, {
@@ -2583,7 +2605,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /openRemoteInviteLobbyForNewCampaign/);
   assert.match(appJs, /apiPreTableLobbySeatUrl/);
   assert.match(appJs, /seatPreTableWaitingGuest/);
-  assert.match(appJs, /Seat as \$\{seatName\}/);
+  assert.match(appJs, /pretable-seat-actions/);
+  assert.match(appJs, /joinableSeats\.length/);
+  assert.match(appJs, /Seat as \$\{seat\.name \|\| "Friend"\}/);
   assert.match(appJs, /Seat reserved\$\{status\.reservedSeat\?\.name/);
   assert.match(appJs, /function saveGuestSession\(session\) \{\s*state\.guestSession = session/s);
   assert.match(appJs, /tableId:\s*status\.localTable\?\.tableId/);

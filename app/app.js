@@ -2457,9 +2457,11 @@ function compactCharacterFormRefs(kind, root = document) {
 
 function autocompleteCompactCharacterForm(refs = {}) {
   const regenerateDerivedFields = true;
+  state.characterAutocompleteRerollCounter = (state.characterAutocompleteRerollCounter || 0) + 1;
   const completed = completeCharacterSeed(compactCharacterSeedFromRefs(refs), {
     campaign: characterAutocompleteCampaignContext(),
     regenerate: regenerateDerivedFields,
+    regenerateNonce: state.characterAutocompleteRerollCounter,
     startingPartyMembers: characterAutocompleteStartingPartyMembers(),
   });
   setIfBlank(refs.name, completed.name);
@@ -2960,7 +2962,8 @@ function renderPreTableLobby(snapshot = {}) {
     return;
   }
   const guests = Array.isArray(snapshot.waitingGuests) ? snapshot.waitingGuests : [];
-  const seats = new Map((snapshot.joinableSeats ?? []).map((seat) => [seat.id, seat.name]));
+  const joinableSeats = Array.isArray(snapshot.joinableSeats) ? snapshot.joinableSeats : [];
+  const seats = new Map(joinableSeats.map((seat) => [seat.id, seat.name]));
   if (!guests.length) {
     elements.preTableWaitingGuests.textContent = snapshot.joinableSeats?.length
       ? "No guests waiting yet."
@@ -2976,15 +2979,26 @@ function renderPreTableLobby(snapshot = {}) {
       ? `${guest.displayName || "Guest"} is seated as ${seatName}.`
       : `${guest.displayName || "Guest"} requested ${seatName}.`;
     row.append(text);
-    if (guest.status !== "seated" && guest.preferredPartyMemberId) {
-      const seatButton = document.createElement("button");
-      seatButton.type = "button";
-      seatButton.className = "mini-action";
-      seatButton.textContent = `Seat as ${seatName}`;
-      seatButton.addEventListener("click", () => {
-        seatPreTableWaitingGuest(guest.id, guest.preferredPartyMemberId);
-      });
-      row.append(seatButton);
+    if (guest.status !== "seated" && joinableSeats.length) {
+      const actions = document.createElement("div");
+      actions.className = "pretable-seat-actions";
+      const preferredSeat = guest.preferredPartyMemberId
+        ? joinableSeats.find((seat) => seat.id === guest.preferredPartyMemberId)
+        : null;
+      const seatOptions = preferredSeat
+        ? [preferredSeat, ...joinableSeats.filter((seat) => seat.id !== preferredSeat.id)]
+        : joinableSeats;
+      for (const seat of seatOptions.slice(0, 4)) {
+        const seatButton = document.createElement("button");
+        seatButton.type = "button";
+        seatButton.className = "mini-action";
+        seatButton.textContent = `Seat as ${seat.name || "Friend"}`;
+        seatButton.addEventListener("click", () => {
+          seatPreTableWaitingGuest(guest.id, seat.id);
+        });
+        actions.append(seatButton);
+      }
+      row.append(actions);
     }
     return row;
   }));

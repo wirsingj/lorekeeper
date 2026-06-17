@@ -258,6 +258,8 @@ Risks:
 128. The first visible silhouette pass removes the strongest developer-tool cues: the gridpaper background is gone from the main play surface, the front door now reads as a larger game-style launcher, side rails are narrower/translucent shelves, message bubbles are softer, and the command deck is less terminal-like.
 129. Table shelf sizing is now user-adjustable and saved locally: left Party shelf, right Notebook shelf, World notes, Your Notes, and Table Talk can be dragged without opening settings. Expanded right-rail panels scroll inside their own bodies when content exceeds the chosen size. Party cards no longer expand on hover, so their action buttons stay reachable.
 130. Use Anyway is now hard-blocked for DM responses that speak or act for controlled party members. Format/proposed-change weirdness can still be reviewed by the host, but controlled-character agency failures require Try Again or Details instead of becoming table text.
+131. Host New pre-lobby waiting guests now show seat buttons for every open Invite Friend slot, even when the guest did not pick a specific character before asking to join.
+132. Character Auto-Complete now behaves like a reroll for generated flavor: it preserves hard facts such as name, ancestry, class, and level, while rotating the pitch, party tie, and DM note on each click.
 
 ### Still Risky
 
@@ -275,7 +277,7 @@ Risks:
 12. Rail containment is improved, but long-session scroll behavior still needs a real campaign soak with many party members, notes, and combatants.
 13. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
 14. Settings are still physically one dialog; app-level preferences and campaign-level settings need a fuller split after the front-door shell stabilizes.
-15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request and reserve Remote Invite seats before Create And Start, but guests cannot yet edit their own character sheet in the shared draft lobby.
+15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request and reserve Remote Invite seats before Create And Start, and the host can seat waiting guests from the draft lobby. Guests cannot yet edit their own character sheet in the shared draft lobby.
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.

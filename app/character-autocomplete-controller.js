@@ -4,6 +4,7 @@
 // current hard facts instead of keeping stale generated text.
 export function completeCharacterSeed(seed = {}, options = {}) {
   const regenerate = Boolean(options.regenerate);
+  const variant = Math.abs(Number(options.regenerateNonce) || 0);
   const campaignContext = buildCharacterAutocompleteContext(options);
   const text = [
     seed.name,
@@ -28,15 +29,36 @@ export function completeCharacterSeed(seed = {}, options = {}) {
   const level = clampLevel(parseOptionalNumber(seed.level) ?? campaignContext.defaultLevel ?? 1);
   const profile = classifyCharacterProfile(`${characterClass} ${roleIntent} ${seed.backstory || seed.concept || ""}`);
   const partyTheme = describePartyTheme(campaignContext);
-  const appearance = `${name} is a ${compactAncestryAdjective(ancestry)} ${profile.label} with practical travel-worn gear and a steady, readable presence.`;
-  const backstory = partyTheme
-    ? `${name} is a ${ancestry} ${characterClass} known for ${roleIntent.toLowerCase()}. They fit the party's ${partyTheme} without taking over the main decision.`
-    : `${name} is a ${ancestry} ${characterClass} known for ${roleIntent.toLowerCase()}. They are dependable under pressure, but carry a personal reason to keep moving with the party.`;
+  const appearance = `${name} is a ${compactAncestryAdjective(ancestry)} ${profile.label} ${pickVariant([
+    "with practical travel-worn gear and a steady, readable presence",
+    "whose kit looks used rather than decorative, with watchful eyes and calm hands",
+    "with one distinctive field-worn detail that makes them easy to recognize at the table",
+    "who carries themselves like someone used to bad roads, worse weather, and quick decisions",
+  ], variant)}.`;
+  const backstoryEnding = partyTheme
+    ? pickVariant([
+      `They fit the party's ${partyTheme} without taking over the main decision.`,
+      `They reinforce the party's ${partyTheme} and naturally back up the lead character.`,
+      `They share enough of the party's ${partyTheme} to feel like they belong from the first scene.`,
+      `They bring a slightly different angle to the party's ${partyTheme} without stealing focus.`,
+    ], variant)
+    : pickVariant([
+      "They are dependable under pressure, but carry a personal reason to keep moving with the party.",
+      "They have a practical reason to stay close and a small complication that can matter later.",
+      "They know the road ahead will get worse and would rather face it with allies than alone.",
+      "They are useful in a crisis, but their loyalties still need room to become personal.",
+    ], variant);
+  const backstory = `${name} is a ${ancestry} ${characterClass} known for ${roleIntent.toLowerCase()}. ${backstoryEnding}`;
   const integrationPrompt = regenerate
-    ? defaultPartyIntegration(name, campaignContext)
+    ? defaultPartyIntegration(name, campaignContext, { variant })
     : seed.integrationPrompt || defaultPartyIntegration(name, campaignContext);
   const hostIntegrationPrompt = regenerate
-    ? `${name} should support the party's current goal without taking control of the main decision.`
+    ? pickVariant([
+      `${name} should support the party's current goal without taking control of the main decision.`,
+      `${name} should add useful pressure, context, or assistance while leaving final choices to the host/player.`,
+      `${name} should feel present at the table, but their actions should stay small unless the host approves them.`,
+      `${name} should strengthen party chemistry and give the DM one grounded hook to use later.`,
+    ], variant)
     : seed.hostIntegrationPrompt || `${name} should support the party's current goal without taking control of the main decision.`;
 
   return {
@@ -167,17 +189,32 @@ function compactAncestryAdjective(ancestry = "") {
   return String(ancestry || "adventuring").toLowerCase();
 }
 
-function defaultPartyIntegration(name = "This character", context = {}) {
+function defaultPartyIntegration(name = "This character", context = {}, options = {}) {
   const partyNames = context.partyNames ?? [];
   const theme = describePartyTheme(context);
   if (partyNames.length) {
     const themeText = theme ? ` as part of the group's ${theme}` : "";
-    return `${name} already has a practical reason to trust ${partyNames.join(", ")}${themeText} and backs them up without taking over the scene.`;
+    return pickVariant([
+      `${name} already has a practical reason to trust ${partyNames.join(", ")}${themeText} and backs them up without taking over the scene.`,
+      `${name} has worked beside ${partyNames.join(", ")}${themeText} long enough to follow their lead when the pressure rises.`,
+      `${name} owes ${partyNames.join(", ")} a favor${themeText} and wants the group to come through this alive.`,
+      `${name} shares a recent problem with ${partyNames.join(", ")}${themeText}, giving them a grounded reason to stay with the party.`,
+    ], options.variant);
   }
   if (context.summary) {
-    return `${name} is tied to the campaign premise and has a grounded reason to join the first scene.`;
+    return pickVariant([
+      `${name} is tied to the campaign premise and has a grounded reason to join the first scene.`,
+      `${name} has a personal stake in the opening situation and can enter naturally without needing a separate introduction.`,
+      `${name} knows enough about the first problem to be useful, but not enough to solve it alone.`,
+      `${name} arrives with a small obligation connected to the opening situation.`,
+    ], options.variant);
   }
-  return `${name} begins in the same immediate situation as the primary character and has a reason to stay with the group.`;
+  return pickVariant([
+    `${name} begins in the same immediate situation as the primary character and has a reason to stay with the group.`,
+    `${name} is already nearby when trouble starts and has a practical reason to cooperate.`,
+    `${name} can be introduced as someone caught in the same pressure as the party.`,
+    `${name} starts with a simple shared need that can grow into real loyalty.`,
+  ], options.variant);
 }
 
 function describePartyTheme(context = {}) {
@@ -221,6 +258,13 @@ function parseOptionalNumber(value) {
   if (!trimmed) return null;
   const number = Number(trimmed);
   return Number.isFinite(number) ? number : null;
+}
+
+function pickVariant(values = [], variant = 0) {
+  const options = values.filter(Boolean);
+  if (!options.length) return "";
+  const index = Math.abs(Number(variant) || 0) % options.length;
+  return options[index];
 }
 
 function titleCase(value = "") {

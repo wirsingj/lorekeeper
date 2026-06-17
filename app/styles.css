@@ -1606,6 +1606,13 @@ button:disabled {
   padding-top: 4px;
 }
 
+.pretable-seat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .guest-table-preview {
   margin-top: 0;
 }
