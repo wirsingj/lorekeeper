@@ -2131,12 +2131,12 @@ function testProviderImportOutcomeProjection() {
 
   const saved = buildProviderImportOutcome({ autoCommitAppliedCount: 2, source: "local" });
   assert.equal(saved.state, "state_saved");
-  assert.match(saved.bridgeStatus, /2 state changes saved/);
-  assert.equal(saved.activityText, "State updated from local response");
+  assert.match(saved.bridgeStatus, /2 table changes saved/);
+  assert.equal(saved.activityText, "Table updated from local response");
 
   const review = buildProviderImportOutcome({ proposedChangesCount: 1 });
   assert.equal(review.state, "review_pending");
-  assert.match(review.bridgeStatus, /1 proposed state change awaiting review/);
+  assert.match(review.bridgeStatus, /1 proposed table change awaiting review/);
 
   const imported = buildProviderImportOutcome();
   assert.equal(imported.state, "imported");
@@ -2467,7 +2467,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /local-table-guidance/);
   assert.match(appShell, /local-table-guest-link/);
   assert.match(appShell, /copy-guest-link/);
-  assert.match(appShell, /Refresh Table/);
+  assert.match(appShell, /Open Guest Lobby/);
+  assert.match(appShell, /Send Guest Actions/);
   assert.doesNotMatch(appShell, />Resync</);
   assert.doesNotMatch(appJs, /Guest resync/i);
   assert.match(appJs, /Guest table refresh/);
@@ -2493,13 +2494,13 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Try Again/);
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);
-  assert.match(appShell, /Table Diagnostics/);
+  assert.match(appShell, /Troubleshooting/);
   assert.match(appShell, /Copy Details/);
-  assert.match(appShell, /Review DM Response/);
+  assert.match(appShell, /DM Recovery/);
   assert.match(appShell, /host-response-review/);
   assert.match(appShell, /No DM Response Waiting/);
   assert.match(appShell, /raw-diagnostics-details/);
-  assert.match(appShell, /Raw Details/);
+  assert.match(appShell, /Developer Details/);
   assert.doesNotMatch(appShell, /raw provider JSON/);
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appJs, /renderRightRailState/);
@@ -2571,7 +2572,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /Opening scene needs review; use Try Again or Details before starting play\./);
   assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);
   assert.doesNotMatch(turnRepairController, /imported despite contract failure/);
-  assert.match(appJs, /DM response details are open in Table Diagnostics/);
+  assert.match(appJs, /DM response details are open in Troubleshooting/);
   assert.match(appJs, /The DM response was received, but the table has not applied it yet\./);
   assert.match(appJs, /The DM responded, but LoreKeeper needs the host to review it before play continues\./);
   assert.match(appJs, /launchInviteLink/);

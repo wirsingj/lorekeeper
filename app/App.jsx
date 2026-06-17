@@ -2,7 +2,7 @@ export function LorekeeperShell() {
   // Static shell only. app/app.js binds behavior to these ids, so changing an id
   // is a behavior change unless the renderer registry is updated too.
   return (
-    <div id="app" className="handheld-shell">
+    <div id="app" className="handheld-shell lobby-mode home-mode">
       <aside className="left-panel panel-rail">
         <section className="rail-section campaign-section">
           <div className="section-title">
@@ -46,7 +46,7 @@ export function LorekeeperShell() {
           </div>
           <div className="status-chips">
             <span id="scene-location">Loading...</span>
-            <span id="save-status">SQLite: local file ready</span>
+            <span id="save-status">Saved locally</span>
           </div>
           <div id="scene-intelligence" className="scene-intelligence" hidden>
             <div>
@@ -97,14 +97,14 @@ export function LorekeeperShell() {
             <div className="home-menu">
               <div className="home-menu-heading">
                 <p className="eyebrow">LoreKeeper</p>
-                <h2>Choose Your Seat</h2>
+                <h2>Start Playing</h2>
               </div>
               <div className="home-flow-grid">
-                <article className="home-flow-card">
+                <article className="home-flow-card home-flow-card-primary">
                   <div>
                     <p className="eyebrow">Host</p>
-                    <h3>Run The Table</h3>
-                    <p>Open an existing campaign or start a new table.</p>
+                    <h3>Run A Table</h3>
+                    <p>Continue a campaign or build a new table for tonight.</p>
                   </div>
                   <label className="home-campaign-picker">
                     <span>Existing Campaign</span>
@@ -113,35 +113,35 @@ export function LorekeeperShell() {
                     </select>
                   </label>
                   <div className="home-flow-actions">
-                    <button id="home-host-flow" type="button">Open</button>
-                    <button id="home-new-campaign" className="secondary-action" type="button">Host New</button>
+                    <button id="home-host-flow" type="button">Continue</button>
+                    <button id="home-new-campaign" className="secondary-action" type="button">New Table</button>
                   </div>
                 </article>
-                <article className="home-flow-card">
+                <article className="home-flow-card home-flow-card-primary">
                   <div>
                     <p className="eyebrow">Join</p>
-                    <h3>Sit At A Hosted Table</h3>
-                    <p>Join with an invite link and a character. No local AI provider needed.</p>
+                    <h3>Sit At A Table</h3>
+                    <p>Use a host link, request a seat, and play without local AI setup.</p>
                   </div>
                   <div className="home-flow-actions">
                     <button id="home-join-flow" type="button">Join</button>
                   </div>
                 </article>
-                <article className="home-flow-card">
+                <article className="home-flow-card home-flow-card-setup">
                   <div>
-                    <p className="eyebrow">Provider</p>
-                    <h3>Set Up The DM</h3>
-                    <p>Choose Ollama or bridge mode, test the model, and tune generation before play.</p>
+                    <p className="eyebrow">AI</p>
+                    <h3>DM Setup</h3>
+                    <p>Pick the local model or fallback chat used by hosted tables.</p>
                   </div>
                   <div className="home-flow-actions">
-                    <button id="home-provider-setup" type="button">Provider Setup</button>
+                    <button id="home-provider-setup" type="button">AI Setup</button>
                   </div>
                 </article>
               </div>
               <div className="home-library-strip" aria-label="Local library summary">
                 <span id="home-active-campaign">Campaigns loading...</span>
-                <span id="home-character-count">Party library coming next</span>
-                <button id="home-settings" className="secondary-action" type="button">App Settings</button>
+                <span id="home-character-count">Characters live with their campaigns</span>
+                <button id="home-settings" className="secondary-action" type="button">Preferences</button>
               </div>
             </div>
           </section>
@@ -445,7 +445,7 @@ function RecordDialog() {
           Auto-Complete
         </button>
         <footer className="dialog-actions">
-          <button id="save-record" type="submit">Save To SQLite</button>
+          <button id="save-record" type="submit">Save</button>
         </footer>
       </form>
     </dialog>
@@ -658,18 +658,18 @@ function SetupDialog() {
       <form method="dialog">
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">Settings</p>
-            <h2>LoreKeeper Preferences</h2>
+            <p className="eyebrow">Preferences</p>
+            <h2>App Setup</h2>
           </div>
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
 
         <section id="app-preferences-section" className="setup-section app-mode-section">
           <div className="section-title">
-            <h3>App Preferences</h3>
+            <h3>Startup</h3>
           </div>
           <label>
-            <span>Mode</span>
+            <span>Default Flow</span>
             <select id="app-mode-select">
               <option value="full">Host</option>
               <option value="thin">Join</option>
@@ -680,13 +680,13 @@ function SetupDialog() {
 
         <section id="provider-setup-section" className="setup-section provider-setup-section">
           <div className="section-title">
-            <h3>Provider Setup</h3>
+            <h3>Local AI</h3>
           </div>
           <label>
-            <span>Provider Mode</span>
+            <span>AI Source</span>
             <select id="provider-mode">
               <option value="ollama">Ollama Local</option>
-              <option value="bridge">ChatGPT Tab / Bridge</option>
+              <option value="bridge">Campaign Chat Fallback</option>
               <option disabled>Claude Tab</option>
               <option disabled>ChatGPT API</option>
               <option disabled>Claude API</option>
@@ -736,11 +736,11 @@ function SetupDialog() {
           <div id="bridge-card" className="bridge-card">
             <div className="status-line">
               <span className="status-dot"></span>
-              <span id="bridge-status">Manual copy/import ready</span>
+              <span id="bridge-status">Campaign chat fallback ready</span>
             </div>
             <div className="button-stack">
               <button id="check-sidecar" type="button">Check / Open Campaign Chat</button>
-              <button id="copy-provider-prompt" type="button">Copy Provider Prompt</button>
+              <button id="copy-provider-prompt" type="button">Copy DM Prompt</button>
               <button id="new-provider-chat" type="button">New Campaign Chat</button>
             </div>
           </div>
@@ -755,17 +755,17 @@ function SetupDialog() {
 
         <section className="setup-section campaign-settings-section">
           <div className="section-title">
-            <h3>Campaign Tools</h3>
+            <h3>Campaigns</h3>
           </div>
           <div className="button-stack two-up">
             <button id="new-campaign" type="button">New Campaign</button>
-            <button id="load-imported" type="button">Load Imported</button>
+            <button id="load-imported" type="button">Load Saved Campaign</button>
           </div>
         </section>
 
         <section className="setup-section diagnostics-section">
           <div className="section-title">
-            <h3>Table Diagnostics</h3>
+            <h3>Troubleshooting</h3>
             <span id="diagnostics-status" className="count-pill">Idle</span>
           </div>
           <label className="check-row" title="Show provider/model metadata under play messages for troubleshooting. Leave this off during normal play.">
@@ -784,7 +784,7 @@ function SetupDialog() {
             <p>No table timeline yet.</p>
           </div>
           <details className="raw-diagnostics-details">
-            <summary>Raw Details</summary>
+            <summary>Developer Details</summary>
             <textarea
               id="diagnostics-output"
               className="rail-textarea diagnostics-output"
@@ -797,7 +797,7 @@ function SetupDialog() {
 
         <section className="setup-section local-table-section">
           <div className="section-title">
-            <h3>Local Table</h3>
+            <h3>Guests</h3>
             <span id="local-table-state" className="count-pill">Off</span>
           </div>
           <p id="local-table-address" className="setup-note">Start a LAN table only when another local app is joining.</p>
@@ -816,17 +816,17 @@ function SetupDialog() {
               id="local-table-guest-link"
               readOnly
               spellCheck="false"
-              placeholder="Start Local Table to get a guest link."
+              placeholder="Open the guest lobby to get a share link."
             />
           </label>
           <div className="button-stack two-up">
-            <button id="start-local-table" type="button">Start Local Table</button>
-            <button id="stop-local-table" type="button">Stop</button>
+            <button id="start-local-table" type="button">Open Guest Lobby</button>
+            <button id="stop-local-table" type="button">Close Guest Lobby</button>
             <button id="copy-guest-link" type="button">Copy Guest Link</button>
-            <button id="copy-character-invite" type="button">Copy Join-As Link</button>
-            <button id="join-campaign" type="button">Join Campaign</button>
-            <button id="sync-guest-table" type="button">Refresh Table</button>
-            <button id="resolve-party-inputs" type="button">Resolve Inputs</button>
+            <button id="copy-character-invite" type="button">Copy Direct Seat Link</button>
+            <button id="join-campaign" type="button">Join From Link</button>
+            <button id="sync-guest-table" type="button">Refresh</button>
+            <button id="resolve-party-inputs" type="button">Send Guest Actions</button>
           </div>
           <textarea
             id="local-table-invite-output"
@@ -843,7 +843,7 @@ function SetupDialog() {
 
         <section className="setup-section">
           <div className="section-title">
-            <h3>Review DM Response</h3>
+            <h3>DM Recovery</h3>
             <span id="review-count" className="count-pill">0</span>
           </div>
           <div id="host-response-review" className="host-response-review" aria-live="polite">

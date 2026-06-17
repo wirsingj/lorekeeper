@@ -1,6 +1,6 @@
 # LoreKeeper State Of The Table
 
-Updated: 2026-06-16
+Updated: 2026-06-17
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
@@ -22,6 +22,18 @@ The party members are the people around the table. The DM is the app plus the AI
 The user should not feel like they are debugging a model, managing queue machinery, or translating software concepts while trying to play.
 
 Every table surface should answer the same practical questions a real table answers without explanation: where are we, whose attention is needed, who controls this character, what just happened, what can I do now, and what is remembered as true.
+
+## Steam-Ready UX Direction
+
+LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
+
+- The front door should answer only three questions: continue hosting, start a new table, or join someone else's table.
+- Provider/model setup should feel like AI readiness, not a core gameplay mode.
+- Normal play surfaces should use table language: Host, Join, Guests, DM, Table, Seat, Continue, Troubleshooting.
+- Technical language such as SQLite, provider import, raw payloads, bridge/manual sync, and diagnostics belongs behind troubleshooting or developer details.
+- Settings should become two calmer surfaces: app preferences before play, and table settings while hosting.
+- Every screen should show the next likely action and hide controls that are not relevant to the current phase.
+- Guest flow should prefer one plain LAN link with a table list and seat requests; direct deep links can remain optional power-user shortcuts.
 
 ## Table Model
 
@@ -157,6 +169,7 @@ Every table surface should answer the same practical questions a real table answ
 118. Stale detailed `/guest?...campaign/table/session...` URLs no longer drive the normal waiting-room preview; the guest page asks the host server what is currently joinable.
 119. Host New waiting guests can be seated before Create And Start; reserved draft seats are adopted into the real local table as remote controllers when the campaign launches.
 120. New campaign seed text no longer appears as the visible first DM bubble; the opening message now tells the host to Nudge the DM or type the first action.
+121. First-pass Steam-ready wording now makes the front door and preferences calmer: Continue/New Table/Join/AI Setup, Guests, Troubleshooting, Developer Details, and Saved locally replace more technical provider/SQLite/import wording in normal paths.
 
 ### Still Risky
 
@@ -184,6 +197,7 @@ Every table surface should answer the same practical questions a real table answ
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
+25. The app still has too many visible controls in Preferences and the table rails. The current pass improved wording, but Steam-ready UX still needs fewer surfaces, clearer phase-specific actions, and better separation between normal play and troubleshooting.
 
 ## Live Acceptance Matrix
 
@@ -224,6 +238,7 @@ Every table surface should answer the same practical questions a real table answ
 12. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
 13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
+15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, and make the front door feel like a game launcher instead of a settings hub.
 
 ### Medium
 
@@ -373,6 +388,10 @@ Every table surface should answer the same practical questions a real table answ
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces.
+- [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
+- [ ] Reduce visible Preferences controls to App, AI, and Guests, with troubleshooting/manual fallback tucked behind an explicit advanced area.
+- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once.
+- [ ] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.
 - [x] Keep debug/repair tools tucked away unless action is required.

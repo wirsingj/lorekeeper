@@ -80,7 +80,7 @@ export function renderMultiplayerSessionPanel({
     elements.localTableGuestLink.value = projection.guestLink || "";
     elements.localTableGuestLink.placeholder = projection.guestLink
       ? ""
-      : "Start Local Table to get a guest link.";
+      : "Open the guest lobby to get a share link.";
   }
   elements.startLocalTable.disabled = !projection.canStartLocalTable;
   elements.stopLocalTable.disabled = !projection.canStopLocalTable;

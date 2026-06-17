@@ -622,20 +622,20 @@ elements.newCampaign.addEventListener("click", async () => {
 
 elements.loadImported.addEventListener("click", async () => {
   const confirmed = await confirmInApp({
-    title: "Load Imported Campaign",
-    message: "This will create or open the imported Veil of the Towers bundle and switch the active campaign.",
-    acceptLabel: "Load Imported",
+    title: "Load Saved Campaign",
+    message: "This will open the bundled Veil of the Towers campaign and switch the active table.",
+    acceptLabel: "Load Campaign",
   });
 
   if (!confirmed) {
-    elements.bridgeStatus.textContent = "Imported load canceled";
+    elements.bridgeStatus.textContent = "Campaign load canceled";
     return;
   }
 
   await loadImportedCampaign();
   seedPlayLog();
   render();
-  elements.bridgeStatus.textContent = "Imported binder loaded";
+  elements.bridgeStatus.textContent = "Campaign loaded";
 });
 
 elements.importResponse.addEventListener("click", async () => {
@@ -2338,7 +2338,7 @@ async function loadCampaign() {
 async function selectCampaignByPath(sqlitePath) {
   try {
     elements.bridgeStatus.textContent = "Opening campaign...";
-    setProviderActivity("Opening campaign from SQLite...", "working");
+    setProviderActivity("Opening campaign...", "working");
     const response = await fetch(apiSelectCampaignUrl, {
       method: "POST",
       headers: {
@@ -2683,8 +2683,8 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     startingPartyMembers: joinerSeeds,
   });
   try {
-    elements.bridgeStatus.textContent = "Creating new SQLite campaign...";
-    setProviderActivity("Creating campaign SQLite file...", "working");
+    elements.bridgeStatus.textContent = "Creating new campaign...";
+    setProviderActivity("Creating campaign...", "working");
     const response = await fetch(apiNewCampaignUrl, {
       method: "POST",
       headers: {
@@ -2723,14 +2723,14 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     elements.campaignDialog.close();
     elements.campaignForm.reset();
     resetCampaignWizardDefaults();
-    elements.bridgeStatus.textContent = "New campaign saved to SQLite";
+    elements.bridgeStatus.textContent = "New campaign saved";
     elements.playerInput.value = "";
     await startNewCampaignOpening(openingPrompt);
     if (remoteInviteLobby?.link) {
       setProviderActivity(
         remoteInviteLobby.copied
           ? "Guest Link copied; Remote Invite seats are open"
-          : "Remote Invite seats are open; copy the Guest Link from Settings",
+          : "Remote Invite seats are open; copy the Guest Link from Preferences",
         remoteInviteLobby.copied ? "idle" : "waiting",
       );
     }
@@ -5596,7 +5596,7 @@ function renderAppModeControls() {
   if (elements.appModeNote) {
     elements.appModeNote.textContent = clientMode
       ? "Join connects to a host and receives visible table state without local provider setup."
-      : "Host runs campaigns, owns SQLite and AI providers, and can also join another host when needed.";
+      : "Host runs campaigns, saves your table, manages AI, and can also join another host when needed.";
   }
 }
 
@@ -6157,7 +6157,7 @@ async function saveRecordFromDialog() {
     elements.recordDialog.close();
     state.editingRecord = null;
     elements.recordForm.reset();
-    elements.bridgeStatus.textContent = `${recordLabel(payload.domain)} saved to SQLite; provider sees it next turn`;
+    elements.bridgeStatus.textContent = `${recordLabel(payload.domain)} saved; the DM will remember it next turn`;
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `Save failed: ${error.message}` : "Save failed";
   }
@@ -6348,10 +6348,10 @@ function render() {
       : "Provider: campaign chat waiting";
   }
   elements.saveStatus.textContent = clientMode || isRemoteTableClient()
-    ? "Remote table: host-owned SQLite"
-    : `Binder: ${state.sourceMode} / SQLite target`;
+    ? "Hosted table"
+    : "Saved locally";
   if (state.sqlitePath) {
-    elements.saveStatus.textContent = "SQLite: active campaign file";
+    elements.saveStatus.textContent = "Saved locally";
   }
   if (elements.nudgeDm) {
     updateNudgeAvailability();
@@ -6441,7 +6441,7 @@ function openLocalTableSeating() {
 async function openSelectedHomeCampaign() {
   const sqlitePath = String(elements.homeCampaignSelect?.value || "").trim();
   if (!sqlitePath) {
-    setProviderActivity("Choose a campaign to host, or use Host New.", "waiting");
+    setProviderActivity("Choose a campaign to continue, or start a new table.", "waiting");
     return;
   }
   state.homeFlow = "host";
@@ -6454,11 +6454,11 @@ function chooseHomeFlow(flow) {
   renderHomePanel();
   renderThinJoinPanel();
   if (nextFlow === "join") {
-    setProviderActivity("LoreKeeper Join ready. Paste a host invite link to request a seat.", "idle");
+    setProviderActivity("Join ready. Paste a host link or use the guest page to request a seat.", "idle");
     window.setTimeout(() => elements.thinJoinInviteLink?.focus(), 50);
     return;
   }
-  setProviderActivity("LoreKeeper Host ready.", "idle");
+  setProviderActivity("Host ready.", "idle");
 }
 
 async function returnToMainMenu() {
@@ -6482,7 +6482,7 @@ async function returnToMainMenu() {
   renderHomePanel();
   renderThinJoinPanel();
   setProviderActivity(
-    wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Host, Join, or Provider Setup.",
+    wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Host, Join, or AI Setup.",
     "idle",
   );
 }
@@ -6519,7 +6519,7 @@ function renderHomePanel() {
   }
 
   if (elements.homeCharacterCount) {
-    elements.homeCharacterCount.textContent = "Character library coming next";
+    elements.homeCharacterCount.textContent = "Characters live with their campaigns";
   }
 
   renderHomeCampaignPicker();
@@ -7151,7 +7151,7 @@ async function commitExtractedChanges(reviewBatch) {
     });
     state.reviewBatch = null;
     state.sqlitePath = result.sqlitePath ?? state.sqlitePath;
-    elements.bridgeStatus.textContent = `${result.applied.length} state change${result.applied.length === 1 ? "" : "s"} saved to SQLite`;
+    elements.bridgeStatus.textContent = `${result.applied.length} table change${result.applied.length === 1 ? "" : "s"} saved`;
     render();
     return result;
   } catch (error) {
@@ -7775,7 +7775,7 @@ async function inspectTurnRepair() {
     elements.setupDialog.showModal();
   }
   await refreshDiagnostics();
-  setProviderActivity("DM response details are open in Table Diagnostics", "waiting");
+  setProviderActivity("DM response details are open in Troubleshooting", "waiting");
 }
 
 async function importTurnRepairAnyway() {
@@ -9507,7 +9507,7 @@ async function saveCharacterSheet() {
 
   try {
     elements.bridgeStatus.textContent = "Saving character sheet...";
-    setProviderActivity(`Saving ${payload.name} to SQLite...`, "working");
+    setProviderActivity(`Saving ${payload.name}...`, "working");
     const response = await fetch(apiCampaignRecordUrl, {
       method: "POST",
       headers: {
@@ -9530,7 +9530,7 @@ async function saveCharacterSheet() {
       state.activeCharacterSheetAutofill = null;
       renderCharacterSheet(updated);
     }
-    elements.bridgeStatus.textContent = `${payload.name} saved to SQLite`;
+    elements.bridgeStatus.textContent = `${payload.name} saved`;
     setProviderActivity(`${payload.name} saved`, "idle");
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `Character save failed: ${error.message}` : "Character save failed";

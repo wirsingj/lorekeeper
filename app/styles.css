@@ -1180,7 +1180,7 @@ button:disabled {
 
 .home-flow-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(240px, 0.82fr);
   gap: 12px;
 }
 
@@ -1196,10 +1196,31 @@ button:disabled {
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
 }
 
+.home-flow-card-primary {
+  min-height: 245px;
+}
+
+.home-flow-card-setup {
+  min-height: 245px;
+  background: rgba(10, 13, 15, 0.36);
+}
+
 .home-flow-card h3 {
   margin: 0 0 8px;
   color: #f4f8f9;
   font-size: 1rem;
+}
+
+@media (max-width: 980px) {
+  .home-flow-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-flow-card,
+  .home-flow-card-primary,
+  .home-flow-card-setup {
+    min-height: 0;
+  }
 }
 
 .home-flow-card p:not(.eyebrow) {
