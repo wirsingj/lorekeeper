@@ -49,6 +49,7 @@ const protectedHostRoutes = [
   ["POST", "/api/pretable-lobby/publish"],
   ["POST", "/api/pretable-lobby/close"],
   ["GET", "/api/pretable-lobby/host-snapshot"],
+  ["POST", "/api/pretable-lobby/seat"],
   ["POST", "/api/pretable-lobby/adopt-active"],
   ["POST", "/api/review/commit"],
 ];
@@ -64,6 +65,7 @@ for (const [method, pathname] of protectedHostRoutes) {
     pathname === "/api/pretable-lobby/publish"
       || pathname === "/api/pretable-lobby/close"
       || pathname === "/api/pretable-lobby/host-snapshot"
+      || pathname === "/api/pretable-lobby/seat"
       ? false
       : true,
     `${method} ${pathname} should have the expected stale-campaign pin policy`,

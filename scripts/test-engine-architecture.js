@@ -2513,11 +2513,17 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /buildPartyTemplateCharacters/);
   assert.match(appJs, /normalizeWizardJoiner/);
   assert.match(appJs, /openRemoteInviteLobbyForNewCampaign/);
+  assert.match(appJs, /apiPreTableLobbySeatUrl/);
+  assert.match(appJs, /seatPreTableWaitingGuest/);
+  assert.match(appJs, /Seat as \$\{seatName\}/);
+  assert.match(appJs, /Seat reserved\$\{status\.reservedSeat\?\.name/);
   assert.match(appJs, /equipmentForProfile/);
   assert.match(appJs, /inventory:\s*equipment\.inventory/);
   assert.match(appJs, /function spell\(name, level/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /Additional starting party members/);
+  assert.match(appJs, /Use Nudge to have the DM frame the opening moment/);
+  assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);
   assert.match(appJs, /wizardControllerSheetFields/);
   assert.match(appJs, /inviteIntent:\s*"remote_player"/);
   assert.match(appJs, /campaign-wizard-mode/);

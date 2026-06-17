@@ -66,6 +66,27 @@ try {
   assert.equal(draftWait.campaignTitle, "Bar Fight 413");
   assert.equal(draftWait.waitingGuest.preferredPartyMemberId, "party-tilli");
 
+  const draftSeat = await fetchJson(`${baseUrl}/api/pretable-lobby/seat`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lorekeeper-api-token": token,
+    },
+    body: JSON.stringify({
+      waitingGuestId: draftWait.waitingGuest.id,
+      partyMemberId: "party-tilli",
+    }),
+  });
+  assert.equal(draftSeat.waitingGuests[0].status, "seated");
+
+  const reservedStatus = await fetchJson(`${baseUrl}/api/multiplayer/waiting-room/status?${new URLSearchParams({
+    waitingGuestId: draftWait.waitingGuest.id,
+    clientId: "draft-client",
+    waitingSecret: draftWait.waitingSecret,
+  })}`);
+  assert.equal(reservedStatus.waitingGuest.status, "seated");
+  assert.equal(reservedStatus.reservedSeat.name, "Tilli");
+
   const draftHostSnapshot = await fetchJson(`${baseUrl}/api/pretable-lobby/host-snapshot`, {
     headers: { "x-lorekeeper-api-token": token },
   });
@@ -106,6 +127,28 @@ try {
     }),
   });
   assert.equal(created.campaign.title, "Integration Table");
+
+  const seededParty = await fetchJson(`${baseUrl}/api/campaign/record`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lorekeeper-api-token": token,
+      "x-lorekeeper-campaign-id": created.campaign.id,
+    },
+    body: JSON.stringify({
+      domain: "party",
+      id: "party-starter-hero",
+      name: "Starter Hero",
+      type: "player_character",
+      playerRole: "Remote player controlled",
+      controllerKind: "unassigned",
+      inviteIntent: "remote_player",
+      ancestryClass: "Human Adventurer",
+      level: 1,
+      background: "Integration test party member.",
+    }),
+  });
+  const activeSeatId = seededParty.campaign.party.find((member) => member.name === "Starter Hero").id;
 
   const stale = await fetch(`${baseUrl}/api/campaign/player-notes`, {
     method: "POST",
@@ -152,7 +195,6 @@ try {
   assert.equal(table.running, true);
   assert.ok(table.tableId);
   assert.ok(table.sessionId);
-
   await fetchJson(`${baseUrl}/api/pretable-lobby/publish`, {
     method: "POST",
     headers: {
@@ -164,7 +206,7 @@ try {
       title: "Market Debt 139",
       premise: "The host is still building a party.",
       party: [
-        { id: "party-tilli", name: "Tilli", ancestry: "Dwarf", characterClass: "Soldier", controllerKind: "remote_invite", inviteIntent: "remote_player" },
+        { id: activeSeatId, name: "Starter Hero", ancestry: "Human", characterClass: "Adventurer", controllerKind: "remote_invite", inviteIntent: "remote_player" },
       ],
     }),
   });
@@ -174,7 +216,18 @@ try {
     body: JSON.stringify({
       playerName: "Ada",
       clientId: "draft-client-after-start",
-      preferredPartyMemberId: "party-tilli",
+      preferredPartyMemberId: activeSeatId,
+    }),
+  });
+  await fetchJson(`${baseUrl}/api/pretable-lobby/seat`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lorekeeper-api-token": token,
+    },
+    body: JSON.stringify({
+      waitingGuestId: draftSeatRequest.waitingGuest.id,
+      partyMemberId: activeSeatId,
     }),
   });
   const adoptedLobby = await fetchJson(`${baseUrl}/api/pretable-lobby/adopt-active`, {
@@ -194,7 +247,9 @@ try {
   assert.ok(adoptedGuest);
   assert.equal(adoptedGuest.tableId, table.tableId);
   assert.equal(adoptedGuest.sessionId, table.sessionId);
-  assert.equal(adoptedGuest.preferredPartyMemberId, "party-tilli");
+  assert.equal(adoptedGuest.preferredPartyMemberId, activeSeatId);
+  assert.equal(adoptedGuest.status, "seated");
+  assert.ok(adoptedGuest.connectionId);
 
   const adoptedStatus = await fetchJson(`${baseUrl}/api/multiplayer/waiting-room/status?${new URLSearchParams({
     waitingGuestId: draftSeatRequest.waitingGuest.id,
@@ -207,6 +262,8 @@ try {
   assert.equal(adoptedStatus.campaignId, created.campaign.id);
   assert.equal(adoptedStatus.localTable.tableId, table.tableId);
   assert.equal(adoptedStatus.waitingGuest.displayName, "Ada");
+  assert.equal(adoptedStatus.seated, true);
+  assert.equal(adoptedStatus.connection.partyMemberId, activeSeatId);
 
   const wrongSessionAction = await fetch(`${baseUrl}/api/multiplayer/action`, {
     method: "POST",

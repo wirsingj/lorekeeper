@@ -306,6 +306,12 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/api/pretable-lobby/seat" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      sendJson(response, 200, seatPreTableWaitingGuest(body));
+      return;
+    }
+
     if (url.pathname === "/api/pretable-lobby/adopt-active" && request.method === "POST") {
       const body = await readJsonBody(request);
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
@@ -935,7 +941,7 @@ function registerPreTableWaitingGuest(lobby, input = {}) {
   const clientId = compactLobbyLine(input.clientId || "", 120);
   const preferredPartyMemberId = normalizePreTableSeatId(lobby, input.preferredPartyMemberId);
   const existing = clientId
-    ? lobby.waitingGuests.find((guest) => guest.clientId === clientId && guest.status === "waiting")
+    ? lobby.waitingGuests.find((guest) => guest.clientId === clientId && (guest.status === "waiting" || guest.status === "seated"))
     : null;
   if (existing) {
     existing.displayName = displayName;
@@ -983,10 +989,39 @@ function heartbeatPreTableWaitingGuest(lobby, input = {}) {
     localTable: lobby.localTable,
     waitingGuest: publicPreTableWaitingGuest(waitingGuest),
     seated: false,
+    reservedSeat: waitingGuest.status === "seated" && waitingGuest.partyMemberId
+      ? preTableJoinableSeats(lobby).find((seat) => seat.id === waitingGuest.partyMemberId) ?? null
+      : null,
     connection: null,
     connectionSecret: "",
     snapshot: null,
   };
+}
+
+function seatPreTableWaitingGuest(input = {}) {
+  if (!preTableLobby?.open) {
+    throwPublicRouteError("No Host New guest lobby is open.", 409);
+  }
+  const waitingGuestId = compactLobbyLine(input.waitingGuestId || "", 120);
+  const partyMemberId = normalizePreTableSeatId(preTableLobby, input.partyMemberId);
+  if (!partyMemberId) {
+    throwPublicRouteError("Choose an open Remote Invite seat for this guest.", 409);
+  }
+  const waitingGuest = preTableLobby.waitingGuests.find((guest) => guest.id === waitingGuestId);
+  if (!waitingGuest || waitingGuest.status !== "waiting") {
+    throwPublicRouteError("That guest is no longer waiting. Ask them to click Ask To Join again.", 409);
+  }
+  if (!isFreshPreTableGuest(waitingGuest)) {
+    throwPublicRouteError(`${waitingGuest.displayName || "That guest"} is no longer connected to the waiting room.`, 409);
+  }
+  waitingGuest.status = "seated";
+  waitingGuest.partyMemberId = partyMemberId;
+  waitingGuest.preferredPartyMemberId = partyMemberId;
+  waitingGuest.seatedAt = new Date().toISOString();
+  waitingGuest.lastSeenAt = new Date().toISOString();
+  preTableLobby.updatedAt = new Date().toISOString();
+  preTableLobby.revision = `draft-${Date.now().toString(36)}`;
+  return preTableLobbyHostSnapshot(preTableLobby);
 }
 
 function adoptPreTableWaitingGuests(campaign) {
@@ -995,7 +1030,7 @@ function adoptPreTableWaitingGuests(campaign) {
     return campaign;
   }
   const localTable = campaign.multiplayer?.localTable ?? {};
-  const waitingGuests = preTableLobby.waitingGuests
+  const draftGuests = preTableLobby.waitingGuests
     .filter(isFreshPreTableGuest)
     .map((guest) => ({
       ...guest,
@@ -1006,16 +1041,32 @@ function adoptPreTableWaitingGuests(campaign) {
       lastSeenAt: new Date().toISOString(),
       connectionId: null,
       partyMemberId: null,
+      reservedPartyMemberId: guest.status === "seated" ? guest.partyMemberId || guest.preferredPartyMemberId || null : null,
     }));
+  const seatedGuests = draftGuests.filter((guest) => guest.reservedPartyMemberId);
   preTableLobby = null;
-  return {
+  let adoptedCampaign = {
     ...campaign,
     multiplayer: {
       ...(campaign.multiplayer ?? {}),
-      waitingGuests: mergeWaitingGuests(campaign.multiplayer?.waitingGuests ?? [], waitingGuests),
+      waitingGuests: mergeWaitingGuests(campaign.multiplayer?.waitingGuests ?? [], draftGuests),
     },
     updatedAt: new Date().toISOString(),
   };
+  for (const guest of seatedGuests) {
+    if (!adoptedCampaign.party?.some((member) => member.id === guest.reservedPartyMemberId)) {
+      continue;
+    }
+    try {
+      adoptedCampaign = seatWaitingGuest(adoptedCampaign, {
+        waitingGuestId: guest.id,
+        partyMemberId: guest.reservedPartyMemberId,
+      });
+    } catch {
+      // Keep the guest waiting if the final party changed before launch.
+    }
+  }
+  return adoptedCampaign;
 }
 
 function mergeWaitingGuests(existing = [], incoming = []) {

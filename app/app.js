@@ -97,6 +97,7 @@ const apiMultiplayerClearPendingUrl = "/api/multiplayer/pending/clear";
 const apiPreTableLobbyPublishUrl = "/api/pretable-lobby/publish";
 const apiPreTableLobbyCloseUrl = "/api/pretable-lobby/close";
 const apiPreTableLobbyHostSnapshotUrl = "/api/pretable-lobby/host-snapshot";
+const apiPreTableLobbySeatUrl = "/api/pretable-lobby/seat";
 const apiPreTableLobbyAdoptActiveUrl = "/api/pretable-lobby/adopt-active";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
@@ -2966,9 +2967,38 @@ function renderPreTableLobby(snapshot = {}) {
     const row = document.createElement("div");
     row.className = "pretable-waiting-guest";
     const seatName = seats.get(guest.preferredPartyMemberId) || "a seat";
-    row.textContent = `${guest.displayName || "Guest"} requested ${seatName}.`;
+    const text = document.createElement("span");
+    text.textContent = guest.status === "seated"
+      ? `${guest.displayName || "Guest"} is seated as ${seatName}.`
+      : `${guest.displayName || "Guest"} requested ${seatName}.`;
+    row.append(text);
+    if (guest.status !== "seated" && guest.preferredPartyMemberId) {
+      const seatButton = document.createElement("button");
+      seatButton.type = "button";
+      seatButton.className = "mini-action";
+      seatButton.textContent = `Seat as ${seatName}`;
+      seatButton.addEventListener("click", () => {
+        seatPreTableWaitingGuest(guest.id, guest.preferredPartyMemberId);
+      });
+      row.append(seatButton);
+    }
     return row;
   }));
+}
+
+async function seatPreTableWaitingGuest(waitingGuestId, partyMemberId) {
+  try {
+    const snapshot = await postJson(apiPreTableLobbySeatUrl, {
+      waitingGuestId,
+      partyMemberId,
+    });
+    renderPreTableLobby(snapshot);
+    const guest = snapshot.waitingGuests?.find((item) => item.id === waitingGuestId);
+    const seat = snapshot.joinableSeats?.find((item) => item.id === partyMemberId);
+    setProviderActivity(`${guest?.displayName || "Guest"} seated${seat?.name ? ` as ${seat.name}` : ""} for launch`, "idle");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Seat guest failed: ${error.message}` : "Seat guest failed", "error");
+  }
 }
 
 async function closePreTableLobby() {
@@ -3549,9 +3579,13 @@ async function refreshWaitingRoomStatus({ explicit = false } = {}) {
     savedAt: new Date().toISOString(),
   });
   if (elements.guestWaitingStatus) {
-    elements.guestWaitingStatus.textContent = explicit
-      ? "Still waiting for the host to choose your seat."
-      : "Waiting for the host to choose your seat.";
+    if (status.reservedSeat?.name || status.waitingGuest?.status === "seated") {
+      elements.guestWaitingStatus.textContent = `Seat reserved${status.reservedSeat?.name ? ` as ${status.reservedSeat.name}` : ""}. Waiting for the host to start the table.`;
+    } else {
+      elements.guestWaitingStatus.textContent = explicit
+        ? "Still waiting for the host to choose your seat."
+        : "Waiting for the host to choose your seat.";
+    }
   }
   return status;
 }
@@ -4504,12 +4538,21 @@ function normalizeWizardJoiners(inputs = []) {
 
 function buildOpeningSceneSummary({ premise, startingLocation, character, startingPartyMembers = [] }) {
   const joiners = normalizeList(startingPartyMembers);
+  const partyNames = [
+    character?.name,
+    ...joiners.map((member) => member.name),
+  ].filter(Boolean);
   const details = [
-    premise,
-    character?.name ? `Player character: ${formatCharacterBasics(character)}.` : "",
-    joiners.length ? `Additional party: ${joiners.map(formatCharacterBasics).join("; ")}.` : "",
-    ...joiners.map((member) => member.integrationPrompt ? `Party connection for ${member.name}: ${member.integrationPrompt}.` : "").filter(Boolean),
-    startingLocation ? `Starting place: ${startingLocation}.` : "",
+    startingLocation
+      ? `The table is ready at ${startingLocation}.`
+      : "The table is ready for the first scene.",
+    partyNames.length
+      ? `${partyNames.join(", ")} ${partyNames.length === 1 ? "is" : "are"} at the table.`
+      : "",
+    premise
+      ? `Premise: ${premise}`
+      : "",
+    "Use Nudge to have the DM frame the opening moment, or type the first player action below.",
   ].filter(Boolean);
 
   return details.join(" ");

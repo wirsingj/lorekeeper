@@ -1414,6 +1414,14 @@ button:disabled {
   line-height: 1.35;
 }
 
+.pretable-waiting-guest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+}
+
 .guest-table-preview {
   margin-top: 0;
 }
