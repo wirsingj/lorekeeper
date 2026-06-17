@@ -2644,7 +2644,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);
   assert.match(appShell, /Troubleshooting/);
-  assert.match(appShell, /className="settings-tabs"/, "settings should be grouped into top-level tabs instead of one dense panel");
+  assert.match(appShell, /id="settings-tabs" className="settings-tabs"/, "settings should be grouped into top-level tabs instead of one dense panel");
   assert.match(appShell, /id="setup-dialog-title"/);
   assert.match(appShell, /id="setup-dialog-subtitle"/);
   assert.match(appShell, /data-settings-tab="app"/);
@@ -2657,9 +2657,14 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /data-settings-panel="troubleshooting" hidden/);
   assert.doesNotMatch(appShell, /id="new-campaign"/, "adventure creation belongs on the front door, not inside Preferences");
   assert.doesNotMatch(appShell, /id="load-imported"/, "saved adventure loading belongs on the front door, not inside Preferences");
-  assert.match(appJs, /function setSettingsTab\(tab = "app"\)/, "settings tab state should be explicit renderer state");
-  assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
-  assert.match(appJs, /function openLocalTableSeating\(\) \{[\s\S]*openSetupDialog\(\{ tab: "friends" \}\)/, "Seat Guest should land on Friends And Seats");
+  assert.match(appJs, /const settingsModeTabs = Object\.freeze/, "settings surfaces should declare allowed tab groups");
+  assert.match(appJs, /app: \["app", "ai"\]/, "app preferences should only expose app-level tabs");
+  assert.match(appJs, /table: \["friends", "troubleshooting"\]/, "table settings should only expose friends and troubleshooting");
+  assert.match(appJs, /button\.hidden = !allowedTabs\.includes/, "irrelevant settings tabs should be hidden by surface mode");
+  assert.match(styles, /\.settings-tabs\[data-visible-tabs="2"\]/, "settings tab grid should collapse when only two tabs are visible");
+  assert.match(appJs, /function setSettingsTab\(tab = "app", \{ mode = state\.settingsMode/, "settings tab state should be explicit renderer state");
+  assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends", mode: "table" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
+  assert.match(appJs, /function openLocalTableSeating\(\) \{[\s\S]*openSetupDialog\(\{ tab: "friends", mode: "table" \}\)/, "Seat Guest should land on Friends And Seats");
   assert.match(appJs, /setupDialogTitle\.textContent = tabCopy\.title/);
   assert.match(appJs, /openSetupDialog\(\{ tab: "troubleshooting" \}\)/, "DM response details should open the Troubleshooting tab directly");
   assert.match(styles, /\.settings-tabs/);

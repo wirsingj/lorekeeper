@@ -2665,6 +2665,14 @@ textarea::placeholder {
   border-bottom: 1px solid rgba(174, 191, 202, 0.1);
 }
 
+.settings-tabs[data-visible-tabs="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-tabs[data-visible-tabs="1"] {
+  grid-template-columns: 1fr;
+}
+
 .settings-tab {
   min-height: 36px;
   padding: 0 10px;

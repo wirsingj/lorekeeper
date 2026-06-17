@@ -160,6 +160,7 @@ const state = {
   tableTimeline: [],
   lastTableStatusText: "",
   tableSession: null,
+  settingsMode: "app",
   pendingChoiceSelection: null,
   playLogVisibleLimit: defaultPlayLogVisibleLimit,
   forceScrollToBottom: false,
@@ -270,6 +271,7 @@ const elements = {
   saveStatus: document.querySelector("#save-status"),
   returnMainMenu: document.querySelector("#return-main-menu"),
   openSetup: document.querySelector("#open-setup"),
+  settingsTabsNav: document.querySelector("#settings-tabs"),
   settingsTabs: [...document.querySelectorAll("[data-settings-tab]")],
   settingsPanels: [...document.querySelectorAll("[data-settings-panel]")],
   nudgeDm: document.querySelector("#nudge-dm"),
@@ -534,15 +536,15 @@ elements.homeNewCampaign?.addEventListener("click", () => {
 });
 
 elements.homeProviderSetup?.addEventListener("click", () => {
-  openSetupDialog({ focusProvider: true });
+  openSetupDialog({ focusProvider: true, mode: "ai" });
 });
 
 elements.homeSettings?.addEventListener("click", () => {
-  openSetupDialog();
+  openSetupDialog({ mode: "app" });
 });
 
 elements.openSetup.addEventListener("click", () => {
-  openSetupDialog({ tab: "friends" });
+  openSetupDialog({ tab: "friends", mode: "table" });
 });
 
 elements.returnMainMenu?.addEventListener("click", async () => {
@@ -871,8 +873,17 @@ elements.pasteResponse.addEventListener("click", async () => {
   }
 });
 
-function openSetupDialog({ focusProvider = false, tab = "" } = {}) {
-  setSettingsTab(focusProvider ? "ai" : tab || "app");
+const settingsModeTabs = Object.freeze({
+  app: ["app", "ai"],
+  ai: ["ai", "app"],
+  table: ["friends", "troubleshooting"],
+  troubleshooting: ["troubleshooting", "friends"],
+});
+
+function openSetupDialog({ focusProvider = false, tab = "", mode = "" } = {}) {
+  const requestedTab = focusProvider ? "ai" : tab || "app";
+  const requestedMode = mode || settingsModeForTab(requestedTab);
+  setSettingsTab(requestedTab, { mode: requestedMode });
   elements.setupDialog.showModal();
   if (focusProvider) {
     window.setTimeout(() => {
@@ -890,8 +901,24 @@ function openSetupDialog({ focusProvider = false, tab = "" } = {}) {
   refreshProviderStatus({ quiet: true });
 }
 
-function setSettingsTab(tab = "app") {
-  const activeTab = ["app", "ai", "friends", "troubleshooting"].includes(tab) ? tab : "app";
+function settingsModeForTab(tab = "app") {
+  if (tab === "friends") {
+    return "table";
+  }
+  if (tab === "troubleshooting") {
+    return "troubleshooting";
+  }
+  if (tab === "ai") {
+    return "ai";
+  }
+  return "app";
+}
+
+function setSettingsTab(tab = "app", { mode = state.settingsMode || "app" } = {}) {
+  const validMode = settingsModeTabs[mode] ? mode : settingsModeForTab(tab);
+  const allowedTabs = settingsModeTabs[validMode] ?? settingsModeTabs.app;
+  const activeTab = allowedTabs.includes(tab) ? tab : allowedTabs[0];
+  state.settingsMode = validMode;
   const tabCopy = {
     app: {
       eyebrow: "Preferences",
@@ -916,6 +943,10 @@ function setSettingsTab(tab = "app") {
   }[activeTab];
   if (elements.setupDialog) {
     elements.setupDialog.dataset.activeTab = activeTab;
+    elements.setupDialog.dataset.settingsMode = validMode;
+  }
+  if (elements.settingsTabsNav) {
+    elements.settingsTabsNav.dataset.visibleTabs = String(allowedTabs.length);
   }
   if (elements.setupDialogEyebrow) {
     elements.setupDialogEyebrow.textContent = tabCopy.eyebrow;
@@ -928,6 +959,7 @@ function setSettingsTab(tab = "app") {
   }
   for (const button of elements.settingsTabs) {
     const active = button.dataset.settingsTab === activeTab;
+    button.hidden = !allowedTabs.includes(button.dataset.settingsTab || "");
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", active ? "true" : "false");
   }
@@ -6472,12 +6504,12 @@ function announceWaitingGuestsIfNeeded() {
 function openLocalTableSeating() {
   if (elements.setupDialog && !elements.setupDialog.open) {
     try {
-      openSetupDialog({ tab: "friends" });
+      openSetupDialog({ tab: "friends", mode: "table" });
     } catch {
       // If the dialog cannot open, the party cards still expose seating actions.
     }
   } else {
-    setSettingsTab("friends");
+    setSettingsTab("friends", { mode: "table" });
   }
   const section = document.querySelector(".local-table-section");
   section?.scrollIntoView({ block: "start" });

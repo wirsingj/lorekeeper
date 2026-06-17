@@ -704,7 +704,7 @@ function SetupDialog() {
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
 
-        <nav className="settings-tabs" aria-label="Preferences sections" role="tablist">
+        <nav id="settings-tabs" className="settings-tabs" aria-label="Preferences sections" role="tablist" data-visible-tabs="4">
           <button className="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="app">App</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="ai">AI</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="friends">Friends</button>
