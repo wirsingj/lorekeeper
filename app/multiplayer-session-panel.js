@@ -11,10 +11,10 @@ export function buildMultiplayerSessionProjection({
   if (clientMode) {
     return {
       mode: "guest",
-      localTableState: "Client",
+      localTableState: "Joined",
       localTableAddress: guestSession?.hostBaseUrl
         ? `${guestSession.status === "connected" ? "Connected" : "Waiting"}: ${guestSession.hostBaseUrl}`
-        : "Paste a host invite link to join.",
+        : "Open a guest page or invite link to join.",
       canStartLocalTable: false,
       canStopLocalTable: false,
       canCopyGuestLink: false,
@@ -22,9 +22,9 @@ export function buildMultiplayerSessionProjection({
       canResolvePartyInputs: false,
       guestLink: "",
       flowSummary: guestSession?.hostBaseUrl
-        ? "Your action goes to the host table first. The host DM resolves it from LoreKeeper."
-        : "Paste an invite link to join a host table.",
-      resolvePartyInputsLabel: "Resolve Inputs",
+        ? "Your action goes to the table first. The host sends it to the DM."
+        : "Open a guest page or invite link to join a table.",
+      resolvePartyInputsLabel: "Send Actions",
       requireGuestActionApproval: false,
       holdGuestActionsForGroupInput: false,
       connectedGuests: [],
@@ -45,7 +45,7 @@ export function buildMultiplayerSessionProjection({
     localTableState: table.running ? "On" : "Off",
     localTableAddress: table.running
       ? `LAN: ${table.lanAddress || "127.0.0.1"}:${table.port || locationPort}`
-      : "Start a LAN table only when another local app is joining.",
+      : "Open the guest page when a friend is joining.",
     canStartLocalTable: true,
     canStopLocalTable: Boolean(table.running),
     canCopyGuestLink: Boolean(guestLink),
@@ -80,7 +80,7 @@ export function renderMultiplayerSessionPanel({
     elements.localTableGuestLink.value = projection.guestLink || "";
     elements.localTableGuestLink.placeholder = projection.guestLink
       ? ""
-      : "Open the guest lobby to get a share link.";
+      : "Open the guest page to get a share link.";
   }
   elements.startLocalTable.disabled = !projection.canStartLocalTable;
   elements.stopLocalTable.disabled = !projection.canStopLocalTable;
@@ -99,7 +99,7 @@ export function renderMultiplayerSessionPanel({
     elements.holdGuestActionsForGroup.disabled = projection.mode !== "host" || projection.requireGuestActionApproval;
   }
   elements.resolvePartyInputs.disabled = !projection.canResolvePartyInputs;
-  elements.resolvePartyInputs.textContent = projection.resolvePartyInputsLabel || "Resolve Inputs";
+  elements.resolvePartyInputs.textContent = projection.resolvePartyInputsLabel || "Send Actions";
   renderWaitingGuests(elements.waitingGuests, projection.waitingGuests, { party: projection.party ?? [], seatWaitingGuest });
   renderConnectedGuests(elements.connectedGuests, projection.connectedGuests, { labelById, approveGuest, denyGuest });
   renderPendingInputs(elements.pendingInputs, projection.pendingInputs);
@@ -140,7 +140,7 @@ function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWa
           })),
         });
       }),
-      "No players waiting for seats.",
+      "No friends waiting for seats.",
     ),
   );
 }
@@ -165,7 +165,7 @@ function renderConnectedGuests(container, connections, { labelById, approveGuest
             : [],
         });
       }),
-      "No guests connected.",
+      "No friends connected.",
     ),
   );
 }
@@ -200,7 +200,7 @@ function joinProposalSummary(connection) {
   const proposal = connection.proposedCharacter ?? {};
   const ancestryClass = [proposal.ancestry, proposal.characterClass].filter(Boolean).join(" ");
   const details = [
-    `${connection.status} / wants to join as ${proposal.name}`,
+    `${connection.status} / wants a seat as ${proposal.name}`,
     ancestryClass,
     proposal.roleIntent,
     proposal.integrationPrompt ? `Hook: ${proposal.integrationPrompt}` : "",
@@ -223,7 +223,7 @@ function renderPendingInputs(container, inputs) {
 
 function hostFlowSummary({ table = {}, settings = {}, pendingInputs = [] } = {}) {
   if (!table.running) {
-    return "Start a LAN table when someone is joining from LoreKeeper.";
+    return "Open the guest page when someone is joining from LoreKeeper.";
   }
   const readyCount = pendingInputs.filter((input) => input.ready && !input.passed && input.text).length;
   const names = pendingInputs
@@ -234,30 +234,30 @@ function hostFlowSummary({ table = {}, settings = {}, pendingInputs = [] } = {})
   const namedCount = names || `${readyCount} guest action${readyCount === 1 ? "" : "s"}`;
   if (settings.requireGuestActionApproval) {
     return readyCount
-      ? `${namedCount} waiting for host approval before the DM sees ${readyCount === 1 ? "it" : "them"}.`
-      : "Guest actions wait for host approval before the DM sees them.";
+      ? `${namedCount} waiting for your review before the DM sees ${readyCount === 1 ? "it" : "them"}.`
+      : "Friend actions wait for your review before the DM sees them.";
   }
   if (settings.holdGuestActionsForGroupInput) {
     return readyCount
-      ? `${namedCount} held for the grouped host turn.`
-      : "Guest actions wait here until the host resolves a grouped table turn.";
+      ? `${namedCount} held for the group turn.`
+      : "Friend actions collect here until you send a group turn.";
   }
   return readyCount
     ? `${namedCount} queued and ready; LoreKeeper resolves ${readyCount === 1 ? "that action" : "those actions"} when the DM is idle.`
-    : "Guest actions resolve one at a time when the DM is idle.";
+    : "Friend actions resolve one at a time when the DM is idle.";
 }
 
 function resolvePartyInputsLabel({ readyInputs = [], settings = {} } = {}) {
   if (!readyInputs.length) {
-    return settings.holdGuestActionsForGroupInput ? "Resolve Group Turn" : "Resolve Inputs";
+    return settings.holdGuestActionsForGroupInput ? "Send Group Turn" : "Send Actions";
   }
   if (settings.requireGuestActionApproval) {
-    return readyInputs.length === 1 ? "Approve For DM" : `Approve ${readyInputs.length} For DM`;
+    return readyInputs.length === 1 ? "Send To DM" : `Send ${readyInputs.length} To DM`;
   }
   if (settings.holdGuestActionsForGroupInput) {
-    return readyInputs.length === 1 ? "Resolve Group Turn" : `Resolve ${readyInputs.length} Inputs`;
+    return readyInputs.length === 1 ? "Send Group Turn" : `Send ${readyInputs.length} Actions`;
   }
-  return readyInputs.length === 1 ? "Resolve Guest Action" : `Resolve ${readyInputs.length} Actions`;
+  return readyInputs.length === 1 ? "Send Friend Action" : `Send ${readyInputs.length} Actions`;
 }
 
 function decoratePendingInput(input = {}, { settings = {}, mode = "host" } = {}) {
@@ -266,18 +266,18 @@ function decoratePendingInput(input = {}, { settings = {}, mode = "host" } = {})
     return { ...input, statusLabel: "Passed this turn." };
   }
   if (mode === "guest" && input.text) {
-    return { ...input, statusLabel: `Sent to host table; waiting for host to resolve: ${text}` };
+    return { ...input, statusLabel: `Sent to the table; waiting to be resolved: ${text}` };
   }
   if (!input.ready || !input.text) {
     return { ...input, statusLabel: "Not ready yet." };
   }
   if (settings.requireGuestActionApproval) {
-    return { ...input, statusLabel: `Waiting for host approval; guest is waiting on host: ${text}` };
+    return { ...input, statusLabel: `Waiting for host review: ${text}` };
   }
   if (settings.holdGuestActionsForGroupInput) {
-    return { ...input, statusLabel: `Held for group turn; guest is waiting for the host: ${text}` };
+    return { ...input, statusLabel: `Held for the group turn: ${text}` };
   }
-  return { ...input, statusLabel: `Guest action received; Queued for DM: ${text}` };
+  return { ...input, statusLabel: `Friend action queued for the DM: ${text}` };
 }
 
 function localTableRow({ title, subtitle, actions = [] }) {

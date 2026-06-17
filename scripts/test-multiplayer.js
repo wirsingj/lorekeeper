@@ -451,11 +451,11 @@ assert.equal(publicMessage.body, "Kevric ducks behind the nearest tree and watch
 assert.equal(publicMessage.data.status, "pending_model_submit");
 assert.equal(publicMessage.data.hostStaged, true);
 assert.equal(publicMessage.data.requiresHostApproval, false);
-assert.match(publicMessage.meta, /sent to host and queued for DM/i);
+assert.match(publicMessage.meta, /queued for DM/i);
 let hostProjection = buildMultiplayerSessionProjection({ campaign });
 assert.match(hostProjection.flowSummary, /Kevric queued and ready/i);
-assert.equal(hostProjection.resolvePartyInputsLabel, "Resolve Guest Action");
-assert.match(hostProjection.pendingInputs[0].statusLabel, /Guest action received; Queued for DM/i);
+assert.equal(hostProjection.resolvePartyInputsLabel, "Send Friend Action");
+assert.match(hostProjection.pendingInputs[0].statusLabel, /Friend action queued for the DM/i);
 let liveGuestSnapshot = createGuestSnapshot(campaign, connected.id, { clientId: "guest-client", connectionSecret });
 assert.match(liveGuestSnapshot.pendingInput.text, /Kevric ducks/i);
 
@@ -497,11 +497,11 @@ campaign = submitGuestAction(campaign, {
 const heldMessage = campaign.sessionLog.messages.find((message) => message.data?.pendingInputId === campaign.multiplayer.pendingTurnInputs[0].id);
 assert.equal(heldMessage.data.hostStaged, true);
 assert.equal(heldMessage.data.holdForGroup, true);
-assert.match(heldMessage.meta, /grouped host turn/i);
+assert.match(heldMessage.meta, /group turn/i);
 hostProjection = buildMultiplayerSessionProjection({ campaign });
-assert.match(hostProjection.flowSummary, /Kevric held for the grouped host turn/i);
-assert.equal(hostProjection.resolvePartyInputsLabel, "Resolve Group Turn");
-assert.match(hostProjection.pendingInputs[0].statusLabel, /Held for group turn; guest is waiting for the host/i);
+assert.match(hostProjection.flowSummary, /Kevric held for the group turn/i);
+assert.equal(hostProjection.resolvePartyInputsLabel, "Send Group Turn");
+assert.match(hostProjection.pendingInputs[0].statusLabel, /Held for the group turn/i);
 
 const heldInputId = campaign.multiplayer.pendingTurnInputs[0].id;
 campaign = clearPendingTurnInputs(campaign, [heldInputId], { disposition: "dropped" });
@@ -518,16 +518,16 @@ campaign = submitGuestAction(campaign, {
   clientId: "guest-client",
   connectionSecret,
   characterId: "kevric",
-  text: "Kevric waits for host approval before stepping into the clearing.",
+  text: "Kevric waits for host review before stepping into the clearing.",
 });
 const approvalMessage = campaign.sessionLog.messages.find((message) => message.data?.pendingInputId === campaign.multiplayer.pendingTurnInputs[0].id);
 assert.equal(approvalMessage.data.hostStaged, false);
 assert.equal(approvalMessage.data.requiresHostApproval, true);
-assert.match(approvalMessage.meta, /waiting for host approval/i);
+assert.match(approvalMessage.meta, /waiting for host review/i);
 hostProjection = buildMultiplayerSessionProjection({ campaign });
-assert.match(hostProjection.flowSummary, /Kevric waiting for host approval/i);
-assert.equal(hostProjection.resolvePartyInputsLabel, "Approve For DM");
-assert.match(hostProjection.pendingInputs[0].statusLabel, /Waiting for host approval; guest is waiting on host/i);
+assert.match(hostProjection.flowSummary, /Kevric waiting for your review/i);
+assert.equal(hostProjection.resolvePartyInputsLabel, "Send To DM");
+assert.match(hostProjection.pendingInputs[0].statusLabel, /Waiting for host review/i);
 
 const hostSnapshot = createHostSnapshot(campaign);
 assert.equal(hostSnapshot.connections.some((connection) => "secret" in connection), false);

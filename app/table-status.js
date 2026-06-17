@@ -58,8 +58,8 @@ const ACTIVITY_RULES = [
     phase: "party_action_staged",
   },
   {
-    match: /waiting for host approval/i,
-    text: "Waiting for host approval.",
+    match: /waiting for host (?:approval|review)/i,
+    text: "Waiting for host review.",
     phase: "waiting_for_host",
   },
   {

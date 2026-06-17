@@ -485,8 +485,8 @@ window.addEventListener("unhandledrejection", (event) => {
 elements.copyProviderPrompt.addEventListener("click", async () => {
   await copyPromptToClipboard(state.prompt, {
     emptyMessage: "Build a turn first",
-    successMessage: "Provider prompt copied",
-    failureMessage: "Clipboard blocked; prompt is in the drawer",
+    successMessage: "DM instructions copied",
+    failureMessage: "Clipboard blocked; instructions are still open",
   });
 });
 
@@ -2513,9 +2513,9 @@ function addWizardPartyMemberCard(input = {}) {
       </div>
     </div>
     <div class="controller-choice-row" aria-label="Character ${index + 2} controller">
-      <label><input type="radio" name="wizard-character-controller-${index}" value="ai_companion" data-character-field="controllerKind" checked /><span>AI</span></label>
-      <label><input type="radio" name="wizard-character-controller-${index}" value="host" data-character-field="controllerKind" /><span>Host</span></label>
-      <label><input type="radio" name="wizard-character-controller-${index}" value="remote_invite" data-character-field="controllerKind" /><span>Remote Invite</span></label>
+      <label><input type="radio" name="wizard-character-controller-${index}" value="ai_companion" data-character-field="controllerKind" checked /><span>Companion</span></label>
+      <label><input type="radio" name="wizard-character-controller-${index}" value="host" data-character-field="controllerKind" /><span>You</span></label>
+      <label><input type="radio" name="wizard-character-controller-${index}" value="remote_invite" data-character-field="controllerKind" /><span>Invite Friend</span></label>
     </div>
     <div class="campaign-wizard-grid">
       <label><span>Name</span><input data-character-field="name" autocomplete="off" placeholder="Oskar, Ingrid, Bren..." /></label>
@@ -2737,8 +2737,8 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     if (remoteInviteLobby?.link) {
       setProviderActivity(
         remoteInviteLobby.copied
-          ? "Guest Link copied; Remote Invite seats are open"
-          : "Remote Invite seats are open; copy the Guest Link from Preferences",
+          ? "Guest page copied; friend seats are open"
+          : "Friend seats are open; copy the Guest Page link from Table Options",
         remoteInviteLobby.copied ? "idle" : "waiting",
       );
     } else {
@@ -2772,9 +2772,9 @@ async function openRemoteInviteLobbyForNewCampaign(seeds = []) {
     return { link, copied };
   } catch (error) {
     pushDiagnosticsEvent("remote_invite_lobby_open_failed", {
-      message: error instanceof Error ? error.message : "Remote Invite lobby did not open.",
+      message: error instanceof Error ? error.message : "Friend seats did not open.",
     });
-    setProviderActivity(error instanceof Error ? `Remote Invite lobby failed: ${error.message}` : "Remote Invite lobby failed", "error");
+    setProviderActivity(error instanceof Error ? `Friend seats failed: ${error.message}` : "Friend seats failed", "error");
     return null;
   }
 }
@@ -2946,7 +2946,7 @@ function renderPreTableLobby(snapshot = {}) {
   if (!guests.length) {
     elements.preTableWaitingGuests.textContent = snapshot.joinableSeats?.length
       ? "No guests waiting yet."
-      : "No Remote Invite seats yet.";
+      : "No friend seats yet.";
     return;
   }
   elements.preTableWaitingGuests.replaceChildren(...guests.map((guest) => {
@@ -3053,7 +3053,7 @@ function applyDevJumpStartSeed(seed) {
   elements.newCharacterConcept.value = seed.playerCharacter.concept;
   elements.newCharacterAutoSheet.checked = seed.playerCharacter.autoSheet !== false;
   setRadioValue("new-character-controller", seed.playerCharacter.controllerKind || "host");
-  setProviderActivity("Dev jump start filled; review or Create And Start", "idle");
+  setProviderActivity("Example filled; review or start the adventure", "idle");
   elements.newCampaignTitle.focus();
   elements.newCampaignTitle.select();
 }
@@ -3117,10 +3117,10 @@ async function saveGuestActionSettings() {
     render();
     setProviderActivity(
       requireGuestActionApproval
-        ? "Guest actions now wait for host approval"
+        ? "Friend actions now wait for your review"
         : holdGuestActionsForGroupInput
-          ? "Guest actions now wait for grouped host resolution"
-          : "Guest actions now submit directly one at a time",
+          ? "Friend actions now collect into a group turn"
+          : "Friend actions now reach the table one at a time",
       "idle",
     );
   } catch (error) {
@@ -3146,7 +3146,7 @@ async function createInviteForMember(member) {
     render();
     await publishInviteLink(result.inviteLink, {
       copiedMessage: `Invite link copied for ${member.name}`,
-      visibleMessage: `Invite link ready for ${member.name}; copy it from Local Table.`,
+      visibleMessage: `Invite ready for ${member.name}; copy it from Table Options.`,
     });
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Invite failed: ${error.message}` : "Invite failed", "error");
@@ -3163,8 +3163,8 @@ async function createCharacterRequestInviteFromUi() {
     state.multiplayerSnapshot = result.multiplayer;
     render();
     await publishInviteLink(result.inviteLink, {
-      copiedMessage: "Join-as character invite copied",
-      visibleMessage: "Join-as character invite ready; copy it from Local Table.",
+      copiedMessage: "New character invite copied",
+      visibleMessage: "New character invite ready; copy it from Table Options.",
     });
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Join-as invite failed: ${error.message}` : "Join-as invite failed", "error");
@@ -3181,7 +3181,7 @@ async function copyGuestLinkFromUi() {
     }
     const link = currentLocalGuestLink();
     if (!link) {
-      throw new Error("Local Table did not report a guest link.");
+      throw new Error("The guest page is not ready yet.");
     }
     showGuestLink(link);
     const copied = await writeClipboardText(link);
@@ -3190,7 +3190,7 @@ async function copyGuestLinkFromUi() {
       return true;
     }
     revealGuestLink();
-    setProviderActivity("Guest link ready; copy it from Local Table.", "waiting");
+    setProviderActivity("Guest page ready; copy it from Table Options.", "waiting");
     return false;
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Guest link failed: ${error.message}` : "Guest link failed", "error");
@@ -3268,7 +3268,7 @@ async function publishInviteLink(inviteLink, { copiedMessage, visibleMessage } =
     return true;
   }
   revealInviteLink();
-  setProviderActivity(visibleMessage || "Invite link ready; copy it from Local Table.", "waiting");
+    setProviderActivity(visibleMessage || "Invite link ready; copy it from Table Options.", "waiting");
   return false;
 }
 
@@ -3764,7 +3764,7 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
       submitButton.disabled = true;
     }
     if (statusElement) {
-      statusElement.textContent = "Requesting host approval...";
+      statusElement.textContent = "Requesting a seat...";
     }
     const baseUrl = `http://${parsed.host}:${parsed.port}`;
     const result = await postJson(`${baseUrl}${apiMultiplayerJoinUrl}`, {
@@ -3793,7 +3793,7 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
     const assignedName = result.snapshot?.assignedCharacter?.name || result.connection?.proposedCharacter?.name || requestedCharacterName;
     const statusText = result.approved
       ? `Joined${assignedName ? ` as ${assignedName}` : ""}. You can submit actions for your assigned character.`
-      : `Join request sent${assignedName ? ` for ${assignedName}` : ""}. Waiting for host approval.`;
+      : `Seat request sent${assignedName ? ` for ${assignedName}` : ""}. Waiting for your friend.`;
     if (statusElement) {
       statusElement.textContent = statusText;
     }
@@ -3918,7 +3918,7 @@ async function refreshGuestSnapshot({ explicit = false } = {}) {
     if (snapshot.tableStopped) {
       setProviderActivity("Host local table is off. Ask the host to start it, then refresh the table.", "waiting");
     } else if (snapshot.awaitingApproval) {
-      setProviderActivity("Waiting for host approval", "waiting");
+      setProviderActivity("Waiting for your friend", "waiting");
     } else if (snapshot.pendingInput?.passed) {
       setProviderActivity("Passed for this turn. Waiting for the host table.", "waiting");
     } else if (snapshot.pendingInput?.text) {
@@ -4218,7 +4218,7 @@ function renderGuestSnapshot(snapshot) {
   } else if (snapshot.assignedCharacter) {
     elements.saveStatus.textContent = `Guest: ${snapshot.assignedCharacter.name}`;
   } else if (snapshot.awaitingApproval) {
-    elements.saveStatus.textContent = "Guest: waiting for host approval";
+    elements.saveStatus.textContent = "Guest: waiting for seat";
   }
 }
 
@@ -4278,10 +4278,10 @@ function createGuestShellCampaign() {
           sessionId: "thin-lorekeeper-session",
           role: "system",
           title: "LoreKeeper",
-          body: guestWaitingRoomMode
-            ? "Guest waiting room is ready. Ask the host for a seat to join the table."
-            : "LoreKeeper Join is ready. Join a hosted local table to play as an assigned party member.",
-          meta: "No local campaign API or model provider is running in this window.",
+        body: guestWaitingRoomMode
+          ? "Choose an open table, ask for a seat, and wait for your friend to bring you in."
+          : "Join a hosted LoreKeeper table and play as an assigned party member.",
+        meta: "No local AI setup is needed here.",
           source: "lorekeeper_join",
           createdAt: new Date().toISOString(),
           data: {},
@@ -4315,25 +4315,25 @@ function controllerLabel(member) {
   }
   const kind = member.controllerKind || (member.type === "player_character" ? "host" : "ai_companion");
   return {
-    host: "Host",
-    remote_player: "Remote",
-    ai_companion: "AI",
+    host: "You",
+    remote_player: "Friend",
+    ai_companion: "Companion",
     unassigned: "Open",
-  }[kind] || "AI";
+  }[kind] || "Companion";
 }
 
 function partyControllerDetail(member) {
   if (member.inviteIntent === "remote_player" && member.controllerKind === "unassigned") {
-    return "Waiting for an invited player.";
+    return "Waiting for an invited friend.";
   }
   if (member.controllerKind === "host") {
-    return "Host controlled.";
+    return "You control this character.";
   }
   if (member.controllerKind === "remote_player") {
-    return "Remote player controlled.";
+    return "A friend controls this character.";
   }
   if (member.controllerKind === "ai_companion") {
-    return "AI companion.";
+    return "Companion.";
   }
   return "";
 }
@@ -6570,7 +6570,7 @@ function renderThinJoinPanel() {
 
   const awaitingApproval = state.guestSession?.status === "pending" || state.guestSnapshot?.awaitingApproval;
   if (elements.thinJoinTitle) {
-    elements.thinJoinTitle.textContent = guestWaitingRoomMode ? "Guest Waiting Room" : "Join A Hosted Table";
+    elements.thinJoinTitle.textContent = guestWaitingRoomMode ? "Find A Seat" : "Join A Table";
   }
   if (elements.joinBackHome) {
     elements.joinBackHome.hidden = false;
@@ -6590,8 +6590,8 @@ function renderThinJoinPanel() {
   document.querySelector(".thin-join-actions")?.toggleAttribute("hidden", guestWaitingRoomMode);
   if (elements.thinJoinCopy) {
     elements.thinJoinCopy.textContent = guestWaitingRoomMode
-      ? "Ask the host for a seat at this table. You will only see campaign details after the host assigns you a character."
-      : "Paste the invite link from the host, add your table name, and request a seat.";
+      ? "Ask for an open character seat. You will see the full table after your friend seats you."
+      : "Paste the invite link, add your table name, and request a seat.";
   }
   if (elements.guestWaitingStatus && guestWaitingRoomMode) {
     const selectedSeat = state.guestLobbyPreview?.joinableSeats?.find((seat) => seat.id === state.selectedGuestSeatId);
@@ -6605,7 +6605,7 @@ function renderThinJoinPanel() {
     elements.thinJoinStatus.hidden = guestWaitingRoomMode;
   }
   if (elements.thinJoinStatus && awaitingApproval) {
-    elements.thinJoinStatus.textContent = "Join request sent. Waiting for host approval.";
+    elements.thinJoinStatus.textContent = "Seat request sent. Waiting for your friend.";
   }
   const savedSession = state.guestSession || state.recentGuestSession;
   if (elements.thinJoinInviteLink && savedSession?.inviteLink && !elements.thinJoinInviteLink.value) {
@@ -6619,8 +6619,8 @@ function renderThinJoinPanel() {
     elements.thinJoinStatus.textContent = state.launchInviteError;
   } else if (elements.thinJoinStatus && !awaitingApproval && !state.guestSession && state.recentGuestSession?.inviteLink) {
     elements.thinJoinStatus.textContent = launchInviteLink
-      ? "Invite loaded. Enter your name, then join the hosted table."
-      : "Previous table remembered. Request join again when the host is available.";
+      ? "Invite loaded. Enter your name, then join the table."
+      : "Previous table remembered. Ask for a seat again when it is open.";
   }
   if (elements.thinJoinSubmit) {
     elements.thinJoinSubmit.textContent = !launchInviteLink && !state.guestSession && state.recentGuestSession?.inviteLink
@@ -9008,7 +9008,7 @@ function remotePendingInputLabel(message) {
 
 function remotePendingInputTitle(message) {
   if (!message.data?.hostStaged) {
-    return "This guest action reached the host table and is waiting for host approval.";
+    return "This action reached the table and is waiting for host review.";
   }
   if (message.data?.holdForGroup) {
     return "This guest action reached the host table and is waiting for the grouped table turn.";
@@ -9165,23 +9165,23 @@ function pendingJoinRequestElement(connection) {
   const name = proposal.name || connection.displayName || "Guest";
   const classLine = [proposal.ancestry, proposal.characterClass].filter(Boolean).join(" ");
   const body = [
-    `${connection.displayName || "Guest"} wants to join as ${name}.`,
+    `${connection.displayName || "Guest"} wants a seat as ${name}.`,
     classLine || proposal.summary || "",
     proposal.integrationPrompt ? "Has story integration notes." : "",
   ].filter(Boolean).join(" ");
   const tile = recordElement({
-    title: `Join request: ${name}`,
+    title: `Seat request: ${name}`,
     body,
-    badge: "Pending",
+    badge: "Waiting",
     actions: [
       {
-        label: "Approve",
-        title: `Approve ${name}`,
+        label: "Seat",
+        title: `Seat ${name}`,
         onClick: () => approveGuest(connection.id),
       },
       {
-        label: "Deny",
-        title: `Deny ${name}`,
+        label: "Decline",
+        title: `Decline ${name}`,
         onClick: () => denyGuest(connection.id),
       },
     ],
@@ -9208,7 +9208,7 @@ function joinRequestDetailsText(connection) {
 
 async function showJoinRequestDetails(connection) {
   await confirmInApp({
-    title: "Join Request Details",
+    title: "Seat Request Details",
     message: joinRequestDetailsText(connection),
     acceptLabel: "Close",
   });
@@ -9280,8 +9280,8 @@ function partyControllerActions(member, pendingConnection = null) {
   }
   if (kind === "ai_companion") {
     actions.push({
-      label: "Invite Player",
-      title: `Invite a player to control ${member.name}`,
+      label: "Invite",
+      title: `Invite a friend to play ${member.name}`,
       onClick: () => createInviteForMember(member),
     });
     actions.push({
@@ -9293,8 +9293,8 @@ function partyControllerActions(member, pendingConnection = null) {
     return actions;
   }
   actions.push({
-    label: "Invite Player",
-    title: `Invite a player to control ${member.name}`,
+    label: "Invite",
+    title: `Invite a friend to play ${member.name}`,
     onClick: () => createInviteForMember(member),
   });
   return actions;

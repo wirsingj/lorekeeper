@@ -57,13 +57,13 @@ summary,
 .handheld-shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: minmax(280px, 300px) minmax(520px, 1fr) 340px;
+  grid-template-columns: minmax(250px, 280px) minmax(660px, 1fr) minmax(280px, 315px);
   grid-template-rows: minmax(0, 1fr) var(--command-deck-height);
   grid-template-areas:
     "left screen right"
     "bottom bottom bottom";
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .handheld-shell.lobby-mode {
@@ -125,8 +125,8 @@ summary,
 .panel-rail,
 .screen-bezel,
 .command-deck {
-  border: 1px solid rgba(174, 191, 202, 0.16);
-  box-shadow: var(--shadow);
+  border: 1px solid rgba(174, 191, 202, 0.13);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
 }
 
 .eyebrow {
@@ -193,7 +193,7 @@ h3 {
 .left-panel {
   grid-area: left;
   min-width: 0;
-  max-width: 300px;
+  max-width: 280px;
 }
 
 .right-panel {
@@ -206,17 +206,17 @@ h3 {
   max-height: 100%;
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 9px;
   overflow-y: auto;
   overflow-x: hidden;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 34%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent 34%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
     var(--stone);
   background-size: auto, 38px 38px, auto;
   color: var(--ink);
-  border-radius: 10px 22px 22px 10px;
+  border-radius: 12px;
 }
 
 .campaign-section {
@@ -241,7 +241,7 @@ h3 {
 }
 
 .right-panel {
-  border-radius: 22px 10px 10px 22px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -261,11 +261,11 @@ h3 {
 
 .rail-section {
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  background: rgba(16, 19, 21, 0.42);
-  border: 1px solid rgba(174, 191, 202, 0.12);
-  border-radius: 10px;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(16, 19, 21, 0.34);
+  border: 1px solid rgba(174, 191, 202, 0.09);
+  border-radius: 8px;
 }
 
 .section-title {
@@ -318,6 +318,10 @@ h3 {
 
 .notes-panel:not([open]) {
   flex: 0 0 auto;
+}
+
+.right-panel .notes-panel:not([open]) {
+  background: rgba(16, 19, 21, 0.24);
 }
 
 .notes-panel summary::-webkit-details-marker {
@@ -1139,11 +1143,11 @@ button:disabled {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 8px;
-  padding: 10px;
+  padding: 8px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 34%),
     var(--stone-dark);
-  border-radius: 16px;
+  border-radius: 14px;
 }
 
 .home-panel {
@@ -1595,18 +1599,17 @@ button:disabled {
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 18px 22px;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    radial-gradient(circle at 12% 18%, rgba(143, 166, 184, 0.08), transparent 22%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
     linear-gradient(135deg, #1d2225, #2b3135 52%, #202529);
-  background-size: 52px 52px, 52px 52px, auto, auto;
+  background-size: 52px 52px, 52px 52px, auto;
   background-position: center;
-  border: 3px solid #3f484f;
-  border-radius: 10px;
+  border: 1px solid rgba(174, 191, 202, 0.22);
+  border-radius: 14px;
   color: #e7ecef;
-  font-size: 0.94rem;
+  font-size: 0.98rem;
 }
 
 .play-log.play-log-with-join-panel {
@@ -1633,22 +1636,22 @@ button:disabled {
 
 .play-message {
   display: grid;
-  grid-template-columns: 32px minmax(0, min(86ch, calc(100% - 40px)));
+  grid-template-columns: 30px minmax(0, min(92ch, calc(100% - 38px)));
   gap: 8px;
   align-items: end;
-  margin-bottom: 11px;
+  margin-bottom: 14px;
 }
 
 .play-message.player,
 .play-message.local {
-  grid-template-columns: minmax(0, min(72ch, calc(100% - 40px))) 32px;
+  grid-template-columns: minmax(0, min(78ch, calc(100% - 38px))) 30px;
   justify-content: end;
   justify-items: end;
 }
 
 .message-avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   border: 2px solid rgba(230, 236, 239, 0.16);
@@ -1682,11 +1685,11 @@ button:disabled {
 
 .message-bubble {
   min-width: 0;
-  padding: 11px 13px;
+  padding: 13px 15px;
   border: 1px solid rgba(174, 191, 202, 0.16);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(29, 34, 38, 0.94);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 9px 22px rgba(0, 0, 0, 0.16);
 }
 
 .play-message.player .message-bubble,
@@ -2101,12 +2104,12 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: minmax(0, 1fr);
   column-gap: 10px;
-  padding: 16px 14px 18px;
+  padding: 14px 12px 16px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 38%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.024), transparent 38%),
     var(--stone-dark);
   color: #edf2f4;
-  border-radius: 10px 10px 18px 18px;
+  border-radius: 12px;
   min-height: 0;
   overflow: hidden;
 }

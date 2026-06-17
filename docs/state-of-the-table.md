@@ -169,11 +169,12 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 118. Stale detailed `/guest?...campaign/table/session...` URLs no longer drive the normal waiting-room preview; the guest page asks the host server what is currently joinable.
 119. Host New waiting guests can be seated before Create And Start; reserved draft seats are adopted into the real local table as remote controllers when the campaign launches.
 120. New campaign seed text no longer appears as the visible first DM bubble; the opening message now tells the host to Nudge the DM or type the first action.
-121. First-pass Steam-ready wording now makes the front door and preferences calmer: Continue/New Table/Join/AI Setup, Guests, Troubleshooting, Developer Details, and Saved locally replace more technical provider/SQLite/import wording in normal paths.
+121. First-pass Steam-ready wording made early front-door and preferences copy calmer, replacing more technical provider/SQLite/import wording in normal paths.
 122. Starting a fresh local table session now resets stale remote runtime state: old connected/pending guests are disconnected, waiting-room records are closed, remote controllers are released, and open seats become requestable again instead of silently reviving old approvals.
 123. Guest seating now updates live renderer session state, not only localStorage/snapshot state, and carries table/session identity forward so a seated guest does not see a "join first" command deck.
 124. Character panel Auto-Complete now re-seeds generated pitch, look/vibe, party integration, and DM-note text from the current basics instead of only filling blanks and leaving stale generated flavor behind.
 125. Create And Start no longer auto-runs the first DM generation; the host lands on a ready table with Nudge available, and waiting-guest cues refresh roughly once per second even while the DM is generating.
+126. Product UX wording and hierarchy now push harder toward story-first table language: Continue/New Adventure/Find Table/Check AI, friend seats, seat requests, host review, Scratchpad, collapsed Player Notes, quieter rails, and a more dominant play log.
 
 ### Still Risky
 
@@ -201,7 +202,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
-25. The app still has too many visible controls in Preferences and the table rails. The current pass improved wording, but Steam-ready UX still needs fewer surfaces, clearer phase-specific actions, and better separation between normal play and troubleshooting.
+25. The app still has too many visible controls in Preferences and the table rails. The current pass improved wording and visual hierarchy, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and better separation between normal play and troubleshooting.
 
 ## Live Acceptance Matrix
 
@@ -242,7 +243,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 12. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
 13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
-15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, and make the front door feel like a game launcher instead of a settings hub.
+15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: first-pass table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
 
 ### Medium
 

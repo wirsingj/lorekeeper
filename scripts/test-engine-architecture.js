@@ -2303,7 +2303,7 @@ function testMultiplayerSessionProjection() {
   assert.equal(hostProjection.guestLink, "http://192.168.1.24:7347/guest");
   assert.equal(hostProjection.canCopyGuestLink, true);
   assert.match(hostProjection.flowSummary, /queued/i);
-  assert.match(hostProjection.pendingInputs[0].statusLabel, /Queued for DM/);
+  assert.match(hostProjection.pendingInputs[0].statusLabel, /queued for the DM/i);
 
   const liveWaitingProjection = buildMultiplayerSessionProjection({
     campaign: {
@@ -2342,16 +2342,16 @@ function testMultiplayerSessionProjection() {
   campaign.multiplayer.settings.requireGuestActionApproval = true;
   const approvalProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
   assert.equal(approvalProjection.requireGuestActionApproval, true);
-  assert.match(approvalProjection.flowSummary, /host approval/i);
-  assert.match(approvalProjection.pendingInputs[0].statusLabel, /Waiting for host approval/);
+  assert.match(approvalProjection.flowSummary, /your review/i);
+  assert.match(approvalProjection.pendingInputs[0].statusLabel, /Waiting for host review/);
 
   campaign.multiplayer.settings.requireGuestActionApproval = false;
   campaign.multiplayer.settings.holdGuestActionsForGroupInput = true;
   const holdProjection = buildMultiplayerSessionProjection({ campaign, locationPort: "4173" });
   assert.equal(holdProjection.holdGuestActionsForGroupInput, true);
-  assert.equal(holdProjection.resolvePartyInputsLabel, "Resolve Group Turn");
-  assert.match(holdProjection.flowSummary, /grouped host turn/i);
-  assert.match(holdProjection.pendingInputs[0].statusLabel, /Held for group turn/);
+  assert.equal(holdProjection.resolvePartyInputsLabel, "Send Group Turn");
+  assert.match(holdProjection.flowSummary, /group turn/i);
+  assert.match(holdProjection.pendingInputs[0].statusLabel, /Held for the group turn/);
 
   const guestProjection = buildMultiplayerSessionProjection({
     campaign,
@@ -2363,8 +2363,8 @@ function testMultiplayerSessionProjection() {
   assert.equal(guestProjection.canStartLocalTable, false);
   assert.equal(guestProjection.canSyncGuestTable, true);
   assert.equal(guestProjection.pendingInputs.length, 1);
-  assert.match(guestProjection.flowSummary, /host table first/i);
-  assert.match(guestProjection.pendingInputs[0].statusLabel, /Sent to host table/);
+  assert.match(guestProjection.flowSummary, /table first/i);
+  assert.match(guestProjection.pendingInputs[0].statusLabel, /Sent to the table/);
 }
 
 function testReviewPanelProjection() {
@@ -2442,8 +2442,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.equal(/label:\s*"Play"/.test(appJs), false, "AI companion cards should use Nudge instead of a Play button");
   assert.match(
     appJs,
-    /label:\s*"Invite Player"[\s\S]*?label:\s*"Nudge"[\s\S]*?className:\s*"nudge-action"/,
-    "AI companion card actions should place Nudge after Invite Player and use nudge styling",
+    /label:\s*"Invite"[\s\S]*?label:\s*"Nudge"[\s\S]*?className:\s*"nudge-action"/,
+    "AI companion card actions should place Nudge after Invite and use nudge styling",
   );
   assert.match(appJs, /Stage For DM/, "AI companion approval should read like staging a table beat");
   assert.match(appJs, /Resolve Now/, "AI companion approval should support immediate DM resolution");
@@ -2488,11 +2488,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   const localTable = await readFile(path.join("src", "multiplayer", "local-table.js"), "utf8");
   const server = await readFile(path.join("scripts", "serve.js"), "utf8");
   assert.doesNotMatch(localTable, /ThinLoreKeeper/, "multiplayer-created character notes should use the unified LoreKeeper Join identity");
-  assert.match(appShell, /Additional Characters/);
-  assert.match(appShell, /Add Party Set/);
+  assert.match(appShell, /Party/);
+  assert.match(appShell, /Add Crew/);
   assert.match(appShell, /add-party-template/);
   assert.match(appShell, /add-wizard-party-member/);
-  assert.match(appShell, /Remote Invite/);
+  assert.match(appShell, /Invite Friend/);
   assert.match(appShell, /new-character-controller/);
   assert.match(appShell, /Back to previous screen/);
   assert.match(appShell, /data-character-field="controllerKind"/);
@@ -2503,8 +2503,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /local-table-guidance/);
   assert.match(appShell, /local-table-guest-link/);
   assert.match(appShell, /copy-guest-link/);
-  assert.match(appShell, /Open Guest Lobby/);
-  assert.match(appShell, /Send Guest Actions/);
+  assert.match(appShell, /Open Guest Page/);
+  assert.match(appShell, /Send Friend Actions/);
   assert.doesNotMatch(appShell, />Resync</);
   assert.doesNotMatch(appJs, /Guest resync/i);
   assert.match(appJs, /Guest table refresh/);
@@ -2521,7 +2521,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /guest-seat-list/);
   assert.match(appShell, /Ask To Join/);
   assert.match(appShell, /home-campaign-select/);
-  assert.match(appShell, /Existing Campaign/);
+  assert.match(appShell, /Saved adventure/);
   assert.match(appShell, /id="waiting-guests"/);
   assert.ok(
     appShell.indexOf('id="provider-activity"') < appShell.indexOf('id="play-log"'),
@@ -2600,7 +2600,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /copyGuestLinkFromUi/);
   assert.match(appJs, /currentLocalGuestLink/);
   assert.match(appJs, /partyControllerDetail/);
-  assert.match(appJs, /Waiting for an invited player/);
+  assert.match(appJs, /Waiting for an invited friend/);
   assert.match(appJs, /renderDebugMetaControl/);
   assert.match(appJs, /DM response needs review\. Try Again, Details, or Use Anyway\./);
   assert.match(appJs, /DM is reconsidering the response/);

@@ -7,7 +7,7 @@ export function LorekeeperShell() {
         <section className="rail-section campaign-section">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Campaign</p>
+              <p className="eyebrow">Adventure</p>
               <h1 id="campaign-title" className="visually-hidden">Loading campaign...</h1>
             </div>
             <div className="title-actions">
@@ -24,7 +24,7 @@ export function LorekeeperShell() {
                 </svg>
                 <span>Nudge</span>
               </button>
-              <button id="open-setup" className="icon-action" type="button" title="Setup" aria-label="Setup">
+              <button id="open-setup" className="icon-action" type="button" title="Table options" aria-label="Table options">
                 <svg aria-hidden="true" viewBox="0 0 24 24">
                   <path d="M12 8.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 0 1 0-7Z"></path>
                   <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5l-2-3.5l-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A8 8 0 0 0 7 6.5l-2.4-1l-2 3.5l2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5l2 3.5l2.4-1a8 8 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a8 8 0 0 0 2.6-1.5l2.4 1l2-3.5l-2-1.5Z"></path>
@@ -46,7 +46,7 @@ export function LorekeeperShell() {
           </div>
           <div className="status-chips">
             <span id="scene-location">Loading...</span>
-            <span id="save-status">Saved locally</span>
+            <span id="save-status">Saved</span>
           </div>
           <div id="scene-intelligence" className="scene-intelligence" hidden>
             <div>
@@ -71,8 +71,8 @@ export function LorekeeperShell() {
                 </svg>
                 <span>Join</span>
               </button>
-              <button id="invite-new-character-main" className="icon-action labeled-action table-action" type="button" title="Invite a player to bring a new character" aria-label="Invite a new player character">
-                <span>Invite New</span>
+              <button id="invite-new-character-main" className="icon-action labeled-action table-action" type="button" title="Invite a friend to bring a character" aria-label="Invite a friend">
+                <span>Invite</span>
               </button>
               <button className="icon-action" data-add-domain="party" type="button" title="Add party member">+</button>
               <span id="party-count" className="count-pill">0</span>
@@ -102,45 +102,45 @@ export function LorekeeperShell() {
               <div className="home-flow-grid">
                 <article className="home-flow-card home-flow-card-primary">
                   <div>
-                    <p className="eyebrow">Host</p>
-                    <h3>Run A Table</h3>
-                    <p>Continue a campaign or build a new table for tonight.</p>
+                    <p className="eyebrow">Your Table</p>
+                    <h3>Continue Adventure</h3>
+                    <p>Pick up an existing story or gather a party for a new one.</p>
                   </div>
                   <label className="home-campaign-picker">
-                    <span>Existing Campaign</span>
+                    <span>Saved adventure</span>
                     <select id="home-campaign-select" aria-label="Existing campaign">
                       <option>Loading campaigns...</option>
                     </select>
                   </label>
                   <div className="home-flow-actions">
                     <button id="home-host-flow" type="button">Continue</button>
-                    <button id="home-new-campaign" className="secondary-action" type="button">New Table</button>
+                    <button id="home-new-campaign" className="secondary-action" type="button">New Adventure</button>
                   </div>
                 </article>
                 <article className="home-flow-card home-flow-card-primary">
                   <div>
-                    <p className="eyebrow">Join</p>
-                    <h3>Sit At A Table</h3>
-                    <p>Use a host link, request a seat, and play without local AI setup.</p>
+                    <p className="eyebrow">Friends</p>
+                    <h3>Join A Table</h3>
+                    <p>Open the host link, choose a seat, and start playing.</p>
                   </div>
                   <div className="home-flow-actions">
-                    <button id="home-join-flow" type="button">Join</button>
+                    <button id="home-join-flow" type="button">Find Table</button>
                   </div>
                 </article>
                 <article className="home-flow-card home-flow-card-setup">
                   <div>
-                    <p className="eyebrow">AI</p>
-                    <h3>DM Setup</h3>
-                    <p>Pick the local model or fallback chat used by hosted tables.</p>
+                    <p className="eyebrow">DM Voice</p>
+                    <h3>AI Readiness</h3>
+                    <p>Check the storyteller before you host.</p>
                   </div>
                   <div className="home-flow-actions">
-                    <button id="home-provider-setup" type="button">AI Setup</button>
+                    <button id="home-provider-setup" type="button">Check AI</button>
                   </div>
                 </article>
               </div>
               <div className="home-library-strip" aria-label="Local library summary">
                 <span id="home-active-campaign">Campaigns loading...</span>
-                <span id="home-character-count">Characters live with their campaigns</span>
+                <span id="home-character-count">Characters stay with their adventures</span>
                 <button id="home-settings" className="secondary-action" type="button">Preferences</button>
               </div>
             </div>
@@ -164,7 +164,7 @@ export function LorekeeperShell() {
               <button id="recheck-provider" className="mini-action" type="button" title="Check the latest DM chat response" hidden>
                 Read Latest
               </button>
-              <button id="seat-waiting-guest" className="mini-action" type="button" title="Open Local Table seating controls" hidden>
+              <button id="seat-waiting-guest" className="mini-action" type="button" title="Open seating controls" hidden>
                 Seat Guest
               </button>
             </div>
@@ -174,7 +174,7 @@ export function LorekeeperShell() {
               <div className="join-panel-header">
                 <div>
                   <p className="eyebrow">LoreKeeper Join</p>
-                  <h2 id="thin-join-title">Join A Hosted Table</h2>
+                  <h2 id="thin-join-title">Join A Table</h2>
                 </div>
                 <button id="join-back-home" className="secondary-action back-home-action" type="button" title="Back to main menu">
                   <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -183,14 +183,14 @@ export function LorekeeperShell() {
                   <span>Back</span>
                 </button>
               </div>
-              <p id="thin-join-copy" className="thin-join-copy">Paste the invite link from the host, add your table name, and request a seat.</p>
+              <p id="thin-join-copy" className="thin-join-copy">Choose an open seat, add the name your friends should see, and ask to join.</p>
               <section id="guest-waiting-room-panel" className="guest-waiting-room-panel" hidden>
                 <section id="guest-table-preview" className="join-preview-card guest-table-preview" hidden>
                   <p className="join-preview-empty">Looking for the host table...</p>
                 </section>
                 <section id="guest-seat-list" className="guest-seat-list" aria-label="Available table seats" hidden></section>
                 <label>
-                  <span>Your table name</span>
+                  <span>Your name at the table</span>
                   <input id="guest-waiting-player-name" autoComplete="name" placeholder="Name" />
                 </label>
                 <button id="guest-waiting-register" type="button">Ask To Join</button>
@@ -216,8 +216,8 @@ export function LorekeeperShell() {
                 </label>
               </section>
               <div className="thin-join-character">
-                <h3>Join As Your Character</h3>
-                <p className="thin-join-copy">Fill this out to request a new party character. Leave it blank only when the host specifically invited you to control an existing party member.</p>
+                <h3>Your Character</h3>
+                <p className="thin-join-copy">Fill this out when you are bringing someone new to the party.</p>
                 <button id="thin-join-character-autocomplete" className="secondary-action character-autocomplete-action" type="button">
                   Auto-Complete
                 </button>
@@ -285,8 +285,8 @@ export function LorekeeperShell() {
         <details id="campaign-notes-panel" className="rail-section notes-panel campaign-notes-panel" open>
           <summary className="notes-panel-summary">
             <span>
-              <p className="eyebrow">Campaign Notes</p>
-              <h2>World, Clues, And Threads</h2>
+              <p className="eyebrow">World Notes</p>
+              <h2>People, Places, Clues</h2>
             </span>
           </summary>
           <div className="notes-panel-body campaign-notes-grid">
@@ -336,11 +336,11 @@ export function LorekeeperShell() {
           </div>
         </details>
 
-        <details id="player-notes-panel" className="rail-section notes-panel player-notes-panel" open>
+        <details id="player-notes-panel" className="rail-section notes-panel player-notes-panel">
           <summary className="notes-panel-summary">
             <span>
-              <p className="eyebrow">Player Notes</p>
-              <h2>Your Table Notes</h2>
+              <p className="eyebrow">Your Notes</p>
+              <h2>Scratchpad</h2>
             </span>
           </summary>
           <div className="notes-panel-body player-notes-grid">
@@ -395,7 +395,7 @@ export function LorekeeperShell() {
               id="player-input"
               rows="3"
               spellCheck="true"
-              placeholder="I check the alley for watchers. (Keep this tense and heist-focused.)"
+              placeholder="What do you do?"
             ></textarea>
             <button id="build-turn" type="submit">Send Turn</button>
           </div>
@@ -458,8 +458,8 @@ function CampaignDialog() {
       <form id="campaign-form" method="dialog">
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">Campaign</p>
-            <h2>New Campaign</h2>
+            <p className="eyebrow">Adventure</p>
+            <h2>New Adventure</h2>
           </div>
           <button id="close-campaign-dialog" className="secondary-action back-home-action" type="button" title="Back to previous screen">
             <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -472,13 +472,13 @@ function CampaignDialog() {
         <div className="campaign-wizard-layout">
           <section className="campaign-wizard-section campaign-seed-section">
             <div className="wizard-heading">
-              <span>Campaign Seed</span>
-              <button id="dev-jump-start-campaign" className="mini-action" type="button">Dev Jump Start</button>
+              <span>Adventure</span>
+              <button id="dev-jump-start-campaign" className="mini-action" type="button">Fill Example</button>
             </div>
             <div className="campaign-wizard-grid">
               <label>
-                <span>Campaign name</span>
-                <input id="new-campaign-title" autoComplete="off" required placeholder="Campaign name" />
+                <span>Adventure name</span>
+                <input id="new-campaign-title" autoComplete="off" required placeholder="The title your table will remember" />
               </label>
               <label>
                 <span>Starting place</span>
@@ -486,15 +486,15 @@ function CampaignDialog() {
               </label>
             </div>
             <label>
-              <span>Opening prompt</span>
-              <textarea
-                id="new-campaign-premise"
-                rows="7"
-                placeholder="Describe the adventure you want to start. This becomes the first prompt LoreKeeper sends to the DM."
-              ></textarea>
+                <span>Opening situation</span>
+                <textarea
+                  id="new-campaign-premise"
+                  rows="7"
+                  placeholder="What is happening when play begins? Who needs help, what is at stake, and why can the party act now?"
+                ></textarea>
             </label>
             <label>
-              <span>Tone / style</span>
+                <span>Tone</span>
               <input
                 id="new-campaign-tone"
                 autoComplete="off"
@@ -503,7 +503,7 @@ function CampaignDialog() {
             </label>
             <div id="pretable-lobby-panel" className="pretable-lobby-panel" hidden>
               <div className="pretable-lobby-heading">
-                <span>Guest Lobby</span>
+                <span>Friends Waiting</span>
                 <button id="copy-pretable-guest-link" className="mini-action" type="button">Copy Link</button>
               </div>
               <input id="pretable-guest-link" readOnly placeholder="Guest link appears here when the local lobby is visible." />
@@ -513,21 +513,21 @@ function CampaignDialog() {
 
           <section className="campaign-wizard-section primary-character-section">
             <div className="wizard-heading">
-              <span>Player Character</span>
+              <span>Your Character</span>
               <button id="new-character-autocomplete" className="mini-action" type="button">Auto-Complete</button>
             </div>
             <div className="controller-choice-row" aria-label="Player character controller">
               <label>
                 <input type="radio" name="new-character-controller" value="host" defaultChecked />
-                <span>Host</span>
+                <span>You</span>
               </label>
               <label>
                 <input type="radio" name="new-character-controller" value="ai_companion" />
-                <span>AI</span>
+                <span>Companion</span>
               </label>
               <label>
                 <input type="radio" name="new-character-controller" value="remote_invite" />
-                <span>Remote Invite</span>
+                <span>Invite Friend</span>
               </label>
             </div>
             <div className="campaign-wizard-grid">
@@ -565,11 +565,11 @@ function CampaignDialog() {
           <section className="campaign-wizard-section additional-characters-section">
             <div className="wizard-heading">
               <div>
-                <span>Additional Characters</span>
-                <p>Build the pre-table party. Host and AI seats are ready immediately; Remote Invite seats open the Guest Link when the campaign starts.</p>
+              <span>Party</span>
+                <p>Add companions or seats for friends before the first scene.</p>
               </div>
               <div className="wizard-heading-actions">
-                <button id="add-party-template" className="mini-action" type="button">Add Party Set</button>
+                <button id="add-party-template" className="mini-action" type="button">Add Crew</button>
                 <button id="add-wizard-party-member" className="icon-action" type="button" title="Add character">+</button>
               </div>
             </div>
@@ -582,15 +582,15 @@ function CampaignDialog() {
                 <div className="controller-choice-row" aria-label="Character 2 controller">
                   <label>
                     <input type="radio" name="wizard-character-controller-0" value="ai_companion" data-character-field="controllerKind" defaultChecked />
-                    <span>AI</span>
+                    <span>Companion</span>
                   </label>
                   <label>
                     <input type="radio" name="wizard-character-controller-0" value="host" data-character-field="controllerKind" />
-                    <span>Host</span>
+                    <span>You</span>
                   </label>
                   <label>
                     <input type="radio" name="wizard-character-controller-0" value="remote_invite" data-character-field="controllerKind" />
-                    <span>Remote Invite</span>
+                    <span>Invite Friend</span>
                   </label>
                 </div>
                 <div className="campaign-wizard-grid">
@@ -645,7 +645,7 @@ function CampaignDialog() {
         </div>
 
         <footer className="dialog-actions">
-          <button type="submit">Create And Start</button>
+          <button type="submit">Start Adventure</button>
         </footer>
       </form>
     </dialog>
@@ -659,7 +659,7 @@ function SetupDialog() {
         <header className="dialog-header">
           <div>
             <p className="eyebrow">Preferences</p>
-            <h2>App Setup</h2>
+            <h2>Table Options</h2>
           </div>
           <button id="close-setup" className="icon-action" type="button" title="Close">x</button>
         </header>
@@ -675,7 +675,7 @@ function SetupDialog() {
               <option value="thin">Join</option>
             </select>
           </label>
-          <p id="app-mode-note" className="setup-note">Host runs campaigns and providers. Join connects to a hosted table without local provider setup.</p>
+          <p id="app-mode-note" className="setup-note">Host runs the table. Join sits down at a friend's table.</p>
         </section>
 
         <section id="provider-setup-section" className="setup-section provider-setup-section">
@@ -685,8 +685,8 @@ function SetupDialog() {
           <label>
             <span>AI Source</span>
             <select id="provider-mode">
-              <option value="ollama">Ollama Local</option>
-              <option value="bridge">Campaign Chat Fallback</option>
+              <option value="ollama">Local AI</option>
+              <option value="bridge">Campaign Chat</option>
               <option disabled>Claude Tab</option>
               <option disabled>ChatGPT API</option>
               <option disabled>Claude API</option>
@@ -712,7 +712,7 @@ function SetupDialog() {
             <div id="ollama-model-summary" className="model-summary" aria-live="polite"></div>
             <p id="ollama-benchmark" className="setup-note">Local AI status will appear here.</p>
             <details className="advanced-provider-settings">
-              <summary>Advanced generation settings</summary>
+              <summary>Advanced</summary>
               <div className="settings-grid">
                 <label>
                   <span>Timeout</span>
@@ -728,25 +728,25 @@ function SetupDialog() {
                 </label>
               </div>
               <div className="button-stack two-up">
-                <button id="refresh-ollama" type="button">Refresh Local AI</button>
-                <button id="test-ollama" type="button">Test Model</button>
+                <button id="refresh-ollama" type="button">Refresh AI</button>
+                <button id="test-ollama" type="button">Test AI</button>
               </div>
             </details>
           </div>
           <div id="bridge-card" className="bridge-card">
             <div className="status-line">
               <span className="status-dot"></span>
-              <span id="bridge-status">Campaign chat fallback ready</span>
+              <span id="bridge-status">Campaign chat ready</span>
             </div>
             <div className="button-stack">
-              <button id="check-sidecar" type="button">Check / Open Campaign Chat</button>
-              <button id="copy-provider-prompt" type="button">Copy DM Prompt</button>
-              <button id="new-provider-chat" type="button">New Campaign Chat</button>
+              <button id="check-sidecar" type="button">Open Campaign Chat</button>
+              <button id="copy-provider-prompt" type="button">Copy DM Instructions</button>
+              <button id="new-provider-chat" type="button">New DM Chat</button>
             </div>
           </div>
           <details id="prompt-drawer" className="prompt-drawer">
             <summary>
-              <span>Provider Prompt</span>
+              <span>DM Instructions</span>
               <span id="prompt-size">0 chars</span>
             </summary>
             <textarea id="prompt-output" spellCheck="false"></textarea>
@@ -755,11 +755,11 @@ function SetupDialog() {
 
         <section className="setup-section campaign-settings-section">
           <div className="section-title">
-            <h3>Campaigns</h3>
+            <h3>Adventures</h3>
           </div>
           <div className="button-stack two-up">
-            <button id="new-campaign" type="button">New Campaign</button>
-            <button id="load-imported" type="button">Load Saved Campaign</button>
+            <button id="new-campaign" type="button">New Adventure</button>
+            <button id="load-imported" type="button">Load Saved Adventure</button>
           </div>
         </section>
 
@@ -770,7 +770,7 @@ function SetupDialog() {
           </div>
           <label className="check-row" title="Show provider/model metadata under play messages for troubleshooting. Leave this off during normal play.">
             <input id="show-debug-meta" type="checkbox" />
-            Show debug meta in play log
+            Show troubleshooting notes in play log
           </label>
           <div className="button-stack two-up">
             <button id="refresh-diagnostics" type="button">Refresh Details</button>
@@ -797,19 +797,19 @@ function SetupDialog() {
 
         <section className="setup-section local-table-section">
           <div className="section-title">
-            <h3>Guests</h3>
+            <h3>Friends</h3>
             <span id="local-table-state" className="count-pill">Off</span>
           </div>
-          <p id="local-table-address" className="setup-note">Start a LAN table only when another local app is joining.</p>
+          <p id="local-table-address" className="setup-note">Open the guest page when friends are joining from another device.</p>
           <label className="check-row local-table-option" title="When off, approved joined players send actions straight to the host turn queue.">
             <input id="require-guest-action-approval" type="checkbox" />
-            Require host approval before guest actions reach the DM
+            Review friend actions before the DM sees them
           </label>
           <label className="check-row local-table-option" title="When on, guest actions wait so the host can collect a group turn before the DM responds.">
             <input id="hold-guest-actions-for-group" type="checkbox" />
-            Hold guest actions for a group turn
+            Collect friend actions into a group turn
           </label>
-          <p id="local-table-guidance" className="setup-note">Guest actions resolve one at a time when the DM is idle.</p>
+          <p id="local-table-guidance" className="setup-note">Friend actions resolve when the table is ready.</p>
           <label className="field-stack local-table-share">
             <span>Guest Link</span>
             <input
@@ -820,13 +820,13 @@ function SetupDialog() {
             />
           </label>
           <div className="button-stack two-up">
-            <button id="start-local-table" type="button">Open Guest Lobby</button>
-            <button id="stop-local-table" type="button">Close Guest Lobby</button>
+            <button id="start-local-table" type="button">Open Guest Page</button>
+            <button id="stop-local-table" type="button">Close Guest Page</button>
             <button id="copy-guest-link" type="button">Copy Guest Link</button>
-            <button id="copy-character-invite" type="button">Copy Direct Seat Link</button>
-            <button id="join-campaign" type="button">Join From Link</button>
-            <button id="sync-guest-table" type="button">Refresh</button>
-            <button id="resolve-party-inputs" type="button">Send Guest Actions</button>
+            <button id="copy-character-invite" type="button">Copy Seat Link</button>
+            <button id="join-campaign" type="button">Use Invite Link</button>
+            <button id="sync-guest-table" type="button">Check Seats</button>
+            <button id="resolve-party-inputs" type="button">Send Friend Actions</button>
           </div>
           <textarea
             id="local-table-invite-output"
@@ -834,7 +834,7 @@ function SetupDialog() {
             rows="3"
             spellCheck="false"
             readOnly
-            placeholder="Generated invite links appear here for copying."
+            placeholder="Guest links appear here."
           ></textarea>
           <div id="waiting-guests" className="local-table-list"></div>
           <div id="connected-guests" className="local-table-list"></div>
@@ -1002,14 +1002,14 @@ function DeleteCampaignDialog() {
         <header className="dialog-header">
           <div>
             <p className="eyebrow">Delete Campaign</p>
-            <h2 id="delete-campaign-title">Delete Campaign</h2>
+            <h2 id="delete-campaign-title">Delete Adventure</h2>
           </div>
           <button id="close-delete-campaign-dialog" className="icon-action" type="button" title="Close">x</button>
         </header>
         <p id="delete-campaign-message" className="dialog-copy"></p>
         <footer className="dialog-actions">
           <button id="cancel-delete-campaign" type="button" className="secondary-action">Cancel</button>
-          <button id="confirm-delete-campaign" type="submit" className="danger-button">Delete Campaign</button>
+          <button id="confirm-delete-campaign" type="submit" className="danger-button">Delete Adventure</button>
         </footer>
       </form>
     </dialog>
@@ -1022,8 +1022,8 @@ function JoinCampaignDialog() {
       <form id="join-campaign-form" method="dialog">
         <header className="dialog-header">
           <div>
-            <p className="eyebrow">Local Table</p>
-            <h2>Join Campaign</h2>
+            <p className="eyebrow">Invite Link</p>
+            <h2>Join Table</h2>
           </div>
           <button id="close-join-campaign-dialog" className="icon-action" type="button" title="Close">x</button>
         </header>
@@ -1038,15 +1038,15 @@ function JoinCampaignDialog() {
           ></textarea>
         </label>
         <section id="join-preview" className="join-preview-card" hidden>
-          <p className="join-preview-empty">Paste a host invite link to preview the table.</p>
+          <p className="join-preview-empty">Paste an invite link to preview the table.</p>
         </section>
         <label>
-          <span>Player name</span>
-          <input id="join-player-name" autoComplete="off" placeholder="Your table name" />
+          <span>Your name at the table</span>
+          <input id="join-player-name" autoComplete="off" placeholder="Name" />
         </label>
         <div className="join-character-card">
-          <h3>Join As Your Character</h3>
-          <p className="join-help">Fill this out when the invite is for a new character. If the host invited you to an existing party member, leave the character details blank.</p>
+          <h3>Your Character</h3>
+          <p className="join-help">Fill this out when you are bringing someone new. Leave it blank if you were invited to an existing party member.</p>
           <button id="join-character-autocomplete" className="secondary-action character-autocomplete-action" type="button">
             Auto-Complete
           </button>

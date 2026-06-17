@@ -238,7 +238,7 @@ function buildPhaseLines(phase, context, nextStep) {
     lines.push(`${context.readyInputs.length} staged table ${context.readyInputs.length === 1 ? "input is" : "inputs are"} ready.`);
   }
   if (context.pendingGuests.length) {
-    lines.push(`${context.pendingGuests.length} guest ${context.pendingGuests.length === 1 ? "request needs" : "requests need"} host approval.`);
+    lines.push(`${context.pendingGuests.length} guest ${context.pendingGuests.length === 1 ? "request needs" : "requests need"} host review.`);
   }
   if (context.waitingGuests.length) {
     lines.push(`${context.waitingGuests.length} guest ${context.waitingGuests.length === 1 ? "is" : "are"} waiting for a seat.`);

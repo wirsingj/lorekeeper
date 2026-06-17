@@ -1005,7 +1005,7 @@ function seatPreTableWaitingGuest(input = {}) {
   const waitingGuestId = compactLobbyLine(input.waitingGuestId || "", 120);
   const partyMemberId = normalizePreTableSeatId(preTableLobby, input.partyMemberId);
   if (!partyMemberId) {
-    throwPublicRouteError("Choose an open Remote Invite seat for this guest.", 409);
+    throwPublicRouteError("Choose an open friend seat for this guest.", 409);
   }
   const waitingGuest = preTableLobby.waitingGuests.find((guest) => guest.id === waitingGuestId);
   if (!waitingGuest || waitingGuest.status !== "waiting") {

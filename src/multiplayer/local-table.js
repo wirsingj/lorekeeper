@@ -1491,12 +1491,12 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
 
 function multiplayerSettingsSummary(settings = {}) {
   if (settings.requireGuestActionApproval) {
-    return "Remote player actions now require host approval.";
+    return "Friend actions now wait for host review.";
   }
   if (settings.holdGuestActionsForGroupInput) {
-    return "Remote player actions now wait for grouped host resolution.";
+    return "Friend actions now collect into a group turn.";
   }
-  return "Remote player actions now submit directly one actor at a time when the host table is ready.";
+  return "Friend actions now reach the table one actor at a time.";
 }
 
 function normalizeTableTalkMessage(message) {
@@ -2095,10 +2095,10 @@ function appendVisibleRemoteMessage(campaign, input, { requireApproval = false, 
     title: input.characterName,
     body: input.text,
     meta: requireApproval
-      ? `From ${input.playerName}; waiting for host approval`
+      ? `From ${input.playerName}; waiting for host review`
       : holdForGroup
-        ? `From ${input.playerName}; queued for grouped host turn`
-        : `From ${input.playerName}; sent to host and queued for DM`,
+        ? `From ${input.playerName}; queued for the group turn`
+        : `From ${input.playerName}; queued for DM`,
     source: "remote_player_input_pending",
     providerRunId: null,
     createdAt,
