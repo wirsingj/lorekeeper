@@ -351,6 +351,14 @@ export function LorekeeperShell() {
               <div id="quest-list" className="binder-list"></div>
             </section>
           </div>
+          <div
+            id="campaign-notes-resize-handle"
+            className="notes-panel-resize-handle"
+            role="separator"
+            aria-orientation="horizontal"
+            tabIndex="0"
+            title="Resize World notes"
+          ></div>
         </details>
 
         <details id="player-notes-panel" className="rail-section notes-panel player-notes-panel">
@@ -378,6 +386,14 @@ export function LorekeeperShell() {
               <textarea id="player-notes-scratch" rows="4" placeholder="Plans, theories, questions for the party..."></textarea>
             </label>
           </div>
+          <div
+            id="player-notes-resize-handle"
+            className="notes-panel-resize-handle"
+            role="separator"
+            aria-orientation="horizontal"
+            tabIndex="0"
+            title="Resize your notes"
+          ></div>
         </details>
 
         <section className="rail-section table-talk-section" aria-label="Table talk side chat">

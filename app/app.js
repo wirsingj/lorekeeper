@@ -103,6 +103,8 @@ const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
 const leftRailWidthStorageKey = "lorekeeper.leftRailWidth";
 const rightRailWidthStorageKey = "lorekeeper.rightRailWidth";
+const campaignNotesHeightStorageKey = "lorekeeper.campaignNotesHeight";
+const playerNotesHeightStorageKey = "lorekeeper.playerNotesHeight";
 const tableTalkHeightStorageKey = "lorekeeper.tableTalkHeight";
 const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const guestSessionStorageKey = "lorekeeper.guestSession";
@@ -317,6 +319,8 @@ const elements = {
   tableTalkSend: document.querySelector("#table-talk-send"),
   leftRailResizeHandle: document.querySelector("#left-rail-resize-handle"),
   rightRailResizeHandle: document.querySelector("#right-rail-resize-handle"),
+  campaignNotesResizeHandle: document.querySelector("#campaign-notes-resize-handle"),
+  playerNotesResizeHandle: document.querySelector("#player-notes-resize-handle"),
   tableTalkResizeHandle: document.querySelector("#table-talk-resize-handle"),
   promptOutput: document.querySelector("#prompt-output"),
   promptSize: document.querySelector("#prompt-size"),
@@ -8246,6 +8250,8 @@ function updateTurnRepairControls() {
 function setupSavedLayoutResizers() {
   setLeftRailWidth(readStoredLayoutSize(leftRailWidthStorageKey, 234), false);
   setRightRailWidth(readStoredLayoutSize(rightRailWidthStorageKey, 232), false);
+  setCampaignNotesHeight(readStoredLayoutSize(campaignNotesHeightStorageKey, 432), false);
+  setPlayerNotesHeight(readStoredLayoutSize(playerNotesHeightStorageKey, 308), false);
   setTableTalkHeight(readStoredLayoutSize(tableTalkHeightStorageKey, 244), false);
 
   setupHorizontalRailResize({
@@ -8262,11 +8268,36 @@ function setupSavedLayoutResizers() {
     set: setRightRailWidth,
     direction: -1,
   });
-  setupTableTalkResize();
+  setupVerticalPanelResize({
+    handle: elements.campaignNotesResizeHandle,
+    panelSelector: ".campaign-notes-panel",
+    storageKey: campaignNotesHeightStorageKey,
+    current: currentCampaignNotesHeight,
+    set: setCampaignNotesHeight,
+    direction: 1,
+  });
+  setupVerticalPanelResize({
+    handle: elements.playerNotesResizeHandle,
+    panelSelector: ".player-notes-panel",
+    storageKey: playerNotesHeightStorageKey,
+    current: currentPlayerNotesHeight,
+    set: setPlayerNotesHeight,
+    direction: 1,
+  });
+  setupVerticalPanelResize({
+    handle: elements.tableTalkResizeHandle,
+    panelSelector: ".table-talk-section",
+    storageKey: tableTalkHeightStorageKey,
+    current: currentTableTalkHeight,
+    set: setTableTalkHeight,
+    direction: -1,
+  });
 
   window.addEventListener("resize", () => {
     setLeftRailWidth(currentLeftRailWidth(), true);
     setRightRailWidth(currentRightRailWidth(), true);
+    setCampaignNotesHeight(currentCampaignNotesHeight(), true);
+    setPlayerNotesHeight(currentPlayerNotesHeight(), true);
     setTableTalkHeight(currentTableTalkHeight(), true);
   });
 }
@@ -8314,8 +8345,7 @@ function setupHorizontalRailResize({ handle, storageKey, current, set, direction
   });
 }
 
-function setupTableTalkResize() {
-  const handle = elements.tableTalkResizeHandle;
+function setupVerticalPanelResize({ handle, panelSelector, storageKey, current, set, direction }) {
   if (!handle) {
     return;
   }
@@ -8325,10 +8355,10 @@ function setupTableTalkResize() {
 
   handle.addEventListener("pointerdown", (event) => {
     startY = event.clientY;
-    startHeight = currentTableTalkHeight();
+    startHeight = current();
     handle.setPointerCapture(event.pointerId);
     elements.app?.classList.add("resizing-layout");
-    document.querySelector(".table-talk-section")?.classList.add("resizing");
+    document.querySelector(panelSelector)?.classList.add("resizing");
     event.preventDefault();
   });
 
@@ -8336,7 +8366,7 @@ function setupTableTalkResize() {
     if (!handle.hasPointerCapture(event.pointerId)) {
       return;
     }
-    setTableTalkHeight(startHeight + startY - event.clientY, true);
+    set(startHeight + ((event.clientY - startY) * direction), true);
   });
 
   const finish = (event) => {
@@ -8344,8 +8374,8 @@ function setupTableTalkResize() {
       handle.releasePointerCapture(event.pointerId);
     }
     elements.app?.classList.remove("resizing-layout");
-    document.querySelector(".table-talk-section")?.classList.remove("resizing");
-    localStorage.setItem(tableTalkHeightStorageKey, String(currentTableTalkHeight()));
+    document.querySelector(panelSelector)?.classList.remove("resizing");
+    localStorage.setItem(storageKey, String(current()));
   };
 
   handle.addEventListener("pointerup", finish);
@@ -8356,7 +8386,7 @@ function setupTableTalkResize() {
     }
     event.preventDefault();
     const delta = event.key === "ArrowUp" ? 12 : -12;
-    setTableTalkHeight(currentTableTalkHeight() + delta, true);
+    set(current() + (delta * -direction), true);
   });
 }
 
@@ -8377,6 +8407,14 @@ function currentRightRailWidth() {
   return currentRootPixelVar("--right-rail-width", 232);
 }
 
+function currentCampaignNotesHeight() {
+  return currentRootPixelVar("--campaign-notes-height", 432);
+}
+
+function currentPlayerNotesHeight() {
+  return currentRootPixelVar("--player-notes-height", 308);
+}
+
 function currentTableTalkHeight() {
   return currentRootPixelVar("--table-talk-height", 244);
 }
@@ -8393,6 +8431,14 @@ function setLeftRailWidth(value, persist = false) {
 
 function setRightRailWidth(value, persist = false) {
   setLayoutPixelVar("--right-rail-width", clampRightRailWidth(value), rightRailWidthStorageKey, persist);
+}
+
+function setCampaignNotesHeight(value, persist = false) {
+  setLayoutPixelVar("--campaign-notes-height", clampRightPanelHeight(value, 176), campaignNotesHeightStorageKey, persist);
+}
+
+function setPlayerNotesHeight(value, persist = false) {
+  setLayoutPixelVar("--player-notes-height", clampRightPanelHeight(value, 168), playerNotesHeightStorageKey, persist);
 }
 
 function setTableTalkHeight(value, persist = false) {
@@ -8415,8 +8461,12 @@ function clampRightRailWidth(value) {
 }
 
 function clampTableTalkHeight(value) {
-  const maxHeight = Math.max(220, Math.round(window.innerHeight * 0.5));
-  return clampLayoutNumber(value, 160, maxHeight);
+  return clampRightPanelHeight(value, 160);
+}
+
+function clampRightPanelHeight(value, min = 160) {
+  const maxHeight = Math.max(min + 60, Math.round(window.innerHeight * 0.62));
+  return clampLayoutNumber(value, min, maxHeight);
 }
 
 function maxRailWidth() {
@@ -8486,7 +8536,11 @@ function finishCommandDeckResize() {
 }
 
 function readStoredCommandDeckHeight() {
-  const stored = Number(localStorage.getItem(commandDeckHeightStorageKey));
+  const raw = localStorage.getItem(commandDeckHeightStorageKey);
+  if (raw === null || raw === "") {
+    return 120;
+  }
+  const stored = Number(raw);
   return Number.isFinite(stored) ? stored : 120;
 }
 

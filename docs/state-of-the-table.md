@@ -256,7 +256,7 @@ Risks:
 126. Product UX wording and hierarchy now push harder toward story-first table language: Continue/New Adventure/Find Table/Check AI, friend seats, seat requests, host review, Scratchpad, collapsed Player Notes, quieter rails, and a more dominant play log.
 127. Product hierarchy now treats notes as a notebook shelf instead of a permanent open binder: World and Player notes are collapsed by default, party cards clamp long descriptive text until hover/focus, Table Talk is smaller, and the center story surface receives more default space.
 128. The first visible silhouette pass removes the strongest developer-tool cues: the gridpaper background is gone from the main play surface, the front door now reads as a larger game-style launcher, side rails are narrower/translucent shelves, message bubbles are softer, and the command deck is less terminal-like.
-129. Table shelf sizing is now user-adjustable and saved locally: left Party shelf, right Notebook shelf, and Table Talk height can be dragged without opening settings. Party cards no longer expand on hover, so their action buttons stay reachable.
+129. Table shelf sizing is now user-adjustable and saved locally: left Party shelf, right Notebook shelf, World notes, Your Notes, and Table Talk can be dragged without opening settings. Expanded right-rail panels scroll inside their own bodies when content exceeds the chosen size. Party cards no longer expand on hover, so their action buttons stay reachable.
 
 ### Still Risky
 
