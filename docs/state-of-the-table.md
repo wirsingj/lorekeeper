@@ -172,6 +172,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 121. First-pass Steam-ready wording now makes the front door and preferences calmer: Continue/New Table/Join/AI Setup, Guests, Troubleshooting, Developer Details, and Saved locally replace more technical provider/SQLite/import wording in normal paths.
 122. Starting a fresh local table session now resets stale remote runtime state: old connected/pending guests are disconnected, waiting-room records are closed, remote controllers are released, and open seats become requestable again instead of silently reviving old approvals.
 123. Guest seating now updates live renderer session state, not only localStorage/snapshot state, and carries table/session identity forward so a seated guest does not see a "join first" command deck.
+124. Character panel Auto-Complete now re-seeds generated pitch, look/vibe, party integration, and DM-note text from the current basics instead of only filling blanks and leaving stale generated flavor behind.
 
 ### Still Risky
 
@@ -217,7 +218,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 | DM has story beyond current scene. | Improved | Hidden arcs exist, are private, and have non-leakage fixtures. Still needs pacing/adaptation scenario testing over longer sessions. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
 | Recovery after provider failure is understandable. | Improved | Player echoes, staged inputs, retry bubbles, table-facing labels, and session `Next:` guidance show lifecycle. Manual review still needs a less developer-shaped surface. |
-| Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place. |
+| Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place; Auto-Complete preserves hard facts while refreshing generated character flavor. |
 
 ## Priority Queue
 
@@ -255,7 +256,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 
 18. Replace remaining overly specific placeholder text with neutral table examples.
 19. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
-20. Add campaign-aware character auto-complete that uses party theme/premise/existing characters without overriding supplied fields.
+20. Continue improving campaign-aware character auto-complete quality; current behavior preserves supplied hard facts while letting the button regenerate derived pitch/integration text from party theme, premise, and existing characters.
 21. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
 22. Add fuller backup/export/restore affordances before release; delete now recycles local SQLite files, but there is not yet a restore UI.
 

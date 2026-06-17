@@ -2431,8 +2431,10 @@ function compactCharacterFormRefs(kind, root = document) {
 }
 
 function autocompleteCompactCharacterForm(refs = {}) {
+  const regenerateDerivedFields = true;
   const completed = completeCharacterSeed(compactCharacterSeedFromRefs(refs), {
     campaign: characterAutocompleteCampaignContext(),
+    regenerate: regenerateDerivedFields,
     startingPartyMembers: characterAutocompleteStartingPartyMembers(),
   });
   setIfBlank(refs.name, completed.name);
@@ -2440,12 +2442,12 @@ function autocompleteCompactCharacterForm(refs = {}) {
   setIfBlank(refs.characterClass, completed.characterClass);
   setIfBlank(refs.level, String(completed.level || 1));
   setIfBlank(refs.roleIntent, completed.roleIntent);
-  setIfBlank(refs.appearance, completed.appearance);
-  setIfBlank(refs.backstory, completed.backstory);
-  setIfBlank(refs.concept, completed.backstory);
-  setIfBlank(refs.integrationPrompt, completed.integrationPrompt);
-  setIfBlank(refs.hostIntegrationPrompt, completed.hostIntegrationPrompt);
-  setProviderActivity(`${completed.name} filled out`, "idle");
+  setGeneratedFormValue(refs.appearance, completed.appearance, { regenerate: regenerateDerivedFields });
+  setGeneratedFormValue(refs.backstory, completed.backstory, { regenerate: regenerateDerivedFields });
+  setGeneratedFormValue(refs.concept, completed.backstory, { regenerate: regenerateDerivedFields });
+  setGeneratedFormValue(refs.integrationPrompt, completed.integrationPrompt, { regenerate: regenerateDerivedFields });
+  setGeneratedFormValue(refs.hostIntegrationPrompt, completed.hostIntegrationPrompt, { regenerate: regenerateDerivedFields });
+  setProviderActivity(`${completed.name} re-seeded`, "idle");
 }
 
 function characterAutocompleteCampaignContext() {
@@ -2648,6 +2650,14 @@ function setFormValue(input, value) {
     return;
   }
   input.value = String(value);
+}
+
+function setGeneratedFormValue(input, value, options = {}) {
+  if (options.regenerate) {
+    setFormValue(input, value);
+    return;
+  }
+  setIfBlank(input, value);
 }
 
 function virtualFormValue(value = "") {

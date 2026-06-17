@@ -2222,7 +2222,31 @@ function testCharacterAutocompleteProjection() {
   assert.equal(preserved.name, "Thor");
   assert.equal(preserved.ancestry, "Dwarf");
   assert.equal(preserved.characterClass, "Scout");
+  assert.equal(preserved.concept, "Keeps watch for the company.");
   assert.match(preserved.integrationPrompt, /Oskar/);
+
+  const regenerated = completeCharacterSeed({
+    name: "Thor",
+    ancestry: "Dwarf",
+    characterClass: "Scout",
+    concept: "Old generated pitch that should be replaced.",
+    integrationPrompt: "Old generated party glue.",
+    hostIntegrationPrompt: "Old generated DM note.",
+  }, {
+    campaign: {
+      summary: "A dwarf soldier company guards a dangerous road.",
+      party: [{ id: "oskar", name: "Oskar", ancestry: "Dwarf", characterClass: "Soldier", level: 2 }],
+    },
+    regenerate: true,
+  });
+  assert.equal(regenerated.name, "Thor");
+  assert.equal(regenerated.ancestry, "Dwarf");
+  assert.equal(regenerated.characterClass, "Scout");
+  assert.notEqual(regenerated.concept, "Old generated pitch that should be replaced.");
+  assert.notEqual(regenerated.integrationPrompt, "Old generated party glue.");
+  assert.notEqual(regenerated.hostIntegrationPrompt, "Old generated DM note.");
+  assert.match(regenerated.concept, /Thor/);
+  assert.match(regenerated.integrationPrompt, /Oskar/);
 
   const themed = completeCharacterSeed({
     ancestry: "Dwarf",

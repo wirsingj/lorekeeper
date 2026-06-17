@@ -1,7 +1,9 @@
 // Shared character creation helper for Host New, post-start host creation, and
-// guest join. Preserve user-supplied facts first; fill only the missing pieces
-// from campaign premise, party theme, and lightweight 5E-lite defaults.
+// guest join. By default it preserves user-supplied facts first; callers can set
+// regenerate when an Auto-Complete button should refresh derived flavor from the
+// current hard facts instead of keeping stale generated text.
 export function completeCharacterSeed(seed = {}, options = {}) {
+  const regenerate = Boolean(options.regenerate);
   const campaignContext = buildCharacterAutocompleteContext(options);
   const text = [
     seed.name,
@@ -30,8 +32,12 @@ export function completeCharacterSeed(seed = {}, options = {}) {
   const backstory = partyTheme
     ? `${name} is a ${ancestry} ${characterClass} known for ${roleIntent.toLowerCase()}. They fit the party's ${partyTheme} without taking over the main decision.`
     : `${name} is a ${ancestry} ${characterClass} known for ${roleIntent.toLowerCase()}. They are dependable under pressure, but carry a personal reason to keep moving with the party.`;
-  const integrationPrompt = seed.integrationPrompt || defaultPartyIntegration(name, campaignContext);
-  const hostIntegrationPrompt = seed.hostIntegrationPrompt || `${name} should support the party's current goal without taking control of the main decision.`;
+  const integrationPrompt = regenerate
+    ? defaultPartyIntegration(name, campaignContext)
+    : seed.integrationPrompt || defaultPartyIntegration(name, campaignContext);
+  const hostIntegrationPrompt = regenerate
+    ? `${name} should support the party's current goal without taking control of the main decision.`
+    : seed.hostIntegrationPrompt || `${name} should support the party's current goal without taking control of the main decision.`;
 
   return {
     ...seed,
@@ -40,9 +46,9 @@ export function completeCharacterSeed(seed = {}, options = {}) {
     characterClass,
     level,
     roleIntent,
-    appearance: seed.appearance || appearance,
-    backstory: seed.backstory || seed.concept || backstory,
-    concept: seed.concept || seed.backstory || backstory,
+    appearance: regenerate ? appearance : seed.appearance || appearance,
+    backstory: regenerate ? backstory : seed.backstory || seed.concept || backstory,
+    concept: regenerate ? backstory : seed.concept || seed.backstory || backstory,
     integrationPrompt,
     hostIntegrationPrompt,
   };
