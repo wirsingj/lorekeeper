@@ -98,6 +98,7 @@ export function LorekeeperShell() {
               <div className="home-menu-heading">
                 <p className="eyebrow">LoreKeeper</p>
                 <h2>Start Playing</h2>
+                <p>Host a living tabletop adventure, join a friend's table, or check that your DM voice is ready.</p>
               </div>
               <div className="home-flow-grid">
                 <article className="home-flow-card home-flow-card-primary">

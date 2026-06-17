@@ -14,7 +14,7 @@
   --copper: #a8845b;
   --red: #b36862;
   --shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
-  --command-deck-height: 108px;
+  --command-deck-height: 104px;
 }
 
 * {
@@ -28,11 +28,9 @@ body {
   overflow: hidden;
   user-select: text;
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    radial-gradient(circle at 20% 10%, rgba(143, 166, 184, 0.1), transparent 26%),
-    linear-gradient(135deg, #111416, #242a2e 48%, #171a1d);
-  background-size: 44px 44px, 44px 44px, auto, auto;
+    radial-gradient(circle at 16% 8%, rgba(125, 213, 201, 0.1), transparent 24%),
+    radial-gradient(circle at 82% 18%, rgba(168, 132, 91, 0.12), transparent 28%),
+    linear-gradient(135deg, #0e1214, #1a2123 52%, #101316);
   color: var(--ink);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -57,13 +55,13 @@ summary,
 .handheld-shell {
   height: 100vh;
   display: grid;
-  grid-template-columns: minmax(226px, 258px) minmax(720px, 1fr) minmax(250px, 284px);
+  grid-template-columns: minmax(210px, 234px) minmax(760px, 1fr) minmax(204px, 232px);
   grid-template-rows: minmax(0, 1fr) var(--command-deck-height);
   grid-template-areas:
     "left screen right"
     "bottom bottom bottom";
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 12px;
 }
 
 .handheld-shell.lobby-mode {
@@ -125,8 +123,8 @@ summary,
 .panel-rail,
 .screen-bezel,
 .command-deck {
-  border: 1px solid rgba(174, 191, 202, 0.13);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(174, 191, 202, 0.1);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
 }
 
 .eyebrow {
@@ -193,7 +191,7 @@ h3 {
 .left-panel {
   grid-area: left;
   min-width: 0;
-  max-width: 258px;
+  max-width: 234px;
 }
 
 .right-panel {
@@ -206,17 +204,16 @@ h3 {
   max-height: 100%;
   display: grid;
   align-content: start;
-  gap: 7px;
-  padding: 8px;
+  gap: 8px;
+  padding: 8px 6px;
   overflow-y: auto;
   overflow-x: hidden;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent 34%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    var(--stone);
-  background-size: auto, 38px 38px, auto;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 30%),
+    rgba(22, 27, 30, 0.64);
+  backdrop-filter: blur(12px);
   color: var(--ink);
-  border-radius: 12px;
+  border-radius: 16px;
 }
 
 .campaign-section {
@@ -241,7 +238,7 @@ h3 {
 }
 
 .right-panel {
-  border-radius: 12px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -262,10 +259,10 @@ h3 {
 .rail-section {
   display: grid;
   gap: 7px;
-  padding: 9px;
-  background: rgba(16, 19, 21, 0.28);
-  border: 1px solid rgba(174, 191, 202, 0.08);
-  border-radius: 8px;
+  padding: 8px;
+  background: rgba(12, 15, 17, 0.36);
+  border: 1px solid rgba(174, 191, 202, 0.07);
+  border-radius: 12px;
 }
 
 .section-title {
@@ -343,7 +340,7 @@ h3 {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  padding: 8px 9px;
+  padding: 8px;
   cursor: pointer;
   list-style: none;
 }
@@ -355,7 +352,7 @@ h3 {
 .notes-panel-summary h2 {
   overflow: hidden;
   color: #eef3f5;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -534,9 +531,9 @@ h3 {
 }
 
 .table-talk-section {
-  flex: 0 0 182px;
-  min-height: 174px;
-  max-height: 224px;
+  flex: 0 0 168px;
+  min-height: 156px;
+  max-height: 204px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   margin-top: auto;
@@ -1169,6 +1166,7 @@ button:disabled {
   grid-area: screen;
   min-height: 0;
   overflow: hidden;
+  padding: 0 2px;
 }
 
 .screen-bezel {
@@ -1177,12 +1175,14 @@ button:disabled {
   min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 8px;
-  padding: 8px;
+  gap: 10px;
+  padding: 10px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 34%),
-    var(--stone-dark);
-  border-radius: 14px;
+    radial-gradient(circle at 50% 10%, rgba(125, 213, 201, 0.06), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 22%),
+    rgba(13, 17, 19, 0.86);
+  border-radius: 18px;
+  backdrop-filter: blur(10px);
 }
 
 .home-panel {
@@ -1191,14 +1191,13 @@ button:disabled {
   z-index: 8;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: clamp(24px, 5vw, 64px);
   border: 0;
   border-radius: 0;
   background:
-    linear-gradient(115deg, rgba(125, 213, 201, 0.08), transparent 34%),
-    linear-gradient(300deg, rgba(192, 168, 120, 0.08), transparent 38%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 26%),
-    linear-gradient(135deg, #111719, #1d2426 56%, #0f1315);
+    radial-gradient(circle at 18% 14%, rgba(125, 213, 201, 0.16), transparent 28%),
+    radial-gradient(circle at 80% 24%, rgba(168, 132, 91, 0.16), transparent 30%),
+    linear-gradient(135deg, #0d1314, #182123 58%, #101315);
 }
 
 .home-panel[hidden] {
@@ -1206,48 +1205,65 @@ button:disabled {
 }
 
 .home-menu {
-  width: min(1040px, 100%);
+  width: min(1160px, 100%);
   display: grid;
-  gap: 14px;
+  gap: 18px;
+}
+
+.home-menu-heading {
+  max-width: 760px;
+  padding-bottom: 8px;
 }
 
 .home-menu-heading h2 {
   margin: 0;
   color: #f2f7f8;
-  font-size: 1.55rem;
+  font-size: clamp(2.05rem, 4vw, 3.4rem);
+  line-height: 1;
+}
+
+.home-menu-heading p:not(.eyebrow) {
+  margin: 12px 0 0;
+  color: #cbd6dc;
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
 .home-flow-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(240px, 0.82fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(220px, 0.72fr);
+  gap: 14px;
 }
 
 .home-flow-card {
   display: grid;
   align-content: space-between;
   gap: 18px;
-  min-height: 220px;
-  padding: 16px;
-  border: 1px solid rgba(174, 191, 202, 0.18);
-  border-radius: 8px;
-  background: rgba(10, 13, 15, 0.52);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  min-height: 240px;
+  padding: 22px;
+  border: 1px solid rgba(174, 191, 202, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(10, 13, 15, 0.62);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.3);
 }
 
 .home-flow-card-primary {
-  min-height: 245px;
+  min-height: 292px;
 }
 
 .home-flow-card-setup {
-  min-height: 245px;
-  background: rgba(10, 13, 15, 0.36);
+  min-height: 292px;
+  background:
+    linear-gradient(180deg, rgba(143, 166, 184, 0.06), rgba(255, 255, 255, 0.01)),
+    rgba(10, 13, 15, 0.42);
 }
 
 .home-flow-card h3 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   color: #f4f8f9;
-  font-size: 1rem;
+  font-size: 1.22rem;
 }
 
 @media (max-width: 980px) {
@@ -1297,9 +1313,9 @@ button:disabled {
 
 .home-flow-actions button,
 .home-library-strip button {
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: 8px;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 12px;
   font-weight: 850;
 }
 
@@ -1634,17 +1650,18 @@ button:disabled {
   height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 18px 22px;
+  padding: 24px clamp(20px, 3vw, 46px);
   background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(135deg, #1d2225, #2b3135 52%, #202529);
-  background-size: 52px 52px, 52px 52px, auto;
-  background-position: center;
-  border: 1px solid rgba(174, 191, 202, 0.22);
-  border-radius: 14px;
+    radial-gradient(circle at 34% 8%, rgba(125, 213, 201, 0.055), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 18%),
+    linear-gradient(135deg, rgba(28, 34, 37, 0.94), rgba(25, 30, 33, 0.98) 54%, rgba(30, 35, 37, 0.96));
+  border: 1px solid rgba(174, 191, 202, 0.14);
+  border-radius: 20px;
   color: #e7ecef;
   font-size: 0.98rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.015);
 }
 
 .play-log.play-log-with-join-panel {
@@ -1672,9 +1689,9 @@ button:disabled {
 .play-message {
   display: grid;
   grid-template-columns: 30px minmax(0, min(92ch, calc(100% - 38px)));
-  gap: 8px;
+  gap: 10px;
   align-items: end;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .play-message.player,
@@ -1720,11 +1737,11 @@ button:disabled {
 
 .message-bubble {
   min-width: 0;
-  padding: 13px 15px;
-  border: 1px solid rgba(174, 191, 202, 0.16);
-  border-radius: 12px;
-  background: rgba(29, 34, 38, 0.94);
-  box-shadow: 0 9px 22px rgba(0, 0, 0, 0.16);
+  padding: 15px 17px;
+  border: 1px solid rgba(174, 191, 202, 0.14);
+  border-radius: 16px;
+  background: rgba(25, 30, 33, 0.95);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
 }
 
 .play-message.player .message-bubble,
@@ -2139,14 +2156,16 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: minmax(0, 1fr);
   column-gap: 10px;
-  padding: 14px 12px 16px;
+  margin: 0 4px;
+  padding: 13px 14px 14px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.024), transparent 38%),
-    var(--stone-dark);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 48%),
+    rgba(12, 15, 17, 0.78);
   color: #edf2f4;
-  border-radius: 12px;
+  border-radius: 18px;
   min-height: 0;
   overflow: hidden;
+  backdrop-filter: blur(12px);
 }
 
 .command-resize-handle {
@@ -2179,17 +2198,17 @@ button:disabled {
 
 .provider-activity {
   flex: 0 0 auto;
-  padding: 9px 10px;
-  border: 1px solid rgba(174, 191, 202, 0.12);
-  border-radius: 10px;
-  background: rgba(10, 13, 15, 0.34);
+  padding: 8px 10px;
+  border: 1px solid rgba(174, 191, 202, 0.09);
+  border-radius: 999px;
+  background: rgba(10, 13, 15, 0.24);
   display: grid;
   grid-template-columns: 9px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px 8px;
   min-height: 20px;
   color: #b9c6cc;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
 }
 
@@ -2293,10 +2312,10 @@ button:disabled {
 textarea {
   width: 100%;
   resize: vertical;
-  border: 1px solid rgba(174, 191, 202, 0.24);
-  border-radius: 8px;
-  padding: 11px;
-  background: #171b1f;
+  border: 1px solid rgba(174, 191, 202, 0.18);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(13, 17, 19, 0.72);
   color: #edf2f4;
   line-height: 1.42;
   font-family:
@@ -2307,13 +2326,18 @@ textarea {
   height: 100%;
   min-height: 0;
   resize: none;
-  background: #15191d;
+  background: rgba(10, 13, 15, 0.74);
   color: #f2f6f8;
-  font-size: 0.94rem;
+  font-size: 0.96rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 #build-turn {
   width: 108px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(125, 213, 201, 0.18), rgba(70, 81, 90, 0.9)),
+    #374248;
 }
 
 .resizing-command-deck {

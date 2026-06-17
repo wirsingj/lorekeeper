@@ -255,6 +255,7 @@ Risks:
 125. Create And Start no longer auto-runs the first DM generation; the host lands on a ready table with Nudge available, and waiting-guest cues refresh roughly once per second even while the DM is generating.
 126. Product UX wording and hierarchy now push harder toward story-first table language: Continue/New Adventure/Find Table/Check AI, friend seats, seat requests, host review, Scratchpad, collapsed Player Notes, quieter rails, and a more dominant play log.
 127. Product hierarchy now treats notes as a notebook shelf instead of a permanent open binder: World and Player notes are collapsed by default, party cards clamp long descriptive text until hover/focus, Table Talk is smaller, and the center story surface receives more default space.
+128. The first visible silhouette pass removes the strongest developer-tool cues: the gridpaper background is gone from the main play surface, the front door now reads as a larger game-style launcher, side rails are narrower/translucent shelves, message bubbles are softer, and the command deck is less terminal-like.
 
 ### Still Risky
 
@@ -282,7 +283,7 @@ Risks:
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
-25. The app still has too many visible controls in Preferences and the table rails. The current pass improved wording, collapsed low-value note surfaces, and compacted rail cards, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and better separation between normal play and troubleshooting.
+25. The app still has too many visible controls in Preferences and the table rails. The current passes improved wording, collapsed low-value note surfaces, compacted rail cards, and changed the visual silhouette, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and better separation between normal play and troubleshooting.
 
 ## Live Acceptance Matrix
 
