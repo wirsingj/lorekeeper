@@ -281,12 +281,12 @@ export function LorekeeperShell() {
         </div>
       </main>
 
-      <aside className="right-panel panel-rail">
-        <details id="campaign-notes-panel" className="rail-section notes-panel campaign-notes-panel" open>
+      <aside className="right-panel panel-rail" aria-label="Notebook and table talk">
+        <details id="campaign-notes-panel" className="rail-section notes-panel campaign-notes-panel">
           <summary className="notes-panel-summary">
             <span>
-              <p className="eyebrow">World Notes</p>
-              <h2>People, Places, Clues</h2>
+              <p className="eyebrow">Notebook</p>
+              <h2>World</h2>
             </span>
           </summary>
           <div className="notes-panel-body campaign-notes-grid">
@@ -339,8 +339,8 @@ export function LorekeeperShell() {
         <details id="player-notes-panel" className="rail-section notes-panel player-notes-panel">
           <summary className="notes-panel-summary">
             <span>
-              <p className="eyebrow">Your Notes</p>
-              <h2>Scratchpad</h2>
+              <p className="eyebrow">Notebook</p>
+              <h2>Your Notes</h2>
             </span>
           </summary>
           <div className="notes-panel-body player-notes-grid">

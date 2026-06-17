@@ -35,6 +35,85 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 - Every screen should show the next likely action and hide controls that are not relevant to the current phase.
 - Guest flow should prefer one plain LAN link with a table list and seat requests; direct deep links can remain optional power-user shortcuts.
 
+## Product UX/UI Redesign Audit
+
+### Information Hierarchy
+
+- Tier 1, always visible: story log, current table status, command input, current turn/active actor, minimal party ownership signal.
+- Tier 2, contextual: party details, combat order, guest seating, table talk, active vote state, recovery actions.
+- Tier 3, collapsed/drawer: world notes, player notes, people/places/things/threads, campaign library details, provider choices, invite link utilities.
+- Tier 4, diagnostics only: raw provider text, JSON/import language, API/session identity, SQLite details, manual state sync, debug metadata, route/storage errors.
+
+Permanent screen space should be reserved for play. The table should not ask players to visually parse campaign records, networking controls, diagnostics, and notes unless that information is part of the current moment.
+
+### Screen Review
+
+1. Front Door: improved, but still should eventually feel more like a game launcher with big Continue/New/Join affordances and AI readiness as secondary.
+2. New Adventure: improved by using full-screen setup, but still reads like a form. It should evolve into an adventure-builder flow with sections for Premise, Hero, Party, Friends.
+3. Join Flow: plain `/guest` is the right direction. The next UX step is a friendly table list plus seat cards, with direct links treated as shortcuts.
+4. Main Table: highest debt. Story must dominate; rails should be notebook/party shelves, not dashboards. Current pass collapses notes by default and compacts party cards, but phase-specific table chrome is still needed.
+5. Combat: mechanically stronger, but visually still too similar to roleplay. Combat should eventually emphasize initiative, current actor, available actions, visible rolls/effects, and clear end-turn flow.
+6. Notes: should feel like a notebook/codex opened when needed. Current pass moves toward this by collapsing World and Player notes by default.
+7. Preferences: still too much one-dialog surface. Split into App Preferences, Table Settings, AI Readiness, and Developer Tools.
+8. Local Table: should become "Invite Friends" and "Seats" in normal play, with network details hidden behind advanced details.
+9. Diagnostics: should remain available but never visually compete with play unless the table is stuck.
+10. Recovery: table-facing copy is better, but the long-term design should feel like "DM needs a ruling" rather than software repair.
+
+### Top UX/UI Debt Sources
+
+Critical:
+
+1. Main table still has three permanent columns competing with the story.
+2. Settings and table-management concepts are too close to play.
+3. Combat and roleplay share almost the same visual mode.
+4. Recovery still has diagnostic/manual-review escape hatches near normal play.
+5. Empty/new-table state still feels sparse instead of guiding the first table beat.
+
+High:
+
+6. Party cards still carry too much descriptive text for permanent rail space, though now clamped by default.
+7. Notes are records rather than a true notebook/codex experience.
+8. Local-table/guest tools still expose hosting mechanics in places.
+9. AI readiness/provider setup still feels like configuration, not choosing a DM voice.
+10. Guest seat requests need more immediate, friendly host-side presentation.
+
+Medium:
+
+11. Table Talk is useful but should feel like side conversation, not another admin panel.
+12. Campaign management is still list/select driven.
+13. Right rail needs true drawer/tab behavior later, not only collapsed details.
+14. Command deck is serviceable but should adapt to phase: RP, vote, combat, waiting, review.
+15. Campaign Notes extraction quality will determine whether the notebook feels magical or noisy.
+
+Low:
+
+16. Some placeholders are still more implementation examples than play prompts.
+17. Icon language is mixed between app controls and table concepts.
+18. Advanced model settings need deeper progressive disclosure.
+19. The desktop/window frame still reads like a dev app until the in-app shell becomes more immersive.
+20. Visual theme is readable but not yet distinctive enough as a tabletop product.
+
+### Future Table Mode Exploration
+
+Do not implement Table Mode yet. The viable path is incremental:
+
+1. First, make table phase explicit everywhere via `TableSessionEngine`.
+2. Then turn the current rails into contextual shelves: Party, Notebook, Friends, Combat.
+3. Then introduce a centered "table surface" view where story is central, active actors have presence, and notes/talk slide in as overlays.
+
+Advantages:
+
+- Stronger feeling of sitting down with people.
+- Less permanent dashboard clutter.
+- Easier guest/player mental model.
+- Clearer distinction between roleplay, combat, and recovery.
+
+Risks:
+
+- A table metaphor can become gimmicky if it hides necessary controls.
+- Combat needs tactical clarity, not decorative table dressing.
+- Multiplayer state must be rock-solid before a more immersive table surface can be trusted.
+
 ## Table Model
 
 1. The DM voice is app/provider owned. It describes the world, NPCs, consequences, rules calls, and combat outcomes.
@@ -175,6 +254,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 124. Character panel Auto-Complete now re-seeds generated pitch, look/vibe, party integration, and DM-note text from the current basics instead of only filling blanks and leaving stale generated flavor behind.
 125. Create And Start no longer auto-runs the first DM generation; the host lands on a ready table with Nudge available, and waiting-guest cues refresh roughly once per second even while the DM is generating.
 126. Product UX wording and hierarchy now push harder toward story-first table language: Continue/New Adventure/Find Table/Check AI, friend seats, seat requests, host review, Scratchpad, collapsed Player Notes, quieter rails, and a more dominant play log.
+127. Product hierarchy now treats notes as a notebook shelf instead of a permanent open binder: World and Player notes are collapsed by default, party cards clamp long descriptive text until hover/focus, Table Talk is smaller, and the center story surface receives more default space.
 
 ### Still Risky
 
@@ -202,7 +282,7 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
-25. The app still has too many visible controls in Preferences and the table rails. The current pass improved wording and visual hierarchy, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and better separation between normal play and troubleshooting.
+25. The app still has too many visible controls in Preferences and the table rails. The current pass improved wording, collapsed low-value note surfaces, and compacted rail cards, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and better separation between normal play and troubleshooting.
 
 ## Live Acceptance Matrix
 
