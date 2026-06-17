@@ -101,6 +101,9 @@ const apiPreTableLobbySeatUrl = "/api/pretable-lobby/seat";
 const apiPreTableLobbyAdoptActiveUrl = "/api/pretable-lobby/adopt-active";
 const extensionRequestType = "lorekeeper.appBridge.request";
 const extensionResponseType = "lorekeeper.appBridge.response";
+const leftRailWidthStorageKey = "lorekeeper.leftRailWidth";
+const rightRailWidthStorageKey = "lorekeeper.rightRailWidth";
+const tableTalkHeightStorageKey = "lorekeeper.tableTalkHeight";
 const commandDeckHeightStorageKey = "lorekeeper.commandDeckHeight";
 const guestSessionStorageKey = "lorekeeper.guestSession";
 const guestRecentSessionStorageKey = "lorekeeper.guestRecentSession";
@@ -312,6 +315,9 @@ const elements = {
   tableTalkForm: document.querySelector("#table-talk-form"),
   tableTalkInput: document.querySelector("#table-talk-input"),
   tableTalkSend: document.querySelector("#table-talk-send"),
+  leftRailResizeHandle: document.querySelector("#left-rail-resize-handle"),
+  rightRailResizeHandle: document.querySelector("#right-rail-resize-handle"),
+  tableTalkResizeHandle: document.querySelector("#table-talk-resize-handle"),
   promptOutput: document.querySelector("#prompt-output"),
   promptSize: document.querySelector("#prompt-size"),
   promptDrawer: document.querySelector("#prompt-drawer"),
@@ -820,6 +826,7 @@ elements.joinCampaignForm.addEventListener("submit", async (event) => {
   await requestJoinFromUi();
 });
 
+setupSavedLayoutResizers();
 setupCommandDeckResize();
 
 elements.pasteResponse.addEventListener("click", async () => {
@@ -8234,6 +8241,190 @@ function updateTurnRepairControls() {
   if (elements.recheckProvider) {
     elements.recheckProvider.hidden = active || clientMode || isRemoteTableClient() || currentProviderSettings().preferredProvider !== "bridge";
   }
+}
+
+function setupSavedLayoutResizers() {
+  setLeftRailWidth(readStoredLayoutSize(leftRailWidthStorageKey, 234), false);
+  setRightRailWidth(readStoredLayoutSize(rightRailWidthStorageKey, 232), false);
+  setTableTalkHeight(readStoredLayoutSize(tableTalkHeightStorageKey, 244), false);
+
+  setupHorizontalRailResize({
+    handle: elements.leftRailResizeHandle,
+    storageKey: leftRailWidthStorageKey,
+    current: currentLeftRailWidth,
+    set: setLeftRailWidth,
+    direction: 1,
+  });
+  setupHorizontalRailResize({
+    handle: elements.rightRailResizeHandle,
+    storageKey: rightRailWidthStorageKey,
+    current: currentRightRailWidth,
+    set: setRightRailWidth,
+    direction: -1,
+  });
+  setupTableTalkResize();
+
+  window.addEventListener("resize", () => {
+    setLeftRailWidth(currentLeftRailWidth(), true);
+    setRightRailWidth(currentRightRailWidth(), true);
+    setTableTalkHeight(currentTableTalkHeight(), true);
+  });
+}
+
+function setupHorizontalRailResize({ handle, storageKey, current, set, direction }) {
+  if (!handle) {
+    return;
+  }
+
+  let startX = 0;
+  let startWidth = 0;
+
+  handle.addEventListener("pointerdown", (event) => {
+    startX = event.clientX;
+    startWidth = current();
+    handle.setPointerCapture(event.pointerId);
+    elements.app?.classList.add("resizing-layout");
+    event.preventDefault();
+  });
+
+  handle.addEventListener("pointermove", (event) => {
+    if (!handle.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    set(startWidth + ((event.clientX - startX) * direction), true);
+  });
+
+  const finish = (event) => {
+    if (event?.pointerId !== undefined && handle.hasPointerCapture(event.pointerId)) {
+      handle.releasePointerCapture(event.pointerId);
+    }
+    elements.app?.classList.remove("resizing-layout");
+    localStorage.setItem(storageKey, String(current()));
+  };
+
+  handle.addEventListener("pointerup", finish);
+  handle.addEventListener("pointercancel", finish);
+  handle.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+      return;
+    }
+    event.preventDefault();
+    const delta = event.key === "ArrowRight" ? 12 : -12;
+    set(current() + (delta * direction), true);
+  });
+}
+
+function setupTableTalkResize() {
+  const handle = elements.tableTalkResizeHandle;
+  if (!handle) {
+    return;
+  }
+
+  let startY = 0;
+  let startHeight = 0;
+
+  handle.addEventListener("pointerdown", (event) => {
+    startY = event.clientY;
+    startHeight = currentTableTalkHeight();
+    handle.setPointerCapture(event.pointerId);
+    elements.app?.classList.add("resizing-layout");
+    document.querySelector(".table-talk-section")?.classList.add("resizing");
+    event.preventDefault();
+  });
+
+  handle.addEventListener("pointermove", (event) => {
+    if (!handle.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    setTableTalkHeight(startHeight + startY - event.clientY, true);
+  });
+
+  const finish = (event) => {
+    if (event?.pointerId !== undefined && handle.hasPointerCapture(event.pointerId)) {
+      handle.releasePointerCapture(event.pointerId);
+    }
+    elements.app?.classList.remove("resizing-layout");
+    document.querySelector(".table-talk-section")?.classList.remove("resizing");
+    localStorage.setItem(tableTalkHeightStorageKey, String(currentTableTalkHeight()));
+  };
+
+  handle.addEventListener("pointerup", finish);
+  handle.addEventListener("pointercancel", finish);
+  handle.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+      return;
+    }
+    event.preventDefault();
+    const delta = event.key === "ArrowUp" ? 12 : -12;
+    setTableTalkHeight(currentTableTalkHeight() + delta, true);
+  });
+}
+
+function readStoredLayoutSize(key, fallback) {
+  const raw = localStorage.getItem(key);
+  if (raw === null || raw === "") {
+    return fallback;
+  }
+  const stored = Number(raw);
+  return Number.isFinite(stored) ? stored : fallback;
+}
+
+function currentLeftRailWidth() {
+  return currentRootPixelVar("--left-rail-width", 234);
+}
+
+function currentRightRailWidth() {
+  return currentRootPixelVar("--right-rail-width", 232);
+}
+
+function currentTableTalkHeight() {
+  return currentRootPixelVar("--table-talk-height", 244);
+}
+
+function currentRootPixelVar(name, fallback) {
+  const rawValue = getComputedStyle(document.documentElement).getPropertyValue(name);
+  const parsed = Number.parseFloat(rawValue);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function setLeftRailWidth(value, persist = false) {
+  setLayoutPixelVar("--left-rail-width", clampLeftRailWidth(value), leftRailWidthStorageKey, persist);
+}
+
+function setRightRailWidth(value, persist = false) {
+  setLayoutPixelVar("--right-rail-width", clampRightRailWidth(value), rightRailWidthStorageKey, persist);
+}
+
+function setTableTalkHeight(value, persist = false) {
+  setLayoutPixelVar("--table-talk-height", clampTableTalkHeight(value), tableTalkHeightStorageKey, persist);
+}
+
+function setLayoutPixelVar(name, value, storageKey, persist) {
+  document.documentElement.style.setProperty(name, `${value}px`);
+  if (persist) {
+    localStorage.setItem(storageKey, String(value));
+  }
+}
+
+function clampLeftRailWidth(value) {
+  return clampLayoutNumber(value, 204, maxRailWidth());
+}
+
+function clampRightRailWidth(value) {
+  return clampLayoutNumber(value, 212, maxRailWidth());
+}
+
+function clampTableTalkHeight(value) {
+  const maxHeight = Math.max(220, Math.round(window.innerHeight * 0.5));
+  return clampLayoutNumber(value, 160, maxHeight);
+}
+
+function maxRailWidth() {
+  return Math.max(260, Math.min(420, Math.round(window.innerWidth * 0.28)));
+}
+
+function clampLayoutNumber(value, min, max) {
+  return Math.min(max, Math.max(min, Math.round(Number(value) || min)));
 }
 
 function setupCommandDeckResize() {

@@ -4,6 +4,14 @@ export function LorekeeperShell() {
   return (
     <div id="app" className="handheld-shell lobby-mode home-mode">
       <aside className="left-panel panel-rail">
+        <div
+          id="left-rail-resize-handle"
+          className="rail-resize-handle left-rail-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          tabIndex="0"
+          title="Resize party shelf"
+        ></div>
         <section className="rail-section campaign-section">
           <div className="section-title">
             <div>
@@ -283,6 +291,14 @@ export function LorekeeperShell() {
       </main>
 
       <aside className="right-panel panel-rail" aria-label="Notebook and table talk">
+        <div
+          id="right-rail-resize-handle"
+          className="rail-resize-handle right-rail-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          tabIndex="0"
+          title="Resize notebook shelf"
+        ></div>
         <details id="campaign-notes-panel" className="rail-section notes-panel campaign-notes-panel">
           <summary className="notes-panel-summary">
             <span>
@@ -365,6 +381,14 @@ export function LorekeeperShell() {
         </details>
 
         <section className="rail-section table-talk-section" aria-label="Table talk side chat">
+          <div
+            id="table-talk-resize-handle"
+            className="table-talk-resize-handle"
+            role="separator"
+            aria-orientation="horizontal"
+            tabIndex="0"
+            title="Resize table talk"
+          ></div>
           <div className="section-title">
             <h2>Table Talk</h2>
             <span id="table-talk-count" className="count-pill">0</span>
