@@ -29,6 +29,7 @@ import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
+import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
@@ -6552,7 +6553,10 @@ async function importProviderResponse(responseText, options = {}) {
   const cleanedText = cleanProviderResponseForPlay(responseText);
   const tableMessages = splitProviderTableMessages(cleanedText, state.campaign, extraction.proposedChanges);
   const implicitSceneChange = options.autoCommit
-    ? createImplicitSceneProgressChange(tableMessages, extraction.proposedChanges)
+    ? createImplicitSceneProgressChange({
+      tableMessages,
+      proposedChanges: extraction.proposedChanges,
+    })
     : null;
   const implicitCombatChange = options.autoCommit
     ? createImplicitCombatStartChange({
@@ -6694,36 +6698,6 @@ function schedulePostImportAutomation() {
 async function autoCommitReviewBatch(reviewBatch) {
   const safeBatch = prepareAutoCommitReviewBatch(reviewBatch);
   return safeBatch ? commitExtractedChanges(safeBatch) : null;
-}
-
-function createImplicitSceneProgressChange(tableMessages = [], proposedChanges = []) {
-  if (proposedChanges.some((change) => normalizeChangeDomain(change.domain) === "scene")) {
-    return null;
-  }
-
-  const latestDmText = [...tableMessages]
-    .reverse()
-    .find((message) => message.role === "dm" && message.body?.trim())?.body;
-  const immediateSituation = compactSceneSituation(latestDmText);
-  if (!immediateSituation) {
-    return null;
-  }
-
-  return {
-    operation: "update",
-    domain: "scene",
-    targetId: null,
-    importance: "minor",
-    visibility: "player_visible",
-    summary: "Scene advanced from latest DM narration.",
-    data: {
-      status: "in_progress",
-      immediateSituation,
-      lastBeatAt: new Date().toISOString(),
-    },
-    confidence: "high",
-    reason: "Keeps SQLite scene state aligned with the imported DM beat so later turns do not repeat stale prompts.",
-  };
 }
 
 function compactSceneSituation(text = "") {

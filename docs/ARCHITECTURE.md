@@ -255,6 +255,7 @@ Start here when making changes:
 - Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
 - Stale combat prompt repair: `app/combat-prompt-repair-controller.js`
 - Provider-import combat fallback guardrails: `app/combat-import-controller.js`
+- Provider-import scene fallback guardrails: `app/scene-import-controller.js`
 - Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`
 - Character creation/autocomplete: `app/character-autocomplete-controller.js`
 - Local multiplayer: `src/multiplayer/local-table.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`

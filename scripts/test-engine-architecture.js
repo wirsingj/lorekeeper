@@ -23,6 +23,7 @@ import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-pa
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
+import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
@@ -1012,6 +1013,32 @@ function testCombatTrackerView() {
 
   const guestView = buildCombatTrackerView(campaign, { hideEnemyHp: true });
   assert.equal(guestView.rows.find((row) => row.id === "miner").hpLabel, "HP ?");
+}
+
+function testSceneImportController() {
+  const change = createImplicitSceneProgressChange({
+    now: () => "2026-06-16T00:00:00.000Z",
+    tableMessages: [
+      { role: "dm", body: "Old situation." },
+      { role: "party", body: "Thor checks the door." },
+      { role: "dm", body: "The door opens onto a rain-slick alley.\nA. Charge ahead\nB. Wait" },
+    ],
+  });
+  assert.equal(change.domain, "scene");
+  assert.equal(change.data.status, "in_progress");
+  assert.equal(change.data.lastBeatAt, "2026-06-16T00:00:00.000Z");
+  assert.equal(change.data.immediateSituation, "The door opens onto a rain-slick alley.");
+
+  const explicitScene = createImplicitSceneProgressChange({
+    tableMessages: [{ role: "dm", body: "The alley changes." }],
+    proposedChanges: [{ domain: "scene", data: { immediateSituation: "Already structured." } }],
+  });
+  assert.equal(explicitScene, null);
+
+  const choiceOnly = createImplicitSceneProgressChange({
+    tableMessages: [{ role: "dm", body: "What do you do?\nA. Run\nB. Hide" }],
+  });
+  assert.equal(choiceOnly, null);
 }
 
 function testSceneAndConsequenceEngines() {
@@ -2334,6 +2361,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
+  const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
@@ -2408,6 +2436,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(combatImportController, /function createImplicitCombatAdvanceChange/, "combat import controller should own implicit initiative advancement");
   assert.match(combatImportController, /!hasResolvedMechanics\(turnResponse\)[\s\S]*return null;/, "implicit combat advancement must require resolved mechanics");
   assert.doesNotMatch(appJs, /function createImplicitCombatAdvanceChange/, "renderer should not own implicit combat advancement policy");
+  assert.match(appJs, /scene-import-controller\.js/, "scene import fallback policy should live outside the main app renderer");
+  assert.match(sceneImportController, /function createImplicitSceneProgressChange/, "scene import controller should own implicit scene progress fallback");
+  assert.doesNotMatch(appJs, /function createImplicitSceneProgressChange/, "renderer should not own implicit scene progress policy");
 }
 
 async function testNewCampaignPreTableJoinerWiring() {
@@ -2558,6 +2589,7 @@ testCombatEndsWhenSideDrops();
 testCombatPromptRepairController();
 testCombatImportController();
 testCombatTrackerView();
+testSceneImportController();
 testSceneAndConsequenceEngines();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
