@@ -303,6 +303,7 @@ Risks:
 165. Campaign Notes now start with a Scene notebook section fed by scene retrieval, surfacing current situation, tensions, consequences, threads, and relevant relationships without making them permanent center-stage chrome.
 166. Start Adventure now disappears after the host requests the opening narration for the current table session, while a fresh re-hosted local table session can show it again if the campaign is still pre-opening.
 167. Opening narration now gives the model explicit neutral-presence examples for controlled party members, and DM Recovery summarizes agency blocks as table language instead of exposing raw `table[n]` validator diagnostics.
+168. Current-schema campaign SQLite files now repair a missing `errors` diagnostics table before server diagnostics read recent errors; older local files with current metadata but missing the table no longer stay in a half-current state.
 
 ### Still Risky
 
@@ -540,7 +541,7 @@ Risks:
 ### Storage, Diagnostics, And Safety
 
 - [x] SQLite is the canonical campaign store.
-- [x] Errors table records provider/session diagnostics.
+- [x] Errors table records provider/session diagnostics. Current state: diagnostics now repair current-schema files that claim to be up to date but are missing the `errors` table.
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add route-level tests for private/guest API split.

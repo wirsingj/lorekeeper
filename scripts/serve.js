@@ -14,7 +14,7 @@ import {
   selectCampaign,
   updateActiveCampaign,
 } from "../src/storage/campaign-repository.js";
-import { readCampaignErrorsFromSqliteFile } from "../src/storage/sqlite-store.js";
+import { ensureCampaignErrorsTableInSqliteFile, readCampaignErrorsFromSqliteFile } from "../src/storage/sqlite-store.js";
 import { addChatMessage } from "../src/campaign-state/chat-history.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { upsertProviderConversation } from "../src/campaign-state/provider-conversations.js";
@@ -1171,7 +1171,10 @@ async function buildDiagnosticsBundle() {
   const recentMessages = (campaign?.sessionLog?.messages ?? []).slice(-40);
   const recentReviews = (campaign?.reviewLog ?? []).slice(-8);
   const recentErrors = active.sqlitePath
-    ? await readCampaignErrorsFromSqliteFile(active.sqlitePath, { limit: 80 }).catch((error) => [{
+    ? await (async () => {
+        await ensureCampaignErrorsTableInSqliteFile(active.sqlitePath);
+        return readCampaignErrorsFromSqliteFile(active.sqlitePath, { limit: 80 });
+      })().catch((error) => [{
         severity: "error",
         source: "diagnostics",
         eventType: "error_log_read_failed",

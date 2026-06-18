@@ -16,6 +16,7 @@ import {
 import { createCampaignBundle, serializeCampaignBundle } from "../src/storage/campaign-bundle.js";
 import {
   appendCampaignErrorToSqliteFile,
+  ensureCampaignErrorsTableInSqliteFile,
   readCampaignFromSqliteFile,
   readCampaignErrorsFromSqliteFile,
   readCampaignRecordsFromSqliteFile,
@@ -153,6 +154,23 @@ try {
   assert.equal(summary.engineCounts.state_effects, 1);
   assert.equal(summary.engineCounts.combat_actions, 1);
   assert.equal(summary.engineCounts.errors, 0);
+
+  const DriftSQL = await initSqlJs();
+  const driftDb = new DriftSQL.Database(await readFile(sqlitePath));
+  try {
+    driftDb.run("DROP TABLE errors");
+    await writeFile(sqlitePath, driftDb.export());
+  } finally {
+    driftDb.close();
+  }
+  const driftSummary = await readCampaignSqliteSummary(sqlitePath);
+  assert.equal(Object.hasOwn(driftSummary.engineCounts, "errors"), false);
+  const repairResult = await ensureCampaignErrorsTableInSqliteFile(sqlitePath);
+  assert.equal(repairResult.created, true);
+  const secondRepairResult = await ensureCampaignErrorsTableInSqliteFile(sqlitePath);
+  assert.equal(secondRepairResult.created, false);
+  const repairedSummary = await readCampaignSqliteSummary(sqlitePath);
+  assert.equal(repairedSummary.engineCounts.errors, 0);
 
   await appendCampaignErrorToSqliteFile(sqlitePath, {
     campaignId: campaign.id,

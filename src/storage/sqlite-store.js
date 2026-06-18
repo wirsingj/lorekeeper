@@ -97,6 +97,28 @@ export async function appendCampaignErrorToSqliteFile(sqlitePath, errorEvent = {
   }
 }
 
+export async function ensureCampaignErrorsTableInSqliteFile(sqlitePath) {
+  if (!existsLikePath(sqlitePath)) {
+    return { sqlitePath, created: false, reason: "missing_file" };
+  }
+  const SQL = await initSqlJs();
+  const bytes = await readFile(sqlitePath);
+  const db = new SQL.Database(bytes);
+  try {
+    assertSqliteSchema2(db);
+    const existed = tableExists(db, "errors");
+    ensureErrorsTable(db);
+    if (existed) {
+      return { sqlitePath, created: false, reason: "already_present" };
+    }
+    const nextBytes = db.export();
+    await writeFileAtomically(sqlitePath, nextBytes);
+    return { sqlitePath, created: true, bytes: nextBytes.length };
+  } finally {
+    db.close();
+  }
+}
+
 export async function readCampaignErrorsFromSqliteFile(sqlitePath, { limit = 80 } = {}) {
   if (!existsLikePath(sqlitePath)) {
     return [];
@@ -581,11 +603,8 @@ function escapeSqlLike(value) {
 }
 
 function ensureErrorsTable(db) {
-  if (tableExists(db, "errors")) {
-    return;
-  }
   db.run(`
-    CREATE TABLE errors (
+    CREATE TABLE IF NOT EXISTS errors (
       campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
       id TEXT NOT NULL CHECK (length(trim(id)) > 0),
       severity TEXT NOT NULL DEFAULT 'error' CHECK (severity IN ('debug', 'info', 'warning', 'error', 'fatal')),
@@ -603,8 +622,8 @@ function ensureErrorsTable(db) {
       PRIMARY KEY (campaign_id, id)
     )
   `);
-  db.run("CREATE INDEX idx_errors_campaign_created ON errors (campaign_id, created_at)");
-  db.run("CREATE INDEX idx_errors_campaign_source ON errors (campaign_id, source, event_type, created_at)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_errors_campaign_created ON errors (campaign_id, created_at)");
+  db.run("CREATE INDEX IF NOT EXISTS idx_errors_campaign_source ON errors (campaign_id, source, event_type, created_at)");
 }
 
 function insertReviewLog(db, campaign) {
