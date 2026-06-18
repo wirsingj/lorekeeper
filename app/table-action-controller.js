@@ -27,11 +27,16 @@ export function buildTableActionProjection({
       disabled: !isHost || !hasTable || !canNudge,
       title: activeRepair
         ? "Review the DM response first"
-        : hasActiveGeneration
-          ? "DM is already generating"
-          : !isHost
-            ? "Only the host can nudge the DM"
+        : !isHost
+          ? "Only the host can nudge the DM"
+          : hasActiveGeneration
+            ? "DM is already generating"
             : "Nudge DM",
+    },
+    cancelGeneration: {
+      visible: Boolean(isHost && hasTable && hasActiveGeneration),
+      disabled: false,
+      title: "Cancel the DM response in progress",
     },
     startAdventure,
     seatGuest: {
@@ -68,6 +73,9 @@ export function buildTableActionProjection({
 
 export function applyTableActionProjection(elements, projection) {
   applyButtonState(elements.nudgeDm, projection.nudgeDm);
+  applyButtonState(elements.cancelGeneration, projection.cancelGeneration, {
+    hiddenWhenUnavailable: true,
+  });
   applyButtonState(elements.startAdventureOpening, projection.startAdventure, {
     hiddenWhenUnavailable: true,
   });

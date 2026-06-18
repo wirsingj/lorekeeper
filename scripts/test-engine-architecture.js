@@ -1771,6 +1771,7 @@ async function testInvalidProviderOutputIsRecoverable() {
   const result = await run.promise;
   assert.equal(result.validationIssue, "bad json");
   assert.equal(turnFlow.getProjection().state, turnStates.ERROR);
+  assert.equal(turnFlow.getProjection().hasActiveGeneration, false);
   assert.equal(turnFlow.getProjection().canRetry, true);
 }
 
@@ -2148,6 +2149,7 @@ function testTableActionProjection() {
   assert.equal(freshTable.startAdventure.visible, true);
   assert.equal(freshTable.startAdventure.disabled, false);
   assert.equal(freshTable.seatGuest.visible, false);
+  assert.equal(freshTable.cancelGeneration.visible, false);
   assert.equal(freshTable.nudgeDm.disabled, true);
   assert.match(freshTable.nudgeDm.title, /Nudge DM/);
 
@@ -2193,15 +2195,25 @@ function testTableActionProjection() {
   assert.equal(bridge.readLatest.visible, true);
   assert.equal(bridge.nudgeDm.disabled, false);
 
+  const generating = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: true },
+    isHost: true,
+  });
+  assert.equal(generating.cancelGeneration.visible, true);
+  assert.equal(generating.cancelGeneration.disabled, false);
+  assert.equal(generating.nudgeDm.disabled, true);
+
   const guestClient = buildTableActionProjection({
     campaign: readyCampaign,
-    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    turnProjection: { hasRepair: false, hasActiveGeneration: true },
     waitingGuests: [{ id: "guest-1", displayName: "Remotie" }],
     preferredProvider: "bridge",
     isHost: false,
   });
   assert.equal(guestClient.startAdventure.visible, false);
   assert.equal(guestClient.seatGuest.visible, false);
+  assert.equal(guestClient.cancelGeneration.visible, false);
   assert.equal(guestClient.readLatest.visible, false);
   assert.equal(guestClient.nudgeDm.disabled, true);
   assert.match(guestClient.nudgeDm.title, /Only the host/);
@@ -2834,6 +2846,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(tableActionController, /function buildTableActionProjection/, "table action visibility policy should live outside app.js");
   assert.match(tableActionController, /buildStartAdventureOpeningProjection/, "Start Adventure action should flow through the unified table action projection");
   assert.match(tableActionController, /nudgeDm/, "Nudge availability should flow through the unified table action projection");
+  assert.match(tableActionController, /cancelGeneration/, "Cancel generation availability should flow through the unified table action projection");
   assert.doesNotMatch(appJs, /function renderWaitingGuestCue/, "guest seating CTA policy should not be a standalone app.js function");
   assert.doesNotMatch(appJs, /function updateTurnRepairControls/, "repair CTA policy should not be a standalone app.js function");
   assert.doesNotMatch(appJs, /function updateStartAdventureOpeningControl/, "opening CTA policy should not be a standalone app.js function");
@@ -2915,6 +2928,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(tableOpeningController, /function buildStartAdventureOpeningProjection/, "Start Adventure button policy should live outside app.js");
   assert.match(tableOpeningController, /function buildAdventureOpeningPrompt/, "opening DM prompt policy should live outside app.js");
   assert.doesNotMatch(appJs, /function buildAdventureOpeningPrompt/, "app.js should not own the opening DM prompt policy");
+  assert.doesNotMatch(appJs, /elements\.cancelGeneration\.hidden\s*=\s*(?:true|false)/, "app.js should not manually hide/show cancel generation");
+  assert.doesNotMatch(appJs, /elements\.cancelGeneration\.disabled\s*=\s*(?:true|false)/, "app.js should not manually enable/disable cancel generation");
   assert.match(appJs, /Start Adventure for the opening DM narration/);
   assert.doesNotMatch(appJs, /Next: click Nudge to ask the DM for the opening moment/);
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Start Adventure must remain host-controlled");

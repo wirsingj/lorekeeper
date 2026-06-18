@@ -5839,7 +5839,6 @@ function applyThinModeChrome() {
     elements.syncGuestTable.hidden = false;
   }
   elements.recheckProvider.hidden = true;
-  elements.cancelGeneration.hidden = true;
   document.querySelectorAll("[data-add-domain]").forEach((button) => {
     button.hidden = true;
     button.disabled = true;
@@ -7599,8 +7598,6 @@ async function runPromptThroughLocalProvider(turn) {
     inputKind: /^\(DM nudge:/i.test(turn.playerMessage) ? "nudge" : "player",
     actorId: state.campaign?.combat?.currentTurnId ?? null,
   });
-  elements.cancelGeneration.hidden = false;
-  elements.cancelGeneration.disabled = false;
   elements.buildTurn.disabled = true;
   setProviderActivity("Generating locally with Ollama...", "working");
   pushDiagnosticsEvent("ollama_generation_started", {
@@ -7621,6 +7618,7 @@ async function runPromptThroughLocalProvider(turn) {
       onEvent: handleProviderGenerationEvent,
     });
     state.turnFlow.startGeneration(run);
+    renderTableActions();
     const result = await run.promise;
     if (generationCampaignId && state.campaign?.id !== generationCampaignId) {
       setProviderActivity("Ignored provider response from previous campaign", "idle");
@@ -7683,8 +7681,6 @@ async function runPromptThroughLocalProvider(turn) {
     render();
     return { providerReceived: false, error };
   } finally {
-    elements.cancelGeneration.hidden = true;
-    elements.cancelGeneration.disabled = true;
     render();
   }
 }

@@ -287,7 +287,7 @@ Risks:
 149. The front door now presents Continue Adventure, New Adventure, and Join A Table as three first-class launcher choices, with AI/preferences still demoted to utility actions.
 150. Fresh-table Start Adventure now appears in the command deck next-step area instead of the status-strip action pile, making the first real table action harder to miss.
 151. Normal DM Nudge prompt policy now lives in `app/dm-nudge-controller.js` with direct tests, reducing another renderer-owned table-flow instruction string.
-152. Table action visibility for Nudge, Start Adventure, Seat Guest, Review DM Response, Use Anyway, Try Again, and Read Latest now flows through `app/table-action-controller.js`, giving phase-aware CTAs one tested projection instead of scattered renderer functions.
+152. Table action visibility for Nudge, Cancel DM Response, Start Adventure, Seat Guest, Review DM Response, Use Anyway, Try Again, and Read Latest now flows through `app/table-action-controller.js`, giving phase-aware CTAs one tested projection instead of scattered renderer functions.
 153. Seat Guest and DM recovery actions now live in the command deck's current-action area beside Now/Next, while provider transport controls stay in the status strip.
 
 ### Still Risky

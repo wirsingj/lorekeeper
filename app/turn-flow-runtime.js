@@ -166,6 +166,7 @@ export function createTurnFlowRuntime(options = {}) {
       });
     },
     failGeneration(error) {
+      activeRun = null;
       return setTurnState(failTurn(turnState, error), { type: "generation_failed", error });
     },
     cancelGeneration(reason = "cancelled") {
