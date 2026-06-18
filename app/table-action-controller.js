@@ -89,6 +89,61 @@ export function applyTableActionProjection(elements, projection) {
   applyButtonState(elements.recheckProvider, projection.readLatest, { hiddenWhenUnavailable: true });
 }
 
+export function buildNudgeDmCommandGate({
+  isHost = true,
+  turnProjection = {},
+} = {}) {
+  if (!isHost) {
+    return {
+      blocked: true,
+      reason: "guest_mode",
+      activityText: "Only the host can nudge the DM",
+      activityState: "waiting",
+    };
+  }
+  if (turnProjection.hasActiveGeneration) {
+    return {
+      blocked: true,
+      reason: "busy",
+      activityText: "DM is already generating",
+      activityState: "waiting",
+    };
+  }
+  return { blocked: false };
+}
+
+export function buildStartAdventureCommandGate({
+  isHost = true,
+  readyForOpening = false,
+  turnProjection = {},
+} = {}) {
+  if (!isHost) {
+    return {
+      blocked: true,
+      reason: "guest_mode",
+      activityText: "Only the host can start the adventure",
+      activityState: "waiting",
+    };
+  }
+  if (!readyForOpening) {
+    return {
+      blocked: true,
+      reason: "already_started",
+      activityText: "The adventure has already started. Use Nudge when the DM needs to continue.",
+      activityState: "idle",
+    };
+  }
+  if (turnProjection.hasActiveGeneration) {
+    return {
+      blocked: true,
+      reason: "busy",
+      activityText: "DM is already starting the adventure",
+      activityState: "waiting",
+    };
+  }
+  return { blocked: false };
+}
+
 function applyButtonState(button, state = {}, { hiddenWhenUnavailable = false, fallbackText = "" } = {}) {
   if (!button) {
     return;

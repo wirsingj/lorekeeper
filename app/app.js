@@ -33,7 +33,7 @@ import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-change
 import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
-import { applyTableActionProjection, buildTableActionProjection } from "./table-action-controller.js";
+import { applyTableActionProjection, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
 import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
@@ -1020,13 +1020,13 @@ elements.playerForm.addEventListener("submit", async (event) => {
 });
 
 async function nudgeDm() {
-  if (clientMode || isRemoteTableClient()) {
-    setProviderActivity("Only the host can nudge the DM", "waiting");
-    return { providerReceived: false, reason: "guest_mode" };
-  }
-  if (hasActiveGeneration()) {
-    setProviderActivity("DM is already generating", "waiting");
-    return { providerReceived: false, reason: "busy" };
+  const gate = buildNudgeDmCommandGate({
+    isHost: !clientMode && !isRemoteTableClient(),
+    turnProjection: turnProjection(),
+  });
+  if (gate.blocked) {
+    setProviderActivity(gate.activityText, gate.activityState);
+    return { providerReceived: false, reason: gate.reason };
   }
 
   pushDiagnosticsEvent("dm_nudge_requested", {
@@ -1042,17 +1042,14 @@ async function nudgeDm() {
 }
 
 async function startAdventureOpening() {
-  if (clientMode || isRemoteTableClient()) {
-    setProviderActivity("Only the host can start the adventure", "waiting");
-    return { providerReceived: false, reason: "guest_mode" };
-  }
-  if (!isCampaignReadyForOpening()) {
-    setProviderActivity("The adventure has already started. Use Nudge when the DM needs to continue.", "idle");
-    return { providerReceived: false, reason: "already_started" };
-  }
-  if (hasActiveGeneration()) {
-    setProviderActivity("DM is already starting the adventure", "waiting");
-    return { providerReceived: false, reason: "busy" };
+  const gate = buildStartAdventureCommandGate({
+    isHost: !clientMode && !isRemoteTableClient(),
+    readyForOpening: isCampaignReadyForOpening(),
+    turnProjection: turnProjection(),
+  });
+  if (gate.blocked) {
+    setProviderActivity(gate.activityText, gate.activityState);
+    return { providerReceived: false, reason: gate.reason };
   }
 
   pushDiagnosticsEvent("opening_start_requested", {

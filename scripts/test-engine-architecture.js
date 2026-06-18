@@ -27,7 +27,7 @@ import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
-import { buildTableActionProjection } from "../app/table-action-controller.js";
+import { buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "../app/table-action-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
 import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "../app/table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
@@ -2290,6 +2290,34 @@ function testTableActionProjection() {
   assert.equal(guestClient.readLatest.visible, false);
   assert.equal(guestClient.nudgeDm.disabled, true);
   assert.match(guestClient.nudgeDm.title, /Only the host/);
+
+  assert.equal(buildNudgeDmCommandGate({ isHost: true, turnProjection: { hasActiveGeneration: false } }).blocked, false);
+  const guestNudgeGate = buildNudgeDmCommandGate({ isHost: false });
+  assert.equal(guestNudgeGate.blocked, true);
+  assert.equal(guestNudgeGate.reason, "guest_mode");
+  assert.match(guestNudgeGate.activityText, /Only the host/);
+  const busyNudgeGate = buildNudgeDmCommandGate({ isHost: true, turnProjection: { hasActiveGeneration: true } });
+  assert.equal(busyNudgeGate.blocked, true);
+  assert.equal(busyNudgeGate.reason, "busy");
+
+  assert.equal(buildStartAdventureCommandGate({
+    isHost: true,
+    readyForOpening: true,
+    turnProjection: { hasActiveGeneration: false },
+  }).blocked, false);
+  const guestStartGate = buildStartAdventureCommandGate({ isHost: false, readyForOpening: true });
+  assert.equal(guestStartGate.blocked, true);
+  assert.equal(guestStartGate.reason, "guest_mode");
+  const startedGate = buildStartAdventureCommandGate({ isHost: true, readyForOpening: false });
+  assert.equal(startedGate.blocked, true);
+  assert.equal(startedGate.reason, "already_started");
+  const busyStartGate = buildStartAdventureCommandGate({
+    isHost: true,
+    readyForOpening: true,
+    turnProjection: { hasActiveGeneration: true },
+  });
+  assert.equal(busyStartGate.blocked, true);
+  assert.equal(busyStartGate.reason, "busy");
 }
 
 function testDmNudgeController() {
