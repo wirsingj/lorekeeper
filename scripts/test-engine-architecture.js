@@ -1911,6 +1911,21 @@ function testInputComposerProjection() {
   assert.equal(snapshotConnectedGuest.sendDisabled, false);
   assert.match(snapshotConnectedGuest.placeholder, /Type as Thor/);
 
+  const guestPendingInput = buildInputComposerProjection({
+    clientMode: true,
+    campaign,
+    guestSession: null,
+    guestSnapshot: {
+      connection: { status: "connected", partyMemberId: "thor" },
+      assignedCharacter: { name: "Thor" },
+      pendingInput: { text: "Thor watches the road." },
+    },
+    tableSession: { phase: tablePhases.WAITING_FOR_DM },
+  });
+  assert.equal(guestPendingInput.inputDisabled, true);
+  assert.equal(guestPendingInput.sendDisabled, true);
+  assert.match(guestPendingInput.placeholder, /sent to the host table/i);
+
   const defaultHostProjection = buildInputComposerProjection({
     campaign,
     turnProjection: { canSubmit: true },
@@ -1919,6 +1934,33 @@ function testInputComposerProjection() {
   assert.equal(defaultHostProjection.sendDisabled, false);
   assert.equal(defaultHostProjection.placeholder, "Describe what your character does, says, or asks.");
   assert.doesNotMatch(defaultHostProjection.placeholder, /heist|alley/i);
+
+  const hostWaitingForDm = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    tableSession: { phase: tablePhases.WAITING_FOR_DM },
+  });
+  assert.equal(hostWaitingForDm.inputDisabled, true);
+  assert.equal(hostWaitingForDm.sendDisabled, true);
+  assert.match(hostWaitingForDm.placeholder, /DM is thinking/i);
+
+  const hostRecovery = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    tableSession: { phase: tablePhases.RECOVERY },
+  });
+  assert.equal(hostRecovery.inputDisabled, true);
+  assert.equal(hostRecovery.sendDisabled, true);
+  assert.match(hostRecovery.placeholder, /Review the DM response/i);
+
+  const hostPartyVote = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    tableSession: { phase: tablePhases.PARTY_VOTE },
+  });
+  assert.equal(hostPartyVote.inputDisabled, false);
+  assert.equal(hostPartyVote.sendDisabled, false);
+  assert.match(hostPartyVote.placeholder, /party vote/i);
 
   campaign.combat = {
     ...campaign.combat,

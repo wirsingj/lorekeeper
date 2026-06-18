@@ -4,6 +4,7 @@ export function buildInputComposerProjection({
   guestSession = null,
   guestSnapshot = null,
   turnProjection = {},
+  tableSession = null,
   collectStagedRemoteInputs = () => [],
   findPartyMember = () => null,
   isHostControlledPartyRecord = () => false,
@@ -18,6 +19,15 @@ export function buildInputComposerProjection({
     const connected = effectiveGuestSession.status === "connected";
     const activeCombatTurn = campaign?.combat?.inCombat ? campaign.combat.currentTurnId : null;
     const isGuestCombatTurn = !activeCombatTurn || activeCombatTurn === effectiveGuestSession.partyMemberId;
+    const guestPhaseOverride = connected ? guestComposerPhaseOverride(tableSession, guestSnapshot) : null;
+    if (guestPhaseOverride) {
+      return {
+        inputDisabled: true,
+        sendDisabled: true,
+        placeholder: guestPhaseOverride,
+        buttonText: "Send To Host",
+      };
+    }
     return {
       inputDisabled: !connected || !isGuestCombatTurn,
       sendDisabled: !connected || !isGuestCombatTurn,
@@ -37,10 +47,12 @@ export function buildInputComposerProjection({
     isHostControlledPartyRecord,
     labelById,
   });
+  const phaseOverride = hostComposerPhaseOverride(tableSession);
+  const phaseLocksComposer = Boolean(phaseOverride?.lock);
   return {
-    inputDisabled: combatGate.inputDisabled,
-    sendDisabled: !turnProjection.canSubmit || combatGate.sendDisabled,
-    placeholder: combatGate.placeholder || "Describe what your character does, says, or asks.",
+    inputDisabled: phaseLocksComposer || combatGate.inputDisabled,
+    sendDisabled: phaseLocksComposer || !turnProjection.canSubmit || combatGate.sendDisabled,
+    placeholder: phaseOverride?.placeholder || combatGate.placeholder || "Describe what your character does, says, or asks.",
     buttonText: "Send Turn",
   };
 }
@@ -81,4 +93,41 @@ export function buildHostCombatGate({
       ? `${activeName}'s remote action is staged. Send Turn resolves it.`
       : `Waiting for ${activeName}'s combat turn.`,
   };
+}
+
+function hostComposerPhaseOverride(tableSession) {
+  const phase = tableSession?.phase || "";
+  if (phase === "waiting_for_dm") {
+    return { lock: true, placeholder: "DM is thinking. Wait for the response before sending another turn." };
+  }
+  if (phase === "recovery") {
+    return { lock: true, placeholder: "Review the DM response before sending the next turn." };
+  }
+  if (phase === "host_review") {
+    return { lock: true, placeholder: "Review the pending table changes before continuing." };
+  }
+  if (phase === "party_vote") {
+    return { lock: false, placeholder: "Review the party vote, then send the table's final choice." };
+  }
+  if (phase === "waiting_for_guest") {
+    return { lock: false, placeholder: "Seat waiting friends when ready, or continue the scene." };
+  }
+  return null;
+}
+
+function guestComposerPhaseOverride(tableSession, guestSnapshot) {
+  const phase = tableSession?.phase || "";
+  if (guestSnapshot?.pendingInput?.text || guestSnapshot?.pendingInput?.passed) {
+    return "Your action was sent to the host table. Wait for it to resolve.";
+  }
+  if (phase === "waiting_for_dm") {
+    return "DM is thinking. Wait for the table to continue.";
+  }
+  if (phase === "recovery" || phase === "host_review") {
+    return "Host is reviewing the table before play continues.";
+  }
+  if (phase === "party_vote") {
+    return "Vote on the table choice above; the host makes the final call.";
+  }
+  return null;
 }

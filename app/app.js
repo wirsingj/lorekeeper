@@ -5848,6 +5848,7 @@ function applyThinModeChrome() {
     campaign: state.campaign,
     guestSession: state.guestSession,
     guestSnapshot: state.guestSnapshot,
+    tableSession: state.tableSession ?? buildCurrentTableSessionProjection(),
     labelById: (id) => labelById(state.campaign, id),
   }));
 }
@@ -5896,6 +5897,7 @@ function applyFullModeChrome() {
   applyInputComposerProjection(elements, buildInputComposerProjection({
     campaign: state.campaign,
     turnProjection: turnProjection(),
+    tableSession: state.tableSession ?? buildCurrentTableSessionProjection(),
     collectStagedRemoteInputs,
     findPartyMember: (id) => findById(state.campaign.party, id),
     isHostControlledPartyRecord,

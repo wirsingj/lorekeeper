@@ -289,6 +289,7 @@ Risks:
 151. Normal DM Nudge prompt policy now lives in `app/dm-nudge-controller.js` with direct tests, reducing another renderer-owned table-flow instruction string.
 152. Table action visibility for Nudge, Cancel DM Response, Start Adventure, Seat Guest, Review DM Response, Use Anyway, Try Again, and Read Latest now flows through `app/table-action-controller.js`, giving phase-aware CTAs one tested projection instead of scattered renderer functions.
 153. Seat Guest and DM recovery actions now live in the command deck's current-action area beside Now/Next, while provider transport controls stay in the status strip.
+154. The command input now consumes `TableSessionEngine` phase state, so DM-thinking, recovery, host-review, party-vote, waiting-guest, and guest-sent states show phase-aware placeholders and locking instead of generic disabled input.
 
 ### Still Risky
 
@@ -310,7 +311,7 @@ Risks:
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
-19. TableSessionEngine is currently a projection layer. The status strip, diagnostics, command deck, and table-focus hook now consume it, but more UI surfaces still need to consume it directly before the table fully stops combining local flags.
+19. TableSessionEngine is currently a projection layer. The status strip, diagnostics, command deck, command input, and table-focus hook now consume it, but more UI surfaces still need to consume it directly before the table fully stops combining local flags.
 20. `app/app.js` and `scripts/serve.js` are better marked, but still large enough that future fixes can accidentally create hidden coupling if new decisions are added there.
 21. `debugSnapshot` summarizes current runtime state, but it is not yet a persisted session recorder or replay tool.
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
