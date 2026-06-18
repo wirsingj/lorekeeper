@@ -8,10 +8,30 @@ export function compactUiText(value, limit = 160) {
 
 export function tableRepairReason(value) {
   const text = compactUiText(value, 140);
+  if (CONTROLLED_AGENCY_REPAIR_REASON.test(String(value ?? ""))) {
+    const names = controlledAgencyRepairNames(value);
+    const target = names.length
+      ? names.length === 1
+        ? names[0]
+        : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`
+      : "a controlled party member";
+    return `the DM response tried to speak or act for ${target}`;
+  }
   if (!text || TECHNICAL_REPAIR_REASON.test(text)) {
     return "the DM response did not pass LoreKeeper's table checks";
   }
   return text;
+}
+
+function controlledAgencyRepairNames(value) {
+  const names = [];
+  for (const match of String(value ?? "").matchAll(/controlled party member ([A-Za-z][A-Za-z0-9' -]{1,60}?)(?: without|;|$)/gi)) {
+    const name = compactUiText(match[1], 80);
+    if (name && !names.includes(name)) {
+      names.push(name);
+    }
+  }
+  return names;
 }
 
 export function turnRepairStatusText(repair) {

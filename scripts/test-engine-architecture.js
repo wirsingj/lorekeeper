@@ -2261,6 +2261,8 @@ function testTableOpeningController() {
   assert.match(prompt, /Begin the first session/);
   assert.match(prompt, /Do not invent a player choice/);
   assert.match(prompt, /Do not speak, think, move, scan, ready weapons, or make tactical choices/);
+  assert.match(prompt, /neutral presence only/);
+  assert.match(prompt, /Bad: 'Rowan watches/);
   assert.match(prompt, /Prefer choices\.options: \[\]/);
 }
 
@@ -2437,6 +2439,7 @@ function testTurnRepairController() {
       "table[1] appears to speak, decide, or act for controlled party member Thora without submitted controller input",
     ],
   };
+  assert.equal(tableRepairReason(agencyRepair.reason), "the DM response tried to speak or act for Thora");
   assert.equal(isHardBlockedTurnRepair(agencyRepair), true);
   assert.match(turnRepairActivityText(agencyRepair), /blocked it because it spoke or acted for a controlled character/);
   assert.match(turnRepairBlockedMessage(agencyRepair), /controlled party member/);
@@ -2529,6 +2532,8 @@ function testHostResponseReviewProjection() {
     },
   });
   assert.equal(agencyRepair.state, "repair");
+  assert.match(agencyRepair.body, /tried to speak or act for Rowan/);
+  assert.doesNotMatch(agencyRepair.body, /table\[2\]/);
   assert.match(agencyRepair.nextStep, /without taking over a controlled character/);
   assert.doesNotMatch(agencyRepair.nextStep, /Use Anyway/);
 

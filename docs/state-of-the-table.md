@@ -302,6 +302,7 @@ Risks:
 164. Campaign Chat fallback/progress copy now lives in `app/provider-chat-controller.js` with direct tests, so app.js executes provider-chat recovery plans instead of owning another cluster of fallback strings.
 165. Campaign Notes now start with a Scene notebook section fed by scene retrieval, surfacing current situation, tensions, consequences, threads, and relevant relationships without making them permanent center-stage chrome.
 166. Start Adventure now disappears after the host requests the opening narration for the current table session, while a fresh re-hosted local table session can show it again if the campaign is still pre-opening.
+167. Opening narration now gives the model explicit neutral-presence examples for controlled party members, and DM Recovery summarizes agency blocks as table language instead of exposing raw `table[n]` validator diagnostics.
 
 ### Still Risky
 
@@ -458,7 +459,7 @@ Risks:
 - [x] Make AI companion suggestions appear as approve/resolve/decline table beats.
 - [x] Add idle companion interjection rules with cooldown/rarity so they feel alive but not noisy.
 - [x] Add fixtures for host-controlled, remote-controlled, unassigned, and AI companion agency boundaries.
-- [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration. Current state: neutral presence, hostile focus, host-name-as-object, remote-PC body-language overreach, and "doesn't back down" resolve-overreach fixtures are covered.
+- [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration. Current state: neutral presence, hostile focus, host-name-as-object, remote-PC body-language overreach, "doesn't back down" resolve-overreach fixtures, and friendlier opening/recovery copy are covered.
 - [x] Let host choose host/AI/unassigned during additional character creation.
 
 ### Multiplayer And LoreKeeper Join
