@@ -6428,9 +6428,7 @@ function render() {
   if (state.sqlitePath) {
     elements.saveStatus.textContent = "Saved locally";
   }
-  if (elements.nudgeDm) {
-    updateNudgeAvailability();
-  }
+  renderTableActions();
 
   renderPlayLog();
   renderThinJoinPanel();
@@ -7687,7 +7685,6 @@ async function runPromptThroughLocalProvider(turn) {
   } finally {
     elements.cancelGeneration.hidden = true;
     elements.cancelGeneration.disabled = true;
-    updateNudgeAvailability();
     render();
   }
 }
@@ -7768,14 +7765,12 @@ function setTurnRepair(repair) {
   pushDiagnosticsEvent("turn_repair_required", summarizeTurnRepair(savedRepair));
   elements.bridgeStatus.textContent = turnRepairStatusText(savedRepair);
   setProviderActivity(turnRepairActivityText(savedRepair), "error");
-  updateNudgeAvailability();
   render();
 }
 
 function clearTurnRepair() {
   state.turnFlow.clearRepair();
   renderTableActions();
-  updateNudgeAvailability();
 }
 
 function cleanMessageMeta(value) {
@@ -7796,7 +7791,6 @@ async function retryTurnRepair() {
   setProviderActivity("DM is reconsidering the response...", "working");
   state.turnFlow.retryLastTurn();
   renderTableActions();
-  updateNudgeAvailability();
   const runResult = await runPromptThroughLocalProvider(repair.turn);
   if (retryMessage?.id) {
     await updatePlayerTurnEchoLifecycle(retryMessage.id, {
@@ -8328,21 +8322,6 @@ function setProviderActivity(message, status = "idle") {
     });
   }
   renderTableActions();
-}
-
-function updateNudgeAvailability() {
-  if (!elements.nudgeDm) {
-    return;
-  }
-  const projection = turnProjection();
-  elements.nudgeDm.disabled = clientMode || isRemoteTableClient() || !projection.canNudge || !state.campaign;
-  elements.nudgeDm.title = projection.hasRepair
-    ? "Review the DM response first"
-    : projection.hasActiveGeneration
-      ? "DM is already generating"
-      : isRemoteTableClient()
-        ? "Only the host can nudge the DM"
-      : "Nudge DM";
 }
 
 function setupSavedLayoutResizers() {

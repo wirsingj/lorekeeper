@@ -12,6 +12,7 @@ export function buildTableActionProjection({
   const hasTable = Boolean(campaign);
   const activeRepair = Boolean(turnProjection.hasRepair || repair);
   const hasActiveGeneration = Boolean(turnProjection.hasActiveGeneration);
+  const canNudge = Boolean(turnProjection.canNudge);
   const guestCount = Array.isArray(waitingGuests) ? waitingGuests.length : 0;
   const firstGuest = guestCount ? waitingGuests[0] : null;
   const startAdventure = buildStartAdventureOpeningProjection({
@@ -21,6 +22,17 @@ export function buildTableActionProjection({
   });
 
   return {
+    nudgeDm: {
+      visible: true,
+      disabled: !isHost || !hasTable || !canNudge,
+      title: activeRepair
+        ? "Review the DM response first"
+        : hasActiveGeneration
+          ? "DM is already generating"
+          : !isHost
+            ? "Only the host can nudge the DM"
+            : "Nudge DM",
+    },
     startAdventure,
     seatGuest: {
       visible: Boolean(isHost && hasTable && guestCount),
@@ -55,6 +67,7 @@ export function buildTableActionProjection({
 }
 
 export function applyTableActionProjection(elements, projection) {
+  applyButtonState(elements.nudgeDm, projection.nudgeDm);
   applyButtonState(elements.startAdventureOpening, projection.startAdventure, {
     hiddenWhenUnavailable: true,
   });

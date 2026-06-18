@@ -2148,6 +2148,8 @@ function testTableActionProjection() {
   assert.equal(freshTable.startAdventure.visible, true);
   assert.equal(freshTable.startAdventure.disabled, false);
   assert.equal(freshTable.seatGuest.visible, false);
+  assert.equal(freshTable.nudgeDm.disabled, true);
+  assert.match(freshTable.nudgeDm.title, /Nudge DM/);
 
   const guestsWaiting = buildTableActionProjection({
     campaign: readyCampaign,
@@ -2184,11 +2186,12 @@ function testTableActionProjection() {
 
   const bridge = buildTableActionProjection({
     campaign: { scene: { status: "active" }, sessionLog: { messages: [{ role: "dm" }] } },
-    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    turnProjection: { hasRepair: false, hasActiveGeneration: false, canNudge: true },
     preferredProvider: "bridge",
     isHost: true,
   });
   assert.equal(bridge.readLatest.visible, true);
+  assert.equal(bridge.nudgeDm.disabled, false);
 
   const guestClient = buildTableActionProjection({
     campaign: readyCampaign,
@@ -2200,6 +2203,8 @@ function testTableActionProjection() {
   assert.equal(guestClient.startAdventure.visible, false);
   assert.equal(guestClient.seatGuest.visible, false);
   assert.equal(guestClient.readLatest.visible, false);
+  assert.equal(guestClient.nudgeDm.disabled, true);
+  assert.match(guestClient.nudgeDm.title, /Only the host/);
 }
 
 function testDmNudgeController() {
@@ -2828,9 +2833,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /renderTableActions/, "renderer should consume the table action projection");
   assert.match(tableActionController, /function buildTableActionProjection/, "table action visibility policy should live outside app.js");
   assert.match(tableActionController, /buildStartAdventureOpeningProjection/, "Start Adventure action should flow through the unified table action projection");
+  assert.match(tableActionController, /nudgeDm/, "Nudge availability should flow through the unified table action projection");
   assert.doesNotMatch(appJs, /function renderWaitingGuestCue/, "guest seating CTA policy should not be a standalone app.js function");
   assert.doesNotMatch(appJs, /function updateTurnRepairControls/, "repair CTA policy should not be a standalone app.js function");
   assert.doesNotMatch(appJs, /function updateStartAdventureOpeningControl/, "opening CTA policy should not be a standalone app.js function");
+  assert.doesNotMatch(appJs, /function updateNudgeAvailability/, "Nudge CTA policy should not be a standalone app.js function");
   assert.match(dmNudgeController, /function buildDmNudgePrompt/, "DM nudge prompt policy should live outside app.js");
   assert.doesNotMatch(appJs, /function buildDmNudgePrompt/, "app.js should not own the normal DM nudge prompt policy");
   assert.match(styles, /\.command-context/);
