@@ -161,23 +161,11 @@ export function LorekeeperShell() {
           <div id="provider-activity" className="provider-activity" data-state="idle" aria-live="polite">
             <span id="provider-activity-label">Table ready.</span>
             <div className="provider-activity-actions">
-              <button id="repair-retry" className="mini-action" type="button" title="Ask the DM to try the response again" hidden>
-                Try Again
-              </button>
-              <button id="repair-inspect" className="mini-action" type="button" title="Open details and timeline for what happened" hidden>
-                Details
-              </button>
-              <button id="repair-import-anyway" className="mini-action danger-button" type="button" title="Use this DM response even though it needs review" hidden>
-                Use Anyway
-              </button>
               <button id="cancel-generation" className="mini-action danger-button" type="button" title="Cancel the DM response in progress" hidden>
                 Cancel
               </button>
               <button id="recheck-provider" className="mini-action" type="button" title="Check the latest DM chat response" hidden>
                 Read Latest
-              </button>
-              <button id="seat-waiting-guest" className="mini-action" type="button" title="Open seating controls" hidden>
-                Seat Guest
               </button>
             </div>
           </div>
@@ -435,8 +423,20 @@ export function LorekeeperShell() {
         <div id="command-context" className="command-context" aria-live="polite">
           <span id="command-context-phase">Now: Table ready</span>
           <span id="command-context-next">Next: Continue the scene.</span>
-          <button id="start-adventure-opening" className="mini-action start-adventure-action" type="button" title="Begin the first DM narration" hidden>
+          <button id="start-adventure-opening" className="mini-action table-current-action start-adventure-action" type="button" title="Begin the first DM narration" hidden>
             Start Adventure
+          </button>
+          <button id="seat-waiting-guest" className="mini-action table-current-action" type="button" title="Open seating controls" hidden>
+            Seat Guest
+          </button>
+          <button id="repair-retry" className="mini-action table-current-action" type="button" title="Ask the DM to try the response again" hidden>
+            Try Again
+          </button>
+          <button id="repair-inspect" className="mini-action table-current-action" type="button" title="Open details and timeline for what happened" hidden>
+            Details
+          </button>
+          <button id="repair-import-anyway" className="mini-action table-current-action danger-button" type="button" title="Use this DM response even though it needs review" hidden>
+            Use Anyway
           </button>
         </div>
         <form id="player-form" className="player-form">

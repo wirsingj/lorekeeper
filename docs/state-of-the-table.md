@@ -288,6 +288,7 @@ Risks:
 150. Fresh-table Start Adventure now appears in the command deck next-step area instead of the status-strip action pile, making the first real table action harder to miss.
 151. Normal DM Nudge prompt policy now lives in `app/dm-nudge-controller.js` with direct tests, reducing another renderer-owned table-flow instruction string.
 152. Table action visibility for Start Adventure, Seat Guest, Review DM Response, Use Anyway, Try Again, and Read Latest now flows through `app/table-action-controller.js`, giving phase-aware CTAs one tested projection instead of scattered renderer functions.
+153. Seat Guest and DM recovery actions now live in the command deck's current-action area beside Now/Next, while provider transport controls stay in the status strip.
 
 ### Still Risky
 
@@ -510,7 +511,7 @@ Risks:
 - [ ] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog now uses a tested `settings-surface-controller` for mode-scoped App/AI/Table/Troubleshooting surfaces that hide irrelevant tabs per entry point, but it is not yet physically separate full screens.
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
-- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, fresh-table Start Adventure lives beside that cue, `app/table-action-controller.js` owns the main table CTA visibility policy, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; rails and combat/recovery surfaces still need deeper phase-specific behavior.
+- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, fresh-table Start Adventure, Seat Guest, and DM recovery actions live beside that cue, `app/table-action-controller.js` owns the main table CTA visibility policy, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; rails and combat/recovery surfaces still need deeper phase-specific behavior.
 - [x] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background. Current state: the primary grid now presents Continue Adventure, New Adventure, and Join A Table as first-class choices, with Check AI and Preferences in the lower utility strip.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.

@@ -2812,6 +2812,16 @@ async function testNewCampaignPreTableJoinerWiring() {
       && appShell.indexOf('id="start-adventure-opening"') < appShell.indexOf('id="player-form"'),
     "Start Adventure should live in the command deck next-step area, not in the status-strip action pile",
   );
+  assert.ok(
+    appShell.indexOf('id="command-context"') < appShell.indexOf('id="seat-waiting-guest"')
+      && appShell.indexOf('id="seat-waiting-guest"') < appShell.indexOf('id="player-form"'),
+    "Seat Guest should live with the table's current action surface",
+  );
+  assert.ok(
+    appShell.indexOf('id="command-context"') < appShell.indexOf('id="repair-retry"')
+      && appShell.indexOf('id="repair-import-anyway"') < appShell.indexOf('id="player-form"'),
+    "Recovery actions should live with the table's current action surface",
+  );
   assert.match(appJs, /renderTableFocus\(state\.tableSession\)/, "table session refresh should update the table focus cue");
   assert.match(appJs, /applyTableFocusProjection/, "command deck phase copy should be rendered through a focused projection");
   assert.match(appJs, /buildTableFocusProjection/, "renderer should consume a tested table focus projection");
@@ -2825,6 +2835,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /function buildDmNudgePrompt/, "app.js should not own the normal DM nudge prompt policy");
   assert.match(styles, /\.command-context/);
   assert.match(styles, /\.command-context \.start-adventure-action/);
+  assert.match(styles, /\.command-context \.table-current-action/);
+  assert.match(styles, /\.command-context #repair-retry/);
   assert.match(styles, /\[data-table-phase="combat"\] \.command-deck/);
   assert.match(styles, /\[data-table-focus="combat"\] \.combat-tracker-section/);
   assert.match(appShell, /Try Again/);

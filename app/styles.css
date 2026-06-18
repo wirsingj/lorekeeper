@@ -2374,13 +2374,35 @@ button:disabled {
   flex: 1 1 auto;
 }
 
-.command-context .start-adventure-action {
+.command-context .table-current-action {
   flex: 0 0 auto;
   min-height: 30px;
   padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.command-context .table-current-action[hidden] {
+  display: none;
+}
+
+.command-context .start-adventure-action,
+.command-context #seat-waiting-guest {
   border-color: rgba(127, 163, 139, 0.42);
   background: linear-gradient(180deg, #31443a, #22332b);
   color: #dceee3;
+}
+
+.command-context #repair-retry,
+.command-context #repair-inspect {
+  border-color: rgba(192, 168, 120, 0.34);
+  background: linear-gradient(180deg, #3a3a31, #2b2c26);
+  color: #f0e5c4;
+}
+
+.command-context #repair-import-anyway {
+  border-color: rgba(179, 104, 98, 0.48);
 }
 
 .command-context[data-tone="attention"] span:first-child {
@@ -2494,9 +2516,6 @@ button:disabled {
 }
 
 #recheck-provider,
-#repair-retry,
-#repair-inspect,
-#repair-import-anyway,
 #cancel-generation {
   min-height: 28px;
   padding: 0 9px;
@@ -2510,9 +2529,6 @@ button:disabled {
 }
 
 #cancel-generation[hidden],
-#repair-retry[hidden],
-#repair-inspect[hidden],
-#repair-import-anyway[hidden],
 #recheck-provider[hidden] {
   display: none;
 }
