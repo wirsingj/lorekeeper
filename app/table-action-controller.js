@@ -1,4 +1,4 @@
-import { buildStartAdventureOpeningProjection } from "./table-opening-controller.js";
+import { buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "./table-opening-controller.js";
 
 export function buildTableActionProjection({
   campaign = null,
@@ -16,6 +16,7 @@ export function buildTableActionProjection({
   const canNudge = Boolean(turnProjection.canNudge);
   const guestCount = Array.isArray(waitingGuests) ? waitingGuests.length : 0;
   const firstGuest = guestCount ? waitingGuests[0] : null;
+  const readyForOpening = isCampaignReadyForOpening(campaign, { isHost });
   const startAdventure = buildStartAdventureOpeningProjection({
     campaign,
     turnProjection,
@@ -26,14 +27,16 @@ export function buildTableActionProjection({
   return {
     nudgeDm: {
       visible: true,
-      disabled: !isHost || !hasTable || !canNudge,
+      disabled: !isHost || !hasTable || readyForOpening || !canNudge,
       title: activeRepair
         ? "Review the DM response first"
         : !isHost
           ? "Only the host can nudge the DM"
-          : hasActiveGeneration
-            ? "DM is already generating"
-            : "Nudge DM",
+          : readyForOpening
+            ? "Start Adventure before nudging the DM"
+            : hasActiveGeneration
+              ? "DM is already generating"
+              : "Nudge DM",
     },
     cancelGeneration: {
       visible: Boolean(isHost && hasTable && hasActiveGeneration),
@@ -93,6 +96,7 @@ export function applyTableActionProjection(elements, projection) {
 
 export function buildNudgeDmCommandGate({
   isHost = true,
+  readyForOpening = false,
   turnProjection = {},
 } = {}) {
   if (!isHost) {
@@ -100,6 +104,14 @@ export function buildNudgeDmCommandGate({
       blocked: true,
       reason: "guest_mode",
       activityText: "Only the host can nudge the DM",
+      activityState: "waiting",
+    };
+  }
+  if (readyForOpening) {
+    return {
+      blocked: true,
+      reason: "opening_not_started",
+      activityText: "Start Adventure before nudging the DM.",
       activityState: "waiting",
     };
   }

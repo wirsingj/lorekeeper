@@ -2,6 +2,7 @@ import { getActiveCombatActor } from "./combat-engine.js";
 
 export const tablePhases = Object.freeze({
   IDLE: "idle",
+  OPENING_READY: "opening_ready",
   ROLEPLAY: "roleplay",
   WAITING_FOR_PLAYER: "waiting_for_player",
   WAITING_FOR_GUEST: "waiting_for_guest",
@@ -28,6 +29,8 @@ const recoveryPhases = new Set([
   "dm_timeout",
   "error",
 ]);
+
+const canonOpeningRoles = new Set(["dm", "player", "party", "npc"]);
 
 // TableSessionEngine is a projection engine: it consumes authoritative state
 // from the turn/combat/multiplayer/provider systems and answers one question for
@@ -138,6 +141,9 @@ function chooseTablePhase(context) {
   if (context.guestPendingInput?.text || context.guestPendingInput?.passed) {
     return tablePhases.WAITING_FOR_DM;
   }
+  if (isCampaignReadyForOpening(context.campaign)) {
+    return tablePhases.OPENING_READY;
+  }
   if (context.readyInputs.length > 0) {
     return tablePhases.WAITING_FOR_PLAYER;
   }
@@ -154,6 +160,8 @@ function phaseHeadline(phase, context) {
   switch (phase) {
     case tablePhases.IDLE:
       return "No Table Open";
+    case tablePhases.OPENING_READY:
+      return "Ready To Start";
     case tablePhases.RECOVERY:
       return "Recovery Needed";
     case tablePhases.HOST_REVIEW:
@@ -182,6 +190,8 @@ function phaseNextStep(phase, context) {
   switch (phase) {
     case tablePhases.IDLE:
       return "Open or create a campaign to start the table.";
+    case tablePhases.OPENING_READY:
+      return "Invite anyone else, then press Start Adventure for the opening DM narration.";
     case tablePhases.RECOVERY:
       return context.repair
         ? "Host chooses Try Again, Details, or Use Anyway."
@@ -258,6 +268,8 @@ function expectedActorForPhase(phase, context) {
     case tablePhases.HOST_REVIEW:
     case tablePhases.RECOVERY:
       return { kind: "host", label: "Host" };
+    case tablePhases.OPENING_READY:
+      return { kind: "host", label: "Host" };
     case tablePhases.PARTY_VOTE:
       return { kind: "party", label: "Party vote" };
     case tablePhases.WAITING_FOR_GUEST:
@@ -282,10 +294,18 @@ function toneForPhase(phase, provider) {
   if (phase === tablePhases.WAITING_FOR_DM || provider.state === "working") {
     return "working";
   }
-  if ([tablePhases.WAITING_FOR_PLAYER, tablePhases.WAITING_FOR_GUEST, tablePhases.PARTY_VOTE, tablePhases.HOST_REVIEW].includes(phase)) {
+  if ([tablePhases.OPENING_READY, tablePhases.WAITING_FOR_PLAYER, tablePhases.WAITING_FOR_GUEST, tablePhases.PARTY_VOTE, tablePhases.HOST_REVIEW].includes(phase)) {
     return "waiting";
   }
   return "ready";
+}
+
+function isCampaignReadyForOpening(campaign) {
+  if (!campaign || campaign.scene?.status !== "campaign_start") {
+    return false;
+  }
+  const storedMessages = campaign.sessionLog?.messages ?? [];
+  return !storedMessages.some((message) => canonOpeningRoles.has(message.role));
 }
 
 function normalizeProviderActivity(providerActivity = {}) {

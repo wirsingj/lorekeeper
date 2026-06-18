@@ -2,6 +2,8 @@ export function buildTurnSubmitGate({
   turnProjection = {},
   repair = null,
   allowDuringRepair = false,
+  readyForOpening = false,
+  allowBeforeOpening = false,
 } = {}) {
   if (turnProjection.hasActiveGeneration) {
     return {
@@ -9,6 +11,15 @@ export function buildTurnSubmitGate({
       reason: "busy",
       bridgeText: "The DM is already resolving a turn.",
       activityText: "Wait for the current DM response before sending again",
+      activityState: "waiting",
+    };
+  }
+  if (readyForOpening && !allowBeforeOpening) {
+    return {
+      blocked: true,
+      reason: "opening_not_started",
+      bridgeText: "Press Start Adventure before sending table actions.",
+      activityText: "Start Adventure before sending table actions.",
       activityState: "waiting",
     };
   }

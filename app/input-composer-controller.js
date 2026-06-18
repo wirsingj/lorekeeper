@@ -1,3 +1,5 @@
+import { isCampaignReadyForOpening } from "./table-opening-controller.js";
+
 export function buildInputComposerProjection({
   clientMode = false,
   campaign = null,
@@ -17,9 +19,18 @@ export function buildInputComposerProjection({
       partyMemberId: guestSession?.partyMemberId ?? guestSnapshot?.connection?.partyMemberId ?? "",
     };
     const connected = effectiveGuestSession.status === "connected";
+    const readyForOpening = isCampaignReadyForOpening(campaign, { isHost: true });
     const activeCombatTurn = campaign?.combat?.inCombat ? campaign.combat.currentTurnId : null;
     const isGuestCombatTurn = !activeCombatTurn || activeCombatTurn === effectiveGuestSession.partyMemberId;
     const guestPhaseOverride = connected ? guestComposerPhaseOverride(tableSession, guestSnapshot) : null;
+    if (connected && readyForOpening) {
+      return {
+        inputDisabled: true,
+        sendDisabled: true,
+        placeholder: "Host is starting the adventure. Wait for the opening scene.",
+        buttonText: "Send To Host",
+      };
+    }
     if (guestPhaseOverride) {
       return {
         inputDisabled: true,
@@ -37,6 +48,16 @@ export function buildInputComposerProjection({
           ? `Type as ${guestSnapshot?.assignedCharacter?.name ?? "your assigned party member"}. Send to the host table.`
           : `Waiting for ${labelById(activeCombatTurn)}'s combat turn.`,
       buttonText: "Send To Host",
+    };
+  }
+
+  const readyForOpening = isCampaignReadyForOpening(campaign, { isHost: true });
+  if (readyForOpening) {
+    return {
+      inputDisabled: true,
+      sendDisabled: true,
+      placeholder: "Press Start Adventure for the opening DM narration before sending table actions.",
+      buttonText: "Send Turn",
     };
   }
 
@@ -100,6 +121,9 @@ function hostComposerPhaseOverride(tableSession) {
   if (phase === "waiting_for_dm") {
     return { lock: true, placeholder: "DM is thinking. Wait for the response before sending another turn." };
   }
+  if (phase === "opening_ready") {
+    return { lock: true, placeholder: "Press Start Adventure for the opening DM narration before sending table actions." };
+  }
   if (phase === "recovery") {
     return { lock: true, placeholder: "Review the DM response before sending the next turn." };
   }
@@ -122,6 +146,9 @@ function guestComposerPhaseOverride(tableSession, guestSnapshot) {
   }
   if (phase === "waiting_for_dm") {
     return "DM is thinking. Wait for the table to continue.";
+  }
+  if (phase === "opening_ready") {
+    return "Host is starting the adventure. Wait for the opening scene.";
   }
   if (phase === "recovery" || phase === "host_review") {
     return "Host is reviewing the table before play continues.";

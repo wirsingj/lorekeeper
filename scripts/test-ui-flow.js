@@ -135,6 +135,7 @@ const scenarios = [
       await guestPage.waitForTimeout(900);
       await captureAuditScreenshot(guestPage, "06-guest-lobby");
 
+      await startAdventureOpeningForHarness(harness, "The tower road scene opens with the caravan paused under a hard grey sky.");
       await harness.mockProviderTurn(combatStartResponse());
       await submitPlayerTurn(page, "Mira signals Renn to watch the brush while she steps toward the tower road.");
       await page.waitForFunction(() => window.__lorekeeperDebug?.renderer?.().tableSession?.combat?.active === true, null, { timeout: 10000 });
@@ -192,7 +193,7 @@ const scenarios = [
         await harness.page.locator(`[data-settings-panel="${tab}"]`).first().waitFor({ state: "visible", timeout: 10000 });
       }
       await harness.page.click("#refresh-diagnostics");
-      await expectVisibleText(harness.page, "Waiting For Player");
+      await expectVisibleText(harness.page, "Ready To Start");
       await harness.page.click("#close-setup");
       await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
     },
@@ -294,6 +295,7 @@ const scenarios = [
           controllerKind: "ai_companion",
         }],
       });
+      await assertPreOpeningDmNudgeDisabled(harness);
       await assertPreOpeningAiCompanionNudgeDisabled(harness, "Mira");
     },
   },
@@ -313,6 +315,7 @@ const scenarios = [
           concept: "A careful occultist who asks polite questions of dangerous things.",
         },
       });
+      await startAdventureOpeningForHarness(harness, "Saint Orra's Market waits in a hush as the first table beat begins.");
       await harness.mockProviderTurn(turnResponse({
         text: "The spice seller lowers her voice. Around Vey, the market keeps moving, but every bell charm above the stalls turns inward as if listening.",
         sceneStatus: { mode: "social", danger: "tense", awaitingPlayer: true },
@@ -339,6 +342,7 @@ const scenarios = [
           concept: "A patient oathkeeper who listens before drawing steel.",
         },
       });
+      await startAdventureOpeningForHarness(harness, "The River Gate wakes as Elian and the party arrive at its carved bank.");
       await harness.mockProviderTurn(turnResponse({
         text: "The gate's carved face asks what Elian will promise before it lets the party through.",
         sceneStatus: { mode: "social", danger: "tense", awaitingPlayer: true },
@@ -421,6 +425,7 @@ const scenarios = [
           concept: "A spear fighter who keeps danger pointed at herself.",
         },
       });
+      await startAdventureOpeningForHarness(harness, "Lantern Bridge flares to life as the ash wolves begin testing the light.");
       await harness.mockProviderTurns([
         combatStartResponse(),
         turnResponse({
@@ -571,6 +576,7 @@ const scenarios = [
       await sendTableTalk(harness.page, "Host sees the remote tab clearly.");
       await expectVisibleText(guestPage, "Host sees the remote tab clearly.");
 
+      await startAdventureOpeningForHarness(harness, "Lantern Road Camp opens with torchlight moving against the wind.");
       await submitGuestTurn(guestPage, "Renn checks the road dust for a second set of tracks.");
       await waitForHostStagedGuestInput(harness.page, "Renn checks the road dust");
       await harness.mockProviderTurn(turnResponse({
@@ -1219,7 +1225,12 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
     return window.__lorekeeperDebug?.stateSummary?.().campaignTitle === title;
   }, `Chaos Table ${runIndex}`, { timeout: 10000 });
   await assertHealthyUi(harness, `chaos ${runIndex}: campaign created`);
+  await assertPreOpeningDmNudgeDisabled(harness);
   await assertFirstPreOpeningAiCompanionNudgeDisabled(harness);
+  await startAdventureOpeningForHarness(
+    harness,
+    `The switchback road comes alive as the first table beat begins for Chaos Table ${runIndex}.`,
+  );
 
   await exerciseTableChrome(harness, rng, runIndex);
   await exerciseRecords(harness, rng, runIndex);
@@ -1237,13 +1248,12 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
 
   await exerciseProviderAndTableTalk(harness, rng, runIndex, actor);
   await commitPendingReviewIfAny(harness);
-  await harness.mockProviderTurns([
-    combatStartTurnResponse({
-      text: `The ambusher breaks cover, and ${actor.name} sees the attack before the road dust settles.`,
-      actor,
-      runIndex,
-    }),
-  ]);
+  const chaosCombatStart = combatStartTurnResponse({
+    text: `The ambusher breaks cover, and ${actor.name} sees the attack before the road dust settles.`,
+    actor,
+    runIndex,
+  });
+  await harness.mockProviderTurns([chaosCombatStart, chaosCombatStart]);
   await submitPlayerTurn(page, `${actor.name} forces the ambusher into the open.`);
   const activeActor = await waitForActiveCombatActor(harness);
   await expectCombatActor(page, activeActor.name);
@@ -1468,6 +1478,32 @@ async function assertFirstPreOpeningAiCompanionNudgeDisabled(harness) {
   await assertPreOpeningAiCompanionNudgeDisabled(harness, companion.name);
 }
 
+async function assertPreOpeningDmNudgeDisabled(harness) {
+  const page = harness.page;
+  const button = page.locator("#nudge-dm");
+  await button.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await button.isDisabled(), true, "DM Nudge should be disabled before Start Adventure");
+  assert.match(await button.getAttribute("title") ?? "", /Start Adventure/i);
+  const input = page.locator("#player-input");
+  const send = page.locator("#build-turn");
+  await input.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await input.isDisabled(), true, "table action input should be disabled before Start Adventure");
+  assert.equal(await send.isDisabled(), true, "Send Turn should be disabled before Start Adventure");
+  assert.match(await input.getAttribute("placeholder") ?? "", /Start Adventure/i);
+  await button.evaluate((element) => element.click());
+  await page.waitForTimeout(500);
+  const snapshot = await page.evaluate(() => ({
+    renderer: window.__lorekeeperDebug?.renderer?.(),
+    stateSummary: window.__lorekeeperDebug?.stateSummary?.(),
+  }));
+  assert.equal(snapshot.stateSummary?.activeGeneration, false, "disabled pre-opening DM nudge should not start generation");
+  assert.notEqual(snapshot.stateSummary?.tablePhase, "recovery", "disabled pre-opening DM nudge should not trigger recovery");
+  assert.doesNotMatch(snapshot.renderer?.providerActivity?.text ?? "", /generating|response review|table check/i);
+  const debugSubmit = await page.evaluate(() => window.__lorekeeperDebug?.submitPlayerTurn?.({ text: "I test the pre-opening gate." }));
+  assert.equal(debugSubmit?.providerReceived, false, "debug submit should respect the pre-opening gate");
+  assert.equal(debugSubmit?.reason, "opening_not_started");
+}
+
 async function assertPreOpeningAiCompanionNudgeDisabled(harness, companionName) {
   const page = harness.page;
   const button = page
@@ -1487,6 +1523,21 @@ async function assertPreOpeningAiCompanionNudgeDisabled(harness, companionName) 
   assert.equal(snapshot.stateSummary?.activeGeneration, false, "disabled pre-opening companion nudge should not start generation");
   assert.notEqual(snapshot.stateSummary?.tablePhase, "recovery", "disabled pre-opening companion nudge should not trigger recovery");
   assert.doesNotMatch(snapshot.renderer?.providerActivity?.text ?? "", /spoke or acted|response review|table check/i);
+}
+
+async function startAdventureOpeningForHarness(harness, openingText) {
+  const page = harness.page;
+  await harness.mockProviderTurns([
+    turnResponse({
+      text: openingText,
+      sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+    }),
+  ]);
+  await page.locator("#start-adventure-opening").waitFor({ state: "visible", timeout: 10000 });
+  await page.click("#start-adventure-opening");
+  await assertNoActiveGeneration(page, 45000);
+  await expectVisibleText(page, openingText);
+  await page.waitForFunction(() => window.__lorekeeperDebug?.stateSummary?.().tablePhase !== "opening_ready", null, { timeout: 10000 });
 }
 
 async function commitPendingReviewIfAny(harness) {
@@ -1515,8 +1566,7 @@ async function clickIfVisible(page, selector) {
   if (!await locator.isVisible().catch(() => false)) {
     return false;
   }
-  await locator.click();
-  return true;
+  return locator.click({ timeout: 1200 }).then(() => true).catch(() => false);
 }
 
 async function fillIfVisible(page, selector, value) {
@@ -1618,6 +1668,27 @@ async function submitPlayerTurn(page, text) {
   const clickAccepted = clicked || (clickAttempted && await waitForSubmittedTurnEvidence(page, text, 30000));
   if (clickAccepted) {
     await assertNoActiveGeneration(page, 45000);
+    return;
+  }
+  if (clickAttempted) {
+    await assertNoActiveGeneration(page, 45000).catch(() => {});
+    if (await waitForSubmittedTurnEvidence(page, text, 5000)) {
+      return;
+    }
+    const diagnostics = await page.evaluate(() => ({
+      renderer: window.__lorekeeperDebug?.renderer?.(),
+      stateSummary: window.__lorekeeperDebug?.stateSummary?.(),
+    }));
+    throw new Error(`clicked turn did not advance; diagnostics=${JSON.stringify({
+      activity: diagnostics.renderer?.providerActivity,
+      bridgeStatus: diagnostics.renderer?.bridgeStatus,
+      currentTurn: diagnostics.renderer?.currentTurn?.playerMessage,
+      turnProjection: diagnostics.renderer?.turnEngine,
+      tablePhase: diagnostics.stateSummary?.tablePhase,
+    })}`);
+  }
+  if (await waitForSubmittedTurnEvidence(page, text, 5000)) {
+    await assertNoActiveGeneration(page, 45000).catch(() => {});
     return;
   }
   if (!clickAccepted) {

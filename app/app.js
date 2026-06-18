@@ -1053,6 +1053,7 @@ elements.playerForm.addEventListener("submit", async (event) => {
 async function nudgeDm() {
   const gate = buildNudgeDmCommandGate({
     isHost: !clientMode && !isRemoteTableClient(),
+    readyForOpening: isCampaignReadyForOpening(),
     turnProjection: turnProjection(),
   });
   if (gate.blocked) {
@@ -1093,6 +1094,7 @@ async function startAdventureOpening() {
   });
   setProviderActivity("Starting the adventure...", "working");
   return submitPlayerTurnFromInput(buildAdventureOpeningPrompt(), {
+    allowBeforeOpening: true,
     skipPlayerEcho: true,
     skipPartySeed: true,
     skipChoiceExpansion: true,
@@ -1575,6 +1577,8 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
     turnProjection: turnProjection(),
     repair: activeTurnRepair(),
     allowDuringRepair: options.allowDuringRepair,
+    readyForOpening: isCampaignReadyForOpening(),
+    allowBeforeOpening: options.allowBeforeOpening,
   });
   if (submitGate.blocked) {
     elements.bridgeStatus.textContent = submitGate.bridgeText;

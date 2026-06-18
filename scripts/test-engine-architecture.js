@@ -2015,6 +2015,40 @@ function testInputComposerProjection() {
   assert.equal(defaultHostProjection.placeholder, "Describe what your character does, says, or asks.");
   assert.doesNotMatch(defaultHostProjection.placeholder, /heist|alley/i);
 
+  const openingCampaign = {
+    ...campaign,
+    scene: { status: "campaign_start" },
+    sessionLog: { messages: [] },
+  };
+  const openingCampaignHostProjection = buildInputComposerProjection({
+    campaign: openingCampaign,
+    turnProjection: { canSubmit: true },
+  });
+  assert.equal(openingCampaignHostProjection.inputDisabled, true);
+  assert.equal(openingCampaignHostProjection.sendDisabled, true);
+  assert.match(openingCampaignHostProjection.placeholder, /Start Adventure/);
+
+  const openingHostProjection = buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    tableSession: { phase: tablePhases.OPENING_READY },
+  });
+  assert.equal(openingHostProjection.inputDisabled, true);
+  assert.equal(openingHostProjection.sendDisabled, true);
+  assert.match(openingHostProjection.placeholder, /Start Adventure/);
+
+  const openingCampaignGuestProjection = buildInputComposerProjection({
+    clientMode: true,
+    campaign: openingCampaign,
+    guestSnapshot: {
+      connection: { status: "connected", partyMemberId: "thor" },
+      assignedCharacter: { name: "Thor" },
+    },
+  });
+  assert.equal(openingCampaignGuestProjection.inputDisabled, true);
+  assert.equal(openingCampaignGuestProjection.sendDisabled, true);
+  assert.match(openingCampaignGuestProjection.placeholder, /opening scene/);
+
   const hostWaitingForDm = buildInputComposerProjection({
     campaign,
     turnProjection: { canSubmit: true },
@@ -2219,6 +2253,19 @@ function testTurnSubmitGates() {
   });
   assert.equal(allowedDuringRepair.blocked, false);
 
+  const preOpeningGate = buildTurnSubmitGate({
+    turnProjection: { hasActiveGeneration: false },
+    readyForOpening: true,
+  });
+  assert.equal(preOpeningGate.blocked, true);
+  assert.equal(preOpeningGate.reason, "opening_not_started");
+  assert.match(preOpeningGate.activityText, /Start Adventure/);
+  assert.equal(buildTurnSubmitGate({
+    turnProjection: { hasActiveGeneration: false },
+    readyForOpening: true,
+    allowBeforeOpening: true,
+  }).blocked, false);
+
   const emptyGate = buildTurnContentGate({ playerMessage: "   ", playerInputs: [] });
   assert.equal(emptyGate.blocked, true);
   assert.equal(emptyGate.reason, "empty");
@@ -2251,6 +2298,18 @@ function testTableSessionEnginePhases() {
   const roleplay = buildTableSessionProjection({ campaign });
   assert.equal(roleplay.phase, tablePhases.ROLEPLAY);
   assert.equal(roleplay.headline, "Roleplay");
+
+  const openingReady = buildTableSessionProjection({
+    campaign: {
+      ...campaign,
+      scene: { status: "campaign_start" },
+      sessionLog: { messages: [] },
+    },
+    turnProjection: { state: "awaiting_input", canSubmit: true },
+  });
+  assert.equal(openingReady.phase, tablePhases.OPENING_READY);
+  assert.equal(openingReady.headline, "Ready To Start");
+  assert.match(openingReady.nextStep, /Start Adventure/);
 
   const waitingForPlayer = buildTableSessionProjection({
     campaign,
@@ -2467,7 +2526,7 @@ function testTableActionProjection() {
   assert.equal(freshTable.seatGuest.visible, false);
   assert.equal(freshTable.cancelGeneration.visible, false);
   assert.equal(freshTable.nudgeDm.disabled, true);
-  assert.match(freshTable.nudgeDm.title, /Nudge DM/);
+  assert.match(freshTable.nudgeDm.title, /Start Adventure/);
 
   const guestsWaiting = buildTableActionProjection({
     campaign: readyCampaign,
@@ -2542,11 +2601,19 @@ function testTableActionProjection() {
   assert.equal(guestClient.nudgeDm.disabled, true);
   assert.match(guestClient.nudgeDm.title, /Only the host/);
 
-  assert.equal(buildNudgeDmCommandGate({ isHost: true, turnProjection: { hasActiveGeneration: false } }).blocked, false);
+  assert.equal(buildNudgeDmCommandGate({ isHost: true, readyForOpening: false, turnProjection: { hasActiveGeneration: false } }).blocked, false);
   const guestNudgeGate = buildNudgeDmCommandGate({ isHost: false });
   assert.equal(guestNudgeGate.blocked, true);
   assert.equal(guestNudgeGate.reason, "guest_mode");
   assert.match(guestNudgeGate.activityText, /Only the host/);
+  const preOpeningDmNudgeGate = buildNudgeDmCommandGate({
+    isHost: true,
+    readyForOpening: true,
+    turnProjection: { hasActiveGeneration: false },
+  });
+  assert.equal(preOpeningDmNudgeGate.blocked, true);
+  assert.equal(preOpeningDmNudgeGate.reason, "opening_not_started");
+  assert.match(preOpeningDmNudgeGate.activityText, /Start Adventure/);
   const busyNudgeGate = buildNudgeDmCommandGate({ isHost: true, turnProjection: { hasActiveGeneration: true } });
   assert.equal(busyNudgeGate.blocked, true);
   assert.equal(busyNudgeGate.reason, "busy");
