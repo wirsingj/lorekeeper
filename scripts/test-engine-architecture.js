@@ -2463,7 +2463,7 @@ function testStagedInputRecoveryController() {
 function testHostResponseReviewProjection() {
   const idle = buildHostResponseReviewProjection();
   assert.equal(idle.state, "idle");
-  assert.match(idle.nextStep, /Copied DM Text/i);
+  assert.match(idle.nextStep, /Replacement DM Response/i);
   assert.doesNotMatch(idle.nextStep, /paste box/i);
 
   const idleFallback = buildManualResponseFallbackProjection();
@@ -3034,7 +3034,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="command-context-next"/);
   assert.match(appShell, /id="host-response-review"/, "DM recovery should lead with a host-facing response summary");
   assert.match(appShell, /id="manual-response-fallback"/, "manual copied-response controls should be a named fallback surface");
-  assert.match(appShell, /Copied DM Text/);
+  assert.match(appShell, /Replacement DM Response/);
   assert.doesNotMatch(appShell, /Use Pasted Response|paste box/i);
   assert.ok(
     appShell.indexOf('id="host-response-review"') < appShell.indexOf('id="manual-response-fallback"')
@@ -3134,6 +3134,12 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Developer Details/);
   assert.doesNotMatch(appShell, /raw provider JSON/);
   assert.match(appShell, /id="show-debug-meta"/);
+  assert.match(appShell, /id="scene-note-list"/, "notebook should include a current-scene section");
+  assert.match(appShell, /id="scene-note-count"/);
+  assert.match(appJs, /function renderSceneNotebook/, "scene notebook projection should be explicit renderer behavior");
+  assert.match(appJs, /buildSceneRetrieval\(campaign\)/, "scene notebook should use the same scene retrieval as DM context");
+  assert.match(appJs, /relevantRelationships\.slice\(0, 2\)/, "scene notebook should surface relationship context without flooding the rail");
+  assert.match(styles, /\.scene-notes-section/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
   assert.match(appJs, /apiCampaignPlayerNotesUrl/);

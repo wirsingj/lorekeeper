@@ -264,6 +264,8 @@ const elements = {
   sceneIntelligenceTitle: document.querySelector("#scene-intelligence-title"),
   sceneIntelligenceTensions: document.querySelector("#scene-intelligence-tensions"),
   sceneIntelligenceConsequences: document.querySelector("#scene-intelligence-consequences"),
+  sceneNoteCount: document.querySelector("#scene-note-count"),
+  sceneNoteList: document.querySelector("#scene-note-list"),
   providerStatus: document.querySelector("#provider-status"),
   campaignRailSection: document.querySelector("#campaign-rail-section"),
   homePanel: document.querySelector("#home-panel"),
@@ -6468,6 +6470,7 @@ function render() {
   elements.sessionLabel.textContent = activeSession?.title || "Campaign Play";
   elements.sceneLocation.textContent = currentPlace?.name ?? "Current scene";
   renderSceneIntelligence(campaign);
+  renderSceneNotebook(campaign);
   const providerSettings = currentProviderSettings();
   elements.providerStatus.textContent = providerSettings.preferredProvider === "ollama"
     ? `Provider: Ollama ${providerSettings.selectedModel}`
@@ -6726,6 +6729,63 @@ function renderSceneIntelligence(campaign) {
       : "";
     elements.sceneIntelligenceConsequences.hidden = consequences.length === 0;
   }
+}
+
+function renderSceneNotebook(campaign) {
+  if (!elements.sceneNoteList || !elements.sceneNoteCount) {
+    return;
+  }
+  const retrieval = buildSceneRetrieval(campaign);
+  const scene = retrieval.scene;
+  const records = [];
+  if (scene) {
+    const location = scene.locationId ? labelById(campaign, scene.locationId) : "";
+    records.push(binderRecordElement({
+      title: scene.title || "Current scene",
+      subtitle: location || scene.type || "scene",
+      body: detailLines([
+        scene.immediateSituation,
+        scene.whyHere ? `Why here: ${scene.whyHere}` : "",
+        ...(scene.tensions ?? []).slice(0, 3).map((tension) => `Tension: ${tension}`),
+        ...(scene.unresolvedQuestions ?? []).slice(0, 3).map((question) => `Open: ${question}`),
+      ]),
+    }));
+  }
+
+  for (const consequence of retrieval.activeConsequences.slice(0, 3)) {
+    records.push(binderRecordElement({
+      title: consequence.title || "Consequence",
+      subtitle: consequence.scope || consequence.importance || "consequence",
+      body: detailLines([
+        consequence.description,
+        consequence.status ? `Status: ${consequence.status}` : "",
+      ]),
+    }));
+  }
+
+  for (const thread of retrieval.activeThreads.slice(0, 3)) {
+    records.push(binderRecordElement({
+      title: thread.title || "Open thread",
+      subtitle: thread.status || "thread",
+      body: detailLines([
+        thread.stakes,
+        ...(thread.openQuestions ?? []).slice(0, 2).map((question) => `Open: ${question}`),
+      ]),
+    }));
+  }
+
+  for (const relationship of retrieval.relevantRelationships.slice(0, 2)) {
+    records.push(binderRecordElement({
+      title: `${labelById(campaign, relationship.sourceId)} / ${labelById(campaign, relationship.targetId)}`,
+      subtitle: relationship.type || "relationship",
+      body: detailLines([relationship.summary, relationship.notes]),
+    }));
+  }
+
+  elements.sceneNoteCount.textContent = String(records.length);
+  elements.sceneNoteList.replaceChildren(
+    ...emptyOrRecords(records, "Scene focus, consequences, and active threads will appear here as play creates them."),
+  );
 }
 
 function renderJoinClientPanel() {

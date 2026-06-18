@@ -32,7 +32,7 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
     state: "idle",
     title: "No DM Response Waiting",
     body: "When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.",
-    nextStep: "Open Copied DM Text only for an intentionally copied replacement response.",
+    nextStep: "Open Replacement DM Response only when you intentionally copied a replacement response.",
     tone: "idle",
     responseChars: 0,
     pendingChanges: 0,
@@ -45,30 +45,30 @@ export function buildManualResponseFallbackProjection({ repair = null, reviewBat
   if (repair) {
     return {
       state: "repair",
-      summary: hasDraftText ? "Copied DM Text Ready" : "Copied DM Text",
+      summary: hasDraftText ? "Replacement DM Response Ready" : "Replacement DM Response",
       hint: "Optional fallback: only use this when you intentionally copied a replacement DM response from another chat.",
       open: Boolean(hasDraftText),
-      pasteLabel: "Paste Copied Text",
-      useLabel: "Use Copied Text",
+      pasteLabel: "Paste Response",
+      useLabel: "Use Response",
     };
   }
   if (pendingChanges.length) {
     return {
       state: "changes",
-      summary: "Copied DM Text",
+      summary: "Replacement DM Response",
       hint: "Usually you should review the waiting table changes above. Use copied text only for a deliberate replacement response.",
       open: Boolean(hasDraftText),
-      pasteLabel: "Paste Copied Text",
-      useLabel: "Use Copied Text",
+      pasteLabel: "Paste Response",
+      useLabel: "Use Response",
     };
   }
   return {
     state: "idle",
-    summary: "Copied DM Text",
+    summary: "Replacement DM Response",
     hint: "Rare fallback for a deliberately copied DM response. Most tables should use Check AI or Read Latest instead.",
     open: Boolean(hasDraftText),
-    pasteLabel: "Paste Copied Text",
-    useLabel: "Use Copied Text",
+    pasteLabel: "Paste Response",
+    useLabel: "Use Response",
   };
 }
 
@@ -95,15 +95,15 @@ export function applyManualResponseFallbackProjection(elements, projection) {
   elements.manualResponseFallback.dataset.state = projection.state || "idle";
   elements.manualResponseFallback.open = Boolean(projection.open);
   if (elements.manualResponseFallbackSummary) {
-    elements.manualResponseFallbackSummary.textContent = projection.summary || "Copied DM Text";
+    elements.manualResponseFallbackSummary.textContent = projection.summary || "Replacement DM Response";
   }
   if (elements.manualResponseFallbackHint) {
     elements.manualResponseFallbackHint.textContent = projection.hint || "";
   }
   if (elements.pasteResponse) {
-    elements.pasteResponse.textContent = projection.pasteLabel || "Paste Copied Text";
+    elements.pasteResponse.textContent = projection.pasteLabel || "Paste Response";
   }
   if (elements.importResponse) {
-    elements.importResponse.textContent = projection.useLabel || "Use Copied Text";
+    elements.importResponse.textContent = projection.useLabel || "Use Response";
   }
 }

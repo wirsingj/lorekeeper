@@ -299,6 +299,14 @@ export function LorekeeperShell() {
             </span>
           </summary>
           <div className="notes-panel-body campaign-notes-grid">
+            <section className="binder-section scene-notes-section">
+              <div className="section-title">
+                <h3>Scene</h3>
+                <span id="scene-note-count" className="count-pill">0</span>
+              </div>
+              <div id="scene-note-list" className="binder-list scene-note-list"></div>
+            </section>
+
             <section className="binder-section">
               <div className="section-title">
                 <h3>People</h3>
@@ -912,10 +920,10 @@ function SetupDialog() {
           <div id="host-response-review" className="host-response-review" aria-live="polite">
             <strong>No DM Response Waiting</strong>
             <p>When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.</p>
-            <p className="review-next-step">Open Copied DM Text only for an intentionally copied replacement response.</p>
+            <p className="review-next-step">Open Replacement DM Response only when you intentionally copied a replacement response.</p>
           </div>
           <details id="manual-response-fallback" className="manual-response-fallback">
-            <summary id="manual-response-fallback-summary">Copied DM Text</summary>
+            <summary id="manual-response-fallback-summary">Replacement DM Response</summary>
             <p id="manual-response-fallback-hint" className="manual-response-fallback-hint">
               Rare fallback for a deliberately copied DM response. Most tables should use Check AI or Read Latest instead.
             </p>
@@ -926,8 +934,8 @@ function SetupDialog() {
               placeholder="Paste intentionally copied DM text here."
             ></textarea>
             <div className="button-stack two-up">
-              <button id="paste-response" type="button">Paste Copied Text</button>
-              <button id="import-response" type="button">Use Copied Text</button>
+              <button id="paste-response" type="button">Paste Response</button>
+              <button id="import-response" type="button">Use Response</button>
             </div>
           </details>
           <div id="review-list" className="review-stack"></div>
