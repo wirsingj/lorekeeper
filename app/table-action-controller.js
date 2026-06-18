@@ -8,6 +8,7 @@ export function buildTableActionProjection({
   waitingGuests = [],
   preferredProvider = "",
   isHost = true,
+  openingRequested = false,
 } = {}) {
   const hasTable = Boolean(campaign);
   const activeRepair = Boolean(turnProjection.hasRepair || repair);
@@ -19,6 +20,7 @@ export function buildTableActionProjection({
     campaign,
     turnProjection,
     isHost,
+    openingRequested,
   });
 
   return {
@@ -115,6 +117,7 @@ export function buildNudgeDmCommandGate({
 export function buildStartAdventureCommandGate({
   isHost = true,
   readyForOpening = false,
+  openingRequested = false,
   turnProjection = {},
 } = {}) {
   if (!isHost) {
@@ -131,6 +134,14 @@ export function buildStartAdventureCommandGate({
       reason: "already_started",
       activityText: "The adventure has already started. Use Nudge when the DM needs to continue.",
       activityState: "idle",
+    };
+  }
+  if (openingRequested) {
+    return {
+      blocked: true,
+      reason: "requested_this_session",
+      activityText: "The adventure is already starting for this table session.",
+      activityState: "waiting",
     };
   }
   if (turnProjection.hasActiveGeneration) {

@@ -15,9 +15,10 @@ export function buildStartAdventureOpeningProjection({
   campaign,
   turnProjection = {},
   isHost = true,
+  openingRequested = false,
 } = {}) {
   const ready = isCampaignReadyForOpening(campaign, { isHost });
-  const visible = ready && !turnProjection.hasRepair;
+  const visible = ready && !turnProjection.hasRepair && !openingRequested;
   return {
     visible,
     disabled: !visible || Boolean(turnProjection.hasActiveGeneration),

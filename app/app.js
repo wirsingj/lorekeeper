@@ -197,6 +197,7 @@ const state = {
   lastCombatPromptRepairKey: "",
   lastTableTalkCount: null,
   lastWaitingGuestSignature: "",
+  openingRequestedSessionKeys: new Set(),
   unreadTableTalkCount: 0,
   playerNotesCampaignId: "",
   playerNotesSaveTimer: null,
@@ -1062,6 +1063,7 @@ async function startAdventureOpening() {
   const gate = buildStartAdventureCommandGate({
     isHost: !clientMode && !isRemoteTableClient(),
     readyForOpening: isCampaignReadyForOpening(),
+    openingRequested: isOpeningRequestedForCurrentSession(),
     turnProjection: turnProjection(),
   });
   if (gate.blocked) {
@@ -1069,6 +1071,8 @@ async function startAdventureOpening() {
     return { providerReceived: false, reason: gate.reason };
   }
 
+  markOpeningRequestedForCurrentSession();
+  renderTableActions();
   pushDiagnosticsEvent("opening_start_requested", {
     campaignId: state.campaign?.id,
     scene: state.campaign?.scene,
@@ -6523,7 +6527,31 @@ function renderTableActions() {
     waitingGuests: waitingGuestsForSeating(),
     preferredProvider: currentProviderSettings().preferredProvider,
     isHost: !clientMode && !isRemoteTableClient(),
+    openingRequested: isOpeningRequestedForCurrentSession(),
   }));
+}
+
+function currentOpeningRequestKey(campaign = state.campaign) {
+  if (!campaign?.id) {
+    return "";
+  }
+  const tableSessionId = campaign.multiplayer?.localTable?.sessionId;
+  if (tableSessionId) {
+    return `table:${campaign.id}:${tableSessionId}`;
+  }
+  return `solo:${campaign.id}:${campaign.sessionLog?.activeSessionId || "session-main"}`;
+}
+
+function isOpeningRequestedForCurrentSession(campaign = state.campaign) {
+  const key = currentOpeningRequestKey(campaign);
+  return Boolean(key && state.openingRequestedSessionKeys.has(key));
+}
+
+function markOpeningRequestedForCurrentSession(campaign = state.campaign) {
+  const key = currentOpeningRequestKey(campaign);
+  if (key) {
+    state.openingRequestedSessionKeys.add(key);
+  }
 }
 
 function announceWaitingGuestsIfNeeded() {

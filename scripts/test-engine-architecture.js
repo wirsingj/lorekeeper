@@ -2234,6 +2234,14 @@ function testTableOpeningController() {
   assert.equal(visible.visible, true);
   assert.equal(visible.disabled, false);
 
+  const requested = buildStartAdventureOpeningProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    openingRequested: true,
+  });
+  assert.equal(requested.visible, false);
+  assert.equal(requested.disabled, true);
+
   const repairing = buildStartAdventureOpeningProjection({
     campaign: readyCampaign,
     turnProjection: { hasRepair: true, hasActiveGeneration: false },
@@ -2324,6 +2332,14 @@ function testTableActionProjection() {
   assert.equal(generating.cancelGeneration.disabled, false);
   assert.equal(generating.nudgeDm.disabled, true);
 
+  const requestedOpening = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    isHost: true,
+    openingRequested: true,
+  });
+  assert.equal(requestedOpening.startAdventure.visible, false);
+
   const guestClient = buildTableActionProjection({
     campaign: readyCampaign,
     turnProjection: { hasRepair: false, hasActiveGeneration: true },
@@ -2365,6 +2381,13 @@ function testTableActionProjection() {
   });
   assert.equal(busyStartGate.blocked, true);
   assert.equal(busyStartGate.reason, "busy");
+  const requestedStartGate = buildStartAdventureCommandGate({
+    isHost: true,
+    readyForOpening: true,
+    openingRequested: true,
+  });
+  assert.equal(requestedStartGate.blocked, true);
+  assert.equal(requestedStartGate.reason, "requested_this_session");
 }
 
 function testDmNudgeController() {
