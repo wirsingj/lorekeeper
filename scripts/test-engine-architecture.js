@@ -2716,6 +2716,45 @@ function testCharacterAutocompleteProjection() {
   assert.ok(partySet.every((member) => member.controllerKind === "ai_companion"));
   assert.equal(new Set(partySet.map((member) => member.name)).size, 3);
   assert.match(partySet[0].integrationPrompt, /Oskar/);
+
+  const secondPartySet = buildPartyTemplateCharacters({
+    name: "Oskar",
+    ancestry: "Dwarf",
+    characterClass: "Soldier",
+    level: 2,
+  }, {
+    campaign: {
+      summary: "A dwarf soldier company opens a mountain road.",
+      party: [{ id: "oskar", name: "Oskar", ancestry: "Dwarf", characterClass: "Soldier", level: 2 }],
+    },
+    startingPartyMembers: partySet,
+    count: 3,
+  });
+  const allCrewNames = [...partySet, ...secondPartySet].map((member) => member.name);
+  assert.equal(new Set(allCrewNames).size, allCrewNames.length, "repeated Add Crew should not clone existing crew names");
+  assert.ok(secondPartySet.every((member) => !partySet.some((existing) => existing.name === member.name)));
+
+  const manyCrew = buildPartyTemplateCharacters({
+    ancestry: "Dwarf",
+    characterClass: "Soldier",
+  }, {
+    startingPartyMembers: [
+      { name: "Oskar" },
+      { name: "Bram" },
+      { name: "Tilli" },
+      { name: "Ingrid" },
+      { name: "Bren" },
+      { name: "Thora" },
+      { name: "Dagna" },
+      { name: "Kelda" },
+      { name: "Marn" },
+      { name: "Hilda" },
+      { name: "Rurik" },
+      { name: "Sella" },
+    ],
+    count: 2,
+  });
+  assert.equal(new Set(manyCrew.map((member) => member.name)).size, manyCrew.length, "exhausted name pools should still produce unique fallback names");
 }
 
 function testMultiplayerSessionProjection() {

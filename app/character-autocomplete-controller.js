@@ -128,6 +128,7 @@ export function buildCharacterAutocompleteContext(options = {}) {
   const ancestries = party.map((member) => member.ancestry || splitAncestryClass(member.ancestryClass).ancestry).filter(Boolean);
   const classes = party.map((member) => member.characterClass || splitAncestryClass(member.ancestryClass || member.role || member.playerRole).characterClass).filter(Boolean);
   return {
+    allPartyNames: party.map((member) => member.name).filter(Boolean),
     partyNames: party.map((member) => member.name).filter(Boolean).slice(0, 4),
     commonAncestry: mostCommon(ancestries),
     commonClass: mostCommon(classes),
@@ -176,13 +177,24 @@ function inferRoleIntent(characterClass = "", text = "", context = {}) {
 
 function suggestCharacterName(ancestry = "", characterClass = "", context = {}) {
   const key = `${ancestry} ${characterClass}`.toLowerCase();
-  const used = new Set((context.partyNames ?? []).map((name) => String(name).toLowerCase()));
+  const used = new Set((context.allPartyNames ?? context.partyNames ?? []).map(normalizeNameKey));
   const names = /dwarf/.test(key)
-    ? ["Oskar", "Bram", "Tilli", "Ingrid", "Bren", "Thora"]
+    ? ["Oskar", "Bram", "Tilli", "Ingrid", "Bren", "Thora", "Dagna", "Kelda", "Marn", "Hilda", "Rurik", "Sella"]
     : /elf|fairy|fae/.test(key)
-      ? ["Mira", "Elaris", "Thistle", "Liora", "Corin"]
-      : ["Rowan", "Jarin", "Evelynn", "Corin", "Garren"];
-  return names.find((name) => !used.has(name.toLowerCase())) || names[0];
+      ? ["Mira", "Elaris", "Thistle", "Liora", "Corin", "Nyra", "Sylvi", "Aerith", "Faelan", "Iris"]
+      : ["Rowan", "Jarin", "Evelynn", "Corin", "Garren", "Mara", "Sable", "Tovan", "Lena", "Perrin"];
+  const available = names.find((name) => !used.has(normalizeNameKey(name)));
+  if (available) {
+    return available;
+  }
+  const base = names[0] || "Companion";
+  for (let suffix = 2; suffix < 1000; suffix += 1) {
+    const candidate = `${base} ${suffix}`;
+    if (!used.has(normalizeNameKey(candidate))) {
+      return candidate;
+    }
+  }
+  return "Companion";
 }
 
 function compactAncestryAdjective(ancestry = "") {
@@ -270,4 +282,8 @@ function pickVariant(values = [], variant = 0) {
 function titleCase(value = "") {
   const text = String(value);
   return text ? `${text.slice(0, 1).toUpperCase()}${text.slice(1).toLowerCase()}` : "";
+}
+
+function normalizeNameKey(value = "") {
+  return String(value ?? "").trim().toLowerCase();
 }
