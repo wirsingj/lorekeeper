@@ -2626,6 +2626,14 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /copy-guest-link/);
   assert.match(appShell, /Open Guest Page/);
   assert.match(appShell, /Send Friend Actions/);
+  assert.match(appShell, /className="friend-share-card"/, "Friends tab should lead with a simple guest-link share card");
+  assert.match(appShell, /className="advanced-table-settings"/, "less common table controls should live behind Table Options");
+  assert.match(styles, /\.friend-share-card/);
+  assert.match(styles, /\.advanced-table-settings/);
+  assert.ok(
+    appShell.indexOf('className="friend-share-card"') < appShell.indexOf('className="advanced-table-settings"'),
+    "Friends tab should show the normal invite/share path before advanced table controls",
+  );
   assert.match(appShell, /id="open-setup"[\s\S]*Friends and seats/, "the in-table setup entry should read as friend seating, not generic settings");
   assert.doesNotMatch(appShell, /title="Table options"/);
   assert.doesNotMatch(appShell, />Resync</);

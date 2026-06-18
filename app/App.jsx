@@ -811,45 +811,52 @@ function SetupDialog() {
             <h3>Friends</h3>
             <span id="local-table-state" className="count-pill">Off</span>
           </div>
-          <p id="local-table-address" className="setup-note">Open the guest page when friends are joining from another device.</p>
-          <label className="check-row local-table-option" title="When off, approved joined players send actions straight to the host turn queue.">
-            <input id="require-guest-action-approval" type="checkbox" />
-            Review friend actions before the DM sees them
-          </label>
-          <label className="check-row local-table-option" title="When on, guest actions wait so the host can collect a group turn before the DM responds.">
-            <input id="hold-guest-actions-for-group" type="checkbox" />
-            Collect friend actions into a group turn
-          </label>
-          <p id="local-table-guidance" className="setup-note">Friend actions resolve when the table is ready.</p>
-          <label className="field-stack local-table-share">
-            <span>Guest Link</span>
-            <input
-              id="local-table-guest-link"
-              readOnly
-              spellCheck="false"
-              placeholder="Open the guest lobby to get a share link."
-            />
-          </label>
-          <div className="button-stack two-up">
-            <button id="start-local-table" type="button">Open Guest Page</button>
-            <button id="stop-local-table" type="button">Close Guest Page</button>
-            <button id="copy-guest-link" type="button">Copy Guest Link</button>
-            <button id="copy-character-invite" type="button">Copy Seat Link</button>
-            <button id="join-campaign" type="button">Use Invite Link</button>
-            <button id="sync-guest-table" type="button">Check Seats</button>
-            <button id="resolve-party-inputs" type="button">Send Friend Actions</button>
+          <div className="friend-share-card">
+            <p id="local-table-address" className="setup-note">Open the guest page when friends are joining from another device.</p>
+            <label className="field-stack local-table-share">
+              <span>Guest Link</span>
+              <input
+                id="local-table-guest-link"
+                readOnly
+                spellCheck="false"
+                placeholder="Open the guest lobby to get a share link."
+              />
+            </label>
+            <div className="button-stack two-up">
+              <button id="start-local-table" type="button">Open Guest Page</button>
+              <button id="copy-guest-link" type="button">Copy Guest Link</button>
+              <button id="stop-local-table" type="button">Close Guest Page</button>
+            </div>
           </div>
-          <textarea
-            id="local-table-invite-output"
-            className="rail-textarea invite-output"
-            rows="3"
-            spellCheck="false"
-            readOnly
-            placeholder="Guest links appear here."
-          ></textarea>
           <div id="waiting-guests" className="local-table-list"></div>
           <div id="connected-guests" className="local-table-list"></div>
           <div id="pending-inputs" className="local-table-list"></div>
+          <details className="advanced-table-settings">
+            <summary>Table Options</summary>
+            <label className="check-row local-table-option" title="When off, approved joined players send actions straight to the host turn queue.">
+              <input id="require-guest-action-approval" type="checkbox" />
+              Review friend actions before the DM sees them
+            </label>
+            <label className="check-row local-table-option" title="When on, guest actions wait so the host can collect a group turn before the DM responds.">
+              <input id="hold-guest-actions-for-group" type="checkbox" />
+              Collect friend actions into a group turn
+            </label>
+            <p id="local-table-guidance" className="setup-note">Friend actions resolve when the table is ready.</p>
+            <div className="button-stack two-up">
+              <button id="copy-character-invite" type="button">Copy Seat Link</button>
+              <button id="join-campaign" type="button">Use Invite Link</button>
+              <button id="sync-guest-table" type="button">Check Seats</button>
+              <button id="resolve-party-inputs" type="button">Send Friend Actions</button>
+            </div>
+            <textarea
+              id="local-table-invite-output"
+              className="rail-textarea invite-output"
+              rows="3"
+              spellCheck="false"
+              readOnly
+              placeholder="Guest links appear here."
+            ></textarea>
+          </details>
         </section>
 
         <section className="setup-section diagnostics-section" data-settings-panel="troubleshooting" hidden>

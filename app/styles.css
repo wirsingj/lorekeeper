@@ -1097,6 +1097,42 @@ h3 {
   padding-top: 8px;
 }
 
+.friend-share-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(125, 213, 201, 0.18);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(125, 213, 201, 0.06), transparent 45%),
+    rgba(255, 255, 255, 0.04);
+}
+
+.friend-share-card .setup-note {
+  margin: 0;
+}
+
+.advanced-table-settings {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid rgba(174, 191, 202, 0.1);
+  padding-top: 8px;
+}
+
+.advanced-table-settings summary {
+  cursor: pointer;
+  color: var(--steel);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  list-style-position: outside;
+  text-transform: uppercase;
+}
+
+.advanced-table-settings[open] {
+  gap: 10px;
+}
+
 .advanced-provider-settings summary {
   cursor: pointer;
   color: var(--steel);
