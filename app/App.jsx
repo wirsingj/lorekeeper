@@ -909,13 +909,24 @@ function SetupDialog() {
           <div id="host-response-review" className="host-response-review" aria-live="polite">
             <strong>No DM Response Waiting</strong>
             <p>When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.</p>
-            <p className="review-next-step">Use the paste box only for an intentionally copied DM response.</p>
+            <p className="review-next-step">Open Copied DM Text only for an intentionally copied replacement response.</p>
           </div>
-          <textarea id="response-import" className="rail-textarea" spellCheck="false"></textarea>
-          <div className="button-stack two-up">
-            <button id="paste-response" type="button">Paste</button>
-            <button id="import-response" type="button">Use Pasted Response</button>
-          </div>
+          <details id="manual-response-fallback" className="manual-response-fallback">
+            <summary id="manual-response-fallback-summary">Copied DM Text</summary>
+            <p id="manual-response-fallback-hint" className="manual-response-fallback-hint">
+              Rare fallback for a deliberately copied DM response. Most tables should use Check AI or Read Latest instead.
+            </p>
+            <textarea
+              id="response-import"
+              className="rail-textarea"
+              spellCheck="false"
+              placeholder="Paste intentionally copied DM text here."
+            ></textarea>
+            <div className="button-stack two-up">
+              <button id="paste-response" type="button">Paste Copied Text</button>
+              <button id="import-response" type="button">Use Copied Text</button>
+            </div>
+          </details>
           <div id="review-list" className="review-stack"></div>
         </section>
       </form>

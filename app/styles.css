@@ -3016,6 +3016,42 @@ textarea::placeholder {
   color: #aebbc2;
 }
 
+.manual-response-fallback {
+  border: 1px solid rgba(174, 191, 202, 0.1);
+  border-radius: 8px;
+  background: rgba(13, 17, 20, 0.24);
+}
+
+.manual-response-fallback[open] {
+  background: rgba(13, 17, 20, 0.38);
+}
+
+.manual-response-fallback summary {
+  cursor: pointer;
+  padding: 8px;
+  color: #cbd6db;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.manual-response-fallback-hint {
+  margin: 0;
+  padding: 0 8px 8px;
+  color: #aebbc2;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.manual-response-fallback .rail-textarea {
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.manual-response-fallback .button-stack {
+  padding: 8px;
+}
+
 .session-health-summary ul {
   display: grid;
   gap: 4px;

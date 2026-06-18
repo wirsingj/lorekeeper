@@ -18,7 +18,7 @@ import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
 import { buildDmNudgePrompt } from "../app/dm-nudge-controller.js";
-import { buildHostResponseReviewProjection } from "../app/host-response-review-controller.js";
+import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
@@ -2455,7 +2455,14 @@ function testStagedInputRecoveryController() {
 function testHostResponseReviewProjection() {
   const idle = buildHostResponseReviewProjection();
   assert.equal(idle.state, "idle");
-  assert.match(idle.nextStep, /paste box/i);
+  assert.match(idle.nextStep, /Copied DM Text/i);
+  assert.doesNotMatch(idle.nextStep, /paste box/i);
+
+  const idleFallback = buildManualResponseFallbackProjection();
+  assert.equal(idleFallback.state, "idle");
+  assert.equal(idleFallback.open, false);
+  assert.match(idleFallback.hint, /Rare fallback/i);
+  assert.doesNotMatch(`${idleFallback.summary} ${idleFallback.hint}`, /JSON|contract|import|paste box/i);
 
   const repair = buildHostResponseReviewProjection({
     repair: {
@@ -2469,6 +2476,20 @@ function testHostResponseReviewProjection() {
   assert.doesNotMatch(`${repair.title} ${repair.body} ${repair.nextStep}`, /JSON|contract|import/i);
   assert.match(repair.nextStep, /Try Again/);
   assert.match(repair.nextStep, /Use Anyway/);
+  const repairFallback = buildManualResponseFallbackProjection({
+    repair: { reason: "choices.options[0] must be string", responseText: "The scene continues." },
+  });
+  assert.equal(repairFallback.state, "repair");
+  assert.equal(repairFallback.open, false);
+  assert.match(repairFallback.hint, /Optional fallback/i);
+  assert.doesNotMatch(repairFallback.hint, /JSON|contract|import|paste box/i);
+
+  const draftFallback = buildManualResponseFallbackProjection({
+    repair: { reason: "choices.options[0] must be string", responseText: "The scene continues." },
+    hasDraftText: true,
+  });
+  assert.equal(draftFallback.open, true);
+  assert.match(draftFallback.summary, /Ready/);
 
   const agencyRepair = buildHostResponseReviewProjection({
     repair: {
@@ -2488,6 +2509,8 @@ function testHostResponseReviewProjection() {
   assert.equal(changes.state, "changes");
   assert.equal(changes.pendingChanges, 1);
   assert.match(changes.body, /1 proposed state change/);
+  const changesFallback = buildManualResponseFallbackProjection({ reviewBatch: { proposedChanges: [{ status: "pending" }] } });
+  assert.match(changesFallback.hint, /review the waiting table changes/i);
 }
 
 function testProviderImportOutcomeProjection() {
@@ -2964,6 +2987,16 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="command-context"/, "command deck should show the current table phase");
   assert.match(appShell, /id="command-context-phase"/);
   assert.match(appShell, /id="command-context-next"/);
+  assert.match(appShell, /id="host-response-review"/, "DM recovery should lead with a host-facing response summary");
+  assert.match(appShell, /id="manual-response-fallback"/, "manual copied-response controls should be a named fallback surface");
+  assert.match(appShell, /Copied DM Text/);
+  assert.doesNotMatch(appShell, /Use Pasted Response|paste box/i);
+  assert.ok(
+    appShell.indexOf('id="host-response-review"') < appShell.indexOf('id="manual-response-fallback"')
+      && appShell.indexOf('id="manual-response-fallback"') < appShell.indexOf('id="response-import"')
+      && appShell.indexOf('id="response-import"') < appShell.indexOf('id="review-list"'),
+    "DM recovery should show guided review before the tucked-away copied-response fallback",
+  );
   assert.match(appShell, /id="start-adventure-opening"/, "ready tables should expose an explicit Start Adventure action");
   assert.ok(
     appShell.indexOf('id="command-context"') < appShell.indexOf('id="start-adventure-opening"')
@@ -3135,7 +3168,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /turnRepairImportOptions/, "Use Anyway import packaging should come from the repair controller");
   assert.match(appJs, /host-response-review-controller\.js/, "host response review guidance should live outside the main app renderer");
   assert.match(appJs, /buildHostResponseReviewProjection/, "review summary should come from a small projection");
+  assert.match(appJs, /buildManualResponseFallbackProjection/, "copied-response fallback copy should come from the review controller");
+  assert.match(appJs, /applyManualResponseFallbackProjection/, "copied-response fallback rendering should stay behind a small projection");
   assert.match(styles, /\.host-response-review/);
+  assert.match(styles, /\.manual-response-fallback/);
   assert.match(styles, /\.raw-diagnostics-details/);
   assert.match(turnRepairController, /the DM response did not pass LoreKeeper's table checks/, "technical repair reasons should be softened for live play");
   assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);

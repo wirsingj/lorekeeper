@@ -32,10 +32,43 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
     state: "idle",
     title: "No DM Response Waiting",
     body: "When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.",
-    nextStep: "Use the paste box only for an intentionally copied DM response.",
+    nextStep: "Open Copied DM Text only for an intentionally copied replacement response.",
     tone: "idle",
     responseChars: 0,
     pendingChanges: 0,
+  };
+}
+
+export function buildManualResponseFallbackProjection({ repair = null, reviewBatch = null, hasDraftText = false } = {}) {
+  const pendingChanges = (reviewBatch?.proposedChanges ?? reviewBatch?.proposals ?? [])
+    .filter((change) => change?.status !== "committed");
+  if (repair) {
+    return {
+      state: "repair",
+      summary: hasDraftText ? "Copied DM Text Ready" : "Copied DM Text",
+      hint: "Optional fallback: only use this when you intentionally copied a replacement DM response from another chat.",
+      open: Boolean(hasDraftText),
+      pasteLabel: "Paste Copied Text",
+      useLabel: "Use Copied Text",
+    };
+  }
+  if (pendingChanges.length) {
+    return {
+      state: "changes",
+      summary: "Copied DM Text",
+      hint: "Usually you should review the waiting table changes above. Use copied text only for a deliberate replacement response.",
+      open: Boolean(hasDraftText),
+      pasteLabel: "Paste Copied Text",
+      useLabel: "Use Copied Text",
+    };
+  }
+  return {
+    state: "idle",
+    summary: "Copied DM Text",
+    hint: "Rare fallback for a deliberately copied DM response. Most tables should use Check AI or Read Latest instead.",
+    open: Boolean(hasDraftText),
+    pasteLabel: "Paste Copied Text",
+    useLabel: "Use Copied Text",
   };
 }
 
@@ -53,4 +86,24 @@ export function renderHostResponseReview(container, projection) {
   next.className = "review-next-step";
   next.textContent = view.nextStep;
   container.replaceChildren(title, body, next);
+}
+
+export function applyManualResponseFallbackProjection(elements, projection) {
+  if (!elements?.manualResponseFallback || !projection) {
+    return;
+  }
+  elements.manualResponseFallback.dataset.state = projection.state || "idle";
+  elements.manualResponseFallback.open = Boolean(projection.open);
+  if (elements.manualResponseFallbackSummary) {
+    elements.manualResponseFallbackSummary.textContent = projection.summary || "Copied DM Text";
+  }
+  if (elements.manualResponseFallbackHint) {
+    elements.manualResponseFallbackHint.textContent = projection.hint || "";
+  }
+  if (elements.pasteResponse) {
+    elements.pasteResponse.textContent = projection.pasteLabel || "Paste Copied Text";
+  }
+  if (elements.importResponse) {
+    elements.importResponse.textContent = projection.useLabel || "Use Copied Text";
+  }
 }

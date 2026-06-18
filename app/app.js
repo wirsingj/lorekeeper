@@ -23,7 +23,12 @@ import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyComb
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
 import { randomDevJumpStart } from "./dev-jump-start.js";
 import { buildDmNudgePrompt } from "./dm-nudge-controller.js";
-import { buildHostResponseReviewProjection, renderHostResponseReview } from "./host-response-review-controller.js";
+import {
+  applyManualResponseFallbackProjection,
+  buildHostResponseReviewProjection,
+  buildManualResponseFallbackProjection,
+  renderHostResponseReview,
+} from "./host-response-review-controller.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
@@ -452,6 +457,9 @@ const elements = {
   responseImport: document.querySelector("#response-import"),
   pasteResponse: document.querySelector("#paste-response"),
   importResponse: document.querySelector("#import-response"),
+  manualResponseFallback: document.querySelector("#manual-response-fallback"),
+  manualResponseFallbackSummary: document.querySelector("#manual-response-fallback-summary"),
+  manualResponseFallbackHint: document.querySelector("#manual-response-fallback-hint"),
   commandResizeHandle: document.querySelector("#command-resize-handle"),
   hostResponseReview: document.querySelector("#host-response-review"),
   reviewList: document.querySelector("#review-list"),
@@ -693,6 +701,10 @@ elements.importResponse.addEventListener("click", async () => {
   await importProviderResponse(elements.responseImport.value.trim());
 });
 
+elements.responseImport?.addEventListener("input", () => {
+  renderReviewBatch();
+});
+
 elements.recheckProvider.addEventListener("click", async () => {
   await importLatestProviderResponse({ requireNewerThanLastImport: true });
 });
@@ -886,7 +898,8 @@ elements.pasteResponse.addEventListener("click", async () => {
       throw new Error(result.error || "Clipboard read failed.");
     }
     elements.responseImport.value = result.text;
-    elements.bridgeStatus.textContent = "Response pasted from clipboard";
+    renderReviewBatch();
+    elements.bridgeStatus.textContent = "Copied DM text is ready";
   } catch {
     elements.bridgeStatus.textContent = "Clipboard paste unavailable";
   }
@@ -10374,9 +10387,15 @@ function renderContextPack(contextPack) {
 }
 
 function renderReviewBatch() {
+  const repair = activeTurnRepair();
   renderHostResponseReview(elements.hostResponseReview, buildHostResponseReviewProjection({
-    repair: activeTurnRepair(),
+    repair,
     reviewBatch: state.reviewBatch,
+  }));
+  applyManualResponseFallbackProjection(elements, buildManualResponseFallbackProjection({
+    repair,
+    reviewBatch: state.reviewBatch,
+    hasDraftText: Boolean(elements.responseImport?.value.trim()),
   }));
   renderReviewPanel({
     elements,

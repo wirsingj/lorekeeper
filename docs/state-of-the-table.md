@@ -294,12 +294,13 @@ Risks:
 156. Nudge DM and Start Adventure command gates now live beside the table action projection, so host/busy/opening-readiness checks are tested outside `app/app.js`.
 157. Table phase focus now reaches the permanent rails: party, combat, notebook, and Table Talk receive tested primary/supporting/quiet states from `TableSessionEngine` projection, and provider-status changes repaint the composer so the Now/Next cue and input placeholder do not disagree.
 158. Combat tracker now has an active-turn cue that names who controls the turn, what the table should do next, and the active actor's current legal actions from app-owned combat rules, making combat visually and functionally less like ordinary roleplay.
+159. The manual copied-response fallback is now tucked behind a Copied DM Text disclosure with controller-owned copy/state, so DM Recovery leads with the table-check summary instead of a visible paste box.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
 2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are now extracted.
-3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, and host review summary, but the underlying manual review textarea still exists as a fallback.
+3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, host review summary, and copied-text fallback disclosure, but the underlying manual review textarea still exists as a rare fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
@@ -355,7 +356,7 @@ Risks:
 
 6. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
 7. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-8. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before the paste/use fallback.
+8. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before a collapsed Copied DM Text fallback, and fallback copy/state lives in the host response review controller.
 9. Run the two-machine playtest checklist and log every friction point.
 10. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 11. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -411,11 +412,12 @@ Risks:
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
 - [x] Add a host-facing DM response review summary before raw pasted-response fallback controls.
+- [x] Tuck copied-response fallback controls behind a guided table-facing disclosure instead of showing a paste box in normal recovery.
 - [x] Extract turn repair display/use-anyway policy out of `app/app.js`.
 - [x] Ensure every stuck state answers who is waiting and what the host can do next.
 
