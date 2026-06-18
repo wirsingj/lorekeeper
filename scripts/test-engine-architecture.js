@@ -25,7 +25,7 @@ import { buildInputComposerProjection } from "../app/input-composer-controller.j
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "../app/provider-chat-controller.js";
-import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
+import { buildProviderImportOutcome, buildProviderImportPlan, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
@@ -2776,6 +2776,46 @@ function testProviderImportOutcomeProjection() {
   assert.equal(newLatest.text, "new answer");
   assert.equal(newLatest.activityState, "working");
 
+  const choicePlan = buildProviderImportPlan({
+    campaign: { id: "campaign-1", party: [] },
+    responseText: "DM text",
+    cleanedText: "DM text",
+    extraction: { proposedChanges: [] },
+    tableMessages: [
+      { role: "dm", title: "DM", body: "What do you do?", source: "provider_response" },
+      { role: "party", title: "Companion", body: "I can scout.", source: "provider_response" },
+    ],
+    options: {
+      data: {
+        choices: { prompt: "Choose", options: ["Scout", "Wait"] },
+        turnResponse: { requestId: "turn-response-1" },
+        providerResult: { requestId: "provider-1" },
+      },
+    },
+  });
+  assert.equal(choicePlan.proposedChanges.length, 0);
+  assert.equal(choicePlan.reviewBatch.campaignId, "campaign-1");
+  assert.equal(choicePlan.messagePlans[0].data.choiceOwner, true);
+  assert.equal(choicePlan.messagePlans[0].data.providerRunId, "provider-1");
+  assert.equal(choicePlan.messagePlans[1].data.choiceOwner, undefined);
+  assert.equal(choicePlan.messagePlans[0].data.import.proposedChanges, 0);
+
+  const combatStartPlan = buildProviderImportPlan({
+    campaign: {
+      id: "campaign-2",
+      scene: { mode: "exploration", summary: "A road ambush begins." },
+      party: [{ id: "mira", name: "Mira", hp: { current: 12, max: 12 }, armorClass: 15 }],
+      combat: { inCombat: false, turnOrder: [], initiative: [], currentTurnId: null },
+    },
+    responseText: "A wolf lunges from the brush. Roll initiative.",
+    cleanedText: "A wolf lunges from the brush. Roll initiative.",
+    extraction: { proposedChanges: [] },
+    tableMessages: [{ role: "dm", title: "DM", body: "A wolf lunges from the brush. Roll initiative.", source: "provider_response" }],
+    options: { autoCommit: true, data: { turnResponse: { flags: { startsCombat: true } } } },
+  });
+  assert.ok(combatStartPlan.proposedChanges.some((change) => change.domain === "scene"));
+  assert.ok(combatStartPlan.proposedChanges.some((change) => change.domain === "combat"));
+
   assert.equal(shouldAutoApproveProviderChange({ importance: "minor", visibility: "player_visible" }), true);
   assert.equal(shouldAutoApproveProviderChange({ importance: "major", visibility: "player_visible" }), false);
   assert.equal(shouldAutoApproveProviderChange({ status: "rejected", importance: "minor" }), false);
@@ -3105,6 +3145,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
+  const providerImportController = await readFile(path.join("app", "provider-import-controller.js"), "utf8");
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
@@ -3186,11 +3227,12 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /combat-prompt-repair-controller\.js/, "combat prompt repair policy should live outside the main app renderer");
   assert.match(combatPromptRepairController, /promptedCombatActorIdFromTurnResponse/, "combat prompt repair controller should own actor prompt detection");
   assert.doesNotMatch(appJs, /function promptedCombatActorIdFromTurnResponse/, "renderer should not own combat prompt actor detection");
-  assert.match(appJs, /combat-import-controller\.js/, "combat import initiative policy should live outside the main app renderer");
+  assert.match(appJs, /buildProviderImportPlan/, "renderer should execute provider import plans instead of assembling implicit changes");
+  assert.match(providerImportController, /combat-import-controller\.js/, "provider import planning should call combat import policy outside the renderer");
   assert.match(combatImportController, /function createImplicitCombatAdvanceChange/, "combat import controller should own implicit initiative advancement");
   assert.match(combatImportController, /!hasResolvedMechanics\(turnResponse\)[\s\S]*return null;/, "implicit combat advancement must require resolved mechanics");
   assert.doesNotMatch(appJs, /function createImplicitCombatAdvanceChange/, "renderer should not own implicit combat advancement policy");
-  assert.match(appJs, /scene-import-controller\.js/, "scene import fallback policy should live outside the main app renderer");
+  assert.match(providerImportController, /scene-import-controller\.js/, "provider import planning should call scene import policy outside the renderer");
   assert.match(sceneImportController, /function createImplicitSceneProgressChange/, "scene import controller should own implicit scene progress fallback");
   assert.doesNotMatch(appJs, /function createImplicitSceneProgressChange/, "renderer should not own implicit scene progress policy");
 }
@@ -3455,7 +3497,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /choice-vote-action/);
   assert.match(appJs, /Draft leading choice \$\{leadingVote\.label\}/);
   assert.match(appJs, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
-  assert.match(appJs, /createImplicitCombatAdvanceChange\(\{[\s\S]*campaign: state\.campaign/, "renderer should call the extracted combat import policy with explicit campaign context");
+  assert.match(appJs, /buildProviderImportPlan\(\{[\s\S]*campaign: state\.campaign/, "renderer should pass explicit campaign context into provider import planning");
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderTableActions/);
   assert.match(appJs, /announceWaitingGuestsIfNeeded/);

@@ -1,5 +1,115 @@
-// Provider import policy projections. Keep table-facing wording and
-// auto-commit decisions here so app.js can execute the policy without owning it.
+import { createReviewBatch } from "../src/canon-review/proposals.js";
+import {
+  createImplicitCombatAdvanceChange,
+  createImplicitCombatEnemySyncChange,
+  createImplicitCombatStartChange,
+} from "./combat-import-controller.js";
+import { createImplicitCombatActorPromptChange } from "./combat-prompt-repair-controller.js";
+import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
+
+// Provider import policy projections. Keep table-facing wording, import
+// planning, and auto-commit decisions here so app.js can execute the policy
+// without owning it.
+export function buildProviderImportPlan({
+  campaign,
+  responseText = "",
+  cleanedText = "",
+  extraction = {},
+  tableMessages = [],
+  options = {},
+  labelForActor = () => "",
+} = {}) {
+  const proposedBase = Array.isArray(extraction.proposedChanges) ? extraction.proposedChanges : [];
+  const autoCommit = Boolean(options.autoCommit);
+  const implicitSceneChange = autoCommit
+    ? createImplicitSceneProgressChange({
+      tableMessages,
+      proposedChanges: proposedBase,
+    })
+    : null;
+  const implicitCombatChange = autoCommit
+    ? createImplicitCombatStartChange({
+      campaign,
+      tableMessages,
+      proposedChanges: proposedBase,
+      turnResponse: options.data?.turnResponse,
+    })
+    : null;
+  const combatContextChanges = implicitCombatChange
+    ? [...proposedBase, implicitCombatChange]
+    : proposedBase;
+  const implicitCombatEnemyChange = autoCommit
+    ? createImplicitCombatEnemySyncChange({
+      campaign,
+      tableMessages,
+      proposedChanges: combatContextChanges,
+      turnResponse: options.data?.turnResponse,
+    })
+    : null;
+  const implicitCombatAdvanceChange = autoCommit
+    ? createImplicitCombatAdvanceChange({
+      campaign,
+      proposedChanges: proposedBase,
+      turnResponse: options.data?.turnResponse,
+      submittedTurn: options.data?.turn,
+      labelForActor,
+    })
+    : null;
+  const actorPromptContextChanges = [
+    ...proposedBase,
+    ...(implicitCombatChange ? [implicitCombatChange] : []),
+    ...(implicitCombatEnemyChange ? [implicitCombatEnemyChange] : []),
+    ...(implicitCombatAdvanceChange ? [implicitCombatAdvanceChange] : []),
+  ];
+  const implicitCombatActorPromptChange = autoCommit
+    ? createImplicitCombatActorPromptChange({
+      campaign,
+      tableMessages,
+      proposedChanges: actorPromptContextChanges,
+      turnResponse: options.data?.turnResponse,
+    })
+    : null;
+  const proposedChanges = [
+    ...proposedBase,
+    ...(implicitSceneChange ? [implicitSceneChange] : []),
+    ...(implicitCombatChange ? [implicitCombatChange] : []),
+    ...(implicitCombatEnemyChange ? [implicitCombatEnemyChange] : []),
+    ...(implicitCombatAdvanceChange ? [implicitCombatAdvanceChange] : []),
+    ...(implicitCombatActorPromptChange ? [implicitCombatActorPromptChange] : []),
+  ];
+  const importData = {
+    source: options.source || "manual_import",
+    responseChars: responseText.length,
+    cleanedChars: cleanedText.length,
+    proposedChanges: proposedChanges.length,
+    extractionError: extraction.error || "",
+  };
+  const choiceOwnerIndex = choiceOwnerMessageIndex(tableMessages);
+  const messagePlans = tableMessages.map((message, messageIndex) => ({
+    message,
+    data: providerMessageData({
+      message,
+      messageIndex,
+      options,
+      choiceOwnerIndex,
+      import: importData,
+    }),
+  }));
+  const reviewBatch = createReviewBatch({
+    campaignId: campaign?.id,
+    source: options.source || "manual_import",
+    rawResponse: responseText,
+    proposedChanges,
+  });
+
+  return {
+    proposedChanges,
+    messagePlans,
+    reviewBatch,
+    importData,
+  };
+}
+
 export function buildProviderImportOutcome({
   extractionError = "",
   autoCommitAppliedCount = 0,
@@ -114,6 +224,35 @@ export function shouldAutoApproveProviderChange(change = {}) {
     return false;
   }
   return true;
+}
+
+export function choiceOwnerMessageIndex(messages = []) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "dm" || messages[index].role === "provider") {
+      return index;
+    }
+  }
+  return Math.max(0, messages.length - 1);
+}
+
+export function providerMessageData({ message, messageIndex, options = {}, choiceOwnerIndex, import: importData }) {
+  const base = {
+    ...(message?.data || {}),
+    import: importData,
+  };
+  const structuredChoices = options.data?.choices ?? null;
+  const ownsChoices = structuredChoices?.options?.length && messageIndex === choiceOwnerIndex;
+  if (!ownsChoices) {
+    return base;
+  }
+
+  return {
+    ...base,
+    choiceOwner: true,
+    choices: structuredChoices,
+    turnResponse: options.data?.turnResponse ?? null,
+    providerRunId: options.data?.providerResult?.requestId ?? options.data?.providerResult?.request_id ?? null,
+  };
 }
 
 function isHiddenStoryChange(change = {}) {

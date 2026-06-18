@@ -17,7 +17,6 @@ import { buildTableSessionProjection } from "../src/engine/table-session-engine.
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "./campaign-adoption-controller.js";
-import { createImplicitCombatAdvanceChange, createImplicitCombatEnemySyncChange, createImplicitCombatStartChange } from "./combat-import-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "./combat-prompt-repair-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
@@ -36,9 +35,8 @@ import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-format
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "./provider-chat-controller.js";
-import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
+import { buildProviderImportOutcome, buildProviderImportPlan, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
-import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { applyTableActionProjection, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
@@ -7022,91 +7020,25 @@ async function importProviderResponse(responseText, options = {}) {
   const extraction = extractLorekeeperUpdates(responseText);
   const cleanedText = cleanProviderResponseForPlay(responseText);
   const tableMessages = splitProviderTableMessages(cleanedText, state.campaign, extraction.proposedChanges);
-  const implicitSceneChange = options.autoCommit
-    ? createImplicitSceneProgressChange({
-      tableMessages,
-      proposedChanges: extraction.proposedChanges,
-    })
-    : null;
-  const implicitCombatChange = options.autoCommit
-    ? createImplicitCombatStartChange({
-      campaign: state.campaign,
-      tableMessages,
-      proposedChanges: extraction.proposedChanges,
-      turnResponse: options.data?.turnResponse,
-    })
-    : null;
-  const combatContextChanges = implicitCombatChange
-    ? [...extraction.proposedChanges, implicitCombatChange]
-    : extraction.proposedChanges;
-  const implicitCombatEnemyChange = options.autoCommit
-    ? createImplicitCombatEnemySyncChange({
-      campaign: state.campaign,
-      tableMessages,
-      proposedChanges: combatContextChanges,
-      turnResponse: options.data?.turnResponse,
-    })
-    : null;
-  const implicitCombatAdvanceChange = options.autoCommit
-    ? createImplicitCombatAdvanceChange({
-      campaign: state.campaign,
-      proposedChanges: extraction.proposedChanges,
-      turnResponse: options.data?.turnResponse,
-      submittedTurn: options.data?.turn,
-      labelForActor: labelById,
-    })
-    : null;
-  const actorPromptContextChanges = [
-    ...extraction.proposedChanges,
-    ...(implicitCombatChange ? [implicitCombatChange] : []),
-    ...(implicitCombatEnemyChange ? [implicitCombatEnemyChange] : []),
-    ...(implicitCombatAdvanceChange ? [implicitCombatAdvanceChange] : []),
-  ];
-  const implicitCombatActorPromptChange = options.autoCommit
-    ? createImplicitCombatActorPromptChange({
-      campaign: state.campaign,
-      tableMessages,
-      proposedChanges: actorPromptContextChanges,
-      turnResponse: options.data?.turnResponse,
-    })
-    : null;
-  const proposedChanges = [
-    ...extraction.proposedChanges,
-    ...(implicitSceneChange ? [implicitSceneChange] : []),
-    ...(implicitCombatChange ? [implicitCombatChange] : []),
-    ...(implicitCombatEnemyChange ? [implicitCombatEnemyChange] : []),
-    ...(implicitCombatAdvanceChange ? [implicitCombatAdvanceChange] : []),
-    ...(implicitCombatActorPromptChange ? [implicitCombatActorPromptChange] : []),
-  ];
-  const choiceOwnerIndex = choiceOwnerMessageIndex(tableMessages);
-  for (const [messageIndex, message] of tableMessages.entries()) {
+  const importPlan = buildProviderImportPlan({
+    campaign: state.campaign,
+    responseText,
+    cleanedText,
+    extraction,
+    tableMessages,
+    options,
+    labelForActor: labelById,
+  });
+  for (const { message, data } of importPlan.messagePlans) {
     await appendPlayMessage({
       ...message,
       meta: cleanMessageMeta(message.meta || options.meta || ""),
       source: options.source ? `${options.source}_response` : message.source,
-      data: providerMessageData({
-        message,
-        messageIndex,
-        options,
-        choiceOwnerIndex,
-        import: {
-          source: options.source || "manual_import",
-          responseChars: responseText.length,
-          cleanedChars: cleanedText.length,
-          proposedChanges: proposedChanges.length,
-          extractionError: extraction.error || "",
-        },
-      }),
+      data,
     });
   }
 
-  const reviewBatch = createReviewBatch({
-    campaignId: state.campaign.id,
-    source: options.source || "manual_import",
-    rawResponse: responseText,
-    proposedChanges,
-  });
-
+  const { proposedChanges, reviewBatch } = importPlan;
   state.reviewBatch = reviewBatch.proposedChanges.length > 0 ? reviewBatch : null;
   const autoCommitResult = options.autoCommit ? await autoCommitReviewBatch(reviewBatch) : null;
 
@@ -7306,35 +7238,6 @@ function buildPartySpeakerLookup(campaign, proposedChanges = []) {
   return [...lookup.entries()]
     .sort((a, b) => b[0].length - a[0].length)
     .map(([alias, entry]) => ({ alias, name: entry.name, record: entry.record }));
-}
-
-function choiceOwnerMessageIndex(messages) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index].role === "dm" || messages[index].role === "provider") {
-      return index;
-    }
-  }
-  return Math.max(0, messages.length - 1);
-}
-
-function providerMessageData({ message, messageIndex, options = {}, choiceOwnerIndex, import: importData }) {
-  const base = {
-    ...(message.data || {}),
-    import: importData,
-  };
-  const structuredChoices = options.data?.choices ?? null;
-  const ownsChoices = structuredChoices?.options?.length && messageIndex === choiceOwnerIndex;
-  if (!ownsChoices) {
-    return base;
-  }
-
-  return {
-    ...base,
-    choiceOwner: true,
-    choices: structuredChoices,
-    turnResponse: options.data?.turnResponse ?? null,
-    providerRunId: options.data?.providerResult?.requestId ?? options.data?.providerResult?.request_id ?? null,
-  };
 }
 
 function parseSpeakerLine(line, speakerLookup) {
