@@ -33,6 +33,7 @@ export const inviteKinds = Object.freeze({
 
 const allowedControllerKinds = new Set(Object.values(controllerKinds));
 const allowedTurnStates = new Set(Object.values(hostTurnStates));
+const canonOpeningRoles = new Set(["dm", "player", "party", "npc"]);
 const defaultMultiplayerSettings = Object.freeze({
   requireGuestActionApproval: false,
   holdGuestActionsForGroupInput: false,
@@ -773,6 +774,7 @@ export function submitGuestAction(campaign, { connectionId, clientId, connection
   if (!member || member.id !== characterId) {
     throw new Error("Guest does not control that party member.");
   }
+  assertGuestMaySubmitTableTurn(next, member);
   const trimmedText = compactLine(text, 1200);
   if (!trimmedText && ready) {
     throw new Error("Action text is required.");
@@ -843,6 +845,16 @@ export function submitGuestChoiceVote(campaign, {
   if (!normalizedChoiceKey || !normalizedOptionId) {
     throw new Error("Choice vote must identify a choice and option.");
   }
+  if (isCampaignReadyForOpening(next)) {
+    throw publicMultiplayerError("The host has not started the adventure yet. Wait for the opening scene.", 409);
+  }
+  const activeChoice = activeChoiceForVote(next);
+  if (!activeChoice || activeChoice.key !== normalizedChoiceKey) {
+    throw publicMultiplayerError("That table choice is no longer active. Wait for the host's current prompt.", 409);
+  }
+  if (!activeChoice.optionIds.has(normalizedOptionId)) {
+    throw publicMultiplayerError("That choice option is no longer active. Pick from the current table choices.", 409);
+  }
   const vote = {
     id: `vote-${connection.playerId}-${characterId}-${normalizedChoiceKey}`,
     campaignId: next.id,
@@ -875,6 +887,40 @@ export function submitGuestChoiceVote(campaign, {
   return touchCampaign(next);
 }
 
+function activeChoiceForVote(campaign) {
+  const messages = campaign.sessionLog?.messages ?? [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    const choices = message?.data?.choices;
+    if ((message?.role === "dm" || message?.role === "provider") && choices?.options?.length) {
+      const key = choiceKeyForStructuredChoices(choices);
+      const optionIds = new Set(choices.options.map((option, optionIndex) =>
+        String(option?.id || choiceLabelForIndex(optionIndex))
+      ));
+      return key ? { key, optionIds } : null;
+    }
+    if (["dm", "provider", "player", "party"].includes(message?.role)) {
+      return null;
+    }
+  }
+  return null;
+}
+
+function choiceKeyForStructuredChoices(choices = {}) {
+  return compactCompareText([
+    choices.prompt || "",
+    choices.scope || "",
+    choices.forActorId || "",
+    (choices.options ?? []).map((option, index) =>
+      `${String(option?.id || choiceLabelForIndex(index))}:${option?.text || ""}`
+    ).join("|"),
+  ].join("::")).slice(0, 500);
+}
+
+function choiceLabelForIndex(index) {
+  return String.fromCharCode(65 + index);
+}
+
 export function passGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId, campaignId = "", tableId = "", sessionId = "" } = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   assertTableAuthority(next, { campaignId, tableId, sessionId });
@@ -891,6 +937,7 @@ export function passGuestAction(campaign, { connectionId, clientId, connectionSe
   if (!member || member.id !== characterId) {
     throw new Error("Guest does not control that party member.");
   }
+  assertGuestMaySubmitTableTurn(next, member);
   const input = {
     id: `input-${connection.playerId}-${characterId}`,
     campaignId: next.id,
@@ -914,6 +961,40 @@ export function passGuestAction(campaign, { connectionId, clientId, connectionSe
     partyMemberId: characterId,
   });
   return touchCampaign(next);
+}
+
+function assertGuestMaySubmitTableTurn(campaign, member) {
+  if (isCampaignReadyForOpening(campaign)) {
+    throw publicMultiplayerError("The host has not started the adventure yet. Wait for the opening scene.", 409);
+  }
+  const combat = campaign.combat;
+  if (!combat?.inCombat || !combat.currentTurnId) {
+    return;
+  }
+  if (combat.currentTurnId === member.id) {
+    return;
+  }
+  const activeName = activeCombatActorName(campaign) || "the active combatant";
+  throw publicMultiplayerError(`Wait for ${activeName}'s combat turn before sending an action.`, 409);
+}
+
+function isCampaignReadyForOpening(campaign) {
+  if (!campaign || campaign.scene?.status !== "campaign_start") {
+    return false;
+  }
+  const storedMessages = campaign.sessionLog?.messages ?? [];
+  return !storedMessages.some((message) => canonOpeningRoles.has(message.role));
+}
+
+function activeCombatActorName(campaign) {
+  const activeId = campaign.combat?.currentTurnId;
+  if (!activeId) {
+    return "";
+  }
+  return campaign.combat?.turnOrder?.find((entry) => entry.id === activeId)?.name
+    || campaign.party?.find((member) => member.id === activeId)?.name
+    || campaign.combat?.enemies?.find((enemy) => enemy.id === activeId)?.name
+    || "";
 }
 
 export function postTableTalk(campaign, { connectionId, clientId, connectionSecret, playerName, text, campaignId = "", tableId = "", sessionId = "" } = {}) {
@@ -2328,6 +2409,10 @@ function compactLine(value, limit = 240) {
     return compact;
   }
   return `${compact.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
+function compactCompareText(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function slugify(value) {

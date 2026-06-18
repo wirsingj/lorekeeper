@@ -605,6 +605,11 @@ const scenarios = [
       await seatActiveWaitingGuest(harness, { playerName: "Remote Jess", seatName: "Renn" });
       const firstSession = await waitForGuestConnected(guestPage, { characterName: "Renn", campaignTitle: "Harness Remote Active A" });
       assert.equal(firstSession.assignedCharacter.name, "Renn");
+      await expectGuestActionRejected(
+        harness,
+        await guestDebugSession(guestPage),
+        "Renn tries to act before the host starts the adventure.",
+      );
 
       await sendTableTalk(guestPage, "Remote Jess says hello from the guest tab.");
       await expectVisibleText(harness.page, "Remote Jess says hello from the guest tab.");

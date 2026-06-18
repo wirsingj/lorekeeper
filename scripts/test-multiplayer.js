@@ -14,6 +14,7 @@ import {
   heartbeatWaitingGuest,
   joinableGuestSeats,
   parseInviteLink,
+  passGuestAction,
   postTableTalk,
   registerWaitingGuest,
   requestJoin,
@@ -252,12 +253,39 @@ assert.equal(connected.sessionId, campaign.multiplayer.localTable.sessionId);
 assert.equal(kevric.controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.equal(kevric.controllerId, connected.playerId);
 
+const activeRiverChoice = {
+  prompt: "What do you do?",
+  scope: "vote",
+  options: [
+    { id: "A", text: "Keep watch from the bank." },
+    { id: "B", text: "Offer to help load the last boat." },
+    { id: "C", text: "Sneak onto the boat." },
+  ],
+  allowVote: true,
+  allowOther: true,
+};
+const activeRiverChoiceKey = testChoiceKey(activeRiverChoice);
+campaign.sessionLog.messages.push({
+  id: "dm-river-crossing-choice",
+  sessionId: "session-main",
+  role: "dm",
+  title: "DM",
+  body: "The last boat creaks at the river crossing. What do you do?",
+  meta: "",
+  source: "test",
+  providerRunId: null,
+  createdAt: new Date().toISOString(),
+  data: {
+    choiceOwner: true,
+    choices: activeRiverChoice,
+  },
+});
 campaign = submitGuestChoiceVote(campaign, {
   connectionId: connected.id,
   clientId: "guest-client",
   connectionSecret,
   characterId: "kevric",
-  choiceKey: "river-crossing-choice",
+  choiceKey: activeRiverChoiceKey,
   optionId: "B",
   optionLabel: "B",
   optionText: "Offer to help load the last boat.",
@@ -275,7 +303,7 @@ campaign = submitGuestChoiceVote(campaign, {
   clientId: "guest-client",
   connectionSecret,
   characterId: "kevric",
-  choiceKey: "river-crossing-choice",
+  choiceKey: activeRiverChoiceKey,
   optionId: "C",
   optionLabel: "C",
   optionText: "Sneak onto the boat.",
@@ -292,8 +320,32 @@ assert.throws(
     connectionId: connected.id,
     clientId: "guest-client",
     connectionSecret,
+    characterId: "kevric",
+    choiceKey: "stale-river-crossing-choice",
+    optionId: "B",
+    optionLabel: "B",
+  }),
+  /choice is no longer active/i,
+);
+assert.throws(
+  () => submitGuestChoiceVote(campaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
+    characterId: "kevric",
+    choiceKey: activeRiverChoiceKey,
+    optionId: "Z",
+    optionLabel: "Z",
+  }),
+  /option is no longer active/i,
+);
+assert.throws(
+  () => submitGuestChoiceVote(campaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
     characterId: "jarin",
-    choiceKey: "river-crossing-choice",
+    choiceKey: activeRiverChoiceKey,
     optionId: "A",
     optionLabel: "A",
   }),
@@ -396,6 +448,80 @@ const healedSnapshot = createGuestSnapshot(staleCampaign, legacyConnection.id, {
 });
 assert.equal(healedSnapshot.connection.status, "connected");
 assert.equal(healedSnapshot.connection.id, connected.id);
+
+let openingGateCampaign = {
+  ...testCampaign(),
+  id: "campaign-opening-gate",
+  scene: {
+    ...testCampaign().scene,
+    status: "campaign_start",
+  },
+};
+openingGateCampaign = startLocalTable(openingGateCampaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+const openingInviteResult = createInviteForPartyMember(openingGateCampaign, {
+  partyMemberId: "kevric",
+  host: "192.168.1.24",
+  port: 7347,
+});
+openingGateCampaign = openingInviteResult.campaign;
+const openingJoinResult = requestJoin(openingGateCampaign, {
+  inviteLink: openingInviteResult.inviteLink,
+  playerName: "Opening Jess",
+  clientId: "opening-guest",
+});
+openingGateCampaign = approveJoinRequest(openingJoinResult.campaign, openingJoinResult.connection.id);
+assert.throws(
+  () => submitGuestAction(openingGateCampaign, {
+    connectionId: openingJoinResult.connection.id,
+    clientId: "opening-guest",
+    connectionSecret: openingJoinResult.connectionSecret,
+    characterId: "kevric",
+    text: "Kevric tries to act before the opening scene.",
+  }),
+  /not started the adventure/i,
+);
+assert.throws(
+  () => passGuestAction(openingGateCampaign, {
+    connectionId: openingJoinResult.connection.id,
+    clientId: "opening-guest",
+    connectionSecret: openingJoinResult.connectionSecret,
+    characterId: "kevric",
+  }),
+  /not started the adventure/i,
+);
+
+const wrongCombatTurnCampaign = {
+  ...JSON.parse(JSON.stringify(campaign)),
+  combat: {
+    inCombat: true,
+    round: 1,
+    currentTurnId: "jarin",
+    turnOrder: [
+      { id: "jarin", name: "Jarin", type: "party" },
+      { id: "kevric", name: "Kevric", type: "party" },
+    ],
+    enemies: [],
+  },
+};
+assert.throws(
+  () => submitGuestAction(wrongCombatTurnCampaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
+    characterId: "kevric",
+    text: "Kevric tries to take Jarin's combat turn.",
+  }),
+  /Wait for Jarin's combat turn/i,
+);
+assert.throws(
+  () => passGuestAction(wrongCombatTurnCampaign, {
+    connectionId: connected.id,
+    clientId: "guest-client",
+    connectionSecret,
+    characterId: "kevric",
+  }),
+  /Wait for Jarin's combat turn/i,
+);
 
 assert.throws(
   () => submitGuestAction(campaign, {
@@ -813,6 +939,21 @@ assert.notEqual(wrongInviteCampaign.party.find((member) => member.id === "jarin"
 assert.equal(wrongInviteCampaign.multiplayer.connections.find((connection) => connection.id === eveJoinResult.connection.id).partyMemberId, eve.id);
 
 console.log("LoreKeeper multiplayer tests passed.");
+
+function testChoiceKey(choices = {}) {
+  return compactCompareText([
+    choices.prompt || "",
+    choices.scope || "",
+    choices.forActorId || "",
+    (choices.options ?? []).map((option, index) =>
+      `${String(option?.id || String.fromCharCode(65 + index))}:${option?.text || ""}`
+    ).join("|"),
+  ].join("::")).slice(0, 500);
+}
+
+function compactCompareText(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
 
 function testCampaign() {
   return {

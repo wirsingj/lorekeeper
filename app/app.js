@@ -9108,7 +9108,15 @@ function renderPartyApprovalActions(message, approval) {
     resolveButton.type = "button";
     resolveButton.className = "mini-action message-submit-action";
     resolveButton.textContent = "Resolve Now";
-    resolveButton.title = "Send this companion beat to the DM now";
+    const resolveGate = buildTurnSubmitGate({
+      turnProjection: turnProjection(),
+      repair: activeTurnRepair(),
+      readyForOpening: isCampaignReadyForOpening(),
+    });
+    resolveButton.disabled = resolveGate.blocked;
+    resolveButton.title = resolveGate.blocked
+      ? resolveGate.activityText
+      : "Send this companion beat to the DM now";
     resolveButton.addEventListener("click", () => resolvePartySuggestionNow(message));
 
     const rejectButton = document.createElement("button");
@@ -9168,6 +9176,15 @@ async function resolvePartySuggestionNow(message) {
   if (!message?.id || hasActiveGeneration()) {
     setProviderActivity("Wait for the current DM response before resolving this companion beat", "waiting");
     return;
+  }
+  const gate = buildTurnSubmitGate({
+    turnProjection: turnProjection(),
+    repair: activeTurnRepair(),
+    readyForOpening: isCampaignReadyForOpening(),
+  });
+  if (gate.blocked) {
+    setProviderActivity(gate.activityText, gate.activityState);
+    return { providerReceived: false, reason: gate.reason };
   }
   const input = partySuggestionInputFromMessage(message);
   if (!input.text) {
