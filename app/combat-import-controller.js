@@ -79,10 +79,7 @@ export function createImplicitCombatEnemySyncChange({
       ];
     }),
   ];
-  const knownKeys = new Set(knownEnemies.flatMap(enemyIdentityKeys));
-  const missingEnemies = inferredEnemies.filter((enemy) =>
-    enemyIdentityKeys(enemy).every((key) => !knownKeys.has(key))
-  );
+  const missingEnemies = inferredEnemies.filter((enemy) => !isKnownEnemy(enemy, knownEnemies));
   if (!missingEnemies.length) {
     return null;
   }
@@ -244,6 +241,48 @@ function enemyIdentityKeys(enemy = {}) {
   ]
     .map(normalizeNameKey)
     .filter(Boolean);
+}
+
+function isKnownEnemy(candidate = {}, knownEnemies = []) {
+  const knownKeys = new Set(knownEnemies.flatMap(enemyIdentityKeys));
+  if (enemyIdentityKeys(candidate).some((key) => knownKeys.has(key))) {
+    return true;
+  }
+
+  const candidateTokens = enemyIdentityTokens(candidate);
+  if (!candidateTokens.length) {
+    return false;
+  }
+  return knownEnemies.some((enemy) => {
+    const knownTokens = enemyIdentityTokens(enemy);
+    return candidateTokens.some((token) => knownTokens.includes(token));
+  });
+}
+
+function enemyIdentityTokens(enemy = {}) {
+  const words = [
+    enemy.id,
+    enemy.enemyId,
+    enemy.name,
+    enemy.title,
+    enemy.type,
+  ]
+    .join(" ")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const combatantNouns = new Set([
+    "wolf",
+    "beast",
+    "creature",
+    "monster",
+    "miner",
+    "dwarf",
+    "brawler",
+    "thug",
+    "bandit",
+  ]);
+  return [...new Set(words.filter((word) => combatantNouns.has(word)))];
 }
 
 function compactSceneSituation(text = "") {

@@ -2068,6 +2068,9 @@ function startMultiplayerPolling() {
         await refreshGuestLobbyPreview({ quiet: true }).catch(() => {});
         return;
       }
+      if (state.campaignWizardCreating) {
+        return;
+      }
       if (state.campaign?.multiplayer?.localTable?.running) {
         const response = await fetch(apiCampaignUrl, { cache: "no-store" });
         if (!response.ok) {
@@ -2441,6 +2444,7 @@ async function loadCampaign() {
   });
   state.prompt = "";
   state.reviewBatch = null;
+  resetTurnCarryover();
 }
 
 async function selectCampaignByPath(sqlitePath) {
@@ -4272,7 +4276,7 @@ async function resolvePendingInputsWithText(inputs, aggregateText) {
 }
 
 function scheduleAutoResolveGuestInputs(reason = "snapshot") {
-  if (clientMode || state.guestSession?.hostBaseUrl) {
+  if (clientMode || state.guestSession?.hostBaseUrl || state.campaignWizardCreating) {
     return;
   }
   if (state.autoResolveGuestInputsTimer) {
@@ -4309,6 +4313,9 @@ async function maybeAutoResolveGuestInputs(reason = "snapshot") {
 }
 
 function shouldAutoResolveGuestInputs() {
+  if (state.campaignWizardCreating) {
+    return false;
+  }
   if (!state.campaign?.multiplayer?.localTable?.running) {
     return false;
   }
@@ -5618,6 +5625,7 @@ async function loadImportedCampaign() {
   });
   state.prompt = "";
   state.reviewBatch = null;
+  resetTurnCarryover();
   state.turnFlow.reset({ reason: "fallback_imported_campaign_loaded" });
 }
 
@@ -5632,11 +5640,21 @@ function setCampaignFromPayload(payload, contextPurpose) {
   });
   state.prompt = "";
   state.reviewBatch = null;
-  if (previousCampaignId && previousCampaignId !== state.campaign.id) {
+  const campaignChanged = previousCampaignId && previousCampaignId !== state.campaign.id;
+  const initialLoad = !previousCampaignId;
+  if (initialLoad || campaignChanged) {
+    resetTurnCarryover();
+  }
+  if (campaignChanged) {
     state.turnFlow.reset({ reason: "campaign_changed" });
     state.playLogVisibleLimit = defaultPlayLogVisibleLimit;
   }
   scheduleAutoResolveGuestInputs(contextPurpose);
+}
+
+function resetTurnCarryover() {
+  state.currentTurn = null;
+  state.pendingChoiceSelection = null;
 }
 
 function currentProviderSettings() {

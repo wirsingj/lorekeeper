@@ -951,6 +951,25 @@ function testCombatImportController() {
     campaign: activeCampaign,
     tableMessages: [{ role: "dm", body: "The massive wolf circles closer." }],
   }), null, "known enemies should not be duplicated");
+
+  const ashWolfDeclaredByProvider = createImplicitCombatEnemySyncChange({
+    campaign: campaignFixture(),
+    proposedChanges: [{
+      domain: "combat",
+      data: {
+        inCombat: true,
+        enemies: [{ id: "enemy-ash-wolf", name: "Ash Wolf", type: "beast" }],
+        turnOrder: [
+          { id: "thor", name: "Thor", type: "party" },
+          { id: "enemy-ash-wolf", name: "Ash Wolf", type: "enemy" },
+        ],
+      },
+    }],
+    tableMessages: [{ role: "dm", body: "The ash wolf drops from the broken stair and snarls." }],
+    turnResponse: { sceneStatus: { mode: "combat" }, flags: { startsCombat: true } },
+  });
+  assert.equal(ashWolfDeclaredByProvider, null, "generic wolf inference should not duplicate a provider-declared Ash Wolf");
+
   assert.equal(inferCombatEnemies("A bandit and a hostile miner block the road.").length >= 2, true);
 
   const campaign = startCombat(campaignFixture(), {
