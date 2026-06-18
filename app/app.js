@@ -5,7 +5,7 @@ import { createSampleCampaign } from "../src/campaign-state/sample-campaign.js";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
 import { getActiveProviderConversation } from "../src/campaign-state/provider-conversations.js";
 import { createReviewBatch } from "../src/canon-review/proposals.js";
-import { extractLorekeeperUpdates, stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
+import { extractLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
@@ -35,7 +35,19 @@ import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-format
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "./provider-chat-controller.js";
-import { buildProviderImportOutcome, buildProviderImportPlan, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
+import {
+  buildProviderImportOutcome,
+  buildProviderImportPlan,
+  cleanChoiceText,
+  cleanProviderResponseForPlay,
+  decideLatestProviderImport,
+  extractChoicePrompt,
+  extractInlineNumberedChoicePanel,
+  normalizeProviderChoiceFormattingForPlay,
+  prepareAutoCommitReviewBatch,
+  splitChoiceText,
+  splitProviderTableMessages,
+} from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
@@ -7019,7 +7031,14 @@ async function importProviderResponse(responseText, options = {}) {
 
   const extraction = extractLorekeeperUpdates(responseText);
   const cleanedText = cleanProviderResponseForPlay(responseText);
-  const tableMessages = splitProviderTableMessages(cleanedText, state.campaign, extraction.proposedChanges);
+  const tableMessages = splitProviderTableMessages(cleanedText, state.campaign, extraction.proposedChanges, {
+    isHostControlledPartyRecord,
+    partyControllerKind,
+    onHostCharacterSuppressed: ({ name, body }) => pushDiagnosticsEvent("host_character_autopost_suppressed", {
+      name,
+      body,
+    }),
+  });
   const importPlan = buildProviderImportPlan({
     campaign: state.campaign,
     responseText,
@@ -7116,130 +7135,6 @@ function compactSceneSituation(text = "") {
   return cleaned.length > 520 ? `${cleaned.slice(0, 519).trimEnd()}...` : cleaned;
 }
 
-function splitProviderTableMessages(text, campaign, proposedChanges = []) {
-  const speakerLookup = buildPartySpeakerLookup(campaign, proposedChanges);
-  if (!text.trim()) {
-    return [
-      {
-        role: "dm",
-        title: "DM",
-        body: "The DM response was imported for review.",
-        source: "provider_response",
-      },
-    ];
-  }
-
-  const messages = [];
-  let dmLines = [];
-  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-
-  for (const line of lines) {
-    if (isChoiceLikeLine(line)) {
-      dmLines.push(line);
-      continue;
-    }
-
-    const speakerLine = parseSpeakerLine(line, speakerLookup);
-    if (speakerLine) {
-      if (isHostControlledPartyRecord(speakerLine.record)) {
-        pushDiagnosticsEvent("host_character_autopost_suppressed", {
-          name: speakerLine.name,
-          body: speakerLine.body,
-        });
-        continue;
-      }
-
-      flushDmLines();
-      messages.push({
-        role: "party",
-        title: speakerLine.name,
-        body: speakerLine.body || "Acts at the table.",
-        source: "provider_response",
-        meta: "Companion beat waiting for host",
-        data: {
-          status: "pending_party_approval",
-          characterId: speakerLine.record?.id ?? null,
-          characterName: speakerLine.name,
-          controllerKind: partyControllerKind(speakerLine.record),
-          suggestedByProvider: true,
-        },
-      });
-      continue;
-    }
-
-    dmLines.push(line);
-  }
-
-  flushDmLines();
-
-  return messages.length
-    ? messages
-    : [
-        {
-          role: "dm",
-          title: "DM",
-          body: text,
-          source: "provider_response",
-        },
-      ];
-
-  function flushDmLines() {
-    if (!dmLines.length) {
-      return;
-    }
-
-    messages.push({
-      role: "dm",
-      title: "DM",
-      body: dmLines.join("\n\n"),
-      source: "provider_response",
-    });
-    dmLines = [];
-  }
-}
-
-function buildPartySpeakerLookup(campaign, proposedChanges = []) {
-  const records = [
-    ...(campaign.party ?? []),
-    ...proposedChanges
-      .filter((change) => normalizeChangeDomain(change.domain) === "party")
-      .map((change) => change.data ?? {}),
-  ];
-  const names = records
-    .map((record) => ({
-      record,
-      name: record.name || record.title,
-    }))
-    .filter((entry) => entry.name)
-    .map((entry) => ({
-      record: entry.record,
-      name: String(entry.name).trim(),
-    }))
-    .filter((entry) => entry.name);
-  const firstNames = new Map();
-
-  names.forEach(({ name, record }) => {
-    const first = name.split(/\s+/)[0];
-    if (!first) {
-      return;
-    }
-    const key = first.toLowerCase();
-    firstNames.set(key, firstNames.has(key) ? null : { name, record });
-  });
-
-  const lookup = new Map();
-  names.forEach(({ name, record }) => lookup.set(name.toLowerCase(), { name, record }));
-  for (const [first, entry] of firstNames) {
-    if (entry) {
-      lookup.set(first, entry);
-    }
-  }
-
-  return [...lookup.entries()]
-    .sort((a, b) => b[0].length - a[0].length)
-    .map(([alias, entry]) => ({ alias, name: entry.name, record: entry.record }));
-}
-
 function parseSpeakerLine(line, speakerLookup) {
   if (isChoiceLikeLine(line)) {
     return null;
@@ -7259,13 +7154,6 @@ function parseSpeakerLine(line, speakerLookup) {
   }
 
   return null;
-}
-
-function normalizeChangeDomain(domain) {
-  if (domain === "party_member" || domain === "player_character") {
-    return "party";
-  }
-  return domain;
 }
 
 function escapeRegExp(value) {
@@ -10661,106 +10549,6 @@ function recordElement({ title, body, badge, actions = [], onEdit }) {
   return wrapper;
 }
 
-function cleanProviderResponseForPlay(text) {
-  const withoutUpdates = stripLorekeeperUpdates(text);
-  const withoutRolePrefix = stripProviderRolePrefix(withoutUpdates);
-  const withoutMarkdownNoise = stripProviderMarkdownNoise(withoutRolePrefix);
-  const withoutJsonTail = stripInlineResponseJsonTail(withoutMarkdownNoise);
-  const withReadableChoices = normalizeChoiceFormattingForPlay(withoutJsonTail);
-  return stripTrailingStatusBlock(withReadableChoices).trim() || "The DM response was imported for review.";
-}
-
-function stripProviderRolePrefix(text) {
-  return String(text ?? "")
-    .replace(/^\s*(?:\*\*)?\s*(?:DM|Dungeon Master|Lorekeeper|Assistant)\s*(?:\*\*)?\s*[:\-]\s*/i, "")
-    .replace(/^\s*(?:#|##)\s*(?:DM|Dungeon Master|Lorekeeper|Assistant)\s*$/gim, "")
-    .trim();
-}
-
-function stripProviderMarkdownNoise(text) {
-  return String(text ?? "")
-    .replace(/\*\*(DM|Dungeon Master|Options?|proposedChanges)\s*:\*\*/gi, "$1:")
-    .replace(/\*\*([^*\n]{1,80})\*\*/g, "$1")
-    .replace(/(?:^|\n)\s*proposedChanges\s*:\s*$/i, "")
-    .trim();
-}
-
-function stripInlineResponseJsonTail(text) {
-  const raw = String(text ?? "");
-  const marker = raw.search(
-    /\b(?:sceneStatus|choices|mechanics|flags|warnings|proposedChanges)\s*:\s*(?:\{|\[|true|false|null|"|\d)/i,
-  );
-  if (marker === -1) {
-    return raw;
-  }
-  const before = raw.slice(0, marker).trim();
-  return before || raw;
-}
-
-function stripTrailingStatusBlock(text) {
-  const statusMarker = text.search(
-    /(?:^|\n)\s*(?:Current Scene|Scene Status|Scene|Location|Time|Party Status|Immediate Tension|Choices Ahead|Next Choices)\s*:/i,
-  );
-
-  if (statusMarker === -1) {
-    return text;
-  }
-
-  const narrativeBeforeMarker = text.slice(0, statusMarker).trim();
-  return narrativeBeforeMarker.length >= 160 ? narrativeBeforeMarker : text;
-}
-
-function normalizeChoiceFormattingForPlay(text) {
-  const blocks = String(text ?? "")
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-  const normalized = [];
-
-  for (let index = 0; index < blocks.length; index += 1) {
-    const block = blocks[index];
-    const nextBlock = blocks[index + 1];
-    const choiceBlock = normalizeInlineChoiceBlock(block, nextBlock);
-    if (choiceBlock) {
-      normalized.push(choiceBlock);
-      if (isSomethingElseChoice(nextBlock)) {
-        index += 1;
-      }
-      continue;
-    }
-
-    normalized.push(block);
-  }
-
-  return normalized.join("\n\n");
-}
-
-function normalizeInlineChoiceBlock(block, nextBlock = "") {
-  if (!block) {
-    return "";
-  }
-
-  const numberedPanel = extractInlineNumberedChoicePanel(block);
-  if (!numberedPanel) {
-    return null;
-  }
-
-  const items = isSomethingElseChoice(nextBlock)
-    ? [...numberedPanel.items, cleanChoiceText(nextBlock)]
-    : numberedPanel.items;
-  const pieces = [];
-  if (numberedPanel.beforeText) {
-    pieces.push(numberedPanel.beforeText);
-  }
-  pieces.push(numberedPanel.prompt);
-  pieces.push(items.map((item, index) => `${index + 1}. ${item}`).join("\n"));
-  return pieces.join("\n\n");
-}
-
-function isSomethingElseChoice(text) {
-  return /^something else\.?$/i.test(String(text ?? "").trim());
-}
-
 function messageBodyElements(text, role = "dm", data = {}) {
   const structuredChoiceBlock = structuredChoiceBlockFromMessageData(data);
   const blocks = mergeStructuredChoiceBlock(
@@ -10895,7 +10683,7 @@ function messageBodyElements(text, role = "dm", data = {}) {
 
 function normalizeMessageBlocks(text, role) {
   const normalizedText = role === "dm" || role === "provider"
-    ? normalizeChoiceFormattingForPlay(text)
+    ? normalizeProviderChoiceFormattingForPlay(text)
     : String(text ?? "");
   const rawBlocks = normalizedText
     .trim()
@@ -11003,30 +10791,12 @@ function extractTrailingChoiceBlocks(rawBlocks) {
   return null;
 }
 
-function extractChoicePrompt(text) {
-  const match = text.match(/(?:^|\.|\?|!)\s*((?:What (?:does|do|would|will|should|can) .*?\?|What do you do|What now|Your move|Choose)[?!.]?)\s*$/i);
-  return match?.[1]?.trim() ?? null;
-}
-
 function mergeStructuredChoiceBlock(blocks, structuredChoiceBlock) {
   if (!structuredChoiceBlock?.items?.length) {
     return blocks;
   }
   const withoutParsedChoices = blocks.filter((block) => block.type !== "choices");
   return [...withoutParsedChoices, structuredChoiceBlock];
-}
-
-function cleanChoiceText(text) {
-  const cleaned = text
-    .trim()
-    .replace(/^[-*]\s+/, "")
-    .replace(/^(?:\d+|[A-Ha-h])[.)]\s*/, "")
-    .trim();
-  const duplicateSomethingElse = cleaned.match(/^(something else(?:\.\.\.|\.?)?)\s*:\s*something else(?:\.\.\.|\.?)?$/i);
-  if (duplicateSomethingElse) {
-    return "Something else.";
-  }
-  return cleaned;
 }
 
 function isLikelyChoiceText(text) {
@@ -11188,83 +10958,6 @@ function extractNumberedChoiceLines(lines) {
     beforeText,
     items,
   };
-}
-
-function extractInlineNumberedChoicePanel(text) {
-  const firstNumberedChoice = text.search(/\s(?:1|A)[.)]\s+/i);
-  if (firstNumberedChoice === -1) {
-    return null;
-  }
-
-  const beforeChoices = text.slice(0, firstNumberedChoice).trim();
-  const optionText = text.slice(firstNumberedChoice).trim();
-  const prompt = extractChoicePrompt(beforeChoices) || extractChoicePrompt(text);
-  if (!prompt) {
-    return null;
-  }
-
-  const choices = splitChoiceText(optionText);
-  if (choices.length < 2) {
-    return null;
-  }
-
-  const promptStart = beforeChoices.lastIndexOf(prompt);
-  const beforeText = promptStart >= 0 ? beforeChoices.slice(0, promptStart).trim() : beforeChoices;
-
-  return {
-    beforeText,
-    prompt,
-    items: choices,
-  };
-}
-
-function splitChoiceText(text) {
-  const normalized = text
-    .replace(/\s*-\s*(?=(?:\d+[.)]\s+|[A-Z][^.!?]{8,120}(?:\.|$)))/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!normalized) {
-    return [];
-  }
-
-  const numbered = normalized
-    .split(/\s+(?=(?:\d+|[A-Ha-h])[.)]\s+)/)
-    .map((item) => item.replace(/^(?:\d+|[A-Ha-h])[.)]\s*/, "").trim())
-    .filter(Boolean);
-  if (numbered.length >= 2) {
-    return normalizeChoiceItems(numbered.map(cleanChoiceText).filter(Boolean));
-  }
-
-  const sentenceChoices = normalized
-    .split(/\s+-\s+|(?<=\.)\s+(?=[A-Z])/)
-    .map((item) => item.trim())
-    .filter((item) => item.length >= 12 && !/^something else\.?$/i.test(item));
-  const hasFallback = /(?:^|\s)Something else\.?$/i.test(normalized);
-  if (sentenceChoices.length >= 2) {
-    return normalizeChoiceItems(hasFallback ? [...sentenceChoices, "Something else."] : sentenceChoices);
-  }
-
-  return [];
-}
-
-function normalizeChoiceItems(items) {
-  const normalized = [];
-  let hasSomethingElse = false;
-  for (const item of items) {
-    const cleaned = cleanChoiceText(item);
-    if (!cleaned) {
-      continue;
-    }
-    if (/^something else(?:\.\.\.|\.?)$/i.test(cleaned)) {
-      if (!hasSomethingElse) {
-        normalized.push("Something else.");
-        hasSomethingElse = true;
-      }
-      continue;
-    }
-    normalized.push(cleaned);
-  }
-  return normalized;
 }
 
 function shouldKeepDmBlockSeparate(text, index, totalBlocks) {

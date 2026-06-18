@@ -319,6 +319,7 @@ Risks:
 181. Hidden provider-status accessibility copy now uses DM Voice language instead of "Provider/manual bridge," closing one more player-facing naming leak without changing internal provider ids.
 182. The Playwright UI harness now has an intentional visual audit mode: `npm run test:ui -- --scenario visual-audit-screenshots` captures successful screenshots for home, App Preferences, New Adventure, ready table, Friends and Seats, `/guest`, combat, and DM Recovery states under `data/runtime/ui-flow-artifacts/<timestamp>/visual-audit/`.
 183. Provider response import planning now lives in `app/provider-import-controller.js`: implicit scene/combat fallback changes, review-batch construction, choice-owner message metadata, and import diagnostics metadata are planned outside the renderer, while `app.js` executes the resulting append/commit/render side effects.
+184. Provider response cleanup and table-message splitting now live in `app/provider-import-controller.js`, including inline JSON/status-tail removal, readable choice formatting, companion beat extraction, and host-controlled PC autopost suppression hooks.
 
 ### Still Risky
 
@@ -441,7 +442,7 @@ Risks:
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, provider response import planning, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import side-effect orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, provider response import planning, provider response cleanup/table-message splitting, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import side-effect orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
@@ -667,6 +668,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Table-sim alignment audit: architecture is moving the right direction through app-owned state/combat/continuity and extracted renderer policies, but the host UX still reads partly like a DM console/settings hub. Highest product gaps are phase-specific combat actions, host-only controls as a tucked-away DM screen, manual recovery escape hatch polish, guest-editable pre-table drafts, two-machine soak, and a first-class visual-audit screenshot mode.
 - 2026-06-18: Visual audit screenshots are now first-class in the hidden UI harness. Verification: `npm run test:ui -- --scenario visual-audit-screenshots --skip-build` passed and produced home, App Preferences, New Adventure, ready table, Friends and Seats, guest lobby, combat, and DM Recovery screenshots.
 - 2026-06-18: Provider response import planning was extracted from `app.js` into `provider-import-controller`, covering implicit scene/combat fallback changes, review-batch creation, and message import metadata. Verification: `npm run build`, `npm run test:all`, focused RP import UI, and focused combat import UI passed.
+- 2026-06-18: Provider response cleanup and table-message splitting moved into `provider-import-controller`, including readable choice cleanup and host-controlled PC autopost suppression hooks. Verification: `npm run build`, `npm run test:all`, focused RP import UI, and focused combat import UI passed.
 
 ## How To Use This Doc
 

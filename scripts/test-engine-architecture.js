@@ -25,7 +25,15 @@ import { buildInputComposerProjection } from "../app/input-composer-controller.j
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "../app/provider-chat-controller.js";
-import { buildProviderImportOutcome, buildProviderImportPlan, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
+import {
+  buildProviderImportOutcome,
+  buildProviderImportPlan,
+  cleanProviderResponseForPlay,
+  decideLatestProviderImport,
+  prepareAutoCommitReviewBatch,
+  shouldAutoApproveProviderChange,
+  splitProviderTableMessages,
+} from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
@@ -2776,6 +2784,36 @@ function testProviderImportOutcomeProjection() {
   assert.equal(newLatest.text, "new answer");
   assert.equal(newLatest.activityState, "working");
 
+  const cleanedProviderText = cleanProviderResponseForPlay(`**DM:** The ridge goes quiet.
+
+What do you do? 1. Follow the tracks 2. Hold position
+
+sceneStatus: {"mode":"exploration"}`);
+  assert.doesNotMatch(cleanedProviderText, /sceneStatus/);
+  assert.doesNotMatch(cleanedProviderText, /\*\*DM:\*\*/);
+  assert.match(cleanedProviderText, /1\. Follow the tracks/);
+
+  const suppressed = [];
+  const splitMessages = splitProviderTableMessages(
+    "Mira: I draw my sword.\n\nRenn: I can scout ahead.\n\nThe road waits.",
+    {
+      party: [
+        { id: "mira", name: "Mira", controllerKind: "host" },
+        { id: "renn", name: "Renn", controllerKind: "ai_companion" },
+      ],
+    },
+    [],
+    {
+      isHostControlledPartyRecord: (member) => member?.controllerKind === "host",
+      partyControllerKind: (member) => member?.controllerKind || "ai_companion",
+      onHostCharacterSuppressed: (entry) => suppressed.push(entry),
+    },
+  );
+  assert.equal(suppressed.length, 1);
+  assert.equal(suppressed[0].name, "Mira");
+  assert.equal(splitMessages.some((message) => message.title === "Mira"), false);
+  assert.equal(splitMessages.some((message) => message.title === "Renn" && message.data.controllerKind === "ai_companion"), true);
+
   const choicePlan = buildProviderImportPlan({
     campaign: { id: "campaign-1", party: [] },
     responseText: "DM text",
@@ -3184,7 +3222,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /buildAiCompanionCombatNudgePrompt/, "AI companion combat nudges should request a suggestion, not resolution");
   assert.match(appJs, /Do not roll dice, deal damage, spend resources, apply conditions, move initiative, resolve the action/, "AI companion combat suggestion must not resolve mechanics before host approval");
   assert.match(combatImportController, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
-  assert.match(appJs, /stripInlineResponseJsonTail/, "table narration cleanup should remove inline provider JSON tails");
+  assert.match(providerImportController, /stripInlineResponseJsonTail/, "provider import cleanup should remove inline provider JSON tails outside the renderer");
   assert.match(appJs, /choiceAudienceLabel/, "structured choice panels should surface party/character/vote audience metadata");
   assert.match(appJs, /choice-audience/, "choice panels should render the selected audience near the prompt");
   assert.equal(/label:\s*"Play"/.test(appJs), false, "AI companion cards should use Nudge instead of a Play button");
