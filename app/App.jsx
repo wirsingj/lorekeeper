@@ -67,7 +67,7 @@ export function LorekeeperShell() {
             <p id="scene-intelligence-tensions"></p>
             <p id="scene-intelligence-consequences"></p>
           </div>
-          <span id="provider-status" className="visually-hidden">Provider: manual bridge</span>
+          <span id="provider-status" className="visually-hidden">DM voice: campaign chat</span>
         </section>
 
         <section id="party-rail-section" className="rail-section party-rail-section">

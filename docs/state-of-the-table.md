@@ -316,6 +316,7 @@ Risks:
 178. Campaign/table switches now clear stale transient turn carryover without clearing same-campaign in-flight turns, and background local-table polling/guest auto-resolution stands down while a new campaign is being created. This prevents old table actions from leaking into or racing a newly hosted campaign.
 179. Guest auto-resolution policy now lives in `app/guest-auto-resolve-controller.js` with direct tests for host/client mode, campaign creation, table-running state, approval/group-hold settings, busy turn flow, host draft text, and staged-input readiness.
 180. Campaign payload adoption and multiplayer background polling branch order now live in `app/campaign-adoption-controller.js` and `app/table-background-polling-controller.js`, so campaign-switch transient resets, guest waiting-room refreshes, Table Talk during DM generation, and new-campaign wizard polling pauses are tested outside `app.js`.
+181. Hidden provider-status accessibility copy now uses DM Voice language instead of "Provider/manual bridge," closing one more player-facing naming leak without changing internal provider ids.
 
 ### Still Risky
 
@@ -345,6 +346,8 @@ Risks:
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
 25. The app still has too many visible controls across table rails and campaign/table management. Preferences are calmer now via top-level tabs, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and a fuller split between app preferences and table settings.
 26. Automated UI coverage is now much stronger, including host plus `/guest` browser-tab flows, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
+27. The Playwright harness is good for assertions and failure artifacts, but not yet ergonomic for intentional visual audits. A stable screenshot/audit mode would make it easier to inspect whether the table actually feels like a D&D table instead of waiting for failure screenshots.
+28. Host play still blends DM-screen responsibilities and shared table experience in one shell. That is functional for authority, but the UX needs a clearer stance: host-only controls should feel like a tucked-away DM screen while the center surface feels shared with the players.
 
 ## Live Acceptance Matrix
 
@@ -386,23 +389,25 @@ Risks:
 13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
 15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door AI readiness is now secondary, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
+16. Decide and document the host-surface stance: "shared table with tucked-away DM screen" versus "host DM console plus player-facing table." Current implementation leans console-like because settings, AI readiness, guest controls, and recovery all live near the main table shell.
 
 ### Medium
 
-16. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
-17. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
-18. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
-19. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
-20. Continue expanding route-level API/security tests as new routes are added; current coverage includes classification, API-token protection, stale identity rejection, local asset blocking, and real mutation routes.
-21. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
+17. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
+18. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
+19. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
+20. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
+21. Continue expanding route-level API/security tests as new routes are added; current coverage includes classification, API-token protection, stale identity rejection, local asset blocking, and real mutation routes.
+22. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
+23. Add an intentional visual-audit/screenshot mode to `test:ui` that captures home, new adventure, active table, combat, recovery, settings, and `/guest` views against a temp campaign root without relying on failure artifacts.
 
 ### Low
 
-22. Replace remaining overly specific placeholder text with neutral table examples. Current state: the main command deck fallback is now campaign-neutral; secondary placeholders still need occasional review as screens evolve.
-23. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
-24. Continue improving campaign-aware character auto-complete quality; current behavior preserves supplied hard facts while letting the button regenerate derived pitch/integration text from party theme, premise, and existing characters.
-25. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
-26. Add fuller backup/export/restore affordances before release; delete now recycles local SQLite files, but there is not yet a restore UI.
+24. Replace remaining overly specific placeholder text with neutral table examples. Current state: the main command deck fallback is now campaign-neutral; secondary placeholders still need occasional review as screens evolve.
+25. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
+26. Continue improving campaign-aware character auto-complete quality; current behavior preserves supplied hard facts while letting the button regenerate derived pitch/integration text from party theme, premise, and existing characters.
+27. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
+28. Add fuller backup/export/restore affordances before release; delete now recycles local SQLite files, but there is not yet a restore UI.
 
 ## Working Checklist
 
@@ -552,6 +557,7 @@ Risks:
 - [x] Make Table Talk harder to miss without making it noisy.
 - [x] Refresh Table Talk during active DM generation so side chat does not wait for the DM turn to finish.
 - [x] Keep the left rail stable when party cards and combat rows have long names/actions.
+- [ ] Add an intentional visual-audit/screenshot harness mode for home, setup, table, combat, recovery, settings, and `/guest` states. Current state: failure artifacts are strong, but successful audit screenshots require ad hoc scripting.
 
 ### Storage, Diagnostics, And Safety
 
@@ -656,6 +662,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Follow-up fixed the combat identity drift plus related remote/new-campaign stale-turn and background-poll races. Verification: `npm run build`, `npm run test:engine`, focused combat UI, focused remote leave/rejoin/new-game UI, seeded chaos UI (`combat-sync-polish`, 3 runs), full `npm run test:ui -- --skip-build`, and `npm run test:all` all passed.
 - 2026-06-18: Guest auto-resolution policy was extracted from `app.js` into a tested controller. Verification: `npm run build`, `npm run test:engine`, focused remote leave/rejoin/new-game UI, seeded chaos UI (`guest-auto-resolve-policy`, 3 runs), full `npm run test:ui -- --skip-build`, and `npm run test:all` all passed.
 - 2026-06-18: Campaign adoption and multiplayer background polling policy were extracted from `app.js` into tested controllers. This keeps campaign-switch transient resets, local-table polling pauses during Host New, guest waiting-room refreshes, and Table Talk refresh during DM generation explicit and regression-covered. Verification: `npm run build`, `npm run test:engine`, focused Table Talk UI, focused remote leave/rejoin/new-game UI, `npm run test:regression`, and `npm run test:all` passed.
+- 2026-06-18: Table-sim alignment audit: architecture is moving the right direction through app-owned state/combat/continuity and extracted renderer policies, but the host UX still reads partly like a DM console/settings hub. Highest product gaps are phase-specific combat actions, host-only controls as a tucked-away DM screen, manual recovery escape hatch polish, guest-editable pre-table drafts, two-machine soak, and a first-class visual-audit screenshot mode.
 
 ## How To Use This Doc
 

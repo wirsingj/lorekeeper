@@ -285,6 +285,6 @@ Start here when making changes:
 3. Some live paths still hydrate whole campaign snapshots instead of using bounded SQLite query helpers.
 4. Provider import/generation is not fully table/session-scoped end to end.
 5. Settings are still physically one dialog, even though app-level and campaign-level settings are conceptually separate.
-6. Pre-table remote seating for brand-new unsaved campaign drafts is not safely modeled yet.
+6. Pre-table remote seating is safer now for Host New draft seat requests/reservations, but guest-editable character drafts are still missing and the draft lobby remains transitional `scripts/serve.js` state rather than a durable pre-table domain model.
 
 When in doubt, prefer extracting a pure policy/projection into a small module with tests over adding more conditional logic to `app/app.js` or `scripts/serve.js`.

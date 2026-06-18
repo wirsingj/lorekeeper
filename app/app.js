@@ -6508,12 +6508,12 @@ function render() {
   renderSceneNotebook(campaign);
   const providerSettings = currentProviderSettings();
   elements.providerStatus.textContent = providerSettings.preferredProvider === "ollama"
-    ? `Provider: Ollama ${providerSettings.selectedModel}`
-    : "Provider: ChatGPT campaign chat/manual";
+    ? `DM voice: Local AI ${providerSettings.selectedModel}`
+    : "DM voice: campaign chat/manual";
   if (providerSettings.preferredProvider === "bridge" && state.bridge.mode === "extension") {
     elements.providerStatus.textContent = state.bridge.ready
-      ? "Provider: campaign chat ready"
-      : "Provider: campaign chat waiting";
+      ? "DM voice: campaign chat ready"
+      : "DM voice: campaign chat waiting";
   }
   elements.saveStatus.textContent = clientMode || isRemoteTableClient()
     ? "Hosted table"
