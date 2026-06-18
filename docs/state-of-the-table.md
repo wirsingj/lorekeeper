@@ -297,6 +297,8 @@ Risks:
 159. The manual copied-response fallback is now tucked behind a Copied DM Text disclosure with controller-owned copy/state, so DM Recovery leads with the table-check summary instead of a visible paste box.
 160. Inspecting a paused DM response now opens a focused DM Recovery settings surface instead of the broader Troubleshooting drawer, with `settings-surface-controller.js` owning the one-tab recovery mode and target panel filtering.
 161. Live playtest fixed two table-flow bugs: Table Talk now repaints from fresh multiplayer snapshots while the DM is thinking, and app-owned enemy turns only mark themselves handled after initiative actually leaves the enemy; enemy attack messages now read as short table narration instead of bare roll receipts.
+162. Join-client internals now use `join`/`host` runtime modes and `join-client` renderer names instead of the old `thin` naming, while legacy launch/package aliases remain as compatibility shims.
+163. The New Adventure seed helper is now product-named as adventure seed presets instead of `dev-jump-start`, and its visible action reads as a creative table aid instead of a developer shortcut.
 
 ### Still Risky
 

@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const clientMode = process.argv.includes("--client");
-const logPath = path.join(rootDir, "data", clientMode ? "launcher-thin.log" : "launcher.log");
-const electronLogPath = path.join(rootDir, "data", clientMode ? "electron-thin.log" : "electron.log");
+const logPath = path.join(rootDir, "data", clientMode ? "launcher-join.log" : "launcher.log");
+const electronLogPath = path.join(rootDir, "data", clientMode ? "electron-join.log" : "electron.log");
 const viteBin = path.join(rootDir, "node_modules", "vite", "bin", "vite.js");
 const electronBinary = process.platform === "win32"
   ? path.join(rootDir, "node_modules", "electron", "dist", "electron.exe")

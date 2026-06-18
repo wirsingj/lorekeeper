@@ -170,12 +170,12 @@ export function LorekeeperShell() {
               </button>
             </div>
           </div>
-          <section id="thin-join-panel" className="thin-join-panel" hidden>
-            <div className="thin-join-card">
+          <section id="join-client-panel" className="join-client-panel" hidden>
+            <div className="join-client-card">
               <div className="join-panel-header">
                 <div>
                   <p className="eyebrow">LoreKeeper Join</p>
-                  <h2 id="thin-join-title">Join A Table</h2>
+                  <h2 id="join-client-title">Join A Table</h2>
                 </div>
                 <button id="join-back-home" className="secondary-action back-home-action" type="button" title="Back to main menu">
                   <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -184,7 +184,7 @@ export function LorekeeperShell() {
                   <span>Back</span>
                 </button>
               </div>
-              <p id="thin-join-copy" className="thin-join-copy">Choose an open seat, add the name your friends should see, and ask to join.</p>
+              <p id="join-client-copy" className="join-client-copy">Choose an open seat, add the name your friends should see, and ask to join.</p>
               <section id="guest-waiting-room-panel" className="guest-waiting-room-panel" hidden>
                 <section id="guest-table-preview" className="join-preview-card guest-table-preview" hidden>
                   <p className="join-preview-empty">Looking for the host table...</p>
@@ -195,61 +195,61 @@ export function LorekeeperShell() {
                   <input id="guest-waiting-player-name" autoComplete="name" placeholder="Name" />
                 </label>
                 <button id="guest-waiting-register" type="button">Ask To Join</button>
-                <p id="guest-waiting-status" className="thin-join-status">Enter your name and ask to join.</p>
+                <p id="guest-waiting-status" className="join-client-status">Enter your name and ask to join.</p>
               </section>
               <section id="guest-invite-panel">
                 <label>
                   <span>Invite link</span>
                   <textarea
-                    id="thin-join-invite-link"
+                    id="join-client-invite-link"
                     className="compact-invite-input"
                     rows="2"
                     spellCheck="false"
                     placeholder="lorekeeper://join?host=192.168.1.24&port=4173&campaign=..."
                   ></textarea>
                 </label>
-                <section id="thin-join-preview" className="join-preview-card" hidden>
+                <section id="join-client-preview" className="join-preview-card" hidden>
                   <p className="join-preview-empty">Paste a host invite link to preview the table.</p>
                 </section>
                 <label>
                   <span>Your name</span>
-                  <input id="thin-join-player-name" autoComplete="off" placeholder="Name" />
+                  <input id="join-client-player-name" autoComplete="off" placeholder="Name" />
                 </label>
               </section>
-              <div className="thin-join-character">
+              <div className="join-client-character">
                 <h3>Your Character</h3>
-                <p className="thin-join-copy">Fill this out when you are bringing someone new to the party.</p>
-                <button id="thin-join-character-autocomplete" className="secondary-action character-autocomplete-action" type="button">
+                <p className="join-client-copy">Fill this out when you are bringing someone new to the party.</p>
+                <button id="join-client-character-autocomplete" className="secondary-action character-autocomplete-action" type="button">
                   Auto-Complete
                 </button>
                 <label>
                   <span>Character name</span>
-                  <input id="thin-join-character-name" autoComplete="off" placeholder="Mira" />
+                  <input id="join-client-character-name" autoComplete="off" placeholder="Mira" />
                 </label>
-                <div className="thin-join-two">
+                <div className="join-client-two">
                   <label>
                     <span>Ancestry</span>
-                    <input id="thin-join-character-ancestry" autoComplete="off" placeholder="Fairy, elf, human..." />
+                    <input id="join-client-character-ancestry" autoComplete="off" placeholder="Fairy, elf, human..." />
                   </label>
                   <label>
                     <span>Class</span>
-                    <input id="thin-join-character-class" autoComplete="off" placeholder="Ranger, druid, rogue..." />
+                    <input id="join-client-character-class" autoComplete="off" placeholder="Ranger, druid, rogue..." />
                   </label>
                 </div>
-                <div className="thin-join-two">
+                <div className="join-client-two">
                   <label>
                     <span>Level</span>
-                    <input id="thin-join-character-level" inputMode="numeric" placeholder="1" />
+                    <input id="join-client-character-level" inputMode="numeric" placeholder="1" />
                   </label>
                   <label>
                     <span>Table role</span>
-                    <input id="thin-join-character-role" autoComplete="off" placeholder="Scout, healer, chaotic helper..." />
+                    <input id="join-client-character-role" autoComplete="off" placeholder="Scout, healer, chaotic helper..." />
                   </label>
                 </div>
                 <label>
                   <span>Look / vibe</span>
                   <textarea
-                    id="thin-join-character-appearance"
+                    id="join-client-character-appearance"
                     rows="3"
                     placeholder="What do people notice first? Style, demeanor, tells, magic, gear..."
                   ></textarea>
@@ -257,7 +257,7 @@ export function LorekeeperShell() {
                 <label>
                   <span>Character pitch</span>
                   <textarea
-                    id="thin-join-character-backstory"
+                    id="join-client-character-backstory"
                     rows="4"
                     placeholder="A short paragraph: who they are, what they care about, and what kind of trouble follows them."
                   ></textarea>
@@ -265,17 +265,17 @@ export function LorekeeperShell() {
                 <label>
                   <span>Why they join this party</span>
                   <textarea
-                    id="thin-join-character-integration"
+                    id="join-client-character-integration"
                     rows="4"
                     placeholder="How should the DM weave them into this scene or the party? Old friend, stranger with a shared goal, hired help, rescued captive..."
                   ></textarea>
                 </label>
               </div>
-              <div className="thin-join-actions">
-                <button id="thin-join-submit" type="button">Join Table</button>
-                <button id="thin-join-open-dialog" className="secondary-action" type="button">Advanced</button>
+              <div className="join-client-actions">
+                <button id="join-client-submit" type="button">Join Table</button>
+                <button id="join-client-open-dialog" className="secondary-action" type="button">Advanced</button>
               </div>
-              <p id="thin-join-status" className="thin-join-status">Paste an invite link to begin.</p>
+              <p id="join-client-status" className="join-client-status">Paste an invite link to begin.</p>
             </div>
           </section>
           <div id="play-log" className="play-log"></div>
@@ -525,7 +525,14 @@ function CampaignDialog() {
           <section className="campaign-wizard-section campaign-seed-section">
             <div className="wizard-heading">
               <span>Adventure</span>
-              <button id="dev-jump-start-campaign" className="mini-action" type="button">Fill Example</button>
+              <button
+                id="adventure-seed-preset"
+                className="mini-action"
+                type="button"
+                data-adventure-seed-preset
+              >
+                Spark Idea
+              </button>
             </div>
             <div className="campaign-wizard-grid">
               <label>
@@ -734,8 +741,8 @@ function SetupDialog() {
           <label>
             <span>Default Flow</span>
             <select id="app-mode-select">
-              <option value="full">Host</option>
-              <option value="thin">Join</option>
+              <option value="host">Host</option>
+              <option value="join">Join</option>
             </select>
           </label>
           <p id="app-mode-note" className="setup-note">Host runs the table. Join sits down at a friend's table.</p>

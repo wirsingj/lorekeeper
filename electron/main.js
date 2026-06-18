@@ -266,7 +266,7 @@ if (singleInstanceLock) {
 }
 
 ipcMain.handle("lorekeeper:runtime-mode", () => ({
-  mode: clientMode ? "thin" : "full",
+  mode: clientMode ? "join" : "host",
   appName,
 }));
 
@@ -288,15 +288,15 @@ ipcMain.handle("lorekeeper:clipboard-read-text", () => {
 });
 
 ipcMain.handle("lorekeeper:relaunch-mode", (_event, requestedMode) => {
-  const nextMode = requestedMode === "thin" ? "thin" : "full";
-  if ((nextMode === "thin") === clientMode) {
+  const nextMode = requestedMode === "join" || requestedMode === "thin" ? "join" : "host";
+  if ((nextMode === "join") === clientMode) {
     return { ok: true, mode: nextMode, relaunched: false };
   }
 
   const args = process.argv
     .slice(1)
     .filter((arg) => arg !== "--client");
-  if (nextMode === "thin") {
+  if (nextMode === "join") {
     args.push("--client");
   }
 

@@ -482,19 +482,19 @@ const qwenGenerationConfig = buildOllamaTurnGenerationConfig({
 assert.equal(qwenGenerationConfig.options.format, undefined);
 assert.match(qwenGenerationConfig.promptPrefix, /\/no_think/);
 
-const partialThinCampaign = createEmptyCampaign({
-  title: "Partial Thin Snapshot",
+const partialJoinCampaign = createEmptyCampaign({
+  title: "Partial Join Snapshot",
   scene: {},
   sessionLog: { messages: [] },
   people: null,
   party: undefined,
 });
-assert.deepEqual(partialThinCampaign.scene.presentPeopleIds, []);
-assert.deepEqual(partialThinCampaign.scene.presentPartyMemberIds, []);
-assert.deepEqual(partialThinCampaign.scene.localNotes, []);
-assert.deepEqual(partialThinCampaign.people, []);
-assert.deepEqual(partialThinCampaign.party, []);
-assert.doesNotThrow(() => buildContextPack(partialThinCampaign, { purpose: "partial_thin_snapshot" }));
+assert.deepEqual(partialJoinCampaign.scene.presentPeopleIds, []);
+assert.deepEqual(partialJoinCampaign.scene.presentPartyMemberIds, []);
+assert.deepEqual(partialJoinCampaign.scene.localNotes, []);
+assert.deepEqual(partialJoinCampaign.people, []);
+assert.deepEqual(partialJoinCampaign.party, []);
+assert.doesNotThrow(() => buildContextPack(partialJoinCampaign, { purpose: "partial_join_snapshot" }));
 
 const hiddenStoryApplied = applyCanonicalChanges(createEmptyCampaign({ title: "Hidden Canon" }), [
   {

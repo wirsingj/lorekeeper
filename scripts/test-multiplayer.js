@@ -403,7 +403,7 @@ assert.throws(
     clientId: "other-client",
     connectionSecret,
     characterId: "kevric",
-    text: "Kevric acts from the wrong thin client.",
+    text: "Kevric acts from the wrong join client.",
   }),
   /client does not match/,
 );

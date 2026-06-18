@@ -21,7 +21,7 @@ import { createImplicitCombatActorPromptChange, latestDmNarration } from "./comb
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
-import { randomDevJumpStart } from "./dev-jump-start.js";
+import { randomAdventureSeedPreset } from "./adventure-seed-presets.js";
 import { buildDmNudgePrompt } from "./dm-nudge-controller.js";
 import {
   applyManualResponseFallbackProjection,
@@ -140,6 +140,7 @@ const defaultCompanionOptions = {
 };
 let preTableLobbyPublishTimer = null;
 let preTableLobbyHostPollTimer = null;
+const adventureSeedPresetButtons = new WeakSet();
 const userSettingsStorageKey = "lorekeeper.lastProviderSettings";
 const appModeStorageKey = "lorekeeper.appMode";
 
@@ -359,9 +360,9 @@ const elements = {
   promptSize: document.querySelector("#prompt-size"),
   promptDrawer: document.querySelector("#prompt-drawer"),
   sessionLabel: document.querySelector("#session-label"),
-  thinJoinPanel: document.querySelector("#thin-join-panel"),
-  thinJoinTitle: document.querySelector("#thin-join-title"),
-  thinJoinCopy: document.querySelector("#thin-join-copy"),
+  joinClientPanel: document.querySelector("#join-client-panel"),
+  joinClientTitle: document.querySelector("#join-client-title"),
+  joinClientCopy: document.querySelector("#join-client-copy"),
   guestInvitePanel: document.querySelector("#guest-invite-panel"),
   guestWaitingRoomPanel: document.querySelector("#guest-waiting-room-panel"),
   guestTablePreview: document.querySelector("#guest-table-preview"),
@@ -369,21 +370,21 @@ const elements = {
   guestWaitingPlayerName: document.querySelector("#guest-waiting-player-name"),
   guestWaitingRegister: document.querySelector("#guest-waiting-register"),
   guestWaitingStatus: document.querySelector("#guest-waiting-status"),
-  thinJoinInviteLink: document.querySelector("#thin-join-invite-link"),
-  thinJoinPreview: document.querySelector("#thin-join-preview"),
-  thinJoinPlayerName: document.querySelector("#thin-join-player-name"),
-  thinJoinCharacterName: document.querySelector("#thin-join-character-name"),
-  thinJoinCharacterAncestry: document.querySelector("#thin-join-character-ancestry"),
-  thinJoinCharacterClass: document.querySelector("#thin-join-character-class"),
-  thinJoinCharacterLevel: document.querySelector("#thin-join-character-level"),
-  thinJoinCharacterRole: document.querySelector("#thin-join-character-role"),
-  thinJoinCharacterAppearance: document.querySelector("#thin-join-character-appearance"),
-  thinJoinCharacterBackstory: document.querySelector("#thin-join-character-backstory"),
-  thinJoinCharacterIntegration: document.querySelector("#thin-join-character-integration"),
-  thinJoinCharacterAutocomplete: document.querySelector("#thin-join-character-autocomplete"),
-  thinJoinSubmit: document.querySelector("#thin-join-submit"),
-  thinJoinOpenDialog: document.querySelector("#thin-join-open-dialog"),
-  thinJoinStatus: document.querySelector("#thin-join-status"),
+  joinClientInviteLink: document.querySelector("#join-client-invite-link"),
+  joinClientPreview: document.querySelector("#join-client-preview"),
+  joinClientPlayerName: document.querySelector("#join-client-player-name"),
+  joinClientCharacterName: document.querySelector("#join-client-character-name"),
+  joinClientCharacterAncestry: document.querySelector("#join-client-character-ancestry"),
+  joinClientCharacterClass: document.querySelector("#join-client-character-class"),
+  joinClientCharacterLevel: document.querySelector("#join-client-character-level"),
+  joinClientCharacterRole: document.querySelector("#join-client-character-role"),
+  joinClientCharacterAppearance: document.querySelector("#join-client-character-appearance"),
+  joinClientCharacterBackstory: document.querySelector("#join-client-character-backstory"),
+  joinClientCharacterIntegration: document.querySelector("#join-client-character-integration"),
+  joinClientCharacterAutocomplete: document.querySelector("#join-client-character-autocomplete"),
+  joinClientSubmit: document.querySelector("#join-client-submit"),
+  joinClientOpenDialog: document.querySelector("#join-client-open-dialog"),
+  joinClientStatus: document.querySelector("#join-client-status"),
   joinBackHome: document.querySelector("#join-back-home"),
   bridgeCard: document.querySelector("#bridge-card"),
   bridgeStatus: document.querySelector("#bridge-status"),
@@ -479,7 +480,6 @@ const elements = {
   closeRecordDialog: document.querySelector("#close-record-dialog"),
   campaignDialog: document.querySelector("#campaign-dialog"),
   campaignForm: document.querySelector("#campaign-form"),
-  devJumpStartCampaign: document.querySelector("#dev-jump-start-campaign"),
   newCampaignTitle: document.querySelector("#new-campaign-title"),
   newCampaignPremise: document.querySelector("#new-campaign-premise"),
   newCampaignStartingLocation: document.querySelector("#new-campaign-starting-location"),
@@ -630,8 +630,8 @@ elements.wizardAdditionalCharacters?.addEventListener("click", (event) => {
   }
 });
 
-elements.thinJoinCharacterAutocomplete?.addEventListener("click", () => {
-  autocompleteCompactCharacterForm(compactCharacterFormRefs("thin-join"));
+elements.joinClientCharacterAutocomplete?.addEventListener("click", () => {
+  autocompleteCompactCharacterForm(compactCharacterFormRefs("join-client"));
 });
 
 elements.joinCharacterAutocomplete?.addEventListener("click", () => {
@@ -819,12 +819,12 @@ elements.inviteNewCharacterMain?.addEventListener("click", async () => {
   await createCharacterRequestInviteFromUi();
 });
 
-elements.thinJoinOpenDialog?.addEventListener("click", () => {
+elements.joinClientOpenDialog?.addEventListener("click", () => {
   openJoinCampaignDialog();
 });
 
-elements.thinJoinSubmit?.addEventListener("click", async () => {
-  await requestJoinFromThinPanel();
+elements.joinClientSubmit?.addEventListener("click", async () => {
+  await requestJoinFromJoinClientPanel();
 });
 
 elements.guestWaitingRegister?.addEventListener("click", async () => {
@@ -847,8 +847,8 @@ elements.guestSeatList?.addEventListener("click", (event) => {
   elements.guestWaitingPlayerName?.focus();
 });
 
-elements.thinJoinInviteLink?.addEventListener("input", () => {
-  scheduleJoinPreview(elements.thinJoinInviteLink.value, "thin");
+elements.joinClientInviteLink?.addEventListener("input", () => {
+  scheduleJoinPreview(elements.joinClientInviteLink.value, "join");
 });
 
 elements.joinInviteLink?.addEventListener("input", () => {
@@ -956,11 +956,6 @@ elements.campaignDialog?.addEventListener("cancel", (event) => {
   }
   event.preventDefault();
   dismissCampaignWizard();
-});
-
-elements.devJumpStartCampaign?.addEventListener("click", () => {
-  applyDevJumpStartSeed(randomDevJumpStart());
-  schedulePreTableLobbyPublish({ immediate: true });
 });
 
 elements.campaignDialog?.addEventListener("input", () => {
@@ -2007,11 +2002,11 @@ async function bootClientMode() {
       elements.guestWaitingPlayerName?.focus();
       return;
     }
-    if (loadedInvite && elements.thinJoinPlayerName && !elements.thinJoinPlayerName.value) {
-      elements.thinJoinPlayerName.focus();
+    if (loadedInvite && elements.joinClientPlayerName && !elements.joinClientPlayerName.value) {
+      elements.joinClientPlayerName.focus();
       return;
     }
-    elements.thinJoinInviteLink?.focus();
+    elements.joinClientInviteLink?.focus();
   }, 200);
 }
 
@@ -2021,7 +2016,7 @@ async function bootRemoteClientMode() {
   state.sqlitePath = "";
   state.campaign = createGuestShellCampaign();
   state.contextPack = buildContextPack(state.campaign, {
-    purpose: "remote_full_client_shell",
+    purpose: "remote_join_client_shell",
   });
   seedPlayLog();
   render();
@@ -2498,16 +2493,16 @@ function compactCharacterFormRefs(kind, root = document) {
       controllerKind: selectedRadioValueFromRoot(root, "[data-character-field='controllerKind']", "ai_companion"),
     };
   }
-  if (kind === "thin-join") {
+  if (kind === "join-client") {
     return {
-      name: elements.thinJoinCharacterName,
-      ancestry: elements.thinJoinCharacterAncestry,
-      characterClass: elements.thinJoinCharacterClass,
-      level: elements.thinJoinCharacterLevel,
-      roleIntent: elements.thinJoinCharacterRole,
-      appearance: elements.thinJoinCharacterAppearance,
-      backstory: elements.thinJoinCharacterBackstory,
-      integrationPrompt: elements.thinJoinCharacterIntegration,
+      name: elements.joinClientCharacterName,
+      ancestry: elements.joinClientCharacterAncestry,
+      characterClass: elements.joinClientCharacterClass,
+      level: elements.joinClientCharacterLevel,
+      roleIntent: elements.joinClientCharacterRole,
+      appearance: elements.joinClientCharacterAppearance,
+      backstory: elements.joinClientCharacterBackstory,
+      integrationPrompt: elements.joinClientCharacterIntegration,
     };
   }
   if (kind === "join-dialog") {
@@ -2951,6 +2946,7 @@ function openCampaignDialog({ returnToMainMenu = false } = {}) {
   resetCampaignWizardDefaults();
   state.campaignWizardReturnHome = Boolean(returnToMainMenu);
   openCampaignWizardWorkspace();
+  bindAdventureSeedPresetAction();
   elements.campaignDialog.showModal();
   schedulePreTableLobbyPublish({ immediate: true });
   elements.newCampaignTitle.focus();
@@ -3157,6 +3153,7 @@ async function copyPreTableGuestLinkFromUi() {
 }
 
 function resetCampaignWizardDefaults() {
+  bindAdventureSeedPresetAction();
   elements.newCampaignTitle.value = "";
   elements.newCampaignPremise.value = "";
   elements.newCampaignStartingLocation.value = "";
@@ -3185,7 +3182,7 @@ function resetCampaignWizardDefaults() {
   }
 }
 
-function applyDevJumpStartSeed(seed) {
+function applyAdventureSeedPreset(seed) {
   elements.newCampaignTitle.value = seed.title;
   elements.newCampaignPremise.value = seed.premise;
   elements.newCampaignStartingLocation.value = seed.startingLocation;
@@ -3200,6 +3197,18 @@ function applyDevJumpStartSeed(seed) {
   setProviderActivity("Example filled; review or start the adventure", "idle");
   elements.newCampaignTitle.focus();
   elements.newCampaignTitle.select();
+}
+
+function bindAdventureSeedPresetAction(root = elements.campaignDialog ?? document) {
+  const button = root?.querySelector?.("[data-adventure-seed-preset]");
+  if (!button || adventureSeedPresetButtons.has(button)) {
+    return;
+  }
+  adventureSeedPresetButtons.add(button);
+  button.addEventListener("click", () => {
+    applyAdventureSeedPreset(randomAdventureSeedPreset());
+    schedulePreTableLobbyPublish({ immediate: true });
+  });
 }
 
 async function refreshMultiplayerSnapshot({ quiet = false } = {}) {
@@ -3484,13 +3493,13 @@ async function setPartyMemberController(member, controllerKind) {
 
 function openJoinCampaignDialog() {
   elements.joinCampaignForm.reset();
-  if (elements.thinJoinInviteLink?.value) {
-    elements.joinInviteLink.value = elements.thinJoinInviteLink.value;
+  if (elements.joinClientInviteLink?.value) {
+    elements.joinInviteLink.value = elements.joinClientInviteLink.value;
   }
-  if (elements.thinJoinPlayerName?.value) {
-    elements.joinPlayerName.value = elements.thinJoinPlayerName.value;
+  if (elements.joinClientPlayerName?.value) {
+    elements.joinPlayerName.value = elements.joinClientPlayerName.value;
   }
-  copyThinJoinCharacterToDialog();
+  copyJoinClientCharacterToDialog();
   elements.joinStatus.textContent = "Paste an invite link from the host.";
   renderJoinPreview(null, elements.joinPreview);
   elements.joinCampaignDialog.showModal();
@@ -3510,22 +3519,22 @@ async function requestJoinFromUi() {
   });
 }
 
-async function requestJoinFromThinPanel() {
+async function requestJoinFromJoinClientPanel() {
   await requestJoinWithValues({
-    inviteLink: elements.thinJoinInviteLink?.value,
-    playerName: elements.thinJoinPlayerName?.value,
+    inviteLink: elements.joinClientInviteLink?.value,
+    playerName: elements.joinClientPlayerName?.value,
     proposedCharacter: {
-      name: elements.thinJoinCharacterName?.value,
-      ancestry: elements.thinJoinCharacterAncestry?.value,
-      characterClass: elements.thinJoinCharacterClass?.value,
-      level: elements.thinJoinCharacterLevel?.value,
-      roleIntent: elements.thinJoinCharacterRole?.value,
-      appearance: elements.thinJoinCharacterAppearance?.value,
-      backstory: elements.thinJoinCharacterBackstory?.value,
-      integrationPrompt: elements.thinJoinCharacterIntegration?.value,
+      name: elements.joinClientCharacterName?.value,
+      ancestry: elements.joinClientCharacterAncestry?.value,
+      characterClass: elements.joinClientCharacterClass?.value,
+      level: elements.joinClientCharacterLevel?.value,
+      roleIntent: elements.joinClientCharacterRole?.value,
+      appearance: elements.joinClientCharacterAppearance?.value,
+      backstory: elements.joinClientCharacterBackstory?.value,
+      integrationPrompt: elements.joinClientCharacterIntegration?.value,
     },
-    statusElement: elements.thinJoinStatus,
-    submitButton: elements.thinJoinSubmit,
+    statusElement: elements.joinClientStatus,
+    submitButton: elements.joinClientSubmit,
   });
 }
 
@@ -3722,16 +3731,16 @@ async function refreshWaitingRoomStatus({ explicit = false } = {}) {
   return status;
 }
 
-function copyThinJoinCharacterToDialog() {
+function copyJoinClientCharacterToDialog() {
   const pairs = [
-    [elements.joinCharacterName, elements.thinJoinCharacterName],
-    [elements.joinCharacterAncestry, elements.thinJoinCharacterAncestry],
-    [elements.joinCharacterClass, elements.thinJoinCharacterClass],
-    [elements.joinCharacterLevel, elements.thinJoinCharacterLevel],
-    [elements.joinCharacterRole, elements.thinJoinCharacterRole],
-    [elements.joinCharacterAppearance, elements.thinJoinCharacterAppearance],
-    [elements.joinCharacterBackstory, elements.thinJoinCharacterBackstory],
-    [elements.joinCharacterIntegration, elements.thinJoinCharacterIntegration],
+    [elements.joinCharacterName, elements.joinClientCharacterName],
+    [elements.joinCharacterAncestry, elements.joinClientCharacterAncestry],
+    [elements.joinCharacterClass, elements.joinClientCharacterClass],
+    [elements.joinCharacterLevel, elements.joinClientCharacterLevel],
+    [elements.joinCharacterRole, elements.joinClientCharacterRole],
+    [elements.joinCharacterAppearance, elements.joinClientCharacterAppearance],
+    [elements.joinCharacterBackstory, elements.joinClientCharacterBackstory],
+    [elements.joinCharacterIntegration, elements.joinClientCharacterIntegration],
   ];
   for (const [target, source] of pairs) {
     if (target && source?.value) {
@@ -3757,11 +3766,12 @@ function hasJoinCharacterProposal(proposal = {}) {
   return Object.values(proposal ?? {}).some((value) => String(value ?? "").trim());
 }
 
-function scheduleJoinPreview(inviteLink, target = "thin", options = {}) {
+function scheduleJoinPreview(inviteLink, target = "join", options = {}) {
   if (state.joinPreviewTimer) {
     window.clearTimeout(state.joinPreviewTimer);
   }
-  const run = () => refreshJoinPreview(inviteLink, target);
+  const previewTarget = target === "dialog" ? "dialog" : "join";
+  const run = () => refreshJoinPreview(inviteLink, previewTarget);
   if (options.immediate) {
     run();
     return;
@@ -3769,8 +3779,9 @@ function scheduleJoinPreview(inviteLink, target = "thin", options = {}) {
   state.joinPreviewTimer = window.setTimeout(run, 250);
 }
 
-async function refreshJoinPreview(inviteLink, target = "thin") {
-  const previewElement = target === "dialog" ? elements.joinPreview : elements.thinJoinPreview;
+async function refreshJoinPreview(inviteLink, target = "join") {
+  const previewTarget = target === "dialog" ? "dialog" : "join";
+  const previewElement = previewTarget === "dialog" ? elements.joinPreview : elements.joinClientPreview;
   const text = String(inviteLink ?? "").trim();
   if (!previewElement) {
     return;
@@ -3791,11 +3802,11 @@ async function refreshJoinPreview(inviteLink, target = "thin") {
     url.searchParams.set("inviteLink", text);
     const preview = await fetchJson(url.toString());
     renderJoinPreview(preview, previewElement);
-    if (target === "thin" && elements.joinInviteLink?.value === text) {
+    if (previewTarget === "join" && elements.joinInviteLink?.value === text) {
       renderJoinPreview(preview, elements.joinPreview);
     }
-    if (target === "dialog" && elements.thinJoinInviteLink?.value === text) {
-      renderJoinPreview(preview, elements.thinJoinPreview);
+    if (previewTarget === "dialog" && elements.joinClientInviteLink?.value === text) {
+      renderJoinPreview(preview, elements.joinClientPreview);
     }
   } catch (error) {
     renderJoinPreview({
@@ -3942,8 +3953,8 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
       statusElement.textContent = statusText;
     }
     elements.joinStatus.textContent = statusText;
-    if (elements.thinJoinStatus) {
-      elements.thinJoinStatus.textContent = statusText;
+    if (elements.joinClientStatus) {
+      elements.joinClientStatus.textContent = statusText;
     }
     setProviderActivity(statusText, result.approved ? "idle" : "waiting");
     if (result.snapshot) {
@@ -3957,8 +3968,8 @@ async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter
       statusElement.textContent = errorText;
     }
     elements.joinStatus.textContent = errorText;
-    if (elements.thinJoinStatus) {
-      elements.thinJoinStatus.textContent = errorText;
+    if (elements.joinClientStatus) {
+      elements.joinClientStatus.textContent = errorText;
     }
     setProviderActivity(`Join failed: ${errorText}`, "error");
   } finally {
@@ -4406,10 +4417,10 @@ function createGuestShellCampaign() {
     items: [],
     quests: [],
     sessionLog: {
-      activeSessionId: "thin-lorekeeper-session",
+      activeSessionId: "lorekeeper-join-session",
       sessions: [
         {
-          id: "thin-lorekeeper-session",
+          id: "lorekeeper-join-session",
           title: "LoreKeeper Join",
           startedAt: new Date().toISOString(),
           endedAt: null,
@@ -4418,8 +4429,8 @@ function createGuestShellCampaign() {
       ],
       messages: [
         {
-          id: "thin-lorekeeper-ready",
-          sessionId: "thin-lorekeeper-session",
+          id: "lorekeeper-join-ready",
+          sessionId: "lorekeeper-join-session",
           role: "system",
           title: "LoreKeeper",
         body: guestWaitingRoomMode
@@ -5654,32 +5665,36 @@ function turnFlowBlocksNewTurn() {
 }
 
 function currentAppMode() {
-  return clientMode || state.homeFlow === "join" || isRemoteTableClient() ? "thin" : "full";
+  return clientMode || state.homeFlow === "join" || isRemoteTableClient() ? "join" : "host";
+}
+
+function normalizeAppMode(mode) {
+  return mode === "join" || mode === "thin" ? "join" : "host";
 }
 
 async function switchAppMode(mode) {
-  const nextMode = mode === "thin" ? "thin" : "full";
+  const nextMode = normalizeAppMode(mode);
   localStorage.setItem(appModeStorageKey, nextMode);
 
   if (!clientMode) {
-    chooseHomeFlow(nextMode === "thin" ? "join" : "host");
+    chooseHomeFlow(nextMode === "join" ? "join" : "host");
     return;
   }
 
   renderAppModeControls();
 
   if (nextMode === currentAppMode()) {
-    setProviderActivity(nextMode === "thin" ? "Already in Join mode" : "Already in Host mode", "idle");
+    setProviderActivity(nextMode === "join" ? "Already in Join mode" : "Already in Host mode", "idle");
     return;
   }
 
   if (window.lorekeeperDesktop?.relaunchMode) {
-    setProviderActivity(`Switching to ${nextMode === "thin" ? "Join" : "Host"} mode...`, "working");
+    setProviderActivity(`Switching to ${nextMode === "join" ? "Join" : "Host"} mode...`, "working");
     await window.lorekeeperDesktop.relaunchMode(nextMode);
     return;
   }
 
-  setProviderActivity(`Use the LoreKeeper app shortcut to open ${nextMode === "thin" ? "Join" : "Host"} mode`, "waiting");
+  setProviderActivity(`Use the LoreKeeper app shortcut to open ${nextMode === "join" ? "Join" : "Host"} mode`, "waiting");
 }
 
 function renderAppModeControls() {
@@ -5795,7 +5810,7 @@ function renderProviderControls() {
     elements.promptDrawer.hidden = true;
     elements.ollamaStatus.textContent = "Join mode uses the host provider.";
     elements.ollamaBenchmark.textContent = "No local model or browser bridge is needed in this window.";
-    applyThinModeChrome();
+    applyJoinClientChrome();
     renderTableActions();
     return;
   }
@@ -5821,14 +5836,14 @@ function renderProviderControls() {
   elements.recheckProvider.hidden = settings.preferredProvider !== "bridge";
   elements.bridgeCard.hidden = settings.preferredProvider !== "bridge";
   elements.promptDrawer.hidden = settings.preferredProvider !== "bridge";
-  applyFullModeChrome();
+  applyHostModeChrome();
   renderTableActions();
 }
 
-function applyThinModeChrome() {
+function applyJoinClientChrome() {
   const tableSession = refreshTableSessionProjection();
   renderAppModeControls();
-  document.body.classList.add("thin-lorekeeper-mode");
+  document.body.classList.add("lorekeeper-join-mode");
   elements.deleteCampaign.hidden = true;
   elements.providerStatus.textContent = "Mode: LoreKeeper Join";
   hideSetupSection(elements.providerMode, true);
@@ -5872,10 +5887,10 @@ function applyThinModeChrome() {
   renderInputComposer(tableSession);
 }
 
-function applyFullModeChrome() {
+function applyHostModeChrome() {
   const tableSession = refreshTableSessionProjection();
   renderAppModeControls();
-  document.body.classList.remove("thin-lorekeeper-mode");
+  document.body.classList.remove("lorekeeper-join-mode");
   elements.deleteCampaign.hidden = false;
   hideSetupSection(elements.providerMode, false);
   hideSetupSection(elements.newCampaign, false);
@@ -6470,7 +6485,7 @@ function render() {
   renderTableActions();
 
   renderPlayLog();
-  renderThinJoinPanel();
+  renderJoinClientPanel();
   renderParty(campaign);
   renderCombatTracker(campaign);
   renderPeople(campaign);
@@ -6558,10 +6573,11 @@ function chooseHomeFlow(flow) {
   const nextFlow = flow === "join" ? "join" : "host";
   state.homeFlow = nextFlow;
   renderHomePanel();
-  renderThinJoinPanel();
+  renderAppModeControls();
+  renderJoinClientPanel();
   if (nextFlow === "join") {
     setProviderActivity("Join ready. Paste a host link or use the guest page to request a seat.", "idle");
-    window.setTimeout(() => elements.thinJoinInviteLink?.focus(), 50);
+    window.setTimeout(() => elements.joinClientInviteLink?.focus(), 50);
     return;
   }
   setProviderActivity("Host ready.", "idle");
@@ -6586,7 +6602,7 @@ async function returnToMainMenu() {
   }
   state.homeFlow = "";
   renderHomePanel();
-  renderThinJoinPanel();
+  renderJoinClientPanel();
   setProviderActivity(
     wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Host, Join, or AI Setup.",
     "idle",
@@ -6667,7 +6683,7 @@ function renderHomeCampaignPicker() {
 
 function renderLobbyChrome({ homeVisible = null, joinVisible = null } = {}) {
   const home = homeVisible ?? !elements.homePanel?.hidden;
-  const join = joinVisible ?? !elements.thinJoinPanel?.hidden;
+  const join = joinVisible ?? !elements.joinClientPanel?.hidden;
   elements.app?.classList.toggle("lobby-mode", Boolean(home || join));
   elements.app?.classList.toggle("home-mode", Boolean(home));
   elements.app?.classList.toggle("join-mode", Boolean(join));
@@ -6711,14 +6727,14 @@ function renderSceneIntelligence(campaign) {
   }
 }
 
-function renderThinJoinPanel() {
-  if (!elements.thinJoinPanel) {
+function renderJoinClientPanel() {
+  if (!elements.joinClientPanel) {
     return;
   }
   const connected = state.guestSession?.status === "connected" || state.guestSnapshot?.connection?.status === "connected";
   const joinFlowActive = state.homeFlow === "join" || (clientMode && state.homeFlow !== "");
   const show = joinFlowActive && !connected;
-  elements.thinJoinPanel.hidden = !show;
+  elements.joinClientPanel.hidden = !show;
   elements.playLog.classList.toggle("play-log-with-join-panel", show);
   renderLobbyChrome({ joinVisible: show });
   if (!show) {
@@ -6726,8 +6742,8 @@ function renderThinJoinPanel() {
   }
 
   const awaitingApproval = state.guestSession?.status === "pending" || state.guestSnapshot?.awaitingApproval;
-  if (elements.thinJoinTitle) {
-    elements.thinJoinTitle.textContent = guestWaitingRoomMode ? "Find A Seat" : "Join A Table";
+  if (elements.joinClientTitle) {
+    elements.joinClientTitle.textContent = guestWaitingRoomMode ? "Find A Seat" : "Join A Table";
   }
   if (elements.joinBackHome) {
     elements.joinBackHome.hidden = false;
@@ -6743,10 +6759,10 @@ function renderThinJoinPanel() {
   if (guestWaitingRoomMode) {
     renderGuestLobbyPreview();
   }
-  document.querySelector(".thin-join-character")?.toggleAttribute("hidden", guestWaitingRoomMode);
-  document.querySelector(".thin-join-actions")?.toggleAttribute("hidden", guestWaitingRoomMode);
-  if (elements.thinJoinCopy) {
-    elements.thinJoinCopy.textContent = guestWaitingRoomMode
+  document.querySelector(".join-client-character")?.toggleAttribute("hidden", guestWaitingRoomMode);
+  document.querySelector(".join-client-actions")?.toggleAttribute("hidden", guestWaitingRoomMode);
+  if (elements.joinClientCopy) {
+    elements.joinClientCopy.textContent = guestWaitingRoomMode
       ? "Ask for an open character seat. You will see the full table after your friend seats you."
       : "Paste the invite link, add your table name, and request a seat.";
   }
@@ -6758,29 +6774,29 @@ function renderThinJoinPanel() {
         ? `Requesting a seat as ${selectedSeat.name}. Enter your name, then ask to join.`
         : "Choose a seat if one is available, then enter your name and ask to join.";
   }
-  if (elements.thinJoinStatus) {
-    elements.thinJoinStatus.hidden = guestWaitingRoomMode;
+  if (elements.joinClientStatus) {
+    elements.joinClientStatus.hidden = guestWaitingRoomMode;
   }
-  if (elements.thinJoinStatus && awaitingApproval) {
-    elements.thinJoinStatus.textContent = "Seat request sent. Waiting for your friend.";
+  if (elements.joinClientStatus && awaitingApproval) {
+    elements.joinClientStatus.textContent = "Seat request sent. Waiting for your friend.";
   }
   const savedSession = state.guestSession || state.recentGuestSession;
-  if (elements.thinJoinInviteLink && savedSession?.inviteLink && !elements.thinJoinInviteLink.value) {
-    elements.thinJoinInviteLink.value = savedSession.inviteLink;
-    scheduleJoinPreview(elements.thinJoinInviteLink.value, "thin", { immediate: true });
+  if (elements.joinClientInviteLink && savedSession?.inviteLink && !elements.joinClientInviteLink.value) {
+    elements.joinClientInviteLink.value = savedSession.inviteLink;
+    scheduleJoinPreview(elements.joinClientInviteLink.value, "join", { immediate: true });
   }
-  if (elements.thinJoinPlayerName && savedSession?.playerName && !elements.thinJoinPlayerName.value) {
-    elements.thinJoinPlayerName.value = savedSession.playerName;
+  if (elements.joinClientPlayerName && savedSession?.playerName && !elements.joinClientPlayerName.value) {
+    elements.joinClientPlayerName.value = savedSession.playerName;
   }
-  if (elements.thinJoinStatus && state.launchInviteError) {
-    elements.thinJoinStatus.textContent = state.launchInviteError;
-  } else if (elements.thinJoinStatus && !awaitingApproval && !state.guestSession && state.recentGuestSession?.inviteLink) {
-    elements.thinJoinStatus.textContent = launchInviteLink
+  if (elements.joinClientStatus && state.launchInviteError) {
+    elements.joinClientStatus.textContent = state.launchInviteError;
+  } else if (elements.joinClientStatus && !awaitingApproval && !state.guestSession && state.recentGuestSession?.inviteLink) {
+    elements.joinClientStatus.textContent = launchInviteLink
       ? "Invite loaded. Enter your name, then join the table."
       : "Previous table remembered. Ask for a seat again when it is open.";
   }
-  if (elements.thinJoinSubmit) {
-    elements.thinJoinSubmit.textContent = !launchInviteLink && !state.guestSession && state.recentGuestSession?.inviteLink
+  if (elements.joinClientSubmit) {
+    elements.joinClientSubmit.textContent = !launchInviteLink && !state.guestSession && state.recentGuestSession?.inviteLink
       ? "Reconnect"
       : "Join Table";
   }
@@ -6792,7 +6808,7 @@ function renderCampaignSelector() {
 
   if (clientMode || isRemoteTableClient()) {
     const option = document.createElement("option");
-    option.value = "thin-lorekeeper";
+    option.value = "lorekeeper-join";
     option.textContent = state.campaign?.title ?? "Remote Table";
     option.selected = true;
     elements.campaignSelect.replaceChildren(option);
@@ -8047,7 +8063,7 @@ async function buildDiagnosticsSnapshot() {
   if (clientMode) {
     return {
       generatedAt: new Date().toISOString(),
-      mode: "thin",
+      mode: "join",
       renderer,
     };
   }

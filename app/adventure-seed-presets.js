@@ -82,7 +82,7 @@ const characters = [
   },
 ];
 
-export function randomDevJumpStart(seed = Math.random) {
+export function randomAdventureSeedPreset(seed = Math.random) {
   const opening = pick(openings, seed);
   const character = pick(characters, seed);
   const suffix = Math.floor(seed() * 900 + 100);
@@ -101,4 +101,3 @@ export function randomDevJumpStart(seed = Math.random) {
 function pick(items, seed) {
   return items[Math.floor(seed() * items.length) % items.length];
 }
-

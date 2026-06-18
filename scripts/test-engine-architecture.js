@@ -16,7 +16,7 @@ import {
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "../app/combat-prompt-repair-controller.js";
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
-import { randomDevJumpStart } from "../app/dev-jump-start.js";
+import { randomAdventureSeedPreset } from "../app/adventure-seed-presets.js";
 import { buildDmNudgePrompt } from "../app/dm-nudge-controller.js";
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
@@ -217,10 +217,10 @@ async function testClipboardFallback() {
   assert.match(readBlocked.error, /blocked/i);
 }
 
-function testDevJumpStartSeed() {
+function testAdventureSeedPreset() {
   const values = [0.1, 0.2, 0.3];
   let index = 0;
-  const seed = randomDevJumpStart(() => values[index++ % values.length]);
+  const seed = randomAdventureSeedPreset(() => values[index++ % values.length]);
   assert.match(seed.title, /\d{3}$/);
   assert.ok(seed.premise.length > 40);
   assert.ok(seed.startingLocation.length > 2);
@@ -3246,7 +3246,7 @@ function testRemoteInviteWizardSeatPersistsAsJoinable() {
 
 testDiceEngine();
 await testClipboardFallback();
-testDevJumpStartSeed();
+testAdventureSeedPreset();
 testAgencyController();
 testTurnEngine();
 testStateEffects();

@@ -1616,14 +1616,14 @@ button:disabled {
   margin-left: auto;
 }
 
-.thin-join-panel {
+.join-client-panel {
   grid-row: 2;
   display: grid;
   place-items: center;
   padding: 12px 12px 4px;
 }
 
-.handheld-shell.join-mode .thin-join-panel {
+.handheld-shell.join-mode .join-client-panel {
   position: absolute;
   inset: 0;
   z-index: 8;
@@ -1637,7 +1637,7 @@ button:disabled {
     linear-gradient(135deg, #111719, #1d2426 56%, #0f1315);
 }
 
-.thin-join-card {
+.join-client-card {
   width: min(620px, 94%);
   padding: 18px;
   border: 1px solid rgba(125, 213, 201, 0.28);
@@ -1674,25 +1674,25 @@ button:disabled {
   stroke-width: 2;
 }
 
-.thin-join-card h2 {
+.join-client-card h2 {
   margin: 0 0 8px;
   font-size: 1.25rem;
 }
 
-.thin-join-card h3 {
+.join-client-card h3 {
   margin: 0 0 6px;
   font-size: 0.9rem;
   text-transform: uppercase;
 }
 
-.thin-join-copy {
+.join-client-copy {
   margin: 0 0 14px;
   color: #c8d2d8;
   font-size: 0.88rem;
   line-height: 1.45;
 }
 
-.thin-join-card label {
+.join-client-card label {
   display: grid;
   gap: 5px;
   margin-top: 10px;
@@ -1701,8 +1701,8 @@ button:disabled {
   font-weight: 850;
 }
 
-.thin-join-card input,
-.thin-join-card textarea {
+.join-client-card input,
+.join-client-card textarea {
   width: 100%;
   border: 1px solid rgba(174, 191, 202, 0.18);
   border-radius: 9px;
@@ -1824,7 +1824,7 @@ button:disabled {
   line-height: 1.3;
 }
 
-.thin-join-card .compact-invite-input,
+.join-client-card .compact-invite-input,
 .join-dialog .compact-invite-input {
   min-height: 46px;
   max-height: 58px;
@@ -1889,32 +1889,32 @@ button:disabled {
   font-size: 0.7rem;
 }
 
-.thin-join-character {
+.join-client-character {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba(174, 191, 202, 0.14);
 }
 
-.thin-join-two {
+.join-client-two {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.thin-join-actions {
+.join-client-actions {
   display: flex;
   gap: 8px;
   margin-top: 12px;
 }
 
-.thin-join-actions button {
+.join-client-actions button {
   min-height: 34px;
   padding: 0 12px;
   border-radius: 8px;
   font-weight: 850;
 }
 
-.thin-join-status {
+.join-client-status {
   margin: 10px 0 0;
   color: #b7c7cf;
   font-size: 0.76rem;
@@ -3282,7 +3282,13 @@ textarea::placeholder {
 @media (max-width: 1280px) {
   .campaign-wizard-layout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto minmax(360px, 1fr);
+    align-items: start;
     overflow: auto;
+  }
+
+  .campaign-wizard-layout > .campaign-wizard-section {
+    overflow: visible;
   }
 
   .additional-characters-section {
@@ -3420,11 +3426,11 @@ textarea::placeholder {
   box-shadow: 0 0 0 2px rgba(125, 213, 201, 0.12), 0 0 24px rgba(125, 213, 201, 0.16);
 }
 
-.thin-lorekeeper-mode .campaign-section {
+.lorekeeper-join-mode .campaign-section {
   border-color: rgba(180, 128, 230, 0.28);
 }
 
-.thin-lorekeeper-mode .provider-activity::before {
+.lorekeeper-join-mode .provider-activity::before {
   background: #b98cff;
 }
 
@@ -3602,7 +3608,7 @@ textarea::placeholder {
   }
 
   .home-flow-grid,
-  .thin-join-two {
+  .join-client-two {
     grid-template-columns: 1fr;
   }
 

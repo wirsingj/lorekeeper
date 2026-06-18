@@ -1183,6 +1183,9 @@ async function buildDiagnosticsBundle() {
   const logFiles = [
     "launcher.log",
     "electron.log",
+    "launcher-join.log",
+    "electron-join.log",
+    // Legacy names from the pre-LoreKeeper Join client builds.
     "launcher-thin.log",
     "electron-thin.log",
   ];
