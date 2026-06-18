@@ -38,7 +38,7 @@ import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
-import { buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "../app/table-action-controller.js";
+import { buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "../app/table-action-controller.js";
 import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "../app/table-background-polling-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
 import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "../app/table-opening-controller.js";
@@ -2550,6 +2550,28 @@ function testTableActionProjection() {
   const busyNudgeGate = buildNudgeDmCommandGate({ isHost: true, turnProjection: { hasActiveGeneration: true } });
   assert.equal(busyNudgeGate.blocked, true);
   assert.equal(busyNudgeGate.reason, "busy");
+  const preOpeningCompanionNudgeGate = buildAiCompanionNudgeGate({
+    isHost: true,
+    readyForOpening: true,
+    companionName: "Mira",
+  });
+  assert.equal(preOpeningCompanionNudgeGate.blocked, true);
+  assert.equal(preOpeningCompanionNudgeGate.reason, "opening_not_started");
+  assert.match(preOpeningCompanionNudgeGate.activityText, /Start Adventure/);
+  const wrongCombatCompanionNudgeGate = buildAiCompanionNudgeGate({
+    isHost: true,
+    readyForOpening: false,
+    inCombat: true,
+    isActiveCombatTurn: false,
+    companionName: "Mira",
+  });
+  assert.equal(wrongCombatCompanionNudgeGate.blocked, true);
+  assert.equal(wrongCombatCompanionNudgeGate.reason, "combat_wrong_turn");
+  const readyCompanionNudgeGate = buildAiCompanionNudgeGate({
+    isHost: true,
+    readyForOpening: false,
+  });
+  assert.equal(readyCompanionNudgeGate.blocked, false);
 
   assert.equal(buildStartAdventureCommandGate({
     isHost: true,

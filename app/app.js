@@ -51,7 +51,7 @@ import {
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
-import { applyTableActionProjection, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
+import { applyTableActionProjection, buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
 import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "./table-background-polling-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
 import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
@@ -1101,14 +1101,19 @@ async function startAdventureOpening() {
 }
 
 async function nudgeAiPartyMember(member) {
-  if (!member?.id || clientMode || isRemoteTableClient()) {
-    return { providerReceived: false, reason: "unavailable" };
+  const inCombat = Boolean(state.campaign?.combat?.inCombat);
+  const gate = buildAiCompanionNudgeGate({
+    isHost: Boolean(member?.id && !clientMode && !isRemoteTableClient()),
+    readyForOpening: isCampaignReadyForOpening(),
+    inCombat,
+    isActiveCombatTurn: isActiveAiCompanionCombatTurn(member),
+    companionName: member?.name || "This companion",
+  });
+  if (gate.blocked) {
+    setProviderActivity(gate.activityText, gate.activityState);
+    return { providerReceived: false, reason: gate.reason };
   }
   if (state.campaign?.combat?.inCombat) {
-    if (!isActiveAiCompanionCombatTurn(member)) {
-      setProviderActivity(`${member.name} can be nudged for RP after combat, or on their own combat turn.`, "waiting");
-      return { providerReceived: false, reason: "combat" };
-    }
     const prompt = buildAiCompanionCombatNudgePrompt(member);
     setProviderActivity(`Prompting ${member.name} for a companion combat suggestion...`, "working");
     return submitPlayerTurnFromInput(prompt, {
@@ -9645,6 +9650,13 @@ function partyControllerActions(member, pendingConnection = null) {
     });
   }
   if (kind === "ai_companion") {
+    const nudgeGate = buildAiCompanionNudgeGate({
+      isHost: !clientMode && !isRemoteTableClient(),
+      readyForOpening: isCampaignReadyForOpening(),
+      inCombat: Boolean(state.campaign?.combat?.inCombat),
+      isActiveCombatTurn: isActiveAiCompanionCombatTurn(member),
+      companionName: member.name || "This companion",
+    });
     actions.push({
       label: "Invite",
       title: `Invite a friend to play ${member.name}`,
@@ -9652,8 +9664,9 @@ function partyControllerActions(member, pendingConnection = null) {
     });
     actions.push({
       label: "Nudge",
-      title: `Nudge ${member.name} for a brief AI companion RP contribution`,
+      title: nudgeGate.title,
       className: "nudge-action",
+      disabled: nudgeGate.blocked,
       onClick: () => nudgeAiPartyMember(member),
     });
     return actions;
@@ -10537,9 +10550,13 @@ function recordElement({ title, body, badge, actions = [], onEdit }) {
       button.type = "button";
       button.textContent = action.label;
       button.title = action.title || action.label;
+      button.disabled = Boolean(action.disabled);
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (action.disabled) {
+          return;
+        }
         action.onClick();
       });
       actionRow.append(button);

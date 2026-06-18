@@ -114,6 +114,48 @@ export function buildNudgeDmCommandGate({
   return { blocked: false };
 }
 
+export function buildAiCompanionNudgeGate({
+  isHost = true,
+  readyForOpening = false,
+  inCombat = false,
+  isActiveCombatTurn = false,
+  companionName = "This companion",
+} = {}) {
+  if (!isHost) {
+    return {
+      blocked: true,
+      reason: "guest_mode",
+      activityText: "Only the host can nudge AI companions",
+      activityState: "waiting",
+      title: "Only the host can nudge AI companions",
+    };
+  }
+  if (readyForOpening) {
+    return {
+      blocked: true,
+      reason: "opening_not_started",
+      activityText: "Start Adventure before nudging AI companions.",
+      activityState: "waiting",
+      title: "Start Adventure before nudging AI companions",
+    };
+  }
+  if (inCombat && !isActiveCombatTurn) {
+    return {
+      blocked: true,
+      reason: "combat_wrong_turn",
+      activityText: `${companionName} can be nudged for RP after combat, or on their own combat turn.`,
+      activityState: "waiting",
+      title: `${companionName} can be nudged on their own combat turn`,
+    };
+  }
+  return {
+    blocked: false,
+    title: inCombat
+      ? `Nudge ${companionName} for a companion combat suggestion`
+      : `Nudge ${companionName} for a brief AI companion RP contribution`,
+  };
+}
+
 export function buildStartAdventureCommandGate({
   isHost = true,
   readyForOpening = false,

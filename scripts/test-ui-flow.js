@@ -272,6 +272,32 @@ const scenarios = [
     },
   },
   {
+    name: "pre-opening-ai-companion-nudge-disabled",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Pre Opening Nudge",
+        premise: "A half-buried shrine waits beside an empty road before the first scene begins.",
+        startingLocation: "Old Shrine Road",
+        tone: "quiet roadside mystery",
+        primary: {
+          name: "Rowan",
+          ancestry: "Elf",
+          characterClass: "Ranger",
+          concept: "A host-controlled archer who watches the road.",
+        },
+        companions: [{
+          name: "Mira",
+          ancestry: "Elf",
+          characterClass: "Ranger",
+          concept: "An AI companion scout who waits for the table to begin.",
+          controllerKind: "ai_companion",
+        }],
+      });
+      await assertPreOpeningAiCompanionNudgeDisabled(harness, "Mira");
+    },
+  },
+  {
     name: "rp-post-narration-import",
     run: async (harness) => {
       await harness.gotoHome();
@@ -1193,6 +1219,7 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
     return window.__lorekeeperDebug?.stateSummary?.().campaignTitle === title;
   }, `Chaos Table ${runIndex}`, { timeout: 10000 });
   await assertHealthyUi(harness, `chaos ${runIndex}: campaign created`);
+  await assertFirstPreOpeningAiCompanionNudgeDisabled(harness);
 
   await exerciseTableChrome(harness, rng, runIndex);
   await exerciseRecords(harness, rng, runIndex);
@@ -1430,6 +1457,36 @@ async function assertHealthyUi(harness, label) {
     const activeActor = await page.locator("#combat-active-actor").textContent().catch(() => "");
     assert.ok(activeActor?.trim(), `${label} should render an active combat actor`);
   }
+}
+
+async function assertFirstPreOpeningAiCompanionNudgeDisabled(harness) {
+  const campaign = await harness.fetchJson("/api/campaign");
+  const companion = campaign?.campaign?.party?.find((member) => member.controllerKind === "ai_companion");
+  if (!companion?.name) {
+    return;
+  }
+  await assertPreOpeningAiCompanionNudgeDisabled(harness, companion.name);
+}
+
+async function assertPreOpeningAiCompanionNudgeDisabled(harness, companionName) {
+  const page = harness.page;
+  const button = page
+    .locator(".record")
+    .filter({ hasText: companionName })
+    .locator("button", { hasText: "Nudge" })
+    .first();
+  await button.waitFor({ state: "visible", timeout: 10000 });
+  assert.equal(await button.isDisabled(), true, `${companionName} Nudge should be disabled before Start Adventure`);
+  assert.match(await button.getAttribute("title") ?? "", /Start Adventure/i);
+  await button.evaluate((element) => element.click());
+  await page.waitForTimeout(500);
+  const snapshot = await page.evaluate(() => ({
+    renderer: window.__lorekeeperDebug?.renderer?.(),
+    stateSummary: window.__lorekeeperDebug?.stateSummary?.(),
+  }));
+  assert.equal(snapshot.stateSummary?.activeGeneration, false, "disabled pre-opening companion nudge should not start generation");
+  assert.notEqual(snapshot.stateSummary?.tablePhase, "recovery", "disabled pre-opening companion nudge should not trigger recovery");
+  assert.doesNotMatch(snapshot.renderer?.providerActivity?.text ?? "", /spoke or acted|response review|table check/i);
 }
 
 async function commitPendingReviewIfAny(harness) {
