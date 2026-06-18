@@ -296,17 +296,18 @@ Risks:
 158. Combat tracker now has an active-turn cue that names who controls the turn, what the table should do next, and the active actor's current legal actions from app-owned combat rules, making combat visually and functionally less like ordinary roleplay.
 159. The manual copied-response fallback is now tucked behind a Copied DM Text disclosure with controller-owned copy/state, so DM Recovery leads with the table-check summary instead of a visible paste box.
 160. Inspecting a paused DM response now opens a focused DM Recovery settings surface instead of the broader Troubleshooting drawer, with `settings-surface-controller.js` owning the one-tab recovery mode and target panel filtering.
+161. Live playtest fixed two table-flow bugs: Table Talk now repaints from fresh multiplayer snapshots while the DM is thinking, and app-owned enemy turns only mark themselves handled after initiative actually leaves the enemy; enemy attack messages now read as short table narration instead of bare roll receipts.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
 2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, focused DM Recovery surface, host review summary, and copied-text fallback disclosure, but the underlying manual review textarea still exists as a rare fallback.
-4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
+4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, combat nudges are active-turn-only suggestions, and app-owned enemy turns now guard against stuck initiative after resolution, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
-8. Table Talk has a subtle unread cue, but should still be checked during two-machine play.
+8. Table Talk has a subtle unread cue and now refreshes during active DM generation, but should still be checked during two-machine play.
 9. Provider narration can still restate the player's action or lean on option panels too much in real-model soak, though the contract now has stronger narration-first instructions.
 10. Failed staged inputs now remain visible and can be dropped by the host, but broader retry/cleanup guidance still needs real-session polish.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
@@ -329,14 +330,14 @@ Risks:
 
 | Table expectation | Status | Notes |
 | --- | --- | --- |
-| Player can tell whose turn it is. | Improved | Combat tracker and input placeholder cover basic cases. Long encounters need richer context. |
+| Player can tell whose turn it is. | Improved | Combat tracker, input placeholder, active-turn cue, and stuck-enemy guard cover basic cases. Long encounters need richer context. |
 | Player can tell who controls each character. | Improved | Badges/actions exist. Language still needs user testing. |
 | DM does not speak for controlled PCs. | Improved | Prompt, context, renderer recovery, suppression, and obvious output validation help. Needs broader scenario fixtures. |
 | AI companions feel like party members. | Improved | Nudge flow, creation defaults, table-shaped Stage/Pass/Resolve Now language, and idle rarity/cooldown policy help. Combat-turn approval still needs polish. |
 | DM can address party or specific party members. | Improved | Choice metadata supports party, character, subset, vote, and combat actor. Remote vote counters, tie language, and host draft action exist. |
 | Guest players know whether input was sent/waiting/resolved. | Improved | Host/guest wording, message lifecycle, and faster waiting-room visibility are covered by tests/static guards. Needs two-machine soak. |
 | Combat has one row per combatant. | Fixed | Grouped enemy expansion exists. |
-| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. Common app-owned combat actions now have fixtures. Richer spell/effect rules and live-play polish are still open. |
+| Combat rolls and HP changes are visible. | Improved | Mechanics rendering exists. Common app-owned combat actions now have fixtures, and enemy attack messages now include a short narration beat. Richer spell/effect rules and live-play polish are still open. |
 | DM can continue scenes without forcing options. | Improved | Prompt/choice suppression and rich full-turn fixtures now cover social, travel, mystery, downtime, combat, and recovery. Needs real-model soak for repeated turns. |
 | DM has story beyond current scene. | Improved | Hidden arcs exist, are private, and have non-leakage fixtures. Still needs pacing/adaptation scenario testing over longer sessions. |
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split. Player Notes are now campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
@@ -527,6 +528,7 @@ Risks:
 - [ ] Consider context-sensitive note sections or tabs after playtest.
 - [x] Persist Player Notes to campaign SQLite or an explicit per-user notes store before relying on them for long campaigns.
 - [x] Make Table Talk harder to miss without making it noisy.
+- [x] Refresh Table Talk during active DM generation so side chat does not wait for the DM turn to finish.
 - [x] Keep the left rail stable when party cards and combat rows have long names/actions.
 
 ### Storage, Diagnostics, And Safety

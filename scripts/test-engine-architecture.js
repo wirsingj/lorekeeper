@@ -805,9 +805,16 @@ function testCombatEngine() {
   assert.equal(controllerChange.data.combatActionLog[0].actorId, "miner");
   assert.equal(controllerChange.data.diceLog.length >= 1, true);
   assert.equal(controllerChange.data.stateEffectLog.length >= 1, true);
+  assert.equal(controllerChange.data.currentTurnId, "thor");
+  assert.equal(controllerChange.data.turnResolved, true);
+  assert.equal(controllerChange.data.advanceTurn, true);
+  assert.equal(controllerChange.data.resolvedActorId, "miner");
+  const canonicalEnemyTurn = applyCanonicalChanges(enemyTurnCampaign, [controllerChange]);
+  assert.equal(canonicalEnemyTurn.campaign.combat.currentTurnId, "thor", "canonical app-owned enemy turn import should not leave initiative stuck on the enemy");
   const controllerMessage = combatResolutionMessage(controllerResolved);
   assert.equal(controllerMessage.role, "dm");
   assert.equal(controllerMessage.data.kind, "combat_engine_resolution");
+  assert.match(controllerMessage.body, /Drunk miner lunges at Thor/);
 
   const surrenderCampaign = startCombat(campaignFixture(), {
     enemies: [{ id: "miner", name: "Drunk miner", hp: { current: 12, max: 12 }, armorClass: 10 }],
@@ -3134,7 +3141,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Start Adventure must remain host-controlled");
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");
   assert.match(appJs, /const multiplayerPollIntervalMs = 1000/, "host guest-request polling should feel live");
-  assert.match(appJs, /hasActiveGeneration\(\)[\s\S]*refreshMultiplayerSnapshot\(\{ quiet: true \}\)[\s\S]*renderTableActions\(\)/, "waiting guest cues should refresh through the table action projection even while the DM is generating");
+  assert.match(appJs, /hasActiveGeneration\(\)[\s\S]*refreshMultiplayerSnapshot\(\{ quiet: true \}\)[\s\S]*renderTableTalk\(\)[\s\S]*renderTableActions\(\)/, "waiting guest cues and table talk should refresh even while the DM is generating");
+  assert.match(appJs, /snapshotTalk\.length > campaignTalk\.length/, "table talk rendering should prefer fresher multiplayer snapshots over stale campaign chat while generation is active");
+  assert.match(appJs, /activeAfterCommit[\s\S]*activeAfterCommit !== current\.id/, "enemy auto-turns should only be marked handled after initiative leaves that enemy");
   assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);
   assert.match(appJs, /wizardControllerSheetFields/);
   assert.match(appJs, /inviteIntent:\s*"remote_player"/);

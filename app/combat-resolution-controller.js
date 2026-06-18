@@ -19,7 +19,12 @@ export function engineCombatResolutionChange(previousCampaign, resolution, optio
     visibility: "player_visible",
     summary: options.summary || resolution.actionRecord?.summary || "Combat turn resolved by LoreKeeper.",
     data: {
-      ...(nextCampaign.combat ?? {}),
+      inCombat: nextCampaign.combat?.inCombat ?? previousCampaign?.combat?.inCombat ?? true,
+      currentTurnId: nextCampaign.combat?.currentTurnId ?? null,
+      round: nextCampaign.combat?.round ?? previousCampaign?.combat?.round ?? 1,
+      turnResolved: true,
+      advanceTurn: true,
+      resolvedActorId: resolution.actionRecord?.actorId ?? previousCampaign?.combat?.currentTurnId ?? null,
       actorUpdates: changedPartyActorUpdates(previousCampaign, nextCampaign),
       combatActionLog: [resolution.actionRecord].filter(Boolean),
       diceLog: resolution.actionRecord?.rolls ?? [],
@@ -35,7 +40,7 @@ export function combatResolutionMessage(resolution) {
   return {
     role: "dm",
     title: "DM",
-    body: resolution.actionRecord.narration,
+    body: narrationForCombatResolution(resolution),
     source: "combat_engine",
     meta: "Mechanics resolved by LoreKeeper.",
     data: {
@@ -44,6 +49,37 @@ export function combatResolutionMessage(resolution) {
       nextActorId: resolution.nextActorId,
     },
   };
+}
+
+function narrationForCombatResolution(resolution) {
+  const action = resolution?.actionRecord ?? {};
+  const baseNarration = action.narration || "The combat turn resolves.";
+  if (action.actionType !== "attack") {
+    return baseNarration;
+  }
+  const attackRoll = (action.rolls ?? []).find((roll) => roll.label === "Attack roll");
+  const damageRoll = (action.rolls ?? []).find((roll) => /damage/i.test(roll.label ?? ""));
+  const targetName = targetNameFromAction(action);
+  if (!attackRoll) {
+    return baseNarration;
+  }
+  const hit = Boolean(damageRoll);
+  const actorName = action.actorName || actorNameFromNarration(baseNarration) || "The enemy";
+  const opening = `${actorName} lunges at ${targetName}`;
+  return hit
+    ? `${opening}, landing the blow for ${damageRoll.breakdown || `${damageRoll.total} damage`}.`
+    : `${opening}, but the attack misses.`;
+}
+
+function targetNameFromAction(action) {
+  const narration = action.narration || "";
+  const match = /\battacks\s+(.+?)\.\s+Attack\b/i.exec(narration);
+  return match?.[1]?.trim() || "the target";
+}
+
+function actorNameFromNarration(narration) {
+  const match = /^(.+?)\s+attacks\b/i.exec(narration || "");
+  return match?.[1]?.trim() || "";
 }
 
 function changedPartyActorUpdates(previousCampaign, nextCampaign) {

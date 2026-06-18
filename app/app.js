@@ -2047,6 +2047,7 @@ function startMultiplayerPolling() {
       if (hasActiveGeneration()) {
         if (!guestWaitingRoomMode && state.campaign?.multiplayer?.localTable?.running) {
           await refreshMultiplayerSnapshot({ quiet: true });
+          renderTableTalk();
           renderTableActions();
           announceWaitingGuestsIfNeeded();
         }
@@ -2117,8 +2118,14 @@ async function maybeAutoResolveEnemyCombatTurn() {
     });
     if (result?.applied?.length) {
       await appendPlayMessage(combatResolutionMessage(resolution));
-      state.lastAutoResolvedEnemyKey = turnKey;
-      setProviderActivity("Enemy turn resolved", "idle");
+      const activeAfterCommit = state.campaign?.combat?.currentTurnId ?? null;
+      if (!state.campaign?.combat?.inCombat || (activeAfterCommit && activeAfterCommit !== current.id)) {
+        state.lastAutoResolvedEnemyKey = turnKey;
+        setProviderActivity("Enemy turn resolved", "idle");
+      } else {
+        state.lastAutoResolvedEnemyKey = "";
+        setProviderActivity(`${current.name}'s turn needs review; initiative did not advance`, "waiting");
+      }
     }
   } catch (error) {
     pushDiagnosticsEvent("enemy_turn_resolution_failed", {
@@ -10358,7 +10365,14 @@ function currentTableTalkMessages() {
   if (state.guestSnapshot) {
     return state.guestSnapshot.tableState?.tableTalk ?? state.guestSnapshot.tableTalk ?? [];
   }
-  return state.campaign?.multiplayer?.tableTalk ?? state.multiplayerSnapshot?.tableTalk ?? [];
+  const snapshotTalk = state.multiplayerSnapshot?.tableTalk ?? [];
+  const campaignTalk = state.campaign?.multiplayer?.tableTalk ?? [];
+  if (!campaignTalk.length || snapshotTalk.length > campaignTalk.length) {
+    return snapshotTalk;
+  }
+  const snapshotLatest = snapshotTalk.at(-1)?.createdAt ?? "";
+  const campaignLatest = campaignTalk.at(-1)?.createdAt ?? "";
+  return snapshotLatest > campaignLatest ? snapshotTalk : campaignTalk;
 }
 
 function renderContextPack(contextPack) {
