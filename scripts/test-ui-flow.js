@@ -36,6 +36,10 @@ const scenarios = [
       await harness.gotoHome();
       await expectVisibleText(harness.page, "Start Playing");
       await expectVisibleText(harness.page, "New Adventure");
+      await expectHomeLibraryText(harness.page, "No saved adventures yet");
+      await assertNoVisibleText(harness.page, "Untitled Campaign");
+      assert.equal(await harness.page.locator("#home-host-flow").isDisabled(), true);
+      assert.equal(await harness.page.locator("#home-delete-campaign").isDisabled(), true);
       await assertRendererHarness(harness.page);
       await assertTraceRecords(harness, "/api/diagnostics");
     },
@@ -224,6 +228,37 @@ const scenarios = [
       await expectVisibleText(harness.page, "Orrin");
       const campaign = await harness.fetchJson("/api/campaign");
       assert.ok(campaign.campaign.party.some((member) => member.name === "Orrin"), "new party member should persist");
+    },
+  },
+  {
+    name: "home-delete-campaign",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Delete From Home",
+        premise: "A short-lived table created only to prove library deletion.",
+        startingLocation: "Temporary Camp",
+        tone: "brief practical fantasy",
+        primary: {
+          name: "Dara",
+          ancestry: "Human",
+          characterClass: "Fighter",
+          concept: "A steady adventurer who knows when a test is over.",
+        },
+      });
+      await harness.page.click("#return-main-menu");
+      await expectHomeCampaignOption(harness.page, "Harness Delete From Home");
+      assert.equal(await harness.page.locator("#home-delete-campaign").isDisabled(), false);
+      await harness.page.click("#home-delete-campaign");
+      await harness.page.locator("#delete-campaign-dialog").waitFor({ state: "visible", timeout: 10000 });
+      await expectVisibleText(harness.page, "Delete Harness Delete From Home");
+      await harness.page.click("#confirm-delete-campaign");
+      await harness.page.waitForFunction(() => document.querySelector("#delete-campaign-dialog")?.open !== true, null, { timeout: 10000 });
+      await expectHomeLibraryText(harness.page, "No saved adventures yet");
+      await assertNoVisibleText(harness.page, "Harness Delete From Home");
+      await assertNoVisibleText(harness.page, "Untitled Campaign");
+      assert.equal(await harness.page.locator("#home-host-flow").isDisabled(), true);
+      assert.equal(await harness.page.locator("#home-delete-campaign").isDisabled(), true);
     },
   },
   {
@@ -1787,6 +1822,22 @@ async function assertTraceRecords(harness, path) {
 
 async function expectVisibleText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({ state: "visible", timeout: 10000 });
+}
+
+async function assertNoVisibleText(page, text) {
+  assert.equal(await page.getByText(text, { exact: false }).first().isVisible().catch(() => false), false);
+}
+
+async function expectHomeLibraryText(page, text) {
+  await page.locator("#home-active-campaign").waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForFunction((expected) => document.querySelector("#home-active-campaign")?.textContent?.includes(expected), text, { timeout: 10000 });
+}
+
+async function expectHomeCampaignOption(page, text) {
+  await page.locator("#home-campaign-select").waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForFunction((expected) => {
+    return [...document.querySelector("#home-campaign-select")?.options ?? []].some((option) => option.textContent?.includes(expected));
+  }, text, { timeout: 10000 });
 }
 
 async function waitForProviderActivityText(page, pattern, timeoutMs = 10000) {

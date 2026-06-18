@@ -127,6 +127,7 @@ export function LorekeeperShell() {
                   </label>
                   <div className="home-flow-actions">
                     <button id="home-host-flow" type="button">Continue</button>
+                    <button id="home-delete-campaign" className="secondary-action danger-action" type="button">Delete</button>
                   </div>
                 </article>
                 <article className="home-flow-card home-flow-card-compact home-flow-card-new">

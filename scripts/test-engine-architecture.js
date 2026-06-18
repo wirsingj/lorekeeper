@@ -3423,8 +3423,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /guest-seat-list/);
   assert.match(appShell, /Ask To Join/);
   assert.match(appShell, /home-campaign-select/);
+  assert.match(appShell, /home-delete-campaign/);
   assert.match(appShell, /home-flow-card-new/, "New Adventure should be its own front-door card, not a secondary continue action");
   assert.match(appShell, /Start New/);
+  assert.match(appShell, />Delete</, "front door should allow deleting saved adventures");
   assert.match(styles, /\.home-flow-card-new/);
   assert.match(appShell, /Saved adventure/);
   assert.ok(

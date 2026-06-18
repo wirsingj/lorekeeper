@@ -215,6 +215,7 @@ const state = {
   playerNotesCampaignId: "",
   playerNotesSaveTimer: null,
   homeFlow: clientMode ? "join" : "",
+  pendingDeleteCampaign: null,
   campaignWizardReturnHome: false,
   campaignWizardCreating: false,
   launchInviteError: "",
@@ -289,6 +290,7 @@ const elements = {
   homeNewCampaign: document.querySelector("#home-new-campaign"),
   homeSettings: document.querySelector("#home-settings"),
   homeCampaignSelect: document.querySelector("#home-campaign-select"),
+  homeDeleteCampaign: document.querySelector("#home-delete-campaign"),
   homeActiveCampaign: document.querySelector("#home-active-campaign"),
   homeCharacterCount: document.querySelector("#home-character-count"),
   providerActivity: document.querySelector("#provider-activity"),
@@ -560,6 +562,14 @@ elements.copyProviderPrompt.addEventListener("click", async () => {
 
 elements.homeHostFlow?.addEventListener("click", async () => {
   await openSelectedHomeCampaign();
+});
+
+elements.homeCampaignSelect?.addEventListener("change", () => {
+  updateHomeDeleteButton();
+});
+
+elements.homeDeleteCampaign?.addEventListener("click", () => {
+  openDeleteCampaignDialog(selectedHomeCampaign());
 });
 
 elements.homeJoinFlow?.addEventListener("click", () => {
@@ -1024,10 +1034,12 @@ elements.confirmForm.addEventListener("submit", (event) => {
 });
 
 elements.closeDeleteCampaignDialog.addEventListener("click", () => {
+  state.pendingDeleteCampaign = null;
   elements.deleteCampaignDialog.close();
 });
 
 elements.cancelDeleteCampaign.addEventListener("click", () => {
+  state.pendingDeleteCampaign = null;
   elements.deleteCampaignDialog.close();
 });
 
@@ -6644,7 +6656,7 @@ function openLocalTableSeating() {
 async function openSelectedHomeCampaign() {
   const sqlitePath = String(elements.homeCampaignSelect?.value || "").trim();
   if (!sqlitePath) {
-    setProviderActivity("Choose a campaign to continue, or start a new table.", "waiting");
+    setProviderActivity("Start a new adventure to create your first saved table.", "waiting");
     return;
   }
   state.homeFlow = "host";
@@ -6663,6 +6675,17 @@ function chooseHomeFlow(flow) {
     return;
   }
   setProviderActivity("Host ready.", "idle");
+}
+
+function visibleCampaigns() {
+  return (state.campaigns ?? []).filter((campaign) => !isBackendStarterCampaign(campaign));
+}
+
+function isBackendStarterCampaign(campaign = {}) {
+  const title = String(campaign.title || "").trim();
+  const summary = String(campaign.summary || "").trim();
+  return /^Untitled Campaign(?: \d+)?$/i.test(title)
+    && summary === "A new D&D 5e-lite campaign ready to grow through play.";
 }
 
 async function returnToMainMenu() {
@@ -6716,10 +6739,10 @@ function renderHomePanel() {
   renderLobbyChrome({ homeVisible: show });
 
   if (elements.homeActiveCampaign) {
-    const campaignCount = state.campaigns?.length ?? 0;
+    const campaignCount = visibleCampaigns().length;
     elements.homeActiveCampaign.textContent = campaignCount
-      ? `${campaignCount} local ${campaignCount === 1 ? "campaign" : "campaigns"}`
-      : "No local campaigns yet";
+      ? `${campaignCount} saved ${campaignCount === 1 ? "adventure" : "adventures"}`
+      : "No saved adventures yet";
   }
 
   if (elements.homeCharacterCount) {
@@ -6733,18 +6756,19 @@ function renderHomeCampaignPicker() {
   if (!elements.homeCampaignSelect) {
     return;
   }
-  const campaigns = state.campaigns ?? [];
+  const campaigns = visibleCampaigns();
   if (!campaigns.length) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "No local campaigns yet";
+    option.textContent = "No saved adventures yet";
     option.selected = true;
     elements.homeCampaignSelect.replaceChildren(option);
     elements.homeCampaignSelect.disabled = true;
     if (elements.homeHostFlow) {
       elements.homeHostFlow.disabled = true;
-      elements.homeHostFlow.title = "Create a campaign first.";
+      elements.homeHostFlow.title = "Start a new adventure first.";
     }
+    updateHomeDeleteButton();
     return;
   }
   elements.homeCampaignSelect.disabled = false;
@@ -6761,6 +6785,26 @@ function renderHomeCampaignPicker() {
     elements.homeHostFlow.disabled = false;
     elements.homeHostFlow.title = "Open the selected campaign as host.";
   }
+  updateHomeDeleteButton();
+}
+
+function selectedHomeCampaign() {
+  const sqlitePath = String(elements.homeCampaignSelect?.value || "").trim();
+  if (!sqlitePath) {
+    return null;
+  }
+  return visibleCampaigns().find((campaign) => campaign.sqlitePath === sqlitePath) ?? null;
+}
+
+function updateHomeDeleteButton() {
+  if (!elements.homeDeleteCampaign) {
+    return;
+  }
+  const selected = selectedHomeCampaign();
+  elements.homeDeleteCampaign.disabled = !selected;
+  elements.homeDeleteCampaign.title = selected
+    ? "Delete the selected saved adventure."
+    : "No saved adventure to delete.";
 }
 
 function renderLobbyChrome({ homeVisible = null, joinVisible = null } = {}) {
@@ -6942,8 +6986,8 @@ function renderJoinClientPanel() {
 }
 
 function renderCampaignSelector() {
-  const campaigns = state.campaigns ?? [];
-  elements.deleteCampaign.disabled = !state.sqlitePath || !state.campaign?.title;
+  const campaigns = visibleCampaigns();
+  elements.deleteCampaign.disabled = !state.sqlitePath || !state.campaign?.title || isBackendStarterCampaign(state.campaign);
 
   if (clientMode || isRemoteTableClient()) {
     const option = document.createElement("option");
@@ -6960,13 +7004,16 @@ function renderCampaignSelector() {
 
   if (!campaigns.length) {
     const option = document.createElement("option");
-    option.value = state.sqlitePath ?? "";
-    option.textContent = state.campaign?.title ?? "No campaigns found";
+    option.value = "";
+    option.textContent = "No saved adventures yet";
     option.selected = true;
     elements.campaignSelect.replaceChildren(option, newCampaignOption());
+    elements.campaignSelect.disabled = true;
+    elements.deleteCampaign.disabled = true;
     return;
   }
 
+  elements.campaignSelect.disabled = false;
   elements.campaignSelect.replaceChildren(
     ...campaigns.map((campaign) => {
       const option = document.createElement("option");
@@ -6986,21 +7033,37 @@ function newCampaignOption() {
   return option;
 }
 
-function openDeleteCampaignDialog() {
-  if (!state.sqlitePath || !state.campaign?.title) {
-    elements.bridgeStatus.textContent = "No active campaign file to delete";
+function openDeleteCampaignDialog(target = activeCampaignDeleteTarget()) {
+  if (!target?.sqlitePath || !target?.title) {
+    elements.bridgeStatus.textContent = "No saved adventure to delete";
     return;
   }
 
-  elements.deleteCampaignTitle.textContent = `Delete ${state.campaign.title}`;
+  state.pendingDeleteCampaign = target;
+  elements.deleteCampaignTitle.textContent = `Delete ${target.title}`;
   elements.deleteCampaignMessage.textContent =
-    `This will remove "${state.campaign.title}" from LoreKeeper and move its SQLite files into the local deleted-campaigns folder for manual recovery.`;
+    `This will remove "${target.title}" from LoreKeeper and move its SQLite files into the local deleted-campaigns folder for manual recovery.`;
   elements.confirmDeleteCampaign.disabled = false;
   elements.deleteCampaignDialog.showModal();
   elements.confirmDeleteCampaign.focus();
 }
 
+function activeCampaignDeleteTarget() {
+  if (!state.sqlitePath || !state.campaign?.title || isBackendStarterCampaign(state.campaign)) {
+    return null;
+  }
+  return {
+    sqlitePath: state.sqlitePath,
+    title: state.campaign.title,
+  };
+}
+
 async function deleteActiveCampaign() {
+  const target = state.pendingDeleteCampaign ?? activeCampaignDeleteTarget();
+  if (!target?.sqlitePath || !target?.title) {
+    elements.bridgeStatus.textContent = "No saved adventure to delete";
+    return;
+  }
   try {
     elements.bridgeStatus.textContent = "Deleting campaign...";
     const response = await fetch(apiDeleteCampaignUrl, {
@@ -7009,8 +7072,8 @@ async function deleteActiveCampaign() {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        sqlitePath: state.sqlitePath,
-        campaignTitle: state.campaign.title,
+        sqlitePath: target.sqlitePath,
+        campaignTitle: target.title,
       }),
     });
 
@@ -7019,13 +7082,14 @@ async function deleteActiveCampaign() {
     }
 
     const payload = await response.json();
+    state.pendingDeleteCampaign = null;
     setCampaignFromPayload(payload, "campaign_deleted_context");
     seedPlayLog();
     render();
     elements.deleteCampaignDialog.close();
     elements.bridgeStatus.textContent = payload.deletedCampaignBackup?.directory
-      ? "Campaign removed; local backup kept"
-      : "Campaign removed";
+      ? "Adventure removed; local backup kept"
+      : "Adventure removed";
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `Delete failed: ${error.message}` : "Delete failed";
   }

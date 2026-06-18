@@ -1564,6 +1564,7 @@ button:disabled {
 .home-flow-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
@@ -3043,6 +3044,11 @@ textarea::placeholder {
   color: #cbd6db;
   font-size: 0.78rem;
   font-weight: 850;
+}
+
+.home-flow-actions .danger-action {
+  min-height: 36px;
+  padding: 0 12px;
 }
 
 .manual-response-fallback-hint {
