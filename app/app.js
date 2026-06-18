@@ -16,6 +16,7 @@ import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
+import { buildCampaignAdoptionPlan } from "./campaign-adoption-controller.js";
 import { createImplicitCombatAdvanceChange, createImplicitCombatEnemySyncChange, createImplicitCombatStartChange } from "./combat-import-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "./combat-prompt-repair-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
@@ -41,6 +42,7 @@ import { createImplicitSceneProgressChange } from "./scene-import-controller.js"
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { applyTableActionProjection, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
+import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "./table-background-polling-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
 import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
@@ -2048,31 +2050,42 @@ async function bootRemoteClientMode() {
 function startMultiplayerPolling() {
   window.setInterval(async () => {
     try {
-      if (hasActiveGeneration()) {
-        if (!guestWaitingRoomMode && state.campaign?.multiplayer?.localTable?.running) {
-          await refreshMultiplayerSnapshot({ quiet: true });
-          renderTableTalk();
-          renderTableActions();
-          announceWaitingGuestsIfNeeded();
-        }
+      const pollingPlan = buildMultiplayerPollingPlan({
+        activeGeneration: hasActiveGeneration(),
+        guestWaitingRoomMode,
+        localTableRunning: state.campaign?.multiplayer?.localTable?.running,
+        guestHostBaseUrl: state.guestSession?.hostBaseUrl,
+        guestConnectionId: state.guestSession?.connectionId,
+        waitingRoomGuestId: state.waitingRoomSession?.waitingGuestId,
+        campaignWizardCreating: state.campaignWizardCreating,
+      });
+
+      if (pollingPlan.action === multiplayerPollingActions.REFRESH_HOST_SNAPSHOT_DURING_GENERATION) {
+        await refreshMultiplayerSnapshot({ quiet: true });
+        renderTableTalk();
+        renderTableActions();
+        announceWaitingGuestsIfNeeded();
         return;
       }
-      if (state.guestSession?.hostBaseUrl && state.guestSession?.connectionId) {
+      if (pollingPlan.action === multiplayerPollingActions.IDLE_DURING_GENERATION) {
+        return;
+      }
+      if (pollingPlan.action === multiplayerPollingActions.REFRESH_GUEST_SNAPSHOT) {
         await refreshGuestSnapshot({ explicit: false });
         return;
       }
-      if (guestWaitingRoomMode && state.waitingRoomSession?.waitingGuestId) {
+      if (pollingPlan.action === multiplayerPollingActions.REFRESH_WAITING_ROOM_STATUS) {
         await refreshWaitingRoomStatus({ explicit: false });
         return;
       }
-      if (guestWaitingRoomMode) {
+      if (pollingPlan.action === multiplayerPollingActions.REFRESH_GUEST_LOBBY_PREVIEW) {
         await refreshGuestLobbyPreview({ quiet: true }).catch(() => {});
         return;
       }
-      if (state.campaignWizardCreating) {
+      if (pollingPlan.action === multiplayerPollingActions.IDLE_CAMPAIGN_WIZARD_CREATING) {
         return;
       }
-      if (state.campaign?.multiplayer?.localTable?.running) {
+      if (pollingPlan.action === multiplayerPollingActions.POLL_LOCAL_TABLE) {
         const response = await fetch(apiCampaignUrl, { cache: "no-store" });
         if (!response.ok) {
           return;
@@ -5635,13 +5648,17 @@ function setCampaignFromPayload(payload, contextPurpose) {
   });
   state.prompt = "";
   state.reviewBatch = null;
-  const campaignChanged = previousCampaignId && previousCampaignId !== state.campaign.id;
-  const initialLoad = !previousCampaignId;
-  if (initialLoad || campaignChanged) {
+  const adoptionPlan = buildCampaignAdoptionPlan({
+    previousCampaignId,
+    nextCampaignId: state.campaign?.id,
+  });
+  if (adoptionPlan.resetTurnCarryover) {
     resetTurnCarryover();
   }
-  if (campaignChanged) {
-    state.turnFlow.reset({ reason: "campaign_changed" });
+  if (adoptionPlan.resetTurnFlow) {
+    state.turnFlow.reset({ reason: adoptionPlan.turnFlowResetReason });
+  }
+  if (adoptionPlan.resetPlayLogLimit) {
     state.playLogVisibleLimit = defaultPlayLogVisibleLimit;
   }
   scheduleAutoResolveGuestInputs(contextPurpose);

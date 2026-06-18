@@ -272,6 +272,7 @@ Start here when making changes:
 - Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`
 - Character creation/autocomplete: `app/character-autocomplete-controller.js`
 - Local multiplayer: `src/multiplayer/local-table.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`
+- Renderer campaign adoption/background polling policy: `app/campaign-adoption-controller.js`, `app/table-background-polling-controller.js`
 - Combat: `src/engine/combat-engine.js`, `src/rules/combat-turns.js`, `app/combat-resolution-controller.js`
 - Provider contract/agency: `src/model-contract/turn-json-contract.js`
 - SQLite: `src/storage/sqlite-store.js`, `src/storage/sqlite-schema.sql`, `src/storage/sqlite-migrations.js`

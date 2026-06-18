@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { buildCampaignAdoptionPlan } from "../app/campaign-adoption-controller.js";
 import { buildStagedInputRecoveryPlan, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { buildProviderTaskRequest, acceptProviderResponseForTurn } from "../src/engine/provider-orchestrator.js";
 import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
@@ -246,7 +247,11 @@ function testProviderAndTableSessionIsolationHelpers() {
 
 async function testRendererWiringForCampaignSwitchAndRetryBubble() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
-  assert.match(appJs, /state\.turnFlow\.reset\(\{\s*reason:\s*"campaign_changed"\s*\}\)/);
+  assert.match(appJs, /buildCampaignAdoptionPlan/, "campaign switch reset policy should be extracted from renderer glue");
+  const switchPlan = buildCampaignAdoptionPlan({ previousCampaignId: "old", nextCampaignId: "new" });
+  assert.equal(switchPlan.resetTurnCarryover, true);
+  assert.equal(switchPlan.resetTurnFlow, true);
+  assert.equal(switchPlan.turnFlowResetReason, "campaign_changed");
   assert.match(appJs, /markRepairTurnRetrying/, "Try Again should update the original player bubble first");
   assert.match(appJs, /updatePlayerTurnEchoLifecycle\(retryMessage\.id/, "Try Again should settle the same player bubble after retry");
 }

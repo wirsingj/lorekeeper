@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-utils.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
+import { buildCampaignAdoptionPlan } from "../app/campaign-adoption-controller.js";
 import {
   createImplicitCombatAdvanceChange,
   createImplicitCombatEnemySyncChange,
@@ -30,6 +31,7 @@ import { createImplicitSceneProgressChange } from "../app/scene-import-controlle
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "../app/table-action-controller.js";
+import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "../app/table-background-polling-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
 import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "../app/table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
@@ -2121,6 +2123,73 @@ function testGuestAutoResolveController() {
   assert.match(group.activityText, /Guest actions received/);
 }
 
+function testCampaignAdoptionController() {
+  const initial = buildCampaignAdoptionPlan({ previousCampaignId: null, nextCampaignId: "campaign-1" });
+  assert.equal(initial.initialLoad, true);
+  assert.equal(initial.campaignChanged, false);
+  assert.equal(initial.resetTurnCarryover, true);
+  assert.equal(initial.resetTurnFlow, false);
+  assert.equal(initial.resetPlayLogLimit, false);
+
+  const same = buildCampaignAdoptionPlan({ previousCampaignId: "campaign-1", nextCampaignId: "campaign-1" });
+  assert.equal(same.initialLoad, false);
+  assert.equal(same.campaignChanged, false);
+  assert.equal(same.resetTurnCarryover, false);
+  assert.equal(same.resetTurnFlow, false);
+  assert.equal(same.resetPlayLogLimit, false);
+
+  const changed = buildCampaignAdoptionPlan({ previousCampaignId: "campaign-1", nextCampaignId: "campaign-2" });
+  assert.equal(changed.initialLoad, false);
+  assert.equal(changed.campaignChanged, true);
+  assert.equal(changed.resetTurnCarryover, true);
+  assert.equal(changed.resetTurnFlow, true);
+  assert.equal(changed.resetPlayLogLimit, true);
+  assert.equal(changed.turnFlowResetReason, "campaign_changed");
+
+  const empty = buildCampaignAdoptionPlan({ previousCampaignId: null, nextCampaignId: null });
+  assert.equal(empty.resetTurnCarryover, false);
+  assert.equal(empty.resetTurnFlow, false);
+}
+
+function testMultiplayerPollingController() {
+  assert.equal(buildMultiplayerPollingPlan({
+    activeGeneration: true,
+    localTableRunning: true,
+  }).action, multiplayerPollingActions.REFRESH_HOST_SNAPSHOT_DURING_GENERATION);
+
+  assert.equal(buildMultiplayerPollingPlan({
+    activeGeneration: true,
+    guestWaitingRoomMode: true,
+    localTableRunning: true,
+    waitingRoomGuestId: "waiting-1",
+  }).action, multiplayerPollingActions.IDLE_DURING_GENERATION);
+
+  assert.equal(buildMultiplayerPollingPlan({
+    guestHostBaseUrl: "http://127.0.0.1:4173",
+    guestConnectionId: "conn-1",
+  }).action, multiplayerPollingActions.REFRESH_GUEST_SNAPSHOT);
+
+  assert.equal(buildMultiplayerPollingPlan({
+    guestWaitingRoomMode: true,
+    waitingRoomGuestId: "waiting-1",
+  }).action, multiplayerPollingActions.REFRESH_WAITING_ROOM_STATUS);
+
+  assert.equal(buildMultiplayerPollingPlan({
+    guestWaitingRoomMode: true,
+  }).action, multiplayerPollingActions.REFRESH_GUEST_LOBBY_PREVIEW);
+
+  assert.equal(buildMultiplayerPollingPlan({
+    campaignWizardCreating: true,
+    localTableRunning: true,
+  }).action, multiplayerPollingActions.IDLE_CAMPAIGN_WIZARD_CREATING);
+
+  assert.equal(buildMultiplayerPollingPlan({
+    localTableRunning: true,
+  }).action, multiplayerPollingActions.POLL_LOCAL_TABLE);
+
+  assert.equal(buildMultiplayerPollingPlan().action, multiplayerPollingActions.IDLE);
+}
+
 function testTurnSubmitGates() {
   const busyGate = buildTurnSubmitGate({
     turnProjection: { hasActiveGeneration: true },
@@ -3489,6 +3558,8 @@ testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();
 testGuestAutoResolveController();
+testCampaignAdoptionController();
+testMultiplayerPollingController();
 testTurnSubmitGates();
 testTableStatusVocabulary();
 testTableSessionEnginePhases();
