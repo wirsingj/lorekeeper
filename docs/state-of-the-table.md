@@ -304,7 +304,8 @@ Risks:
 166. Start Adventure now disappears after the host requests the opening narration for the current table session, while a fresh re-hosted local table session can show it again if the campaign is still pre-opening.
 167. Opening narration now gives the model explicit neutral-presence examples for controlled party members, and DM Recovery summarizes agency blocks as table language instead of exposing raw `table[n]` validator diagnostics.
 168. Current-schema campaign SQLite files now repair a missing `errors` diagnostics table before server diagnostics read recent errors; older local files with current metadata but missing the table no longer stay in a half-current state.
-169. Internal observability harnesses now cover bounded/redacted trace logs, hidden server diagnostics trace endpoints, provider prompt/response lifecycle events, a SQLite diagnostics inspector, a hidden renderer debug hook, and an opt-in Playwright UI smoke script without adding player-facing chrome.
+169. Internal observability harnesses now cover bounded/redacted trace logs, hidden server diagnostics trace endpoints, provider prompt/response lifecycle events, a SQLite diagnostics inspector, a hidden renderer debug hook, and an opt-in Playwright UI scenario script without adding player-facing chrome.
+170. The Playwright harness now runs hidden UI scenario permutations for home load, pre-lobby Add Crew uniqueness, campaign creation, Start Adventure button hiding after use, and immediate Table Talk posting; failures capture screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`.
 
 ### Still Risky
 
@@ -545,7 +546,7 @@ Risks:
 - [x] Errors table records provider/session diagnostics. Current state: diagnostics now repair current-schema files that claim to be up to date but are missing the `errors` table.
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
-- [x] Add internal trace/debug harnesses for API/provider/renderer/UI investigation. Current state: server diagnostics include an auth-protected trace ring, provider generation emits prompt/response lifecycle events, `inspect:diagnostics` reads campaign SQLite diagnostics, and `test:ui` is an opt-in Playwright smoke harness.
+- [x] Add internal trace/debug harnesses for API/provider/renderer/UI investigation. Current state: server diagnostics include an auth-protected trace ring, provider generation emits prompt/response lifecycle events, `inspect:diagnostics` reads campaign SQLite diagnostics, and `test:ui` is an opt-in Playwright scenario harness.
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [x] Add local asset and path traversal integration coverage for the server.

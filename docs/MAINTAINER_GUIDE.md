@@ -37,9 +37,10 @@ Internal harnesses:
 npm run inspect:diagnostics -- --limit 20
 npm run inspect:diagnostics -- --sqlite data/campaigns/ruined-shrine-628.lorekeeper.sqlite --limit 20
 npm run test:ui
+npm run test:ui -- --scenario table-talk-posts-immediately
 ```
 
-`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. These are hidden/internal harnesses for maintainers and agents; do not turn them into visible player controls.
+`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. It runs scenario permutations for home load, pre-lobby party setup, campaign creation, Start Adventure visibility, and Table Talk posting. Failures write screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`. These are hidden/internal harnesses for maintainers and agents; do not turn them into visible player controls.
 
 Desktop:
 
@@ -68,7 +69,7 @@ npm run cleanup
 - Copyable debug summary: `src/engine/table-debug-snapshot.js`
 - Internal trace helper: `src/observability/trace-log.js`
 - Diagnostics inspector: `scripts/inspect-diagnostics.js`
-- UI flow smoke harness: `scripts/test-ui-flow.js`
+- UI flow scenario harness: `scripts/test-ui-flow.js`
 - Living world continuity: `src/engine/living-world-engine.js`, `docs/living-world.md`
 - Turn lifecycle: `src/engine/turn-engine.js`, `app/turn-flow-runtime.js`
 - Provider orchestration: `src/engine/provider-orchestrator.js`, `src/ai/provider-service.js`
@@ -128,6 +129,15 @@ npm run inspect:diagnostics -- --limit 20
 ```
 
 Use this to inspect the active campaign SQLite for recent errors, provider runs/events, and recent messages without opening the app.
+
+UI scenario inspection:
+
+```powershell
+npm run test:ui
+npm run test:ui -- --scenario create-campaign-and-hide-start-adventure-after-use
+```
+
+The Playwright harness starts its own temporary server and campaign directory. It mocks provider generation only inside scenarios that need deterministic DM output.
 
 ## Debugging Owners
 

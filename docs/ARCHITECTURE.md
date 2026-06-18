@@ -53,7 +53,7 @@ Tests:
 - `scripts/test-server-security.js` and `scripts/test-server-integration.js` cover route exposure and real HTTP mutation behavior.
 - `scripts/test-high-risk-regressions.js` is the small fast pack for scary changes: provider rejection, stale guest identity, controlled-PC agency, combat narration-only advancement, staged input preservation, campaign switch wiring, and delete recycling.
 - `scripts/test-observability.js` covers the internal trace ring, redaction, bounded retention, and error serialization.
-- `scripts/test-ui-flow.js` is an opt-in Playwright smoke harness for hidden UI automation/introspection; it is not part of shipped player UI and is not in `test:all`.
+- `scripts/test-ui-flow.js` is an opt-in Playwright scenario harness for hidden UI automation/introspection; it is not part of shipped player UI and is not in `test:all`.
 
 ## Identity And Authority
 
