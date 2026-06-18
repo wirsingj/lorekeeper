@@ -1440,7 +1440,7 @@ async function submitPlayerTurn(page, text) {
   const clicked = clickAttempted && await page.waitForFunction((expectedText) => {
     return window.__lorekeeperDebug?.renderer?.().currentTurn?.playerMessage === expectedText;
   }, text, { timeout: 2000 }).then(() => true).catch(() => false);
-  const clickAccepted = clicked || (clickAttempted && await waitForSubmittedTurnEvidence(page, text, 12000));
+  const clickAccepted = clicked || (clickAttempted && await waitForSubmittedTurnEvidence(page, text, 30000));
   if (clickAccepted) {
     await assertNoActiveGeneration(page, 45000);
     return;

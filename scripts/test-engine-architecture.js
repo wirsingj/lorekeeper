@@ -18,6 +18,7 @@ import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomAdventureSeedPreset } from "../app/adventure-seed-presets.js";
 import { buildDmNudgePrompt } from "../app/dm-nudge-controller.js";
+import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "../app/guest-auto-resolve-controller.js";
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
@@ -2071,6 +2072,55 @@ function testInputComposerProjection() {
   assert.match(remoteStaged.placeholder, /remote action is staged/i);
 }
 
+function testGuestAutoResolveController() {
+  const campaign = {
+    multiplayer: {
+      localTable: { running: true },
+      settings: {
+        requireGuestActionApproval: false,
+        holdGuestActionsForGroupInput: false,
+      },
+    },
+  };
+  const stagedInputs = [{ id: "input-1", characterName: "Renn", text: "Renn checks the road.", ready: true }];
+
+  assert.equal(shouldScheduleGuestAutoResolve(), true);
+  assert.equal(shouldScheduleGuestAutoResolve({ clientMode: true }), false);
+  assert.equal(shouldScheduleGuestAutoResolve({ hasGuestHostBaseUrl: true }), false);
+  assert.equal(shouldScheduleGuestAutoResolve({ campaignWizardCreating: true }), false);
+
+  const ready = buildGuestAutoResolvePlan({ campaign, stagedInputs });
+  assert.equal(ready.shouldResolve, true);
+  assert.equal(ready.reason, "ready");
+  assert.match(ready.activityText, /Renn sent an action/);
+  assert.deepEqual(ready.inputs, stagedInputs);
+
+  assert.equal(buildGuestAutoResolvePlan({ campaign: null, stagedInputs }).reason, "local_table_not_running");
+  assert.equal(buildGuestAutoResolvePlan({ campaign, campaignWizardCreating: true, stagedInputs }).reason, "campaign_wizard_creating");
+  assert.equal(buildGuestAutoResolvePlan({
+    campaign: { multiplayer: { localTable: { running: true }, settings: { requireGuestActionApproval: true } } },
+    stagedInputs,
+  }).reason, "approval_required");
+  assert.equal(buildGuestAutoResolvePlan({
+    campaign: { multiplayer: { localTable: { running: true }, settings: { holdGuestActionsForGroupInput: true } } },
+    stagedInputs,
+  }).reason, "group_input_hold");
+  assert.equal(buildGuestAutoResolvePlan({ campaign, autoResolvingGuestInputs: true, stagedInputs }).reason, "already_resolving");
+  assert.equal(buildGuestAutoResolvePlan({ campaign, turnFlowBlocksNewTurn: true, stagedInputs }).reason, "turn_flow_busy");
+  assert.equal(buildGuestAutoResolvePlan({ campaign, hostDraftText: "Host is typing", stagedInputs }).reason, "host_draft_present");
+  assert.equal(buildGuestAutoResolvePlan({ campaign, stagedInputs: [] }).reason, "no_staged_inputs");
+
+  const group = buildGuestAutoResolvePlan({
+    campaign,
+    stagedInputs: [
+      { id: "input-1", characterName: "Renn", text: "Renn checks the road." },
+      { id: "input-2", characterName: "Mira", text: "Mira keeps watch." },
+    ],
+  });
+  assert.equal(group.shouldResolve, true);
+  assert.match(group.activityText, /Guest actions received/);
+}
+
 function testTurnSubmitGates() {
   const busyGate = buildTurnSubmitGate({
     turnProjection: { hasActiveGeneration: true },
@@ -3438,6 +3488,7 @@ testProviderChatProjection();
 testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();
+testGuestAutoResolveController();
 testTurnSubmitGates();
 testTableStatusVocabulary();
 testTableSessionEnginePhases();

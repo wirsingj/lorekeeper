@@ -23,6 +23,7 @@ import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyComb
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
 import { randomAdventureSeedPreset } from "./adventure-seed-presets.js";
 import { buildDmNudgePrompt } from "./dm-nudge-controller.js";
+import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "./guest-auto-resolve-controller.js";
 import {
   applyManualResponseFallbackProjection,
   buildHostResponseReviewProjection,
@@ -4276,7 +4277,11 @@ async function resolvePendingInputsWithText(inputs, aggregateText) {
 }
 
 function scheduleAutoResolveGuestInputs(reason = "snapshot") {
-  if (clientMode || state.guestSession?.hostBaseUrl || state.campaignWizardCreating) {
+  if (!shouldScheduleGuestAutoResolve({
+    clientMode,
+    hasGuestHostBaseUrl: Boolean(state.guestSession?.hostBaseUrl),
+    campaignWizardCreating: state.campaignWizardCreating,
+  })) {
     return;
   }
   if (state.autoResolveGuestInputsTimer) {
@@ -4289,22 +4294,19 @@ function scheduleAutoResolveGuestInputs(reason = "snapshot") {
 }
 
 async function maybeAutoResolveGuestInputs(reason = "snapshot") {
-  if (!shouldAutoResolveGuestInputs()) {
-    return;
-  }
-  const inputs = collectStagedRemoteInputs();
-  if (!inputs.length) {
+  const plan = guestAutoResolvePlan();
+  if (!plan.shouldResolve) {
     return;
   }
   state.autoResolvingGuestInputs = true;
   try {
     pushDiagnosticsEvent("guest_inputs_auto_resolving", {
       reason,
-      inputIds: inputs.map((input) => input.id),
+      inputIds: plan.inputs.map((input) => input.id),
       combatActorId: state.campaign?.combat?.currentTurnId ?? null,
     });
-    setProviderActivity(inputs.length === 1 ? `${inputs[0].characterName} sent an action; resolving...` : "Guest actions received; resolving...", "working");
-    await resolvePendingInputsWithText(inputs, "");
+    setProviderActivity(plan.activityText, "working");
+    await resolvePendingInputsWithText(plan.inputs, "");
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Guest action queued: ${error.message}` : "Guest action queued", "waiting");
   } finally {
@@ -4313,25 +4315,18 @@ async function maybeAutoResolveGuestInputs(reason = "snapshot") {
 }
 
 function shouldAutoResolveGuestInputs() {
-  if (state.campaignWizardCreating) {
-    return false;
-  }
-  if (!state.campaign?.multiplayer?.localTable?.running) {
-    return false;
-  }
-  if (state.campaign.multiplayer?.settings?.requireGuestActionApproval) {
-    return false;
-  }
-  if (state.campaign.multiplayer?.settings?.holdGuestActionsForGroupInput) {
-    return false;
-  }
-  if (state.autoResolvingGuestInputs || turnFlowBlocksNewTurn()) {
-    return false;
-  }
-  if (elements.playerInput?.value?.trim()) {
-    return false;
-  }
-  return collectStagedRemoteInputs().length > 0;
+  return guestAutoResolvePlan().shouldResolve;
+}
+
+function guestAutoResolvePlan() {
+  return buildGuestAutoResolvePlan({
+    campaign: state.campaign,
+    campaignWizardCreating: state.campaignWizardCreating,
+    autoResolvingGuestInputs: state.autoResolvingGuestInputs,
+    turnFlowBlocksNewTurn: turnFlowBlocksNewTurn(),
+    hostDraftText: elements.playerInput?.value ?? "",
+    stagedInputs: collectStagedRemoteInputs(),
+  });
 }
 
 function earliestGuestInputForImmediateResolution(inputs) {

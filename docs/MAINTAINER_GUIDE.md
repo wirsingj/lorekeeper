@@ -80,6 +80,7 @@ npm run cleanup
 - Provider contract/agency: `src/model-contract/turn-json-contract.js`
 - Combat authority: `src/engine/combat-engine.js`, `src/rules/combat-turns.js`
 - Multiplayer authority: `src/multiplayer/local-table.js`
+- Guest auto-resolution policy: `app/guest-auto-resolve-controller.js`
 - SQLite/repository: `src/storage/sqlite-store.js`, `src/storage/campaign-repository.js`, `src/storage/sqlite-migrations.js`
 - Recovery/import projections: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
 - Play log projection: `app/play-log-controller.js`
