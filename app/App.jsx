@@ -170,6 +170,9 @@ export function LorekeeperShell() {
               <button id="seat-waiting-guest" className="mini-action" type="button" title="Open seating controls" hidden>
                 Seat Guest
               </button>
+              <button id="start-adventure-opening" className="mini-action start-adventure-action" type="button" title="Begin the first DM narration" hidden>
+                Start Adventure
+              </button>
             </div>
           </div>
           <section id="thin-join-panel" className="thin-join-panel" hidden>

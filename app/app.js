@@ -270,6 +270,7 @@ const elements = {
   repairInspect: document.querySelector("#repair-inspect"),
   repairImportAnyway: document.querySelector("#repair-import-anyway"),
   seatWaitingGuest: document.querySelector("#seat-waiting-guest"),
+  startAdventureOpening: document.querySelector("#start-adventure-opening"),
   saveStatus: document.querySelector("#save-status"),
   returnMainMenu: document.querySelector("#return-main-menu"),
   openSetup: document.querySelector("#open-setup"),
@@ -702,6 +703,10 @@ elements.seatWaitingGuest?.addEventListener("click", () => {
   openLocalTableSeating();
 });
 
+elements.startAdventureOpening?.addEventListener("click", async () => {
+  await startAdventureOpening();
+});
+
 elements.providerMode.addEventListener("change", async () => {
   await saveProviderSettingsFromControls();
 });
@@ -1032,6 +1037,34 @@ async function nudgeDm() {
   });
 }
 
+async function startAdventureOpening() {
+  if (clientMode || isRemoteTableClient()) {
+    setProviderActivity("Only the host can start the adventure", "waiting");
+    return { providerReceived: false, reason: "guest_mode" };
+  }
+  if (!isCampaignReadyForOpening()) {
+    setProviderActivity("The adventure has already started. Use Nudge when the DM needs to continue.", "idle");
+    return { providerReceived: false, reason: "already_started" };
+  }
+  if (hasActiveGeneration()) {
+    setProviderActivity("DM is already starting the adventure", "waiting");
+    return { providerReceived: false, reason: "busy" };
+  }
+
+  pushDiagnosticsEvent("opening_start_requested", {
+    campaignId: state.campaign?.id,
+    scene: state.campaign?.scene,
+    partyCount: state.campaign?.party?.length ?? 0,
+  });
+  setProviderActivity("Starting the adventure...", "working");
+  return submitPlayerTurnFromInput(buildAdventureOpeningPrompt(), {
+    skipPlayerEcho: true,
+    skipPartySeed: true,
+    skipChoiceExpansion: true,
+    preserveInput: true,
+  });
+}
+
 function buildDmNudgePrompt() {
   return [
     "(DM nudge: Continue from the current SQLite campaign state without inventing a player action.",
@@ -1043,6 +1076,20 @@ function buildDmNudgePrompt() {
     "If combat.inCombat and the current initiative actor is an enemy/DM actor, do not invent HP/resource/initiative changes; LoreKeeper resolves enemy mechanics before narration.",
     "If combat/enemies look stale or mismatched with the current scene, propose a compact combat update to clear or correct them.",
     "Do not repeat this instruction in the table narration.)",
+  ].join(" ");
+}
+
+function buildAdventureOpeningPrompt() {
+  return [
+    "(Opening narration: Begin the first session from the current SQLite campaign state.",
+    "This is not a player action. Do not invent a player choice before play begins.",
+    "Deliver a strong tabletop opening like a real D&D first scene: 4-7 paragraphs, sensory detail, clear location, present party, tone, immediate pressure, and why action matters now.",
+    "Use the campaign premise, starting place, party members, party integrations, hidden goal horizon, living-world memory, and current scene facts.",
+    "Do not speak, think, move, scan, ready weapons, or make tactical choices for host-controlled, remote-controlled, or unassigned party members.",
+    "AI companions may have tiny presence only if generation.companionInterjectionPolicy allows it, and never as the main decision-maker.",
+    "End with one direct table-facing prompt or immediate situation the players can respond to.",
+    "Prefer choices.options: [] unless the opening begins in combat or immediate danger truly requires structured options.",
+    "Do not repeat these instructions in the table narration.)",
   ].join(" ");
 }
 
@@ -2824,7 +2871,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
         remoteInviteLobby.copied ? "idle" : "waiting",
       );
     } else {
-      setProviderActivity("Table ready. Use Nudge to have the DM frame the opening moment.", "idle");
+      setProviderActivity("Table ready. Invite friends or press Start Adventure when everyone is seated.", "idle");
     }
   } catch (error) {
     render();
@@ -4639,7 +4686,7 @@ function buildOpeningSceneSummary({ premise, startingLocation, character, starti
     premise
       ? `Premise: ${premise}`
       : "",
-    "Next: click Nudge to ask the DM for the opening moment, or type the first player action below.",
+    "Next: invite anyone else you want at the table, then press Start Adventure for the opening DM narration.",
   ].filter(Boolean);
 
   return details.join("\n\n");
@@ -6427,6 +6474,7 @@ function render() {
   renderDebugMetaControl();
   renderMultiplayerPanel();
   renderWaitingGuestCue();
+  updateStartAdventureOpeningControl();
 }
 
 function renderWaitingGuestCue() {
@@ -6449,6 +6497,30 @@ function renderWaitingGuestCue() {
   elements.seatWaitingGuest.title = waitingGuests.length === 1
     ? `${firstGuest.displayName || "A guest"} is waiting for a character seat`
     : `${waitingGuests.length} guests are waiting for character seats`;
+}
+
+function isCampaignReadyForOpening(campaign = state.campaign) {
+  if (!campaign || clientMode || isRemoteTableClient()) {
+    return false;
+  }
+  if (campaign.scene?.status !== "campaign_start") {
+    return false;
+  }
+  const storedMessages = campaign.sessionLog?.messages ?? [];
+  return !storedMessages.some((message) => ["dm", "player", "party", "npc"].includes(message.role));
+}
+
+function updateStartAdventureOpeningControl() {
+  if (!elements.startAdventureOpening) {
+    return;
+  }
+  const projection = turnProjection();
+  const visible = isCampaignReadyForOpening() && !projection.hasRepair;
+  elements.startAdventureOpening.hidden = !visible;
+  elements.startAdventureOpening.disabled = !visible || projection.hasActiveGeneration;
+  elements.startAdventureOpening.title = projection.hasActiveGeneration
+    ? "The DM is already starting the adventure"
+    : "Begin the opening DM narration";
 }
 
 function announceWaitingGuestsIfNeeded() {
@@ -8309,6 +8381,7 @@ function setProviderActivity(message, status = "idle") {
     });
   }
   updateTurnRepairControls();
+  updateStartAdventureOpeningControl();
 }
 
 function updateNudgeAvailability() {
