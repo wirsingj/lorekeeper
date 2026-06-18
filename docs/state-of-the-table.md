@@ -305,7 +305,7 @@ Risks:
 167. Opening narration now gives the model explicit neutral-presence examples for controlled party members, and DM Recovery summarizes agency blocks as table language instead of exposing raw `table[n]` validator diagnostics.
 168. Current-schema campaign SQLite files now repair a missing `errors` diagnostics table before server diagnostics read recent errors; older local files with current metadata but missing the table no longer stay in a half-current state.
 169. Internal observability harnesses now cover bounded/redacted trace logs, hidden server diagnostics trace endpoints, provider prompt/response lifecycle events, a SQLite diagnostics inspector, a hidden renderer debug hook, and an opt-in Playwright UI scenario script without adding player-facing chrome.
-170. The Playwright harness now runs hidden UI scenario permutations for home load, pre-lobby Add Crew uniqueness, campaign creation, Start Adventure button hiding after use, and immediate Table Talk posting; failures capture screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`.
+170. The Playwright harness now runs ten hidden UI scenario permutations for home load, context-aware settings tabs, pre-lobby Add Crew uniqueness, binder party creation, campaign creation, RP posts, choice drafting, real Ollama contract parsing on a quick installed model, combat turn flow, Start Adventure button hiding after use, and immediate Table Talk posting; failures capture screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`.
 
 ### Still Risky
 

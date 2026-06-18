@@ -40,7 +40,7 @@ npm run test:ui
 npm run test:ui -- --scenario table-talk-posts-immediately
 ```
 
-`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. It runs scenario permutations for home load, pre-lobby party setup, campaign creation, Start Adventure visibility, and Table Talk posting. Failures write screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`. These are hidden/internal harnesses for maintainers and agents; do not turn them into visible player controls.
+`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. It runs ten scenario permutations covering home load, settings tabs, pre-lobby party setup, binder party creation, campaign creation, RP posts, choice buttons, real Ollama contract parsing on a quick installed model, combat turn flow, Start Adventure visibility, and Table Talk posting. Failures write screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`. These are hidden/internal harnesses for maintainers and agents; do not turn them into visible player controls.
 
 Desktop:
 
@@ -137,7 +137,7 @@ npm run test:ui
 npm run test:ui -- --scenario create-campaign-and-hide-start-adventure-after-use
 ```
 
-The Playwright harness starts its own temporary server and campaign directory. It mocks provider generation only inside scenarios that need deterministic DM output.
+The Playwright harness starts its own temporary server and campaign directory. It mocks provider generation inside scenarios that need deterministic DM output, and keeps one real Ollama provider-contract scenario to catch parser drift against an installed quick model.
 
 ## Debugging Owners
 

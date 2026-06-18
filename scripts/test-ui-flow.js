@@ -63,6 +63,72 @@ const scenarios = [
     },
   },
   {
+    name: "settings-navigation-and-diagnostics",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await harness.page.click("#home-settings");
+      await harness.page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.locator("[data-settings-panel='app']").first().waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.click("#close-setup");
+      await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
+      await harness.page.click("#home-provider-setup");
+      await harness.page.locator("[data-settings-panel='ai']").first().waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.click("#close-setup");
+      await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
+
+      await createCampaignFromWizard(harness, {
+        title: "Harness Settings",
+        premise: "A group gathers in a rain-warm inn before choosing the next road.",
+        startingLocation: "The Copper Eave",
+        tone: "quiet table setup",
+        primary: {
+          name: "Perrin",
+          ancestry: "Human",
+          characterClass: "Bard",
+          concept: "A calm host who keeps everyone at the same table.",
+        },
+      });
+      await harness.page.click("#open-setup");
+      await harness.page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
+      for (const tab of ["friends", "troubleshooting"]) {
+        await harness.page.click(`[data-settings-tab="${tab}"]`);
+        await harness.page.locator(`[data-settings-panel="${tab}"]`).first().waitFor({ state: "visible", timeout: 10000 });
+      }
+      await harness.page.click("#refresh-diagnostics");
+      await expectVisibleText(harness.page, "Waiting For Player");
+      await harness.page.click("#close-setup");
+      await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
+    },
+  },
+  {
+    name: "record-dialog-add-party-member",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Binder Party",
+        premise: "A dockside crew prepares to search a lighthouse that answers questions in thunder.",
+        startingLocation: "Saltglass Docks",
+        tone: "stormy pulp fantasy",
+        primary: {
+          name: "Cass",
+          ancestry: "Human",
+          characterClass: "Rogue",
+          concept: "A lockpicker with a conscience and a bad history with lighthouses.",
+        },
+      });
+      await harness.page.click("[data-add-domain='party']");
+      await harness.page.locator("#record-dialog").waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.fill("#record-name", "Orrin");
+      await harness.page.fill("#record-role", "Dwarf Cleric");
+      await harness.page.fill("#record-notes", "Orrin keeps the crew patched up and distrusts talking architecture.");
+      await harness.page.click("#save-record");
+      await harness.page.waitForFunction(() => document.querySelector("#record-dialog")?.open !== true, null, { timeout: 10000 });
+      await expectVisibleText(harness.page, "Orrin");
+      const campaign = await harness.fetchJson("/api/campaign");
+      assert.ok(campaign.campaign.party.some((member) => member.name === "Orrin"), "new party member should persist");
+    },
+  },
+  {
     name: "create-campaign-and-hide-start-adventure-after-use",
     run: async (harness) => {
       await harness.gotoHome();
@@ -90,7 +156,10 @@ const scenarios = [
       assertUniqueNames(campaign.campaign.party, "name", "campaign party");
       assert.equal(campaign.campaign.party.length, 2);
 
-      await harness.mockProviderTurn("The watchtower bell rings once, then every candle in Mossbridge bends toward the hill.");
+      await harness.mockProviderTurn(turnResponse({
+        text: "The watchtower bell rings once, then every candle in Mossbridge bends toward the hill.",
+        sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+      }));
       await harness.page.locator("#start-adventure-opening").waitFor({ state: "visible", timeout: 10000 });
       await harness.page.click("#start-adventure-opening");
       await harness.page.waitForFunction(() => {
@@ -103,6 +172,163 @@ const scenarios = [
       const summary = await harness.page.evaluate(() => window.__lorekeeperDebug.stateSummary());
       assert.equal(summary.activeGeneration, false);
       await expectVisibleText(harness.page, "watchtower bell rings");
+    },
+  },
+  {
+    name: "rp-post-narration-import",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness RP Post",
+        premise: "A shrine market goes silent whenever anyone says the missing saint's name.",
+        startingLocation: "Saint Orra's Market",
+        tone: "curious folkloric fantasy",
+        primary: {
+          name: "Vey",
+          ancestry: "Tiefling",
+          characterClass: "Warlock",
+          concept: "A careful occultist who asks polite questions of dangerous things.",
+        },
+      });
+      await harness.mockProviderTurn(turnResponse({
+        text: "The spice seller lowers her voice. Around Vey, the market keeps moving, but every bell charm above the stalls turns inward as if listening.",
+        sceneStatus: { mode: "social", danger: "tense", awaitingPlayer: true },
+      }));
+      await submitPlayerTurn(harness.page, "I ask the spice seller who last spoke the saint's name.");
+      await expectVisibleText(harness.page, "spice seller lowers her voice");
+      await expectVisibleText(harness.page, "I ask the spice seller");
+      await assertNoActiveGeneration(harness.page);
+    },
+  },
+  {
+    name: "rp-choice-option-drafts-input",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness RP Choices",
+        premise: "A river gate will open for one promise and close forever for another.",
+        startingLocation: "The River Gate",
+        tone: "mythic negotiation",
+        primary: {
+          name: "Elian",
+          ancestry: "Elf",
+          characterClass: "Paladin",
+          concept: "A patient oathkeeper who listens before drawing steel.",
+        },
+      });
+      await harness.mockProviderTurn(turnResponse({
+        text: "The gate's carved face asks what Elian will promise before it lets the party through.",
+        sceneStatus: { mode: "social", danger: "tense", awaitingPlayer: true },
+        choices: {
+          prompt: "What promise does Elian offer?",
+          scope: "character",
+          forActorId: "party-elian",
+          forActor: "Elian",
+          options: [
+            { id: "A", actorId: "party-elian", actor: "Elian", text: "Promise to return with the river's stolen bell." },
+            { id: "B", actorId: "party-elian", actor: "Elian", text: "Promise to guard the crossing for one night." },
+          ],
+          allowOther: true,
+        },
+      }));
+      await submitPlayerTurn(harness.page, "I ask what price the gate demands.");
+      await harness.page.locator(".choice-option").first().waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.locator(".choice-option").first().click();
+      await harness.page.waitForFunction(() => document.querySelector("#player-input")?.value.includes("stolen bell"), null, { timeout: 10000 });
+    },
+  },
+  {
+    name: "ollama-provider-contract-smoke",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Ollama Contract",
+        premise: "A lantern keeper hears one knock from inside an empty tower.",
+        startingLocation: "Hollow Lantern Tower",
+        tone: "concise eerie fantasy",
+        primary: {
+          name: "Lio",
+          ancestry: "Human",
+          characterClass: "Ranger",
+          concept: "A quiet scout who tests danger with careful questions.",
+        },
+      });
+      const status = await harness.fetchJson("/api/provider/status");
+      const model = chooseFastOllamaModel(status);
+      if (!model) {
+        console.log("SKIP ollama-provider-contract-smoke (no running Ollama quick model found)");
+        return;
+      }
+      await harness.fetchJson("/api/provider/settings", {
+        method: "POST",
+        body: {
+          preferredProvider: "ollama",
+          selectedModel: model,
+          fastMode: true,
+          outputLimit: 260,
+          generationTimeoutMs: 45_000,
+        },
+      });
+      const rpResult = await runProviderContractTurn(harness, {
+        playerMessage: "I listen at the empty tower door.",
+      });
+      assert.equal(rpResult.parseError || "", "", "real Ollama RP result should parse");
+      assert.ok(rpResult.structured?.table?.length, "real Ollama RP result should include table narration");
+
+      const combatResult = await runProviderContractTurn(harness, {
+        playerMessage: "I draw my bow and prepare for the thing behind the door.",
+      });
+      assert.equal(combatResult.parseError || "", "", "real Ollama combat-ish result should parse");
+      assert.ok(combatResult.structured?.table?.length, "real Ollama combat-ish result should include table narration");
+    },
+  },
+  {
+    name: "combat-player-and-enemy-turns",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Combat Turns",
+        premise: "Ash wolves test the edge of a lantern-lit bridge.",
+        startingLocation: "Lantern Bridge",
+        tone: "fast tactical fantasy",
+        primary: {
+          name: "Mira",
+          ancestry: "Human",
+          characterClass: "Fighter",
+          concept: "A spear fighter who keeps danger pointed at herself.",
+        },
+      });
+      await harness.mockProviderTurns([
+        combatStartResponse(),
+        turnResponse({
+          text: "Mira's spear snaps forward and drives the ash wolf back from the bridge rail.",
+          sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+          mechanics: [{ type: "attack", actor: "Mira", target: "Ash Wolf", roll: "d20+5 = 18 vs AC 13", damage: "1d8+3 = 8 piercing", outcome: "success", text: "Mira hits the Ash Wolf for 8 piercing damage." }],
+          proposedChanges: [combatChange({
+            id: "combat-mira-advance",
+            summary: "Mira's attack resolves and initiative advances.",
+            data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "party-mira" },
+          })],
+        }),
+        turnResponse({
+          text: "The ash wolf lunges low, jaws snapping against Mira's greave before it skids past her guard.",
+          sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+          mechanics: [{ type: "attack", actor: "Ash Wolf", target: "Mira", roll: "d20+4 = 11 vs AC 16", outcome: "failure", text: "Ash Wolf attacks Mira. Attack 11 vs AC 16: miss." }],
+          proposedChanges: [combatChange({
+            id: "combat-wolf-advance",
+            summary: "The Ash Wolf attack misses and initiative returns to Mira.",
+            data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: "enemy-ash-wolf" },
+          })],
+        }),
+      ]);
+      await submitPlayerTurn(harness.page, "I step between the courier and the ash wolf.");
+      await expectCombatActor(harness.page, "Mira");
+      await submitPlayerTurn(harness.page, "Mira attacks the ash wolf with her spear.");
+      await expectVisibleText(harness.page, "Mira hits the Ash Wolf");
+      await expectCombatActor(harness.page, "Ash Wolf");
+      await harness.page.click("#nudge-dm");
+      await expectVisibleText(harness.page, "Attack 11 vs AC 16: miss");
+      await expectCombatActor(harness.page, "Mira");
     },
   },
   {
@@ -212,21 +438,21 @@ async function runScenario(browserInstance, scenario) {
       async fetchJson(pathname, options = {}) {
         return fetchJson(`${baseUrl}${pathname}`, options);
       },
-      async mockProviderTurn(text) {
+      async mockProviderTurn(response) {
+        await this.mockProviderTurns([response]);
+      },
+      async mockProviderTurns(responses) {
+        const queue = [...responses];
         await page.route("**/api/provider/generate-turn", (route) => {
-          const response = {
-            table: [{
-              speaker: "DM",
-              speakerId: null,
-              role: "dm",
-              kind: "narration",
-              visibility: "table",
-              text,
-            }],
-            choices: [],
-            mechanics: [],
-            stateChanges: [],
-          };
+          const response = queue.shift();
+          if (!response) {
+            route.fulfill({
+              status: 500,
+              contentType: "text/plain",
+              body: "UI harness provider queue exhausted.",
+            });
+            return;
+          }
           const body = [
             { type: "start", model: "ui-harness" },
             {
@@ -255,7 +481,7 @@ async function runScenario(browserInstance, scenario) {
     await scenario.run(harness);
     await assertRendererHarness(page);
     assert.deepEqual(browserErrors, [], `${scenario.name} browser errors`);
-    console.log(`✓ ${scenario.name}`);
+    console.log(`PASS ${scenario.name}`);
   } catch (error) {
     if (page) {
       await writeFailureArtifacts({ scenarioName: scenario.name, page, baseUrl: page.url(), error });
@@ -353,6 +579,25 @@ async function assertNoDuplicateWizardCardNames(page) {
   assertUniqueStrings(names, "wizard character card names");
 }
 
+async function submitPlayerTurn(page, text) {
+  await page.locator("#player-input").waitFor({ state: "visible", timeout: 10000 });
+  await page.fill("#player-input", text);
+  await page.click("#build-turn");
+  await assertNoActiveGeneration(page);
+}
+
+async function assertNoActiveGeneration(page) {
+  await page.waitForFunction(() => {
+    return window.__lorekeeperDebug?.stateSummary?.().activeGeneration === false;
+  }, null, { timeout: 15000 });
+}
+
+async function expectCombatActor(page, actorName) {
+  await page.waitForFunction((name) => {
+    return document.querySelector("#combat-active-actor")?.textContent?.includes(name);
+  }, actorName, { timeout: 10000 });
+}
+
 async function assertRendererHarness(page) {
   const summary = await page.evaluate(() => window.__lorekeeperDebug?.stateSummary?.());
   assert.ok(summary, "internal renderer debug harness should be installed");
@@ -384,6 +629,159 @@ async function fetchJson(url, options = {}) {
     throw new Error(`${response.status}: ${await response.text()}`);
   }
   return response.json();
+}
+
+async function runProviderContractTurn(harness, body) {
+  const response = await fetch(`${harness.baseUrl}/api/provider/generate-turn`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lorekeeper-api-token": token,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`${response.status}: ${await response.text()}`);
+  }
+  let done = null;
+  for await (const event of readNdjsonResponse(response.body)) {
+    if (event.type === "error") {
+      throw new Error(event.error || "Provider returned an error event.");
+    }
+    if (event.type === "done") {
+      done = event.result;
+    }
+  }
+  assert.ok(done, "provider stream should finish with a done event");
+  return done;
+}
+
+async function* readNdjsonResponse(body) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex = buffer.indexOf("\n");
+      while (newlineIndex !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (line) {
+          yield JSON.parse(line);
+        }
+        newlineIndex = buffer.indexOf("\n");
+      }
+    }
+    const final = buffer.trim();
+    if (final) {
+      yield JSON.parse(final);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function chooseFastOllamaModel(status = {}) {
+  const models = status.providers?.ollama?.models ?? [];
+  if (!status.providers?.ollama?.running || !models.length) {
+    return "";
+  }
+  const installed = models.map((model) => model.name || model.model).filter(Boolean);
+  const normalized = new Map(installed.map((model) => [normalizeModelId(model), model]));
+  for (const candidate of ["llama3.2:3b", "llama3.1:8b", "mistral-nemo", "mistral-nemo:latest", "qwen3:14b"]) {
+    const match = normalized.get(normalizeModelId(candidate));
+    if (match) {
+      return match;
+    }
+  }
+  return installed[0] || "";
+}
+
+function normalizeModelId(value) {
+  return String(value ?? "").trim().replace(/:latest$/i, "").toLowerCase();
+}
+
+function turnResponse({
+  text,
+  sceneStatus = { mode: "exploration", danger: "tense", awaitingPlayer: true },
+  choices = { prompt: "", options: [], allowOther: true },
+  mechanics = [],
+  proposedChanges = [],
+  flags = {},
+} = {}) {
+  return {
+    schemaVersion: 1,
+    requestId: "ui-harness",
+    table: [{
+      speaker: "DM",
+      speakerId: null,
+      role: "dm",
+      kind: "narration",
+      visibility: "table",
+      text,
+    }],
+    sceneStatus,
+    choices: {
+      prompt: "",
+      scope: "free",
+      options: [],
+      allowOther: true,
+      ...choices,
+    },
+    mechanics,
+    flags: {
+      requiresReview: false,
+      startsCombat: false,
+      endsScene: false,
+      containsSecretInfo: false,
+      ...flags,
+    },
+    proposedChanges,
+  };
+}
+
+function combatStartResponse() {
+  return turnResponse({
+    text: "The ash wolf drops from the broken signal stair, hackles sparking with gray cinders as it blocks the ford.",
+    sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: true },
+    mechanics: [{ type: "initiative", actor: "Mira", roll: "Mira 18; Ash Wolf 10", outcome: "pending", text: "Initiative begins: Mira acts before the Ash Wolf." }],
+    flags: { startsCombat: true },
+    proposedChanges: [combatChange({
+      id: "combat-start-ash-wolf",
+      summary: "Combat starts with an ash wolf.",
+      data: {
+        inCombat: true,
+        round: 1,
+        currentTurnId: "party-mira",
+        initiative: ["party-mira", "enemy-ash-wolf"],
+        turnOrder: [
+          { id: "party-mira", name: "Mira", type: "party", initiativeScore: 18 },
+          { id: "enemy-ash-wolf", name: "Ash Wolf", type: "enemy", initiativeScore: 10 },
+        ],
+        enemies: [{ id: "enemy-ash-wolf", name: "Ash Wolf", hp: { current: 16, max: 16 }, armorClass: 13, attackBonus: 4, damage: "1d6+2" }],
+      },
+    })],
+  });
+}
+
+function combatChange({ id, summary, data }) {
+  return {
+    id,
+    operation: "update",
+    domain: "combat",
+    targetId: null,
+    importance: "normal",
+    visibility: "player_visible",
+    summary,
+    data,
+    confidence: "high",
+    reason: summary,
+  };
 }
 
 function waitForServerPort(child) {
