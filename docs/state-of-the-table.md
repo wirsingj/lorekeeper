@@ -35,6 +35,14 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 - Every screen should show the next likely action and hide controls that are not relevant to the current phase.
 - Guest flow should prefer one plain LAN link with a table list and seat requests; direct deep links can remain optional power-user shortcuts.
 
+### Current Product Decisions
+
+- Side rails may stay open by default. The center story log should dominate, but the table does not need every inch of horizontal space; Party, Notebook, and Table Talk can remain visible when they are calm, useful, and resizable.
+- Guest `/guest` flow should require host approval for requested seats for now. Future trust can remember a returning person/account/IP for a prior seat, but the near-term product should be explicit and safe.
+- New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
+- Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
+- AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
+
 ## Product UX/UI Redesign Audit
 
 ### Information Hierarchy
