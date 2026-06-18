@@ -2136,6 +2136,8 @@ function testTableFocusProjection() {
   const empty = buildTableFocusProjection();
   assert.equal(empty.phase, "idle");
   assert.equal(empty.focusRail, "none");
+  assert.equal(empty.surfaces.party, "supporting");
+  assert.equal(empty.surfaces.notebook, "supporting");
   assert.equal(empty.nowText, "Now: Table Ready");
   assert.equal(empty.nextText, "Next: Continue the scene.");
 
@@ -2146,6 +2148,9 @@ function testTableFocusProjection() {
     nextStep: "Mira takes the active combat turn.",
   });
   assert.equal(combat.focusRail, "combat");
+  assert.equal(combat.surfaces.combat, "primary");
+  assert.equal(combat.surfaces.notebook, "quiet");
+  assert.equal(combat.surfaces.tableTalk, "quiet");
   assert.equal(combat.label, "Combat");
   assert.equal(combat.nowText, "Now: Combat Round 2: Mira");
   assert.equal(combat.nextText, "Next: Mira takes the active combat turn.");
@@ -2157,7 +2162,27 @@ function testTableFocusProjection() {
     nextStep: "Host chooses Try Again, Details, or Use Anyway.",
   });
   assert.equal(recovery.focusRail, "review");
+  assert.equal(recovery.surfaces.campaign, "primary");
+  assert.equal(recovery.surfaces.party, "quiet");
   assert.equal(recovery.tone, "attention");
+
+  const waitingForGuest = buildTableFocusProjection({
+    phase: tablePhases.WAITING_FOR_GUEST,
+    headline: "Guest Waiting",
+    nextStep: "Host seats Mira.",
+  });
+  assert.equal(waitingForGuest.focusRail, "party");
+  assert.equal(waitingForGuest.surfaces.party, "primary");
+  assert.equal(waitingForGuest.surfaces.tableTalk, "supporting");
+
+  const waitingForDm = buildTableFocusProjection({
+    phase: tablePhases.WAITING_FOR_DM,
+    headline: "DM Thinking",
+    nextStep: "Wait for the DM response.",
+  });
+  assert.equal(waitingForDm.focusRail, "story");
+  assert.equal(waitingForDm.surfaces.party, "quiet");
+  assert.equal(waitingForDm.surfaces.notebook, "quiet");
 }
 
 function testTableOpeningController() {
@@ -2944,6 +2969,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /renderTableFocus\(state\.tableSession\)/, "table session refresh should update the table focus cue");
   assert.match(appJs, /applyTableFocusProjection/, "command deck phase copy should be rendered through a focused projection");
   assert.match(appJs, /buildTableFocusProjection/, "renderer should consume a tested table focus projection");
+  assert.match(
+    appJs,
+    /function setProviderActivity[\s\S]*?refreshTableSessionProjection\(\);[\s\S]*?renderTableActions\(\);[\s\S]*?renderInputComposer\(state\.tableSession\);/,
+    "provider status changes should repaint phase-aware actions and composer together",
+  );
   assert.match(appJs, /renderTableActions/, "renderer should consume the table action projection");
   assert.match(tableActionController, /function buildTableActionProjection/, "table action visibility policy should live outside app.js");
   assert.match(tableActionController, /buildStartAdventureOpeningProjection/, "Start Adventure action should flow through the unified table action projection");
@@ -2960,7 +2990,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(styles, /\.command-context \.table-current-action/);
   assert.match(styles, /\.command-context #repair-retry/);
   assert.match(styles, /\[data-table-phase="combat"\] \.command-deck/);
-  assert.match(styles, /\[data-table-focus="combat"\] \.combat-tracker-section/);
+  assert.match(styles, /\.rail-section\[data-table-focus="primary"\]/);
+  assert.match(styles, /\.combat-tracker-section\[data-table-focus="primary"\]/);
+  assert.match(styles, /\.rail-section\[data-table-focus="quiet"\]/);
+  assert.match(appShell, /id="party-rail-section"/);
+  assert.match(appShell, /id="table-talk-section"/);
   assert.match(appShell, /Try Again/);
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);

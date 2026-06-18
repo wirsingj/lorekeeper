@@ -12,7 +12,7 @@ export function LorekeeperShell() {
           tabIndex="0"
           title="Resize party shelf"
         ></div>
-        <section className="rail-section campaign-section">
+        <section id="campaign-rail-section" className="rail-section campaign-section">
           <div className="section-title">
             <div>
               <p className="eyebrow">Adventure</p>
@@ -70,7 +70,7 @@ export function LorekeeperShell() {
           <span id="provider-status" className="visually-hidden">Provider: manual bridge</span>
         </section>
 
-        <section className="rail-section">
+        <section id="party-rail-section" className="rail-section party-rail-section">
           <div className="section-title">
             <h2>Party</h2>
             <div className="title-actions">
@@ -387,7 +387,7 @@ export function LorekeeperShell() {
           ></div>
         </details>
 
-        <section className="rail-section table-talk-section" aria-label="Table talk side chat">
+        <section id="table-talk-section" className="rail-section table-talk-section" aria-label="Table talk side chat">
           <div
             id="table-talk-resize-handle"
             className="table-talk-resize-handle"

@@ -306,6 +306,11 @@ h3 {
   background: rgba(12, 15, 17, 0.36);
   border: 1px solid rgba(174, 191, 202, 0.07);
   border-radius: 12px;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
 }
 
 .section-title {
@@ -878,7 +883,32 @@ h3 {
   border-color: rgba(179, 148, 88, 0.28);
 }
 
-.handheld-shell[data-table-focus="combat"] .combat-tracker-section {
+.rail-section[data-table-focus="primary"] {
+  border-color: rgba(125, 213, 201, 0.36);
+  background:
+    linear-gradient(180deg, rgba(125, 213, 201, 0.09), transparent 62%),
+    rgba(12, 15, 17, 0.42);
+  box-shadow:
+    inset 3px 0 0 rgba(125, 213, 201, 0.48),
+    0 14px 30px rgba(0, 0, 0, 0.14);
+}
+
+.rail-section[data-table-focus="supporting"] {
+  opacity: 0.94;
+}
+
+.rail-section[data-table-focus="quiet"] {
+  opacity: 0.74;
+  border-color: rgba(174, 191, 202, 0.055);
+}
+
+.rail-section[data-table-focus="quiet"]:hover,
+.rail-section[data-table-focus="quiet"]:focus-within,
+.notes-panel[data-table-focus="quiet"][open] {
+  opacity: 1;
+}
+
+.combat-tracker-section[data-table-focus="primary"] {
   border-color: rgba(222, 188, 120, 0.58);
   background:
     linear-gradient(180deg, rgba(85, 61, 28, 0.34), rgba(12, 15, 17, 0.34)),
@@ -888,12 +918,8 @@ h3 {
     0 16px 34px rgba(0, 0, 0, 0.18);
 }
 
-.handheld-shell[data-table-focus="party"] .left-panel .rail-section:nth-of-type(2),
-.handheld-shell[data-table-focus="review"] .left-panel .campaign-section {
-  border-color: rgba(125, 213, 201, 0.22);
-  background:
-    linear-gradient(180deg, rgba(125, 213, 201, 0.07), transparent 58%),
-    rgba(12, 15, 17, 0.38);
+.table-talk-section[data-table-focus="supporting"] {
+  border-color: rgba(125, 213, 201, 0.16);
 }
 
 .combat-active-actor {

@@ -258,6 +258,7 @@ const elements = {
   sceneIntelligenceTensions: document.querySelector("#scene-intelligence-tensions"),
   sceneIntelligenceConsequences: document.querySelector("#scene-intelligence-consequences"),
   providerStatus: document.querySelector("#provider-status"),
+  campaignRailSection: document.querySelector("#campaign-rail-section"),
   homePanel: document.querySelector("#home-panel"),
   homeHostFlow: document.querySelector("#home-host-flow"),
   homeJoinFlow: document.querySelector("#home-join-flow"),
@@ -316,6 +317,7 @@ const elements = {
   sheetSpells: document.querySelector("#sheet-spells"),
   sheetNotes: document.querySelector("#sheet-notes"),
   autoFillCharacterSheet: document.querySelector("#auto-fill-character-sheet"),
+  partyRailSection: document.querySelector("#party-rail-section"),
   partyList: document.querySelector("#party-list"),
   partyCount: document.querySelector("#party-count"),
   combatTrackerSection: document.querySelector("#combat-tracker-section"),
@@ -334,6 +336,9 @@ const elements = {
   playerNotesPlaces: document.querySelector("#player-notes-places"),
   playerNotesThings: document.querySelector("#player-notes-things"),
   playerNotesScratch: document.querySelector("#player-notes-scratch"),
+  campaignNotesPanel: document.querySelector("#campaign-notes-panel"),
+  playerNotesPanel: document.querySelector("#player-notes-panel"),
+  tableTalkSection: document.querySelector("#table-talk-section"),
   tableTalkLog: document.querySelector("#table-talk-log"),
   tableTalkCount: document.querySelector("#table-talk-count"),
   tableTalkForm: document.querySelector("#table-talk-form"),
@@ -5800,6 +5805,7 @@ function renderProviderControls() {
 }
 
 function applyThinModeChrome() {
+  const tableSession = refreshTableSessionProjection();
   renderAppModeControls();
   document.body.classList.add("thin-lorekeeper-mode");
   elements.deleteCampaign.hidden = true;
@@ -5842,17 +5848,11 @@ function applyThinModeChrome() {
     button.hidden = true;
     button.disabled = true;
   });
-  applyInputComposerProjection(elements, buildInputComposerProjection({
-    clientMode: true,
-    campaign: state.campaign,
-    guestSession: state.guestSession,
-    guestSnapshot: state.guestSnapshot,
-    tableSession: state.tableSession ?? buildCurrentTableSessionProjection(),
-    labelById: (id) => labelById(state.campaign, id),
-  }));
+  renderInputComposer(tableSession);
 }
 
 function applyFullModeChrome() {
+  const tableSession = refreshTableSessionProjection();
   renderAppModeControls();
   document.body.classList.remove("thin-lorekeeper-mode");
   elements.deleteCampaign.hidden = false;
@@ -5893,10 +5893,28 @@ function applyFullModeChrome() {
     button.hidden = false;
     button.disabled = false;
   });
+  renderInputComposer(tableSession);
+}
+
+function renderInputComposer(tableSession = state.tableSession ?? refreshTableSessionProjection()) {
+  if (!state.campaign || !elements.playerInput || !elements.buildTurn) {
+    return;
+  }
+  if (clientMode) {
+    applyInputComposerProjection(elements, buildInputComposerProjection({
+      clientMode: true,
+      campaign: state.campaign,
+      guestSession: state.guestSession,
+      guestSnapshot: state.guestSnapshot,
+      tableSession,
+      labelById: (id) => labelById(state.campaign, id),
+    }));
+    return;
+  }
   applyInputComposerProjection(elements, buildInputComposerProjection({
     campaign: state.campaign,
     turnProjection: turnProjection(),
-    tableSession: state.tableSession ?? buildCurrentTableSessionProjection(),
+    tableSession,
     collectStagedRemoteInputs,
     findPartyMember: (id) => findById(state.campaign.party, id),
     isHostControlledPartyRecord,
@@ -8319,6 +8337,7 @@ function setProviderActivity(message, status = "idle") {
     });
   }
   renderTableActions();
+  renderInputComposer(state.tableSession);
 }
 
 function setupSavedLayoutResizers() {
