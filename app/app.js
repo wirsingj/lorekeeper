@@ -33,6 +33,7 @@ import { buildInputComposerProjection, applyInputComposerProjection } from "./in
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
+import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "./provider-chat-controller.js";
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch } from "./provider-import-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
@@ -7525,17 +7526,15 @@ async function runPromptThroughCampaignChat(prompt) {
   try {
     const probe = await probeExtensionBridge();
     if (!probe.available) {
-      await copyPromptToClipboard(prompt, {
-        successMessage: "Extension not connected; prompt copied",
-        failureMessage: "Extension not connected; copy from prompt drawer",
-      });
+      const fallback = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.EXTENSION_UNAVAILABLE);
+      await copyPromptToClipboard(prompt, fallback.copy);
       state.bridge = {
-        mode: "manual",
+        mode: fallback.bridgeMode,
         ready: false,
         lastRun: null,
         lastImportedProviderText: state.bridge.lastImportedProviderText,
       };
-      setProviderActivity("Extension unavailable; prompt copied for manual paste", "error");
+      setProviderActivity(fallback.activityText, fallback.activityState);
       return { providerReceived: false };
     }
 
@@ -7588,11 +7587,9 @@ async function runPromptThroughCampaignChat(prompt) {
     }
 
     if (result.loginRequired) {
-      await copyPromptToClipboard(prompt, {
-        successMessage: "ChatGPT needs login; prompt copied",
-        failureMessage: "ChatGPT needs login; copy from prompt drawer",
-      });
-      setProviderActivity("ChatGPT needs login; prompt copied", "error");
+      const fallback = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.LOGIN_REQUIRED);
+      await copyPromptToClipboard(prompt, fallback.copy);
+      setProviderActivity(fallback.activityText, fallback.activityState);
       render();
       return { providerReceived: false };
     }
@@ -7605,11 +7602,9 @@ async function runPromptThroughCampaignChat(prompt) {
       return { providerReceived: Boolean(result.sent), imported: true, recovered: true };
     }
 
-    await copyPromptToClipboard(prompt, {
-      successMessage: "Campaign chat did not return a response; prompt copied",
-      failureMessage: "Campaign chat did not return a response; copy from prompt drawer",
-    });
-    setProviderActivity("No provider response returned; prompt copied", "error");
+    const noResponseFallback = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.NO_RESPONSE);
+    await copyPromptToClipboard(prompt, noResponseFallback.copy);
+    setProviderActivity(noResponseFallback.activityText, noResponseFallback.activityState);
     return { providerReceived: Boolean(result.sent) };
   } catch (error) {
     stopProviderChatProgress();
@@ -7622,17 +7617,15 @@ async function runPromptThroughCampaignChat(prompt) {
       return { providerReceived: true, imported: true, recovered: true };
     }
 
-    await copyPromptToClipboard(prompt, {
-      successMessage: "Campaign chat failed; prompt copied",
-      failureMessage: "Campaign chat failed; copy from prompt drawer",
-    });
+    const failureFallback = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.RUN_FAILED);
+    await copyPromptToClipboard(prompt, failureFallback.copy);
     state.bridge = {
-      mode: "manual",
+      mode: failureFallback.bridgeMode,
       ready: false,
       lastRun: null,
       lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
-    setProviderActivity("Provider run failed; prompt copied for manual paste", "error");
+    setProviderActivity(failureFallback.activityText, failureFallback.activityState);
     render();
     return { providerReceived: false, error };
   }
@@ -8707,20 +8700,10 @@ let activeProgressTimers = [];
 
 function startProviderChatProgress() {
   stopProviderChatProgress();
-  activeProgressTimers = [
-    window.setTimeout(() => {
-      elements.bridgeStatus.textContent = "Waiting for ChatGPT response...";
-      setProviderActivity("Waiting on ChatGPT response...", "waiting");
-    }, 8000),
-    window.setTimeout(() => {
-      elements.bridgeStatus.textContent = "Still waiting on the campaign chat...";
-      setProviderActivity("Still waiting on ChatGPT...", "waiting");
-    }, 30000),
-    window.setTimeout(() => {
-      elements.bridgeStatus.textContent = "Campaign chat is taking a while; manual fallback remains available";
-      setProviderActivity("ChatGPT is taking a while; manual fallback is ready", "waiting");
-    }, 65000),
-  ];
+  activeProgressTimers = buildCampaignChatProgressSteps().map((step) => window.setTimeout(() => {
+    elements.bridgeStatus.textContent = step.bridgeStatus;
+    setProviderActivity(step.activityText, step.activityState);
+  }, step.delayMs));
 
   return {
     stop: stopProviderChatProgress,

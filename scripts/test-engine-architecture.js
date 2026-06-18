@@ -22,6 +22,7 @@ import { buildHostResponseReviewProjection, buildManualResponseFallbackProjectio
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
+import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "../app/provider-chat-controller.js";
 import { buildProviderImportOutcome, decideLatestProviderImport, prepareAutoCommitReviewBatch, shouldAutoApproveProviderChange } from "../app/provider-import-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
@@ -2590,6 +2591,31 @@ function testProviderImportOutcomeProjection() {
   assert.equal(prepareAutoCommitReviewBatch({ proposedChanges: [{ importance: "major" }] }), null);
 }
 
+function testProviderChatProjection() {
+  const unavailable = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.EXTENSION_UNAVAILABLE);
+  assert.equal(unavailable.bridgeMode, "manual");
+  assert.match(unavailable.copy.successMessage, /Extension not connected/);
+  assert.match(unavailable.activityText, /manual paste/);
+
+  const login = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.LOGIN_REQUIRED);
+  assert.equal(login.bridgeMode, "extension");
+  assert.match(login.copy.failureMessage, /DM Instructions/);
+  assert.equal(login.activityState, "error");
+
+  const noResponse = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.NO_RESPONSE);
+  assert.match(noResponse.copy.successMessage, /Campaign chat did not return/);
+  assert.match(noResponse.activityText, /No DM response/);
+
+  const failed = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.RUN_FAILED);
+  assert.equal(failed.bridgeMode, "manual");
+  assert.match(failed.copy.failureMessage, /Campaign chat failed/);
+
+  const progress = buildCampaignChatProgressSteps();
+  assert.deepEqual(progress.map((step) => step.delayMs), [8000, 30000, 65000]);
+  assert.ok(progress.every((step) => step.activityState === "waiting"));
+  assert.match(progress[2].bridgeStatus, /manual fallback/);
+}
+
 function testCharacterAutocompleteProjection() {
   assert.deepEqual(splitAncestryClass("Dwarf Soldier"), { ancestry: "Dwarf", characterClass: "Soldier" });
 
@@ -2900,6 +2926,11 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
   assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
+  assert.match(appJs, /provider-chat-controller\.js/, "campaign chat fallback policy should live outside the main app renderer");
+  assert.match(appJs, /buildCampaignChatFallbackPlan/, "renderer should execute campaign chat fallback projections");
+  assert.match(appJs, /buildCampaignChatProgressSteps/, "campaign chat progress timing copy should be projected outside app.js");
+  assert.doesNotMatch(appJs, /Campaign chat failed; prompt copied/, "campaign chat failure copy should not be owned by app.js");
+  assert.doesNotMatch(appJs, /Campaign chat did not return a response; prompt copied/, "campaign chat no-response copy should not be owned by app.js");
   assert.doesNotMatch(appJs, /function shouldAutoApproveChange/, "renderer should not own provider auto-approval policy");
   assert.match(appJs, /buildTableSessionProjection/, "renderer should consume the table session projection");
   assert.match(appJs, /dataset\.tablePhase/, "status strip should expose the unified table phase");
@@ -3271,6 +3302,7 @@ testTurnRepairController();
 testStagedInputRecoveryController();
 testHostResponseReviewProjection();
 testProviderImportOutcomeProjection();
+testProviderChatProjection();
 testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();

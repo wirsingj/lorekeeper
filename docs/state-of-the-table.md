@@ -1,6 +1,6 @@
 # LoreKeeper State Of The Table
 
-Updated: 2026-06-17
+Updated: 2026-06-18
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
@@ -299,11 +299,12 @@ Risks:
 161. Live playtest fixed two table-flow bugs: Table Talk now repaints from fresh multiplayer snapshots while the DM is thinking, and app-owned enemy turns only mark themselves handled after initiative actually leaves the enemy; enemy attack messages now read as short table narration instead of bare roll receipts.
 162. Join-client internals now use `join`/`host` runtime modes and `join-client` renderer names instead of the old `thin` naming, while legacy launch/package aliases remain as compatibility shims.
 163. The New Adventure seed helper is now product-named as adventure seed presets instead of `dev-jump-start`, and its visible action reads as a creative table aid instead of a developer shortcut.
+164. Campaign Chat fallback/progress copy now lives in `app/provider-chat-controller.js` with direct tests, so app.js executes provider-chat recovery plans instead of owning another cluster of fallback strings.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
-2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are now extracted.
+2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, campaign-chat fallback/progress copy, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, focused DM Recovery surface, host review summary, and copied-text fallback disclosure, but the underlying manual review textarea still exists as a rare fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, combat nudges are active-turn-only suggestions, and app-owned enemy turns now guard against stuck initiative after resolution, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
@@ -371,20 +372,20 @@ Risks:
 
 ### Medium
 
-14. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
-15. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
-16. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
-17. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
-18. Continue expanding route-level API/security tests as new routes are added; current coverage includes classification, API-token protection, stale identity rejection, local asset blocking, and real mutation routes.
-19. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
+16. Make scene tension, consequences, and optional hidden-story debug summaries more visible in Settings/diagnostics, not live play.
+17. Add curated regression campaigns for social negotiation, wilderness travel, mystery, downtime, and combat.
+18. Tighten prompts so normal scene turns can be rich without always forcing choices, then validate with repeated real-model turns.
+19. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
+20. Continue expanding route-level API/security tests as new routes are added; current coverage includes classification, API-token protection, stale identity rejection, local asset blocking, and real mutation routes.
+21. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
 
 ### Low
 
-18. Replace remaining overly specific placeholder text with neutral table examples. Current state: the main command deck fallback is now campaign-neutral; secondary placeholders still need occasional review as screens evolve.
-19. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
-20. Continue improving campaign-aware character auto-complete quality; current behavior preserves supplied hard facts while letting the button regenerate derived pitch/integration text from party theme, premise, and existing characters.
-21. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
-22. Add fuller backup/export/restore affordances before release; delete now recycles local SQLite files, but there is not yet a restore UI.
+22. Replace remaining overly specific placeholder text with neutral table examples. Current state: the main command deck fallback is now campaign-neutral; secondary placeholders still need occasional review as screens evolve.
+23. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
+24. Continue improving campaign-aware character auto-complete quality; current behavior preserves supplied hard facts while letting the button regenerate derived pitch/integration text from party theme, premise, and existing characters.
+25. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
+26. Add fuller backup/export/restore affordances before release; delete now recycles local SQLite files, but there is not yet a restore UI.
 
 ## Working Checklist
 
@@ -416,7 +417,7 @@ Risks:
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, campaign-chat fallback/progress copy, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
@@ -622,10 +623,10 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-15: Qwen3 gives much richer scene prose when run without Ollama JSON mode. Watch for role/agency drift because richer narration can make overreach more tempting.
 - 2026-06-15: The DM should be able to target individual party members or the whole party, and party votes should become an actual table flow with host tie-breaks. Current state: targeting, votes, counters, and host draft action exist; two-machine feel testing remains.
 - 2026-06-15: AI companions should occasionally feel alive with brief unprompted contributions, but not every response cycle and not for major decisions. Current state: idle companion interjections are rarity/cooldown gated in the provider request.
-- 2026-06-15: App-owned combat resolution now covers DC checks and opposed contests. Current state: saves/spells/enemy-turn bounding and one-actor response validation have coverage; broader app-owned combat resolution remains open.
-- 2026-06-16: Player Notes should not remain only local device state if they become part of long-campaign play. Decide whether they are per-user private notes, host-visible table notes, or both.
+- 2026-06-15: App-owned combat resolution now covers common attacks, checks, contests, saves, simple spells, healing, reactions, concentration, retreat/surrender, and enemy turns. Remaining work is live-play polish for richer improvised actions and edge cases.
+- 2026-06-16: Player Notes are now campaign-backed for local/host continuity. Remaining design decision: whether multiplayer notes become per-user private notes, host-visible table notes, or both.
 - 2026-06-16: Pre-table guest seating now has a draft table/session identity and is published to the normal `/guest` page while Host New is open. Hosts can reserve a requested seat before launch. Remaining work: guest-editable character draft state and live local-browser soak.
-- 2026-06-16: Remote party-choice voting is now usable, but host resolution should become more explicit than "read the counters and send the choice." Current state: leading vote can draft the host action; a dedicated confirmation flow may still be smoother.
+- 2026-06-16: Remote party-choice voting is usable, with leader/tie language and a host draft action. Remaining work is two-machine feel testing to decide whether the normal Send Turn confirmation is enough.
 - 2026-06-16: Next local playtest target should be host app plus local browser guest through `/guest`: join waiting room, seat request, party vote, guest leave/rejoin, one combat turn, and one provider recovery.
 - 2026-06-18: Round 2 audit found stale "early scaffold/sidecar" product copy and visible disabled provider roadmap options. README, default campaign copy, prompt/template labels, server/check strings, and Preferences AI source now use current LoreKeeper/table DM language; stored prompt template IDs remain stable for compatibility.
 
