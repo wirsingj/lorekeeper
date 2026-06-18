@@ -27,6 +27,7 @@ import { createImplicitSceneProgressChange } from "../app/scene-import-controlle
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
+import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "../app/table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import {
@@ -2083,6 +2084,55 @@ function testTableFocusProjection() {
   assert.equal(recovery.tone, "attention");
 }
 
+function testTableOpeningController() {
+  const readyCampaign = {
+    scene: { status: "campaign_start" },
+    sessionLog: { messages: [] },
+  };
+  assert.equal(isCampaignReadyForOpening(readyCampaign), true);
+  assert.equal(isCampaignReadyForOpening(readyCampaign, { isHost: false }), false);
+  assert.equal(isCampaignReadyForOpening({
+    ...readyCampaign,
+    sessionLog: { messages: [{ role: "system", body: "Ready table note." }] },
+  }), true);
+  assert.equal(isCampaignReadyForOpening({
+    ...readyCampaign,
+    sessionLog: { messages: [{ role: "dm", body: "The adventure starts." }] },
+  }), false);
+  assert.equal(isCampaignReadyForOpening({
+    ...readyCampaign,
+    scene: { status: "active" },
+  }), false);
+
+  const visible = buildStartAdventureOpeningProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+  });
+  assert.equal(visible.visible, true);
+  assert.equal(visible.disabled, false);
+
+  const repairing = buildStartAdventureOpeningProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: true, hasActiveGeneration: false },
+  });
+  assert.equal(repairing.visible, false);
+  assert.equal(repairing.disabled, true);
+
+  const busy = buildStartAdventureOpeningProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: true },
+  });
+  assert.equal(busy.visible, true);
+  assert.equal(busy.disabled, true);
+  assert.match(busy.title, /already starting/i);
+
+  const prompt = buildAdventureOpeningPrompt();
+  assert.match(prompt, /Begin the first session/);
+  assert.match(prompt, /Do not invent a player choice/);
+  assert.match(prompt, /Do not speak, think, move, scan, ready weapons, or make tactical choices/);
+  assert.match(prompt, /Prefer choices\.options: \[\]/);
+}
+
 function testPlayLogProjectionBoundsLongSessions() {
   const messages = Array.from({ length: defaultPlayLogVisibleLimit + 75 }, (_, index) => ({
     id: `msg-${index + 1}`,
@@ -2601,6 +2651,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
+  const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
@@ -2740,6 +2791,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /startAdventureOpening/);
   assert.match(appJs, /buildAdventureOpeningPrompt/);
   assert.match(appJs, /isCampaignReadyForOpening/);
+  assert.match(tableOpeningController, /function buildStartAdventureOpeningProjection/, "Start Adventure button policy should live outside app.js");
+  assert.match(tableOpeningController, /function buildAdventureOpeningPrompt/, "opening DM prompt policy should live outside app.js");
+  assert.doesNotMatch(appJs, /function buildAdventureOpeningPrompt/, "app.js should not own the opening DM prompt policy");
   assert.match(appJs, /Start Adventure for the opening DM narration/);
   assert.doesNotMatch(appJs, /Next: click Nudge to ask the DM for the opening moment/);
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Start Adventure must remain host-controlled");
@@ -2875,6 +2929,7 @@ testInputComposerProjection();
 testTableStatusVocabulary();
 testTableSessionEnginePhases();
 testTableFocusProjection();
+testTableOpeningController();
 testPlayLogProjectionBoundsLongSessions();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
