@@ -323,6 +323,7 @@ const elements = {
   combatTrackerSection: document.querySelector("#combat-tracker-section"),
   combatRound: document.querySelector("#combat-round"),
   combatActiveActor: document.querySelector("#combat-active-actor"),
+  combatActiveCue: document.querySelector("#combat-active-cue"),
   combatTurnOrder: document.querySelector("#combat-turn-order"),
   peopleList: document.querySelector("#people-list"),
   peopleCount: document.querySelector("#people-count"),
@@ -9449,11 +9450,13 @@ function renderCombatTracker(campaign) {
   if (!view.inCombat) {
     elements.combatTurnOrder.replaceChildren();
     elements.combatActiveActor.textContent = "No active turn.";
+    renderCombatActiveCue(null);
     return;
   }
 
   elements.combatRound.textContent = view.roundLabel;
   elements.combatActiveActor.textContent = view.activeLabel;
+  renderCombatActiveCue(view.activeCue);
   elements.combatTurnOrder.replaceChildren(
     ...view.rows.map((entry) => {
       const item = document.createElement("li");
@@ -9479,6 +9482,41 @@ function renderCombatTracker(campaign) {
       return item;
     }),
   );
+}
+
+function renderCombatActiveCue(cue) {
+  if (!elements.combatActiveCue) {
+    return;
+  }
+  elements.combatActiveCue.hidden = !cue;
+  elements.combatActiveCue.replaceChildren();
+  if (!cue) {
+    return;
+  }
+  elements.combatActiveCue.dataset.controller = cue.controllerKind || "";
+  const header = document.createElement("div");
+  header.className = "combat-active-cue-header";
+  const label = document.createElement("strong");
+  label.textContent = cue.controllerLabel || "Active turn";
+  const actor = document.createElement("span");
+  actor.textContent = cue.actorName || "";
+  header.append(label, actor);
+
+  const instruction = document.createElement("p");
+  instruction.textContent = cue.instruction || "";
+  elements.combatActiveCue.append(header, instruction);
+
+  if (cue.actions?.length) {
+    const list = document.createElement("div");
+    list.className = "combat-action-chips";
+    cue.actions.forEach((action) => {
+      const chip = document.createElement("span");
+      chip.className = "combat-action-chip";
+      chip.textContent = action.label;
+      list.append(chip);
+    });
+    elements.combatActiveCue.append(list);
+  }
 }
 
 function pendingJoinConnectionForMember(campaign, memberId) {

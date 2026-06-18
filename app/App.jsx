@@ -98,6 +98,7 @@ export function LorekeeperShell() {
             <span id="combat-round" className="count-pill">R1</span>
           </div>
           <p id="combat-active-actor" className="combat-active-actor">No active turn.</p>
+          <div id="combat-active-cue" className="combat-active-cue" hidden></div>
           <ol id="combat-turn-order" className="combat-turn-order"></ol>
         </section>
       </aside>

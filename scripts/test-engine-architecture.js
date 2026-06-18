@@ -1012,6 +1012,10 @@ function testCombatTrackerView() {
   };
   const view = buildCombatTrackerView(campaign, { controlledActorId: "karl" });
   assert.equal(view.inCombat, true);
+  assert.equal(view.activeCue.actorName, "Thor");
+  assert.equal(view.activeCue.controllerLabel, "Host turn");
+  assert.match(view.activeCue.instruction, /Choose an action/i);
+  assert.ok(view.activeCue.actions.some((action) => action.id === "move"), "active combat cue should respect spent action economy and show legal options");
   assert.equal(view.rows.some((row) => row.name === "Drunk miner" && row.meta === "DM"), true);
   assert.equal(view.rows.find((row) => row.id === "miner").hpLabel, "10/10");
   assert.equal(view.rows.find((row) => row.id === "thor").hpLabel, "12/12");
@@ -1029,6 +1033,16 @@ function testCombatTrackerView() {
 
   const guestView = buildCombatTrackerView(campaign, { hideEnemyHp: true });
   assert.equal(guestView.rows.find((row) => row.id === "miner").hpLabel, "HP ?");
+
+  campaign.combat.currentTurnId = "karl";
+  const controlledGuestView = buildCombatTrackerView(campaign, { controlledActorId: "karl" });
+  assert.equal(controlledGuestView.activeCue.controllerLabel, "Your turn");
+  assert.match(controlledGuestView.activeCue.instruction, /send it to the host table/i);
+
+  campaign.combat.currentTurnId = "miner";
+  const enemyTurnView = buildCombatTrackerView(campaign);
+  assert.equal(enemyTurnView.activeCue.controllerLabel, "DM turn");
+  assert.match(enemyTurnView.activeCue.instruction, /app resolves enemy mechanics/i);
 }
 
 function testSceneImportController() {
@@ -2992,9 +3006,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(styles, /\[data-table-phase="combat"\] \.command-deck/);
   assert.match(styles, /\.rail-section\[data-table-focus="primary"\]/);
   assert.match(styles, /\.combat-tracker-section\[data-table-focus="primary"\]/);
+  assert.match(styles, /\.combat-active-cue/);
   assert.match(styles, /\.rail-section\[data-table-focus="quiet"\]/);
   assert.match(appShell, /id="party-rail-section"/);
   assert.match(appShell, /id="table-talk-section"/);
+  assert.match(appShell, /id="combat-active-cue"/);
   assert.match(appShell, /Try Again/);
   assert.match(appShell, /Details/);
   assert.match(appShell, /Use Anyway/);

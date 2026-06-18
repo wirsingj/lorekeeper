@@ -1,4 +1,6 @@
-import { getActiveCombatActor } from "../src/engine/combat-engine.js";
+import { controllerForActor } from "../src/engine/agency-controller.js";
+import { getActiveCombatActor, legalActionsForActor } from "../src/engine/combat-engine.js";
+import { controllerKinds } from "../src/engine/types.js";
 
 export function buildCombatTrackerView(campaign, options = {}) {
   const combat = campaign.combat ?? {};
@@ -10,6 +12,7 @@ export function buildCombatTrackerView(campaign, options = {}) {
       inCombat: false,
       roundLabel: "",
       activeLabel: "No active turn.",
+      activeCue: null,
       rows: [],
     };
   }
@@ -19,6 +22,7 @@ export function buildCombatTrackerView(campaign, options = {}) {
     inCombat: true,
     roundLabel: `R${combat.round ?? 1}`,
     activeLabel: `${active?.name ?? "Unknown"}'s turn`,
+    activeCue: buildActiveCombatCue(campaign, active, options),
     activeId,
     rows: turnOrder.map((entry, index) => ({
       ...entry,
@@ -32,6 +36,69 @@ export function buildCombatTrackerView(campaign, options = {}) {
       }),
     })),
   };
+}
+
+function buildActiveCombatCue(campaign, active, options = {}) {
+  if (!active?.id) {
+    return null;
+  }
+  const controller = controllerForActor(campaign, active.id);
+  const actions = legalActionsForActor(campaign, active.id, { maxLegalOptions: 5 })
+    .filter((action) => action?.legal !== false)
+    .slice(0, 5)
+    .map((action) => ({
+      id: action.id,
+      label: action.label || titleCaseToken(action.type || action.id),
+      type: action.type || "",
+    }));
+  const controlled = active.id === options.controlledActorId;
+  const type = active.type || combatActorType(campaign, active.id);
+  return {
+    actorId: active.id,
+    actorName: active.name || labelById(campaign, active.id),
+    controllerKind: controller.kind,
+    controllerLabel: activeControllerLabel(controller.kind, { controlled, type }),
+    instruction: activeCombatInstruction(controller.kind, { controlled, type }),
+    actions,
+  };
+}
+
+function activeControllerLabel(kind, { controlled = false, type = "" } = {}) {
+  if (controlled) {
+    return "Your turn";
+  }
+  if (type === "enemy" || kind === controllerKinds.NPC_DM) {
+    return "DM turn";
+  }
+  if (kind === controllerKinds.REMOTE_PLAYER) {
+    return "Friend turn";
+  }
+  if (kind === controllerKinds.AI_COMPANION) {
+    return "Companion turn";
+  }
+  if (kind === controllerKinds.HOST) {
+    return "Host turn";
+  }
+  return "Table turn";
+}
+
+function activeCombatInstruction(kind, { controlled = false, type = "" } = {}) {
+  if (controlled) {
+    return "Choose your action and send it to the host table.";
+  }
+  if (type === "enemy" || kind === controllerKinds.NPC_DM) {
+    return "The app resolves enemy mechanics, then the DM narrates the beat.";
+  }
+  if (kind === controllerKinds.REMOTE_PLAYER) {
+    return "Wait for the seated friend, or resolve their staged action when it arrives.";
+  }
+  if (kind === controllerKinds.AI_COMPANION) {
+    return "Ask for a companion suggestion, stage it, or pass their turn.";
+  }
+  if (kind === controllerKinds.HOST) {
+    return "Choose an action, roll, spell, or tactic for the active character.";
+  }
+  return "Host decides who speaks for this turn before resolving it.";
 }
 
 export function normalizedCombatTurnOrder(campaign) {

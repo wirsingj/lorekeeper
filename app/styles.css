@@ -933,6 +933,78 @@ h3 {
   font-weight: 900;
 }
 
+.combat-active-cue {
+  display: grid;
+  gap: 7px;
+  margin: -2px 0 8px;
+  padding: 8px;
+  border: 1px solid rgba(222, 188, 120, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(222, 188, 120, 0.1), rgba(255, 255, 255, 0.035)),
+    rgba(12, 15, 17, 0.38);
+}
+
+.combat-active-cue[hidden] {
+  display: none;
+}
+
+.combat-active-cue-header {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.combat-active-cue-header strong,
+.combat-active-cue-header span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combat-active-cue-header strong {
+  color: #fff0bf;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.combat-active-cue-header span {
+  color: #f7fafb;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.combat-active-cue p {
+  margin: 0;
+  color: #d8d2c0;
+  font-size: 0.72rem;
+  line-height: 1.32;
+}
+
+.combat-action-chips {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.combat-action-chip {
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid rgba(222, 188, 120, 0.22);
+  border-radius: 999px;
+  background: rgba(222, 188, 120, 0.08);
+  color: #f6ead0;
+  font-size: 0.64rem;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .combat-turn-order {
   min-width: 0;
   display: grid;
