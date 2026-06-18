@@ -1393,7 +1393,7 @@ button:disabled {
 
 .home-flow-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(320px, 1.2fr) minmax(220px, 0.8fr) minmax(220px, 0.8fr);
   gap: 14px;
 }
 
@@ -1415,6 +1415,18 @@ button:disabled {
   min-height: 292px;
 }
 
+.home-flow-card-compact {
+  min-height: 292px;
+}
+
+.home-flow-card-new {
+  border-color: rgba(192, 168, 120, 0.2);
+  background:
+    linear-gradient(150deg, rgba(192, 168, 120, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
+    rgba(10, 13, 15, 0.62);
+}
+
 .home-flow-card h3 {
   margin: 0 0 10px;
   color: #f4f8f9;
@@ -1427,7 +1439,8 @@ button:disabled {
   }
 
   .home-flow-card,
-  .home-flow-card-primary {
+  .home-flow-card-primary,
+  .home-flow-card-compact {
     min-height: 0;
   }
 }

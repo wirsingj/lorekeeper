@@ -2703,7 +2703,15 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /guest-seat-list/);
   assert.match(appShell, /Ask To Join/);
   assert.match(appShell, /home-campaign-select/);
+  assert.match(appShell, /home-flow-card-new/, "New Adventure should be its own front-door card, not a secondary continue action");
+  assert.match(appShell, /Start New/);
+  assert.match(styles, /\.home-flow-card-new/);
   assert.match(appShell, /Saved adventure/);
+  assert.ok(
+    appShell.indexOf('id="home-host-flow"') < appShell.indexOf('id="home-new-campaign"')
+      && appShell.indexOf('id="home-new-campaign"') < appShell.indexOf('id="home-join-flow"'),
+    "front door should read as Continue, New Adventure, then Join",
+  );
   assert.ok(
     appShell.indexOf('className="home-library-strip"') < appShell.indexOf('id="home-provider-setup"'),
     "AI readiness should live in the lower utility strip, not as a primary front-door mode",

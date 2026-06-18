@@ -284,6 +284,7 @@ Risks:
 146. Freshly created ready tables now expose a table-level Start Adventure action that runs a dedicated first-session opening narration prompt after the host finishes last-minute invites and party edits.
 147. Friends And Seats now leads with the normal Guest Link/open/copy flow and tucks seat-link/check/collection controls under Table Options, reducing the old wall-of-settings feeling for host seating.
 148. Start Adventure opening readiness, button state, and first-session prompt policy now live in `app/table-opening-controller.js` with direct tests instead of being renderer-owned string/visibility logic.
+149. The front door now presents Continue Adventure, New Adventure, and Join A Table as three first-class launcher choices, with AI/preferences still demoted to utility actions.
 
 ### Still Risky
 
@@ -507,7 +508,7 @@ Risks:
 - [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
 - [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; rails and combat/recovery surfaces still need deeper phase-specific behavior.
-- [ ] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background. Current state: the primary grid now focuses on Continue Adventure and Join A Table, with Check AI in the lower utility strip.
+- [x] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background. Current state: the primary grid now presents Continue Adventure, New Adventure, and Join A Table as first-class choices, with Check AI and Preferences in the lower utility strip.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.
 - [x] Keep debug/repair tools tucked away unless action is required.

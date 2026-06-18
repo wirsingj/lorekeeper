@@ -109,14 +109,14 @@ export function LorekeeperShell() {
               <div className="home-menu-heading">
                 <p className="eyebrow">LoreKeeper</p>
                 <h2>Start Playing</h2>
-                <p>Host a living tabletop adventure, join a friend's table, or check that your DM voice is ready.</p>
+                <p>Choose the table you want to sit at: continue a story, begin a new adventure, or join friends already gathering.</p>
               </div>
               <div className="home-flow-grid">
                 <article className="home-flow-card home-flow-card-primary">
                   <div>
                     <p className="eyebrow">Your Table</p>
                     <h3>Continue Adventure</h3>
-                    <p>Pick up an existing story or gather a party for a new one.</p>
+                    <p>Return to a saved campaign and gather everyone before the next scene.</p>
                   </div>
                   <label className="home-campaign-picker">
                     <span>Saved adventure</span>
@@ -126,14 +126,23 @@ export function LorekeeperShell() {
                   </label>
                   <div className="home-flow-actions">
                     <button id="home-host-flow" type="button">Continue</button>
-                    <button id="home-new-campaign" className="secondary-action" type="button">New Adventure</button>
                   </div>
                 </article>
-                <article className="home-flow-card home-flow-card-primary">
+                <article className="home-flow-card home-flow-card-compact home-flow-card-new">
+                  <div>
+                    <p className="eyebrow">New Story</p>
+                    <h3>New Adventure</h3>
+                    <p>Set the opening situation, create your character, and invite companions before the first narration.</p>
+                  </div>
+                  <div className="home-flow-actions">
+                    <button id="home-new-campaign" type="button">Start New</button>
+                  </div>
+                </article>
+                <article className="home-flow-card home-flow-card-compact">
                   <div>
                     <p className="eyebrow">Friends</p>
                     <h3>Join A Table</h3>
-                    <p>Open the host link, choose a seat, and start playing.</p>
+                    <p>Find the host's table, ask for a seat, and play from this device.</p>
                   </div>
                   <div className="home-flow-actions">
                     <button id="home-join-flow" type="button">Find Table</button>
