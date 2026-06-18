@@ -1,5 +1,5 @@
 import { buildContextPack } from "../context-packs/build-context-pack.js";
-import { buildSidecarPrompt } from "../prompt-builder/build-prompt.js";
+import { buildTableDmPrompt } from "../prompt-builder/build-prompt.js";
 import { parsePlayerMessage } from "./player-message.js";
 
 export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgpt", playerInputs = [] }) {
@@ -14,7 +14,7 @@ export function createPlayerTurn({ campaign, playerMessage, providerId = "chatgp
     purpose: "player_turn",
     includeCombatDetail: isCombatRelevant(parsedMessage),
   });
-  const providerPrompt = buildSidecarPrompt({
+  const providerPrompt = buildTableDmPrompt({
     campaign,
     contextPack,
     userIntent: parsedMessage.inWorldText || (structuredInputs.length ? "Resolve the structured player inputs for this turn." : "No in-world action supplied this turn."),

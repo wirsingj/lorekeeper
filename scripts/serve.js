@@ -138,7 +138,7 @@ const server = createServer(async (request, response) => {
       if (existsSync(builtIndex)) {
         await serveFile(builtIndex, response);
       } else {
-        sendText(response, 200, "Lorekeeper API is running. Start the React app with npm run dev.");
+        sendText(response, 200, "LoreKeeper API is running. Start the React app with npm run dev.");
       }
       return;
     }
@@ -829,7 +829,7 @@ server.on("error", (error) => {
 
 if (isDirectRun) {
   server.listen(port, bindHost, () => {
-    console.log(`Lorekeeper local app: http://${bindHost === "127.0.0.1" ? "localhost" : bindHost}:${activeServerPort()}`);
+    console.log(`LoreKeeper local app: http://${bindHost === "127.0.0.1" ? "localhost" : bindHost}:${activeServerPort()}`);
   });
 }
 
@@ -854,7 +854,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 function shutdownServer(signal) {
-  console.log(`Lorekeeper local app shutting down (${signal}).`);
+  console.log(`LoreKeeper local app shutting down (${signal}).`);
   server.close(() => {
     process.exit(0);
   });

@@ -662,9 +662,9 @@ elements.deleteCampaign.addEventListener("click", () => {
 });
 
 elements.checkSidecar.addEventListener("click", async () => {
-  const result = await ensureCompanionSidecar({ openIfMissing: false });
+  const result = await ensureCampaignChatSession({ openIfMissing: false });
   if (result?.found) {
-    await ensureCompanionSidecar({ openIfMissing: true, focusProvider: true });
+    await ensureCampaignChatSession({ openIfMissing: true, focusProvider: true });
     return;
   }
 
@@ -1646,7 +1646,7 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   const providerMode = currentProviderSettings().preferredProvider;
   const runResult = providerMode === "ollama"
     ? await runPromptThroughLocalProvider(state.currentTurn)
-    : await runPromptThroughSidecar(state.prompt);
+    : await runPromptThroughCampaignChat(state.prompt);
   await updatePlayerTurnEchoLifecycle(playerEchoMessageId, runResult);
   await applyStagedInputRecoveryPlan(buildStagedInputRecoveryPlan({
     runResult,
@@ -6372,7 +6372,7 @@ function recordDialogConfig(domain) {
       roleLabel: "Kind",
       namePlaceholder: "Brindle Hollow map",
       rolePlaceholder: "image",
-      notesPlaceholder: "What should Lorekeeper remember about this source image?",
+      notesPlaceholder: "What should LoreKeeper remember about this source image?",
     },
     items: {
       title: "Add Thing",
@@ -7359,7 +7359,7 @@ async function persistPlayMessage(message) {
   }
 }
 
-async function ensureCompanionSidecar({ openIfMissing = false, focusProvider = false, forceNewConversation = false } = {}) {
+async function ensureCampaignChatSession({ openIfMissing = false, focusProvider = false, forceNewConversation = false } = {}) {
   const probe = await probeExtensionBridge();
   if (!probe.available) {
     state.bridge = {
@@ -7422,7 +7422,7 @@ async function startNewProviderConversation() {
         providerId: defaultCompanionOptions.providerId,
         projectHint: state.campaign.providerSettings?.projectHint || defaultCompanionOptions.projectHint,
         status: "planned",
-        notes: "Fresh provider conversation requested from Lorekeeper UI.",
+        notes: "Fresh provider conversation requested from LoreKeeper UI.",
       }),
     });
 
@@ -7444,7 +7444,7 @@ async function startNewProviderConversation() {
     elements.bridgeStatus.textContent = `Opening fresh campaign chat: ${conversation.conversationHint}`;
     setProviderActivity(`Opening ChatGPT chat for ${conversation.conversationHint}...`, "working");
     render();
-    const result = await ensureCompanionSidecar({
+    const result = await ensureCampaignChatSession({
       openIfMissing: true,
       focusProvider: true,
       forceNewConversation: true,
@@ -7462,15 +7462,15 @@ async function startNewProviderConversation() {
 async function bootstrapProviderConversation() {
   const conversation = getActiveProviderConversation(state.campaign, defaultCompanionOptions.providerId);
   const prompt = [
-    "# Lorekeeper Campaign Chat Bootstrap",
+    "# LoreKeeper Campaign Chat Bootstrap",
     "",
-    `This provider chat is for the Lorekeeper campaign: ${conversation.conversationHint}.`,
+    `This provider chat is for the LoreKeeper campaign: ${conversation.conversationHint}.`,
     `Campaign title: ${state.campaign.title}.`,
     `Local campaign id: ${state.campaign.id}.`,
     "",
     "Please name or summarize this chat using that campaign name and id if your UI supports it.",
     "Do not add campaign canon from this bootstrap message.",
-    "Lorekeeper SQLite is the source of truth; provider chat history is only a sidecar.",
+    "LoreKeeper SQLite is the source of truth; provider chat history is only scratch memory.",
     "",
     "Reply with one short sentence confirming the campaign chat is ready.",
   ].join("\n");
@@ -7513,7 +7513,7 @@ async function bootstrapProviderConversation() {
   }
 }
 
-async function runPromptThroughSidecar(prompt) {
+async function runPromptThroughCampaignChat(prompt) {
   if (!prompt.trim()) {
     elements.bridgeStatus.textContent = "Build a provider prompt first";
     setProviderActivity("Build a provider prompt first", "idle");
@@ -7543,7 +7543,7 @@ async function runPromptThroughSidecar(prompt) {
     baselineProviderText = baselineResponse?.text ?? "";
     elements.bridgeStatus.textContent = "Sending turn to campaign ChatGPT conversation...";
     setProviderActivity("Submitting turn to ChatGPT...", "working");
-    const progress = startSidecarProgress();
+    const progress = startProviderChatProgress();
     const result = await sendExtensionMessage(
       {
         type: "lorekeeper.runCompanionPrompt",
@@ -7606,13 +7606,13 @@ async function runPromptThroughSidecar(prompt) {
     }
 
     await copyPromptToClipboard(prompt, {
-      successMessage: "Sidecar did not return a response; prompt copied",
-      failureMessage: "Sidecar did not return a response; copy from prompt drawer",
+      successMessage: "Campaign chat did not return a response; prompt copied",
+      failureMessage: "Campaign chat did not return a response; copy from prompt drawer",
     });
     setProviderActivity("No provider response returned; prompt copied", "error");
     return { providerReceived: Boolean(result.sent) };
   } catch (error) {
-    stopSidecarProgress();
+    stopProviderChatProgress();
     const recovered = await importLatestProviderResponse({
       newerThanText: baselineProviderText,
       quietIfUnchanged: true,
@@ -7623,8 +7623,8 @@ async function runPromptThroughSidecar(prompt) {
     }
 
     await copyPromptToClipboard(prompt, {
-      successMessage: "Sidecar failed; prompt copied",
-      failureMessage: "Sidecar failed; copy from prompt drawer",
+      successMessage: "Campaign chat failed; prompt copied",
+      failureMessage: "Campaign chat failed; copy from prompt drawer",
     });
     state.bridge = {
       mode: "manual",
@@ -8705,8 +8705,8 @@ function commandDeckMaxHeight() {
 
 let activeProgressTimers = [];
 
-function startSidecarProgress() {
-  stopSidecarProgress();
+function startProviderChatProgress() {
+  stopProviderChatProgress();
   activeProgressTimers = [
     window.setTimeout(() => {
       elements.bridgeStatus.textContent = "Waiting for ChatGPT response...";
@@ -8723,11 +8723,11 @@ function startSidecarProgress() {
   ];
 
   return {
-    stop: stopSidecarProgress,
+    stop: stopProviderChatProgress,
   };
 }
 
-function stopSidecarProgress() {
+function stopProviderChatProgress() {
   for (const timer of activeProgressTimers) {
     window.clearTimeout(timer);
   }
@@ -8845,7 +8845,7 @@ function sendExtensionMessage(message, timeoutMs = 10000) {
     const requestId = `lk-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const timeout = window.setTimeout(() => {
       window.removeEventListener("message", handleResponse);
-      reject(new Error("Lorekeeper extension did not respond."));
+      reject(new Error("LoreKeeper extension did not respond."));
     }, timeoutMs);
 
     function handleResponse(event) {
@@ -8859,7 +8859,7 @@ function sendExtensionMessage(message, timeoutMs = 10000) {
       if (event.data.ok) {
         resolve(event.data.result);
       } else {
-        reject(new Error(event.data.error ?? "Lorekeeper extension bridge failed."));
+        reject(new Error(event.data.error ?? "LoreKeeper extension bridge failed."));
       }
     }
 
@@ -9416,7 +9416,7 @@ function speakerName(message) {
   }
 
   if (message.role === "system") {
-    return message.title || "Lorekeeper";
+    return message.title || "LoreKeeper";
   }
 
   return message.title || "Player";

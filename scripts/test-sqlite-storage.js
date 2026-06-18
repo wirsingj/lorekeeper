@@ -343,7 +343,7 @@ try {
   await rm(tempDir, { recursive: true, force: true });
 }
 
-console.log("Lorekeeper SQLite storage tests passed.");
+console.log("LoreKeeper SQLite storage tests passed.");
 
 function createLongCampaignFixture() {
   const campaign = createStarterCampaign({

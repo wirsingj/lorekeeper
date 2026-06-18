@@ -106,4 +106,4 @@ assert.equal(isAuthorizedRequestForToken("host-secret-token", {
   searchParams: new URLSearchParams({ lkToken: "wrong-token" }),
 }), false);
 
-console.log("Lorekeeper server security route tests passed.");
+console.log("LoreKeeper server security route tests passed.");

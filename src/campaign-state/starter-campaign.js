@@ -1,10 +1,10 @@
 import { createDefaultRulesProfile, createEmptyCampaign } from "./schema.js";
 
 export function createStarterCampaign(options = {}) {
-  const title = options.title?.trim() || "New Lorekeeper Campaign";
+  const title = options.title?.trim() || "New LoreKeeper Campaign";
   const premise =
     options.premise?.trim() ||
-    "A new fantasy campaign ready to grow through play, with canon captured by Lorekeeper.";
+    "A new fantasy campaign ready to grow through play, with canon captured by LoreKeeper.";
 
   return createEmptyCampaign({
     id: options.id ?? slugify(title),
@@ -68,7 +68,7 @@ export function createStarterCampaign(options = {}) {
       ],
       formattingRules: [
         "End most turns with solid narration or a direct prompt; reserve structured choices for combat, immediate danger, or explicit option requests.",
-        "Separate proposed Lorekeeper updates from in-world narration.",
+        "Separate proposed LoreKeeper updates from in-world narration.",
         "Use structured combat turns when stakes rise.",
       ],
     },

@@ -148,7 +148,7 @@ export class OllamaProvider {
   async testGeneration({ model, signal } = {}) {
     const result = await this.generateTurn({
       model,
-      prompt: "Reply with exactly: Lorekeeper local model ready.",
+      prompt: "Reply with exactly: LoreKeeper local model ready.",
       options: {
         outputLimit: 32,
         temperature: 0,

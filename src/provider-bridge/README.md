@@ -1,6 +1,6 @@
 # Provider Bridge
 
-The provider bridge defines how Lorekeeper treats ChatGPT, Claude, and similar provider tabs as
+The provider bridge defines how LoreKeeper treats ChatGPT, Claude, and similar provider tabs as
 visible AI execution surfaces.
 
 - `contracts.js` defines adapter metadata and bridge run state.

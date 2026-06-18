@@ -12,7 +12,7 @@ export function createManualWorkflow(prompt) {
       {
         id: "copy_prompt",
         label: "Copy prompt",
-        detail: "Copy the Lorekeeper prompt and paste it into the chosen provider chat.",
+        detail: "Copy the LoreKeeper prompt and paste it into the chosen provider chat.",
       },
       {
         id: "send_in_provider",
@@ -27,10 +27,9 @@ export function createManualWorkflow(prompt) {
       {
         id: "import_response",
         label: "Import response",
-        detail: "Paste or import the response into Lorekeeper for proposed canon updates.",
+        detail: "Paste or import the response into LoreKeeper for proposed canon updates.",
       },
     ],
     prompt,
   };
 }
-

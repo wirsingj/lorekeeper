@@ -3,7 +3,7 @@ export function extractLorekeeperUpdates(responseText) {
   if (!payload) {
     return {
       proposedChanges: [],
-      error: "No Lorekeeper update JSON block found.",
+      error: "No LoreKeeper update JSON block found.",
     };
   }
 
@@ -19,13 +19,13 @@ export function extractLorekeeperUpdates(responseText) {
     if (partialChanges.length > 0) {
       return {
         proposedChanges: partialChanges.flatMap(normalizeChange),
-        error: `Recovered ${partialChanges.length} complete update${partialChanges.length === 1 ? "" : "s"} from incomplete Lorekeeper JSON.`,
+        error: `Recovered ${partialChanges.length} complete update${partialChanges.length === 1 ? "" : "s"} from incomplete LoreKeeper JSON.`,
       };
     }
 
     return {
       proposedChanges: [],
-      error: error instanceof Error ? error.message : "Could not parse Lorekeeper update JSON.",
+      error: error instanceof Error ? error.message : "Could not parse LoreKeeper update JSON.",
     };
   }
 }
@@ -37,7 +37,7 @@ export function stripLorekeeperUpdates(responseText) {
   }
 
   const before = responseText.slice(0, payload.start).replace(
-    /(?:^|\n|\s)(?:JSON|Lorekeeper Updates|lorekeeper_updates)\s*[:\-]?\s*$/i,
+    /(?:^|\n|\s)(?:JSON|LoreKeeper Updates|Lorekeeper Updates|lorekeeper_updates)\s*[:\-]?\s*$/i,
     "",
   );
   const after = responseText.slice(payload.end);

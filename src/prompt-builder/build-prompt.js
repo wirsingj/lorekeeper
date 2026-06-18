@@ -1,21 +1,21 @@
 import { renderContextPackMarkdown } from "../context-packs/build-context-pack.js";
 import { storyThreadPromptLines } from "../context-packs/story-threads.js";
-import { renderTemplateInstructions, sidecarTurnTemplate } from "./templates.js";
+import { renderTemplateInstructions, tableDmTurnTemplate } from "./templates.js";
 
-export function buildSidecarPrompt({
+export function buildTableDmPrompt({
   campaign,
   contextPack,
   userIntent = "",
   metaInstructions = [],
   playerInputs = [],
-  template = sidecarTurnTemplate,
+  template = tableDmTurnTemplate,
 }) {
   const metaLines = metaInstructions.length
     ? metaInstructions.map((instruction) => `- ${compactLine(instruction, 240)}`)
     : ["- None."];
   const updateSchema = JSON.stringify(createEmptyUpdateContract(), null, 2);
   const sections = [
-    "# Lorekeeper Sidecar Prompt",
+    "# LoreKeeper Table DM Prompt",
     "",
     "## Role",
     renderTemplateInstructions(template),
@@ -43,7 +43,7 @@ export function buildSidecarPrompt({
     "",
     renderContextPackMarkdown(contextPack),
     "",
-    "## Lorekeeper Update Contract",
+    "## LoreKeeper Update Contract",
     "Only include changed/new canon that matters. Prefer compact data. One record per party/person/place/item/quest/etc. Use party for PCs and trusted companions.",
     "For hidden DM story planning, use domain quests, visibility dm_only, and data.threadType story_arc with data.horizon long|mid|short.",
     "Your final lines must be exactly one fenced block like this. If nothing changed, use an empty proposedChanges array.",
@@ -55,6 +55,8 @@ export function buildSidecarPrompt({
 
   return sections.join("\n").trim();
 }
+
+export const buildSidecarPrompt = buildTableDmPrompt;
 
 function formatPlayerInputs(playerInputs) {
   const inputs = Array.isArray(playerInputs)

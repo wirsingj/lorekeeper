@@ -7,10 +7,10 @@ import {
   writeCampaignSqliteFile,
 } from "../src/storage/sqlite-store.js";
 
-const title = process.argv[2] ?? "New Lorekeeper Campaign";
+const title = process.argv[2] ?? "New LoreKeeper Campaign";
 const premise =
   process.argv[3] ??
-  "A new fantasy campaign ready to grow through play, with canon captured by Lorekeeper.";
+  "A new fantasy campaign ready to grow through play, with canon captured by LoreKeeper.";
 const outputPath = process.argv[4] ?? defaultCampaignSqlitePath(title);
 
 const campaign = createStarterCampaign({
@@ -27,4 +27,3 @@ console.log(`Title: ${summary.campaign.title}`);
 console.log(`Path: ${writeResult.path}`);
 console.log(`Bytes: ${writeResult.bytes}`);
 console.log(`Record domains: ${Object.keys(summary.counts).join(", ")}`);
-

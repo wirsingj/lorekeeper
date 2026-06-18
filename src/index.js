@@ -1,7 +1,7 @@
 import { createSampleCampaign } from "./campaign-state/sample-campaign.js";
 import { normalizeCampaign, validateCampaign } from "./campaign-state/schema.js";
 import { buildContextPack, renderContextPackMarkdown } from "./context-packs/build-context-pack.js";
-import { buildSidecarPrompt } from "./prompt-builder/build-prompt.js";
+import { buildTableDmPrompt } from "./prompt-builder/build-prompt.js";
 import { createReviewBatch, summarizeReviewBatch } from "./canon-review/proposals.js";
 import { createManualWorkflow } from "./provider-bridge/manual-workflow.js";
 import { createCampaignBundle, serializeCampaignBundle } from "./storage/campaign-bundle.js";
@@ -21,7 +21,7 @@ const contextPack = buildContextPack(campaign, {
   purpose: "demo_next_turn",
 });
 
-const prompt = buildSidecarPrompt({
+const prompt = buildTableDmPrompt({
   campaign,
   contextPack,
   userIntent:
@@ -52,7 +52,7 @@ const reviewBatch = createReviewBatch({
 const workflow = createManualWorkflow(prompt);
 const bundle = createCampaignBundle(campaign);
 
-console.log("Lorekeeper scaffold check passed.");
+console.log("LoreKeeper project check passed.");
 console.log(`Campaign: ${campaign.title}`);
 console.log(`Context sections: ${contextPack.sections.length}`);
 console.log(`Prompt characters: ${prompt.length}`);

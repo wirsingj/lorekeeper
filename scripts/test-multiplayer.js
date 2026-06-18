@@ -812,7 +812,7 @@ assert.equal(eve.controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.notEqual(wrongInviteCampaign.party.find((member) => member.id === "jarin").controllerKind, controllerKinds.REMOTE_PLAYER);
 assert.equal(wrongInviteCampaign.multiplayer.connections.find((connection) => connection.id === eveJoinResult.connection.id).partyMemberId, eve.id);
 
-console.log("Lorekeeper multiplayer tests passed.");
+console.log("LoreKeeper multiplayer tests passed.");
 
 function testCampaign() {
   return {

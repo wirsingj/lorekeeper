@@ -627,6 +627,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-16: Pre-table guest seating now has a draft table/session identity and is published to the normal `/guest` page while Host New is open. Hosts can reserve a requested seat before launch. Remaining work: guest-editable character draft state and live local-browser soak.
 - 2026-06-16: Remote party-choice voting is now usable, but host resolution should become more explicit than "read the counters and send the choice." Current state: leading vote can draft the host action; a dedicated confirmation flow may still be smoother.
 - 2026-06-16: Next local playtest target should be host app plus local browser guest through `/guest`: join waiting room, seat request, party vote, guest leave/rejoin, one combat turn, and one provider recovery.
+- 2026-06-18: Round 2 audit found stale "early scaffold/sidecar" product copy and visible disabled provider roadmap options. README, default campaign copy, prompt/template labels, server/check strings, and Preferences AI source now use current LoreKeeper/table DM language; stored prompt template IDs remain stable for compatibility.
 
 ## How To Use This Doc
 

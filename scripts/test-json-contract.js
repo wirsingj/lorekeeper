@@ -50,7 +50,7 @@ assert.equal(stripLorekeeperUpdates(validResponse), "The room goes quiet.");
 
 const missing = extractLorekeeperUpdates("Only narration, no update block.");
 assert.equal(missing.proposedChanges.length, 0);
-assert.match(missing.error, /No Lorekeeper update JSON/);
+assert.match(missing.error, /No LoreKeeper update JSON/);
 
 const malformed = extractLorekeeperUpdates('Narration\n{"proposedChanges":[{"operation":"add","domain":"party","summary":"Sevrin joins.","data":{"name":"Sevrin"}}');
 assert.equal(malformed.proposedChanges.length, 1);
@@ -1903,7 +1903,7 @@ assert.equal(attackMechanics[1].rows[1].label, "Damage");
 
 assert.equal(validateTurnResponse(validTurnResponse()).valid, true);
 
-console.log("Lorekeeper JSON contract tests passed.");
+console.log("LoreKeeper JSON contract tests passed.");
 
 function testCampaign() {
   return {

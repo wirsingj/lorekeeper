@@ -205,7 +205,7 @@ function buildProviderSyncNote(domain, record, verb = "Added") {
   const label = domainLabels[domain] || domain;
   const title = record.name || record.title;
   const summary = record.summary || record.stakes || record.notes?.[0] || record.path || "No notes supplied.";
-  return `(Lorekeeper canon update: ${verb} ${label} "${title}". ${summary} Treat this as established campaign canon.)`;
+  return `(LoreKeeper canon update: ${verb} ${label} "${title}". ${summary} Treat this as established campaign canon.)`;
 }
 
 function normalizeDomain(domain) {

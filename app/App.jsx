@@ -103,7 +103,7 @@ export function LorekeeperShell() {
         </section>
       </aside>
 
-      <main className="play-screen" aria-label="Lorekeeper play screen">
+      <main className="play-screen" aria-label="LoreKeeper play screen">
         <div className="screen-bezel">
           <section id="home-panel" className="home-panel" hidden>
             <div className="home-menu">
@@ -757,10 +757,6 @@ function SetupDialog() {
             <select id="provider-mode">
               <option value="ollama">Local AI</option>
               <option value="bridge">Campaign Chat</option>
-              <option disabled>Claude Tab</option>
-              <option disabled>ChatGPT API</option>
-              <option disabled>Claude API</option>
-              <option disabled>Manual</option>
             </select>
           </label>
           <div className="local-ai-card">

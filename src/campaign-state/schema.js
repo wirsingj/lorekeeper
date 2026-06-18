@@ -483,8 +483,8 @@ export function createDefaultPromptTemplateSettings() {
     templates: [
       {
         id: "sidecar_turn_v1",
-        name: "Sidecar Campaign Turn",
-        purpose: "Run the next campaign beat using a focused Lorekeeper context pack.",
+        name: "Table DM Turn",
+        purpose: "Run the next campaign beat using a focused LoreKeeper context pack.",
       },
     ],
   };
@@ -594,7 +594,7 @@ export function createDefaultRulesProfile() {
     providerGuardRails: [
       "Use real rolls when resolving uncertain actions.",
       "Do not silently change HP, items, spells, relationships, or major canon.",
-      "If exact stats are missing, state the assumption and propose a Lorekeeper update.",
+      "If exact stats are missing, state the assumption and propose a LoreKeeper update.",
       "Keep combat tactical and readable rather than exhaustive.",
       "The user controls their primary character unless they explicitly delegate.",
     ],

@@ -318,7 +318,7 @@ try {
   await rm(tempDir, { recursive: true, force: true });
 }
 
-console.log("Lorekeeper server integration tests passed.");
+console.log("LoreKeeper server integration tests passed.");
 
 async function fetchJson(url, init) {
   const response = await fetch(url, init);
@@ -338,7 +338,7 @@ function waitForServerPort(processHandle) {
 
     processHandle.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
-      const match = stdout.match(/Lorekeeper local app: http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
+      const match = stdout.match(/LoreKeeper local app: http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
       if (match) {
         clearTimeout(timeout);
         resolve(Number(match[1]));
