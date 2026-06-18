@@ -179,9 +179,6 @@ export function LorekeeperShell() {
               <button id="seat-waiting-guest" className="mini-action" type="button" title="Open seating controls" hidden>
                 Seat Guest
               </button>
-              <button id="start-adventure-opening" className="mini-action start-adventure-action" type="button" title="Begin the first DM narration" hidden>
-                Start Adventure
-              </button>
             </div>
           </div>
           <section id="thin-join-panel" className="thin-join-panel" hidden>
@@ -438,6 +435,9 @@ export function LorekeeperShell() {
         <div id="command-context" className="command-context" aria-live="polite">
           <span id="command-context-phase">Now: Table ready</span>
           <span id="command-context-next">Next: Continue the scene.</span>
+          <button id="start-adventure-opening" className="mini-action start-adventure-action" type="button" title="Begin the first DM narration" hidden>
+            Start Adventure
+          </button>
         </div>
         <form id="player-form" className="player-form">
           <label className="visually-hidden" htmlFor="player-input">Table Message</label>

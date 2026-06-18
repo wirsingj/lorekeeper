@@ -2374,6 +2374,15 @@ button:disabled {
   flex: 1 1 auto;
 }
 
+.command-context .start-adventure-action {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 12px;
+  border-color: rgba(127, 163, 139, 0.42);
+  background: linear-gradient(180deg, #31443a, #22332b);
+  color: #dceee3;
+}
+
 .command-context[data-tone="attention"] span:first-child {
   color: #f0b6ae;
 }
