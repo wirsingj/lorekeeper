@@ -376,6 +376,143 @@ const scenarios = [
       );
     },
   },
+  {
+    name: "remote-guest-prelobby-joins-and-plays",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await openCampaignWizard(harness.page);
+      await fillCampaignSeed(harness.page, {
+        title: "Harness Prelobby Remote",
+        premise: "A river watch gathers before a suspicious ferry crossing.",
+        startingLocation: "Greyford Ferry",
+        tone: "warm, tense road fantasy",
+        primary: {
+          name: "Ilyra",
+          ancestry: "Half-elf",
+          characterClass: "Bard",
+          concept: "A watchful singer who reads a crowd before speaking.",
+        },
+      });
+      const remoteCard = await ensureWizardPartyCard(harness.page, 0);
+      await fillWizardPartyCard(remoteCard, {
+        name: "Renn",
+        ancestry: "Human",
+        characterClass: "Ranger",
+        concept: "A river scout who knows when ferrymen are lying.",
+        integrationPrompt: "Renn arrives with news from the far bank.",
+        controllerKind: "remote_invite",
+      });
+      const preTableSnapshot = await waitForPreTableParty(harness, { minSeats: 1 });
+      assert.ok(preTableSnapshot.joinableSeats.some((seat) => seat.name === "Renn"), "Renn should be joinable before campaign launch");
+
+      const guestPage = await harness.newGuestPage("guest-prelobby");
+      await requestGuestSeat(guestPage, { playerName: "Remote Jess", seatName: "Renn" });
+      await seatPreTableGuest(harness, { playerName: "Remote Jess", seatName: "Renn" });
+      await expectVisibleText(guestPage, "Seat reserved");
+
+      await harness.page.click("#start-campaign-submit");
+      await harness.page.waitForFunction(() => document.querySelector("#campaign-dialog")?.open !== true, null, { timeout: 15000 });
+      await harness.page.waitForFunction((title) => {
+        return window.__lorekeeperDebug?.stateSummary?.().campaignTitle === title;
+      }, "Harness Prelobby Remote", { timeout: 10000 });
+
+      const connected = await waitForGuestConnected(guestPage, { characterName: "Renn", campaignTitle: "Harness Prelobby Remote" });
+      assert.equal(connected.assignedCharacter.name, "Renn");
+      await sendTableTalk(guestPage, "Remote Jess is ready from the pre-lobby.");
+      await expectVisibleText(harness.page, "Remote Jess is ready from the pre-lobby.");
+      await assertRemoteController(harness, "Renn");
+    },
+  },
+  {
+    name: "remote-guest-active-table-leave-rejoin-new-game",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Remote Active A",
+        premise: "A road camp watches torchlight move against the wind.",
+        startingLocation: "Lantern Road Camp",
+        tone: "alert cooperative fantasy",
+        primary: {
+          name: "Ilyra",
+          ancestry: "Half-elf",
+          characterClass: "Bard",
+          concept: "A steady traveler keeping the group from panic.",
+        },
+        companions: [{
+          name: "Renn",
+          ancestry: "Human",
+          characterClass: "Ranger",
+          concept: "A scout who reads tracks and trouble.",
+          integrationPrompt: "Renn has been watching the road ahead.",
+          controllerKind: "remote_invite",
+        }],
+      });
+      await waitForActiveJoinableSeat(harness, "Renn");
+
+      const guestPage = await harness.newGuestPage("guest-active");
+      await requestGuestSeat(guestPage, { playerName: "Remote Jess", seatName: "Renn" });
+      await seatActiveWaitingGuest(harness, { playerName: "Remote Jess", seatName: "Renn" });
+      const firstSession = await waitForGuestConnected(guestPage, { characterName: "Renn", campaignTitle: "Harness Remote Active A" });
+      assert.equal(firstSession.assignedCharacter.name, "Renn");
+
+      await sendTableTalk(guestPage, "Remote Jess says hello from the guest tab.");
+      await expectVisibleText(harness.page, "Remote Jess says hello from the guest tab.");
+      await sendTableTalk(harness.page, "Host sees the remote tab clearly.");
+      await expectVisibleText(guestPage, "Host sees the remote tab clearly.");
+
+      await submitGuestTurn(guestPage, "Renn checks the road dust for a second set of tracks.");
+      await waitForHostStagedGuestInput(harness.page, "Renn checks the road dust");
+      await harness.mockProviderTurn(turnResponse({
+        text: "Renn finds a second set of tracks cutting through the camp perimeter, and Ilyra spots the lantern that tried to hide them.",
+        sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+      }));
+      await submitPlayerTurn(harness.page, "Ilyra keeps the camp quiet while Renn points out the tracks.");
+      await expectVisibleText(guestPage, "second set of tracks");
+
+      const staleSession = await guestDebugSession(guestPage);
+      await guestPage.click("#return-main-menu");
+      await waitForProviderActivityText(guestPage, /Left the hosted table/i);
+      await expectGuestActionRejected(harness, staleSession, "Renn tries to act after leaving.");
+      await waitForActiveJoinableSeat(harness, "Renn");
+
+      await requestGuestSeat(guestPage, { playerName: "Remote Jess", seatName: "Renn" });
+      await seatActiveWaitingGuest(harness, { playerName: "Remote Jess", seatName: "Renn" });
+      const rejoined = await waitForGuestConnected(guestPage, { characterName: "Renn", campaignTitle: "Harness Remote Active A" });
+      assert.notEqual(rejoined.connection.id, staleSession.connectionId, "rejoin should create a fresh active connection");
+      const oldGameSession = await guestDebugSession(guestPage);
+
+      await harness.page.click("#return-main-menu");
+      await createCampaignFromWizard(harness, {
+        title: "Harness Remote Active B",
+        premise: "A city gate opens for a new table with a different scout.",
+        startingLocation: "Southgate Arch",
+        tone: "clean fresh-start fantasy",
+        primary: {
+          name: "Mira",
+          ancestry: "Human",
+          characterClass: "Fighter",
+          concept: "A calm guard captain starting a fresh job.",
+        },
+        companions: [{
+          name: "Tavi",
+          ancestry: "Halfling",
+          characterClass: "Rogue",
+          concept: "A bright-eyed courier with quick hands.",
+          integrationPrompt: "Tavi knows who hired the party at Southgate.",
+          controllerKind: "remote_invite",
+        }],
+      });
+      await waitForActiveJoinableSeat(harness, "Tavi");
+      await expectGuestActionRejected(harness, oldGameSession, "Renn tries to act in the old game after host starts a new one.");
+
+      await guestPage.click("#return-main-menu");
+      await requestGuestSeat(guestPage, { playerName: "Remote Jess", seatName: "Tavi" });
+      await seatActiveWaitingGuest(harness, { playerName: "Remote Jess", seatName: "Tavi" });
+      const newGameSession = await waitForGuestConnected(guestPage, { characterName: "Tavi", campaignTitle: "Harness Remote Active B" });
+      assert.equal(newGameSession.campaignTitle, "Harness Remote Active B");
+      assert.equal(newGameSession.assignedCharacter.name, "Tavi");
+    },
+  },
 ];
 const chaosScenarios = wantsChaos ? buildChaosScenarios({ seed: chaosSeed, runs: chaosRuns }) : [];
 const allScenarios = [...scenarios, ...chaosScenarios];
@@ -426,6 +563,7 @@ async function runScenario(browserInstance, scenario) {
   const childExit = new Promise((resolve) => child.once("exit", resolve));
   let context;
   let page;
+  const pages = [];
   const browserErrors = [];
   const responseChecks = [];
   let serverOutput = "";
@@ -442,31 +580,36 @@ async function runScenario(browserInstance, scenario) {
     context = await browserInstance.newContext({
       viewport: scenario.viewport ?? { width: 1440, height: 1000 },
     });
-    page = await context.newPage();
-    page.on("console", (message) => {
-      if (message.type() === "error") {
-        if (/Failed to load resource: the server responded with a status of/i.test(message.text())) {
-          return;
+    const trackPage = async (trackedPage, label = "page") => {
+      pages.push({ page: trackedPage, label });
+      trackedPage.on("console", (message) => {
+        if (message.type() === "error") {
+          if (/Failed to load resource: the server responded with a status of/i.test(message.text())) {
+            return;
+          }
+          browserErrors.push(`[${label} console] ${message.text()}`);
         }
-        browserErrors.push(`[console] ${message.text()}`);
-      }
-    });
-    page.on("pageerror", (error) => {
-      browserErrors.push(`[pageerror] ${error.message}`);
-    });
-    page.on("response", (response) => {
-      responseChecks.push((async () => {
-        const status = response.status();
-        const url = response.url();
-        if (status === 404 && url.includes("/api/campaign/message/update")) {
-          return;
-        }
-        if (status >= 500) {
-          const body = await response.text().catch(() => "");
-          browserErrors.push(`[response ${status}] ${url}${body ? `: ${body.slice(0, 300)}` : ""}`);
-        }
-      })());
-    });
+      });
+      trackedPage.on("pageerror", (error) => {
+        browserErrors.push(`[${label} pageerror] ${error.message}`);
+      });
+      trackedPage.on("response", (response) => {
+        responseChecks.push((async () => {
+          const status = response.status();
+          const url = response.url();
+          if (status === 404 && url.includes("/api/campaign/message/update")) {
+            return;
+          }
+          if (status >= 500) {
+            const body = await response.text().catch(() => "");
+            browserErrors.push(`[${label} response ${status}] ${url}${body ? `: ${body.slice(0, 300)}` : ""}`);
+          }
+        })());
+      });
+      return trackedPage;
+    };
+
+    page = await trackPage(await context.newPage(), "host");
 
     const providerQueue = [];
     let providerRouteInstalled = false;
@@ -524,6 +667,13 @@ async function runScenario(browserInstance, scenario) {
     const harness = {
       baseUrl,
       page,
+      async newGuestPage(label = "guest") {
+        const guestPage = await trackPage(await context.newPage(), label);
+        await guestPage.goto(`${baseUrl}/guest`, { waitUntil: "domcontentloaded" });
+        await guestPage.waitForSelector("#root", { timeout: 10000 });
+        await guestPage.waitForFunction(() => Boolean(window.__lorekeeperDebug), null, { timeout: 10000 });
+        return guestPage;
+      },
       async gotoHome() {
         await page.goto(`${baseUrl}/?lkToken=${encodeURIComponent(token)}`, { waitUntil: "domcontentloaded" });
         await page.waitForSelector("#root", { timeout: 10000 });
@@ -549,6 +699,9 @@ async function runScenario(browserInstance, scenario) {
   } catch (error) {
     if (page) {
       await writeFailureArtifacts({ scenarioName: scenario.name, page, baseUrl: page.url(), error });
+      for (const { page: extraPage, label } of pages.filter((entry) => entry.page !== page)) {
+        await writeFailureArtifacts({ scenarioName: `${scenario.name}-${label}`, page: extraPage, baseUrl: extraPage.url(), error }).catch(() => {});
+      }
       await writeFile(path.join(artifactsRoot, `${scenario.name}.server.txt`), serverOutput).catch(() => {});
     }
     throw error;
@@ -658,6 +811,204 @@ async function waitForPreTableParty(harness, { minSeats }) {
     timeoutMs: 10000,
     description: `pre-table lobby with ${minSeats} seats`,
   });
+}
+
+async function requestGuestSeat(guestPage, { playerName, seatName }) {
+  if (!await guestPage.locator("#guest-waiting-room-panel").isVisible().catch(() => false)) {
+    await clickIfVisible(guestPage, "#home-join-flow");
+  }
+  if (!await guestPage.locator("#guest-waiting-room-panel").isVisible().catch(() => false)) {
+    await guestPage.waitForTimeout(300);
+  }
+  if (!await guestPage.locator("#guest-waiting-room-panel").isVisible().catch(() => false)) {
+    const origin = new URL(guestPage.url()).origin;
+    await guestPage.goto(`${origin}/guest`, { waitUntil: "domcontentloaded" });
+    await guestPage.waitForFunction(() => Boolean(window.__lorekeeperDebug), null, { timeout: 10000 });
+  }
+  await guestPage.locator("#guest-waiting-room-panel").waitFor({ state: "visible", timeout: 10000 });
+  await guestPage.waitForFunction((name) => {
+    const buttons = [...document.querySelectorAll("[data-guest-seat-id]")];
+    return buttons.some((button) => !name || button.textContent?.includes(name));
+  }, seatName ?? "", { timeout: 15000 });
+  if (seatName) {
+    await guestPage.locator("[data-guest-seat-id]").filter({ hasText: seatName }).first().click();
+  } else {
+    await guestPage.locator("[data-guest-seat-id]").first().click();
+  }
+  await guestPage.fill("#guest-waiting-player-name", playerName);
+  await guestPage.click("#guest-waiting-register");
+  await guestPage.waitForFunction(() => {
+    return /waiting|seat request sent/i.test(document.querySelector("#guest-waiting-status")?.textContent ?? "");
+  }, null, { timeout: 10000 });
+}
+
+async function seatPreTableGuest(harness, { playerName, seatName }) {
+  const snapshot = await waitForAsync(async () => {
+    const candidate = await harness.fetchJson("/api/pretable-lobby/host-snapshot");
+    const guest = candidate.waitingGuests?.find((item) => item.displayName === playerName);
+    const seat = candidate.joinableSeats?.find((item) => item.name === seatName);
+    return guest && seat ? { candidate, guest, seat } : null;
+  }, {
+    timeoutMs: 15000,
+    description: `pre-table guest ${playerName} waiting for ${seatName}`,
+  });
+  await harness.fetchJson("/api/pretable-lobby/seat", {
+    method: "POST",
+    body: {
+      waitingGuestId: snapshot.guest.id,
+      partyMemberId: snapshot.seat.id,
+    },
+  });
+}
+
+async function waitForActiveJoinableSeat(harness, seatName) {
+  return waitForAsync(async () => {
+    const { campaign } = await harness.fetchJson("/api/campaign");
+    const seat = (campaign.party ?? []).find((member) =>
+      member.name === seatName &&
+      member.inviteIntent === "remote_player" &&
+      member.controllerKind !== "remote_player"
+    );
+    const table = campaign.multiplayer?.localTable ?? {};
+    return table.running && seat ? { campaign, seat, table } : null;
+  }, {
+    timeoutMs: 15000,
+    description: `active joinable seat ${seatName}`,
+  });
+}
+
+async function seatActiveWaitingGuest(harness, { playerName, seatName }) {
+  const state = await waitForAsync(async () => {
+    const { campaign } = await harness.fetchJson("/api/campaign");
+    const guest = (campaign.multiplayer?.waitingGuests ?? []).find((item) =>
+      item.displayName === playerName && item.status === "waiting"
+    );
+    const seat = (campaign.party ?? []).find((member) => member.name === seatName);
+    const table = campaign.multiplayer?.localTable ?? {};
+    return guest && seat && table.running ? { campaign, guest, seat, table } : null;
+  }, {
+    timeoutMs: 15000,
+    description: `active waiting guest ${playerName} for ${seatName}`,
+  });
+  await harness.fetchJson("/api/multiplayer/waiting-room/seat", {
+    method: "POST",
+    body: {
+      campaignId: state.campaign.id,
+      tableId: state.table.tableId,
+      sessionId: state.table.sessionId,
+      waitingGuestId: state.guest.id,
+      partyMemberId: state.seat.id,
+    },
+  });
+}
+
+async function waitForGuestConnected(guestPage, { characterName, campaignTitle }) {
+  return waitForAsync(async () => {
+    const renderer = await guestPage.evaluate(() => window.__lorekeeperDebug?.renderer?.());
+    const guest = renderer?.debugSnapshot?.multiplayer?.guest;
+    const saveStatus = await guestPage.locator("#save-status").textContent().catch(() => "");
+    if (
+      guest?.status === "connected" &&
+      (!characterName || saveStatus?.includes(characterName)) &&
+      (!campaignTitle || renderer?.debugSnapshot?.identity?.campaignTitle === campaignTitle)
+    ) {
+      return {
+        campaignTitle: renderer.debugSnapshot.identity.campaignTitle,
+        assignedCharacter: { name: characterName || saveStatus?.replace(/^Guest:\s*/i, "") || "" },
+        connection: {
+          id: guest.connectionId,
+          partyMemberId: guest.partyMemberId,
+          status: guest.status,
+        },
+      };
+    }
+    return null;
+  }, {
+    timeoutMs: 20000,
+    intervalMs: 250,
+    description: `guest connected${characterName ? ` as ${characterName}` : ""}`,
+  });
+}
+
+async function assertRemoteController(harness, characterName) {
+  const { campaign } = await harness.fetchJson("/api/campaign");
+  const member = campaign.party.find((item) => item.name === characterName);
+  assert.equal(member?.controllerKind, "remote_player", `${characterName} should be remote-controlled`);
+}
+
+async function sendTableTalk(page, text) {
+  await page.locator("#table-talk-input").waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForFunction(() => {
+    const input = document.querySelector("#table-talk-input");
+    const button = document.querySelector("#table-talk-send");
+    return input && button && !input.disabled && !button.disabled;
+  }, null, { timeout: 10000 });
+  await page.fill("#table-talk-input", text);
+  await page.click("#table-talk-send");
+  await expectVisibleText(page, text);
+}
+
+async function submitGuestTurn(guestPage, text) {
+  await guestPage.locator("#player-input").waitFor({ state: "visible", timeout: 10000 });
+  await waitForAsync(async () => {
+    if (!await setPlayerInput(guestPage, text)) {
+      return null;
+    }
+    return await guestPage.evaluate((expectedText) => {
+      const button = document.querySelector("#build-turn");
+      const input = document.querySelector("#player-input");
+      return Boolean(button && input && input.value === expectedText && !button.disabled && !input.disabled);
+    }, text) ? true : null;
+  }, {
+    timeoutMs: 12000,
+    description: "guest input ready to submit",
+  });
+  await guestPage.click("#build-turn");
+  await guestPage.waitForFunction(() => /Action sent|Waiting for the host/i.test(document.querySelector("#provider-activity-label")?.textContent ?? ""), null, { timeout: 10000 });
+}
+
+async function waitForHostStagedGuestInput(hostPage, textFragment) {
+  return waitForAsync(async () => {
+    const stagedInputs = await hostPage.evaluate(() =>
+      window.__lorekeeperDebug?.renderer?.().debugSnapshot?.multiplayer?.stagedGuestInputs ?? []
+    );
+    return stagedInputs.some((input) => input.textPreview?.includes(textFragment)) ? stagedInputs : null;
+  }, {
+    timeoutMs: 15000,
+    description: `host staged guest input containing ${textFragment}`,
+  });
+}
+
+async function guestDebugSession(guestPage) {
+  return guestPage.evaluate(() => {
+    try {
+      return JSON.parse(localStorage.getItem("lorekeeper.guestSession") || "null");
+    } catch {
+      return null;
+    }
+  });
+}
+
+async function expectGuestActionRejected(harness, session, text) {
+  if (!session?.connectionId) {
+    return;
+  }
+  const response = await fetch(`${harness.baseUrl}/api/multiplayer/action`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      connectionId: session.connectionId,
+      clientId: session.clientId,
+      connectionSecret: session.connectionSecret,
+      characterId: session.partyMemberId,
+      text,
+      ready: true,
+      campaignId: session.campaignId,
+      tableId: session.tableId,
+      sessionId: session.sessionId,
+    }),
+  });
+  assert.equal(response.ok, false, "stale or disconnected guest credentials should not submit actions");
 }
 
 async function assertNoDuplicateWizardCardNames(page) {
@@ -1185,6 +1536,13 @@ async function assertTraceRecords(harness, path) {
 
 async function expectVisibleText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({ state: "visible", timeout: 10000 });
+}
+
+async function waitForProviderActivityText(page, pattern, timeoutMs = 10000) {
+  await page.waitForFunction((source) => {
+    const pattern = new RegExp(source, "i");
+    return pattern.test(document.querySelector("#provider-activity-label")?.textContent ?? "");
+  }, pattern.source ?? String(pattern), { timeout: timeoutMs });
 }
 
 async function fetchJson(url, options = {}) {

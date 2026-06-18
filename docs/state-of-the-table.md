@@ -311,6 +311,7 @@ Risks:
 173. The UI harness provider mock is now a persistent page route with a mutable response queue, so cancel/retry tests remain deterministic and do not accidentally fall through to a real Ollama request except in the explicit Ollama contract smoke scenario.
 174. Combat context pack text now sanitizes object-shaped action labels and enemy HP before provider prompts, preventing `[object Object]` leaks in legal options or enemy summaries.
 175. Windows SQLite saves now retry transient atomic-replace collisions, reducing `EPERM`/`EBUSY` failures when review commits, Table Talk, diagnostics, and provider saves overlap under test pressure.
+176. The Playwright harness now opens separate host and `/guest` browser tabs for remote-player coverage: pre-lobby guest request/adoption, active-table guest request, guest leave/rejoin, stale old-session rejection, new-game join, guest Table Talk, host Table Talk, guest action staging, and host/provider resolution.
 
 ### Still Risky
 
@@ -339,7 +340,7 @@ Risks:
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
 25. The app still has too many visible controls across table rails and campaign/table management. Preferences are calmer now via top-level tabs, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and a fuller split between app preferences and table settings.
-26. Automated UI coverage is now much stronger, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
+26. Automated UI coverage is now much stronger, including host plus `/guest` browser-tab flows, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
 
 ## Live Acceptance Matrix
 
@@ -494,6 +495,7 @@ Risks:
 - [x] Waiting-room seating updates live guest session state so the guest composer and send path agree with the visible "seated as" state.
 - [x] Normal Guest Links use plain `/guest`; actions/snapshots still validate campaign/table/session identity after registration.
 - [x] Guest snapshots and staged actions reject wrong campaign/table/session identity when supplied.
+- [x] Add host plus `/guest` UI harness coverage for pre-lobby join/adoption, active-table join, leave/rejoin, stale old-session rejection, new-game join, guest/host Table Talk, and remote action staging/resolution.
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.
@@ -644,6 +646,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Round 2 audit found stale "early scaffold/sidecar" product copy and visible disabled provider roadmap options. README, default campaign copy, prompt/template labels, server/check strings, and Preferences AI source now use current LoreKeeper/table DM language; stored prompt template IDs remain stable for compatibility.
 - 2026-06-18: Automated UI chaos should stay desktop/tabletop-first for now. Mobile/narrow viewports are useful only as an opt-in stress check; release confidence should prioritize Electron host plus `/guest` browser/desktop guest flows.
 - 2026-06-18: Test campaign SQLite files must stay isolated to temporary harness roots and be cleaned after successful bundles. Failed bundles may keep artifacts for debugging, but should not pollute real `data/campaigns`.
+- 2026-06-18: Remote multiplayer UI harness now uses a real second `/guest` page against the same temp host server. It catches renderer/session wiring regressions, but two-machine play is still needed for LAN/firewall/browser-device behavior.
 
 ## How To Use This Doc
 
