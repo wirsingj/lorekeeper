@@ -37,6 +37,7 @@ import { applyTableActionProjection, buildTableActionProjection } from "./table-
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
 import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
+import { buildTurnContentGate, buildTurnSubmitGate } from "./turn-submit-controller.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 import {
   isHardBlockedTurnRepair,
@@ -1534,15 +1535,15 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   // Danger zone: renderer still coordinates input echoing, staged guest inputs,
   // provider execution, and recovery lifecycle. Future target: a TurnFlow
   // command handler that returns a projection for app.js to render.
-  if (hasActiveGeneration()) {
-    elements.bridgeStatus.textContent = "The DM is already resolving a turn.";
-    setProviderActivity("Wait for the current DM response before sending again", "waiting");
-    return { providerReceived: false, reason: "busy" };
-  }
-  if (activeTurnRepair() && !options.allowDuringRepair) {
-    elements.bridgeStatus.textContent = "Review the DM response before sending another turn.";
-    setProviderActivity("DM response needs review. Try Again, Details, or Use Anyway.", "error");
-    return { providerReceived: false, reason: "repair_required" };
+  const submitGate = buildTurnSubmitGate({
+    turnProjection: turnProjection(),
+    repair: activeTurnRepair(),
+    allowDuringRepair: options.allowDuringRepair,
+  });
+  if (submitGate.blocked) {
+    elements.bridgeStatus.textContent = submitGate.bridgeText;
+    setProviderActivity(submitGate.activityText, submitGate.activityState);
+    return { providerReceived: false, reason: submitGate.reason };
   }
   const approvedPartyInputs = options.playerInputs ? [] : collectApprovedPartyInputs();
   const stagedRemoteInputs = options.playerInputs ? [] : collectStagedRemoteInputs();
@@ -1553,10 +1554,11 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
     ...stagedRemoteInputs,
   ];
   const playerMessage = normalizedMessage;
-  if (!playerMessage && !playerInputs.length) {
-    elements.bridgeStatus.textContent = "Type an action or wait for a staged party input first";
-    setProviderActivity("Type an action or stage a party input", "idle");
-    return { providerReceived: false, reason: "empty" };
+  const contentGate = buildTurnContentGate({ playerMessage, playerInputs });
+  if (contentGate.blocked) {
+    elements.bridgeStatus.textContent = contentGate.bridgeText;
+    setProviderActivity(contentGate.activityText, contentGate.activityState);
+    return { providerReceived: false, reason: contentGate.reason };
   }
 
   setProviderActivity("Building provider prompt...", "working");

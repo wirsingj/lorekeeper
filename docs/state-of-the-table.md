@@ -290,11 +290,12 @@ Risks:
 152. Table action visibility for Nudge, Cancel DM Response, Start Adventure, Seat Guest, Review DM Response, Use Anyway, Try Again, and Read Latest now flows through `app/table-action-controller.js`, giving phase-aware CTAs one tested projection instead of scattered renderer functions.
 153. Seat Guest and DM recovery actions now live in the command deck's current-action area beside Now/Next, while provider transport controls stay in the status strip.
 154. The command input now consumes `TableSessionEngine` phase state, so DM-thinking, recovery, host-review, party-vote, waiting-guest, and guest-sent states show phase-aware placeholders and locking instead of generic disabled input.
+155. Send-turn preflight policy now lives in `app/turn-submit-controller.js`, so busy/repair/empty-turn blocking copy is tested outside `app/app.js`.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
-2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, and Nudge/table action visibility policy are now extracted.
+2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, and Nudge/table action visibility policy are now extracted.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, and host review summary, but the underlying manual review textarea still exists as a fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, and combat nudges are active-turn-only suggestions, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
@@ -407,7 +408,7 @@ Risks:
 - [x] Session health names the waiting character and the next table responsibility for guest inputs.
 - [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, and Nudge/table action visibility policy are extracted; broader provider/import orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, and Nudge/table action visibility policy are extracted; broader provider/import orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.

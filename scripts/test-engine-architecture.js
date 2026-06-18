@@ -31,6 +31,7 @@ import { buildTableActionProjection } from "../app/table-action-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
 import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "../app/table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
+import { buildTurnContentGate, buildTurnSubmitGate } from "../app/turn-submit-controller.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import {
   isHardBlockedTurnRepair,
@@ -2002,6 +2003,36 @@ function testInputComposerProjection() {
   assert.match(remoteStaged.placeholder, /remote action is staged/i);
 }
 
+function testTurnSubmitGates() {
+  const busyGate = buildTurnSubmitGate({
+    turnProjection: { hasActiveGeneration: true },
+  });
+  assert.equal(busyGate.blocked, true);
+  assert.equal(busyGate.reason, "busy");
+  assert.match(busyGate.activityText, /current DM response/i);
+
+  const repairGate = buildTurnSubmitGate({
+    turnProjection: { hasActiveGeneration: false },
+    repair: { reason: "needs review" },
+  });
+  assert.equal(repairGate.blocked, true);
+  assert.equal(repairGate.reason, "repair_required");
+
+  const allowedDuringRepair = buildTurnSubmitGate({
+    repair: { reason: "needs review" },
+    allowDuringRepair: true,
+  });
+  assert.equal(allowedDuringRepair.blocked, false);
+
+  const emptyGate = buildTurnContentGate({ playerMessage: "   ", playerInputs: [] });
+  assert.equal(emptyGate.blocked, true);
+  assert.equal(emptyGate.reason, "empty");
+
+  assert.equal(buildTurnContentGate({
+    playerInputs: [{ characterId: "thor", text: "Thor watches the road." }],
+  }).blocked, false);
+}
+
 function testTableStatusVocabulary() {
   assert.equal(tableStatusForActivity("Generating locally with Ollama...", "working").text, "DM is thinking...");
   assert.equal(tableStatusForActivity("Needs repair - sceneStatus.awaitingPlayer must be boolean. Inspect or retry.", "error").text, "DM response needs review.");
@@ -2789,6 +2820,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const dmNudgeController = await readFile(path.join("app", "dm-nudge-controller.js"), "utf8");
   const tableActionController = await readFile(path.join("app", "table-action-controller.js"), "utf8");
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
+  const turnSubmitController = await readFile(path.join("app", "turn-submit-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
@@ -3017,7 +3049,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited friend/);
   assert.match(appJs, /renderDebugMetaControl/);
-  assert.match(appJs, /DM response needs review\. Try Again, Details, or Use Anyway\./);
+  assert.match(turnSubmitController, /DM response needs review\. Try Again, Details, or Use Anyway\./);
+  assert.doesNotMatch(appJs, /DM response needs review\. Try Again, Details, or Use Anyway\./, "send-turn blocking copy should live outside app.js");
   assert.match(appJs, /DM is reconsidering the response/);
   assert.match(appJs, /turn-repair-controller\.js/, "repair display policy should live outside the main app renderer");
   assert.match(appJs, /turnRepairStatusText/, "repair status should come from the repair controller");
@@ -3104,6 +3137,7 @@ testProviderImportOutcomeProjection();
 testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();
+testTurnSubmitGates();
 testTableStatusVocabulary();
 testTableSessionEnginePhases();
 testTableFocusProjection();
