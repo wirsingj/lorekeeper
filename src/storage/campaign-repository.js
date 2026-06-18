@@ -402,15 +402,19 @@ function cleanCampaignTitle(title) {
 async function loadCampaignIndex(projectRoot) {
   const indexPath = getCampaignIndexPath(projectRoot);
   if (!existsSync(indexPath)) {
-    return {
-      indexVersion: campaignIndexVersion,
-      activeCampaignPath: null,
-      campaigns: [],
-      hiddenCampaignPaths: [],
-    };
+    return emptyCampaignIndex();
   }
 
-  const index = JSON.parse(await readFile(indexPath, "utf8"));
+  let index = null;
+  try {
+    const raw = await readFile(indexPath, "utf8");
+    if (!raw.trim()) {
+      return emptyCampaignIndex();
+    }
+    index = JSON.parse(raw);
+  } catch {
+    return emptyCampaignIndex();
+  }
   return {
     indexVersion: index.indexVersion ?? null,
     activeCampaignPath: index.activeCampaignPath ?? null,
@@ -418,6 +422,15 @@ async function loadCampaignIndex(projectRoot) {
     hiddenCampaignPaths: Array.isArray(index.hiddenCampaignPaths)
       ? index.hiddenCampaignPaths.map((item) => path.resolve(item))
       : [],
+  };
+}
+
+function emptyCampaignIndex() {
+  return {
+    indexVersion: campaignIndexVersion,
+    activeCampaignPath: null,
+    campaigns: [],
+    hiddenCampaignPaths: [],
   };
 }
 

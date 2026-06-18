@@ -10,6 +10,7 @@ import {
   createNewActiveCampaign,
   deleteCampaign,
   listCampaigns,
+  loadActiveCampaign,
   loadImportedCampaign,
 } from "../src/storage/campaign-repository.js";
 import { createCampaignBundle, serializeCampaignBundle } from "../src/storage/campaign-bundle.js";
@@ -285,6 +286,33 @@ try {
   const index = JSON.parse(await readFile(indexPath, "utf8"));
   assert.equal(index.campaigns.some((entry) => path.resolve(entry.sqlitePath) === path.resolve(second.sqlitePath)), false);
   assert.equal(index.hiddenCampaignPaths.some((sqlitePath) => path.resolve(sqlitePath) === path.resolve(second.sqlitePath)), false);
+
+  const corruptIndexRoot = path.join(tempDir, "corrupt-index-repo");
+  const recoveredCampaign = createStarterCampaign({
+    title: "Recovered Campaign",
+    premise: "The index disappeared but the SQLite file survived.",
+  });
+  const corruptIndexCampaignPath = path.join(corruptIndexRoot, "data", "campaigns", "recovered-campaign.lorekeeper.sqlite");
+  await mkdir(path.dirname(corruptIndexCampaignPath), { recursive: true });
+  await writeCampaignSqliteFile(recoveredCampaign, corruptIndexCampaignPath);
+  await writeFile(path.join(corruptIndexRoot, "data", "campaigns", "campaign-index.json"), "", "utf8");
+
+  const recoveredList = await listCampaigns(corruptIndexRoot);
+  assert.equal(recoveredList.campaigns.length, 1);
+  assert.equal(recoveredList.campaigns[0].title, "Recovered Campaign");
+
+  const recoveredActive = await loadActiveCampaign(corruptIndexRoot);
+  assert.equal(recoveredActive.campaign.title, "Recovered Campaign");
+
+  const afterCorruptCreate = await createNewActiveCampaign(corruptIndexRoot, {
+    title: "New After Corrupt Index",
+    premise: "New campaign creation should rewrite the index.",
+  });
+  assert.equal(afterCorruptCreate.campaign.title, "New After Corrupt Index");
+  assert.ok(afterCorruptCreate.campaigns.some((entry) => entry.title === "Recovered Campaign"));
+  assert.ok(afterCorruptCreate.campaigns.some((entry) => entry.title === "New After Corrupt Index"));
+  const repairedIndex = JSON.parse(await readFile(path.join(corruptIndexRoot, "data", "campaigns", "campaign-index.json"), "utf8"));
+  assert.ok(repairedIndex.campaigns.length >= 2);
 
   const assetSourceDir = path.join(tempDir, "source-assets");
   await mkdir(assetSourceDir, { recursive: true });
