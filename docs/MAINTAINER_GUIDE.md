@@ -37,12 +37,13 @@ Internal harnesses:
 npm run inspect:diagnostics -- --limit 20
 npm run inspect:diagnostics -- --sqlite data/campaigns/ruined-shrine-628.lorekeeper.sqlite --limit 20
 npm run test:ui
+npm run test:ui -- --scenario visual-audit-screenshots
 npm run test:ui -- --scenario table-talk-posts-immediately
 npm run test:ui -- --chaos-only --chaos-runs 3 --seed chaos-edge-batch
 npm run test:ui -- --chaos --chaos-runs 3 --seed full-table-shake
 ```
 
-`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. It builds the app before running unless `--skip-build` is supplied, starts its own temporary server, uses a temporary campaign root, and cleans up test campaign SQLite files after successful scenarios. Failed runs keep screenshots, HTML, renderer diagnostics, and server output under `data/runtime/ui-flow-artifacts/`.
+`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. It builds the app before running unless `--skip-build` is supplied, starts its own temporary server, uses a temporary campaign root, and cleans up test campaign SQLite files after successful scenarios. Failed runs keep screenshots, HTML, renderer diagnostics, and server output under `data/runtime/ui-flow-artifacts/`. The `visual-audit-screenshots` scenario also writes successful screenshots under `data/runtime/ui-flow-artifacts/<timestamp>/visual-audit/` for home, App Preferences, New Adventure, ready table, Friends and Seats, `/guest`, combat, and DM Recovery states.
 
 The default run covers scenario permutations for home load, settings tabs, pre-lobby party setup, binder party creation, campaign creation, RP posts, choice buttons, real Ollama contract parsing on a quick installed model, combat turn flow, Start Adventure visibility, Table Talk posting, and remote guest browser-tab flows. Chaos mode adds seeded desktop/tabletop permutations for delayed DM generation, Table Talk during generation, cancel/retry, dialogs, pre-lobby Add Crew uniqueness, AI companion combat locks, app-owned combat turns, and common buttons. Narrow/mobile chaos is opt-in with `--mobile-chaos`; desktop/tabletop is the primary target. These are hidden/internal harnesses for maintainers and agents; do not turn them into visible player controls.
 

@@ -25,6 +25,7 @@ const desktopChaosViewports = [
 const narrowChaosViewport = { width: 390, height: 844 };
 const token = "ui-flow-secret";
 const artifactsRoot = path.resolve("data/runtime/ui-flow-artifacts", timestampForPath(new Date()));
+const auditScreenshotsRoot = path.join(artifactsRoot, "visual-audit");
 if (!args.skipBuild) {
   await runNpmScript("build");
 }
@@ -72,6 +73,90 @@ const scenarios = [
       assertUniqueNames(snapshot.joinableSeats, "name", "pre-table joinable seats");
       assertUniqueIds(snapshot.joinableSeats, "pre-table joinable seats");
       assert.equal(new Set(snapshot.joinableSeats.map((seat) => seat.name)).size, snapshot.joinableSeats.length);
+    },
+  },
+  {
+    name: "visual-audit-screenshots",
+    run: async (harness) => {
+      const page = harness.page;
+      await harness.gotoHome();
+      await page.waitForTimeout(600);
+      await captureAuditScreenshot(page, "01-home");
+
+      await page.click("#home-settings");
+      await page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
+      await page.waitForTimeout(400);
+      await captureAuditScreenshot(page, "02-app-preferences");
+      await page.click("#close-setup");
+      await page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
+
+      await openCampaignWizard(page);
+      await page.waitForTimeout(400);
+      await captureAuditScreenshot(page, "03-new-adventure");
+
+      await fillCampaignSeed(page, {
+        title: "Audit Table Road",
+        premise: "A caravan road bends toward an old watchtower as villagers argue about whether to turn back before sunset.",
+        startingLocation: "Old South Road",
+        tone: "dark hopeful roadside fantasy",
+        primary: {
+          name: "Mira",
+          ancestry: "Half-elf",
+          characterClass: "Soldier",
+          concept: "A careful caravan guard who notices danger in old road signs.",
+        },
+      });
+      const remoteCard = await ensureWizardPartyCard(page, 0);
+      await fillWizardPartyCard(remoteCard, {
+        name: "Renn",
+        ancestry: "Human",
+        characterClass: "Ranger",
+        concept: "A practical scout who reads danger in road dust.",
+        integrationPrompt: "Renn has been watching the caravan road ahead.",
+        controllerKind: "remote_invite",
+      });
+      await page.click("#start-campaign-submit");
+      await page.waitForFunction(() => document.querySelector("#campaign-dialog")?.open !== true, null, { timeout: 15000 });
+      await page.waitForTimeout(900);
+      await captureAuditScreenshot(page, "04-table-ready");
+
+      await page.click("#open-setup");
+      await page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
+      await page.waitForTimeout(400);
+      await captureAuditScreenshot(page, "05-friends-and-seats");
+      await page.click("#close-setup");
+      await page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
+
+      await harness.fetchJson("/api/multiplayer/start", { method: "POST", body: {} });
+      await harness.gotoHome();
+      await page.click("#home-host-flow");
+      await page.waitForFunction(() => window.__lorekeeperDebug?.stateSummary?.().campaignTitle === "Audit Table Road", null, { timeout: 10000 });
+      const guestPage = await harness.newGuestPage("guest-audit");
+      await guestPage.waitForTimeout(900);
+      await captureAuditScreenshot(guestPage, "06-guest-lobby");
+
+      await harness.mockProviderTurn(combatStartResponse());
+      await submitPlayerTurn(page, "Mira signals Renn to watch the brush while she steps toward the tower road.");
+      await page.waitForFunction(() => window.__lorekeeperDebug?.renderer?.().tableSession?.combat?.active === true, null, { timeout: 10000 });
+      await page.waitForTimeout(700);
+      await captureAuditScreenshot(page, "07-combat");
+      const activeCombatActor = await page.evaluate(() =>
+        window.__lorekeeperDebug?.renderer?.().tableSession?.combat?.activeActorName || "the active hero"
+      );
+
+      await harness.mockProviderTurn({
+        __rawText: "The tower road answers with a shape in the dust, but the table pauses before accepting the DM response.",
+        __parseError: "Audit capture: malformed DM response for recovery screenshot.",
+        __validationErrors: ["Audit capture: malformed DM response for recovery screenshot."],
+      });
+      await submitPlayerTurn(page, `${activeCombatActor} studies the dust before moving closer.`);
+      await page.locator("#repair-inspect").waitFor({ state: "visible", timeout: 10000 });
+      await page.click("#repair-inspect");
+      await page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
+      await page.waitForTimeout(500);
+      await captureAuditScreenshot(page, "08-recovery");
+
+      console.log(`Visual audit screenshots: ${auditScreenshotsRoot}`);
     },
   },
   {
@@ -639,6 +724,31 @@ async function runScenario(browserInstance, scenario) {
           });
           return;
         }
+        if (response.__rawText) {
+          const body = [
+            { type: "start", model: "ui-harness" },
+            {
+              type: "done",
+              result: {
+                ok: false,
+                providerId: "ui-harness",
+                model: "ui-harness",
+                durationMs: 5,
+                text: response.__rawText,
+                rawText: response.__rawText,
+                structured: null,
+                parseError: response.__parseError ?? "UI harness provider response did not match the turn contract.",
+                validationErrors: response.__validationErrors ?? [],
+              },
+            },
+          ].map((event) => JSON.stringify(event)).join("\n") + "\n";
+          await fulfillProviderRoute(route, {
+            status: 200,
+            contentType: "application/x-ndjson; charset=utf-8",
+            body,
+          });
+          return;
+        }
         const structured = stripHarnessResponseMeta(response);
         const body = [
           { type: "start", model: "ui-harness" },
@@ -652,7 +762,7 @@ async function runScenario(browserInstance, scenario) {
               text: JSON.stringify(structured),
               rawText: JSON.stringify(structured),
               structured,
-              validationErrors: [],
+              validationErrors: response.__validationErrors ?? [],
             },
           },
         ].map((event) => JSON.stringify(event)).join("\n") + "\n";
@@ -1362,8 +1472,16 @@ async function fillIfVisible(page, selector, value) {
 }
 
 function stripHarnessResponseMeta(response) {
-  const { __delayMs, __error, ...structured } = response;
+  const { __delayMs, __error, __rawText, __parseError, __validationErrors, ...structured } = response;
   return structured;
+}
+
+async function captureAuditScreenshot(page, name) {
+  await mkdir(auditScreenshotsRoot, { recursive: true });
+  await page.screenshot({
+    path: path.join(auditScreenshotsRoot, `${name}.png`),
+    fullPage: true,
+  });
 }
 
 async function fulfillProviderRoute(route, options) {
@@ -1651,10 +1769,12 @@ function turnResponse({
   flags = {},
   __delayMs = 0,
   __error = null,
+  __validationErrors = [],
 } = {}) {
   return {
     __delayMs,
     __error,
+    __validationErrors,
     schemaVersion: 1,
     requestId: "ui-harness",
     table: [{

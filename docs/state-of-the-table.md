@@ -317,6 +317,7 @@ Risks:
 179. Guest auto-resolution policy now lives in `app/guest-auto-resolve-controller.js` with direct tests for host/client mode, campaign creation, table-running state, approval/group-hold settings, busy turn flow, host draft text, and staged-input readiness.
 180. Campaign payload adoption and multiplayer background polling branch order now live in `app/campaign-adoption-controller.js` and `app/table-background-polling-controller.js`, so campaign-switch transient resets, guest waiting-room refreshes, Table Talk during DM generation, and new-campaign wizard polling pauses are tested outside `app.js`.
 181. Hidden provider-status accessibility copy now uses DM Voice language instead of "Provider/manual bridge," closing one more player-facing naming leak without changing internal provider ids.
+182. The Playwright UI harness now has an intentional visual audit mode: `npm run test:ui -- --scenario visual-audit-screenshots` captures successful screenshots for home, App Preferences, New Adventure, ready table, Friends and Seats, `/guest`, combat, and DM Recovery states under `data/runtime/ui-flow-artifacts/<timestamp>/visual-audit/`.
 
 ### Still Risky
 
@@ -346,7 +347,7 @@ Risks:
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
 25. The app still has too many visible controls across table rails and campaign/table management. Preferences are calmer now via top-level tabs, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and a fuller split between app preferences and table settings.
 26. Automated UI coverage is now much stronger, including host plus `/guest` browser-tab flows, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
-27. The Playwright harness is good for assertions and failure artifacts, but not yet ergonomic for intentional visual audits. A stable screenshot/audit mode would make it easier to inspect whether the table actually feels like a D&D table instead of waiting for failure screenshots.
+27. The Playwright harness now has a stable visual-audit screenshot mode for core host, guest, combat, and recovery states, but it remains a local browser harness. Visual QA still needs occasional Electron-host and real LAN guest review to catch shell/window/device details.
 28. Host play still blends DM-screen responsibilities and shared table experience in one shell. That is functional for authority, but the UX needs a clearer stance: host-only controls should feel like a tucked-away DM screen while the center surface feels shared with the players.
 
 ## Live Acceptance Matrix
@@ -399,7 +400,7 @@ Risks:
 20. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
 21. Continue expanding route-level API/security tests as new routes are added; current coverage includes classification, API-token protection, stale identity rejection, local asset blocking, and real mutation routes.
 22. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
-23. Add an intentional visual-audit/screenshot mode to `test:ui` that captures home, new adventure, active table, combat, recovery, settings, and `/guest` views against a temp campaign root without relying on failure artifacts.
+23. Expand visual audit coverage as the UX evolves: add richer table phases, a cleaner host-only DM screen once it exists, and any release-critical Electron shell states that the local browser harness cannot see.
 
 ### Low
 
@@ -557,7 +558,7 @@ Risks:
 - [x] Make Table Talk harder to miss without making it noisy.
 - [x] Refresh Table Talk during active DM generation so side chat does not wait for the DM turn to finish.
 - [x] Keep the left rail stable when party cards and combat rows have long names/actions.
-- [ ] Add an intentional visual-audit/screenshot harness mode for home, setup, table, combat, recovery, settings, and `/guest` states. Current state: failure artifacts are strong, but successful audit screenshots require ad hoc scripting.
+- [x] Add an intentional visual-audit/screenshot harness mode for home, setup, table, combat, recovery, settings, and `/guest` states. Current state: `test:ui -- --scenario visual-audit-screenshots` captures home, App Preferences, New Adventure, ready table, Friends and Seats, guest lobby, combat, and DM Recovery screenshots against a temp campaign root.
 
 ### Storage, Diagnostics, And Safety
 
@@ -663,6 +664,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Guest auto-resolution policy was extracted from `app.js` into a tested controller. Verification: `npm run build`, `npm run test:engine`, focused remote leave/rejoin/new-game UI, seeded chaos UI (`guest-auto-resolve-policy`, 3 runs), full `npm run test:ui -- --skip-build`, and `npm run test:all` all passed.
 - 2026-06-18: Campaign adoption and multiplayer background polling policy were extracted from `app.js` into tested controllers. This keeps campaign-switch transient resets, local-table polling pauses during Host New, guest waiting-room refreshes, and Table Talk refresh during DM generation explicit and regression-covered. Verification: `npm run build`, `npm run test:engine`, focused Table Talk UI, focused remote leave/rejoin/new-game UI, `npm run test:regression`, and `npm run test:all` passed.
 - 2026-06-18: Table-sim alignment audit: architecture is moving the right direction through app-owned state/combat/continuity and extracted renderer policies, but the host UX still reads partly like a DM console/settings hub. Highest product gaps are phase-specific combat actions, host-only controls as a tucked-away DM screen, manual recovery escape hatch polish, guest-editable pre-table drafts, two-machine soak, and a first-class visual-audit screenshot mode.
+- 2026-06-18: Visual audit screenshots are now first-class in the hidden UI harness. Verification: `npm run test:ui -- --scenario visual-audit-screenshots --skip-build` passed and produced home, App Preferences, New Adventure, ready table, Friends and Seats, guest lobby, combat, and DM Recovery screenshots.
 
 ## How To Use This Doc
 
