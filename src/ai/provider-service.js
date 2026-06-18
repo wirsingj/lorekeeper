@@ -106,6 +106,23 @@ export async function generateTurnWithProvider({
   const generationOptions = generationConfig.options;
   const modelPrompt = generationConfig.promptPrefix ? `${generationConfig.promptPrefix}${prompt}` : prompt;
   const cachedOllamaContext = findOllamaContextForCampaign(campaign, settings);
+  onEvent?.({
+    type: "provider_request_built",
+    requestId: request.requestId,
+    providerId: providerModes.OLLAMA,
+    model: settings.selectedModel,
+    fastMode: settings.fastMode,
+    promptChars: modelPrompt.length,
+    promptPreview: modelPrompt.slice(0, 2400),
+    contextSections: contextPack?.sections?.map((section) => ({
+      id: section.id,
+      kind: section.kind,
+      title: section.title,
+      entries: section.entries?.length ?? 0,
+    })) ?? [],
+    ollamaContextUsed: Boolean(cachedOllamaContext?.length),
+    generationOptions,
+  });
   let result = await provider.generateTurn({
     prompt: modelPrompt,
     model: settings.selectedModel,
@@ -118,6 +135,17 @@ export async function generateTurnWithProvider({
     },
   });
   const primaryResult = result;
+  onEvent?.({
+    type: "provider_response_received",
+    requestId: request.requestId,
+    providerId: result.providerId,
+    model: result.model,
+    durationMs: result.durationMs,
+    contextSize: result.contextSize,
+    tokenCounts: result.tokenCounts,
+    textChars: result.text?.length ?? 0,
+    textPreview: String(result.text || "").slice(0, 2400),
+  });
 
   let parsed = parseTurnJsonResponse(result.text, {
     requestId: request.requestId,
@@ -131,6 +159,13 @@ export async function generateTurnWithProvider({
       originalError: parsed.error,
       originalText: result.text,
     };
+    onEvent?.({
+      type: "provider_repair_started",
+      requestId: request.requestId,
+      providerId: result.providerId,
+      model: result.model,
+      validationErrors: parsed.validationErrors,
+    });
     const repairPrompt = buildTurnResponseRepairPrompt({
       request,
       originalPrompt: modelPrompt,
@@ -149,6 +184,15 @@ export async function generateTurnWithProvider({
         temperature: 0.2,
       },
     });
+    onEvent?.({
+      type: "provider_repair_response_received",
+      requestId: request.requestId,
+      providerId: result.providerId,
+      model: result.model,
+      durationMs: result.durationMs,
+      textChars: result.text?.length ?? 0,
+      textPreview: String(result.text || "").slice(0, 2400),
+    });
     parsed = parseTurnJsonResponse(result.text, {
       requestId: request.requestId,
       choicePolicy: request.generation.choicePolicy,
@@ -158,6 +202,23 @@ export async function generateTurnWithProvider({
     repairAttempt.repaired = !parsed.error;
     repairAttempt.finalError = parsed.error;
   }
+  onEvent?.({
+    type: parsed.error ? "provider_response_rejected" : "provider_response_accepted",
+    requestId: request.requestId,
+    providerId: result.providerId,
+    model: result.model,
+    parseError: parsed.error,
+    validationErrors: parsed.error ? parsed.validationErrors : [],
+    validationWarnings: parsed.error ? [] : parsed.validationErrors,
+    recovery: parsed.recovery,
+    repairAttempt: repairAttempt
+      ? {
+          repaired: repairAttempt.repaired,
+          originalError: repairAttempt.originalError,
+          finalError: repairAttempt.finalError,
+        }
+      : null,
+  });
   return {
     ...result,
     text: renderTurnResponseForImport(parsed.response),

@@ -31,6 +31,7 @@ import {
 import { OllamaProvider } from "../src/ai/ollama-provider.js";
 import { updateCampaignOllamaContext } from "../src/ai/ollama-context-cache.js";
 import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
+import { createTraceLog, summarizeForTrace } from "../src/observability/trace-log.js";
 import {
   approveJoinRequest,
   clearPendingTurnInputs,
@@ -74,6 +75,9 @@ const apiToken = process.env.LOREKEEPER_API_TOKEN || "";
 const builtAppRoot = path.join(defaultProjectRoot, "dist", "app");
 const startedAt = new Date().toISOString();
 const maxJsonBodyBytes = 1024 * 1024;
+const serverTraceLog = createTraceLog({
+  limit: Number(process.env.LOREKEEPER_TRACE_LIMIT) || 500,
+});
 let preTableLobby = null;
 
 const mimeTypes = new Map([
@@ -106,8 +110,24 @@ const corsHeaders = {
 };
 
 const server = createServer(async (request, response) => {
+  const requestStartedAt = Date.now();
+  let url;
+  let traceableRequest = false;
   try {
-    const url = new URL(request.url, `http://${request.headers.host}`);
+    url = new URL(request.url, `http://${request.headers.host}`);
+    traceableRequest = shouldTraceRequest(url);
+    if (traceableRequest) {
+      response.on("finish", () => {
+        traceServerEvent("api.request", {
+          method: request.method,
+          path: url.pathname,
+          queryKeys: [...url.searchParams.keys()].filter((key) => !/token|secret/i.test(key)),
+          statusCode: response.statusCode,
+          durationMs: Date.now() - requestStartedAt,
+          campaignHeader: request.headers["x-lorekeeper-campaign-id"] || "",
+        });
+      });
+    }
     // Request gates are ordered from broadest to most stateful:
     // origin/auth first, then active-campaign pinning, then route handling.
     if (!isAllowedRequestOrigin(request)) {
@@ -157,8 +177,23 @@ const server = createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/diagnostics" && request.method === "GET") {
-      const diagnostics = await buildDiagnosticsBundle();
+      const full = url.searchParams.get("full") === "1";
+      const diagnostics = await buildDiagnosticsBundle({ full });
       sendJson(response, 200, url.searchParams.get("full") === "1" ? diagnostics : redactDiagnosticsBundle(diagnostics));
+      return;
+    }
+
+    if (url.pathname === "/api/diagnostics/trace" && request.method === "GET") {
+      sendJson(response, 200, serverTraceLog.snapshot({
+        redact: url.searchParams.get("full") !== "1",
+        limit: Number(url.searchParams.get("limit")) || 120,
+      }));
+      return;
+    }
+
+    if (url.pathname === "/api/diagnostics/trace/clear" && request.method === "POST") {
+      serverTraceLog.clear();
+      sendJson(response, 200, { ok: true, clearedAt: new Date().toISOString() });
       return;
     }
 
@@ -818,6 +853,14 @@ const server = createServer(async (request, response) => {
 
     sendText(response, 404, "Not found");
   } catch (error) {
+    if (traceableRequest) {
+      traceServerEvent("api.error", {
+        method: request.method,
+        path: url?.pathname || "",
+        durationMs: Date.now() - requestStartedAt,
+        error: error instanceof Error ? error.message : String(error ?? "Unknown server error"),
+      }, { level: "error" });
+    }
     sendError(response, error);
   }
 });
@@ -864,6 +907,14 @@ function shutdownServer(signal) {
 function activeServerPort() {
   const address = server.address();
   return address && typeof address === "object" ? address.port : port;
+}
+
+function shouldTraceRequest(url) {
+  return url.pathname.startsWith("/api/");
+}
+
+function traceServerEvent(type, detail = {}, options = {}) {
+  return serverTraceLog.record(type, summarizeForTrace(detail, 1600), options);
 }
 
 function publishPreTableLobby(input = {}) {
@@ -1163,7 +1214,7 @@ function slugifyLobby(value) {
     .replace(/^-|-$/g, "") || "table";
 }
 
-async function buildDiagnosticsBundle() {
+async function buildDiagnosticsBundle({ full = false } = {}) {
   const active = await loadActiveCampaign(projectRoot).catch((error) => ({
     error: error instanceof Error ? error.message : "Active campaign load failed.",
   }));
@@ -1236,6 +1287,12 @@ async function buildDiagnosticsBundle() {
       },
       recentErrors,
     }),
+    observability: {
+      serverTrace: serverTraceLog.snapshot({
+        redact: !full,
+        limit: full ? 300 : 80,
+      }),
+    },
     recentMessages,
     recentReviews,
     recentErrors,
@@ -1298,6 +1355,20 @@ async function streamProviderTurn(request, response) {
     includeCombatDetail: isCombatRelevant(parsedMessage),
     kinds: settings.fastMode ? fastContextKinds() : undefined,
   });
+  traceServerEvent("provider.turn.start", {
+    campaignId: campaign.id,
+    providerId: settings.preferredProvider,
+    model: settings.selectedModel,
+    fastMode: settings.fastMode,
+    playerMessageChars: String(body.playerMessage || "").length,
+    playerInputs: Array.isArray(body.playerInputs) ? body.playerInputs.length : 0,
+    contextSections: contextPack.sections.map((section) => ({
+      id: section.id,
+      kind: section.kind,
+      title: section.title,
+      entries: section.entries?.length ?? 0,
+    })),
+  });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), settings.generationTimeoutMs);
   response.on("close", () => {
@@ -1333,6 +1404,7 @@ async function streamProviderTurn(request, response) {
       providerSettings: settings,
       signal: controller.signal,
       onToken: (token) => writeNdjson(response, { type: "token", text: token }),
+      onEvent: (event) => traceServerEvent(`provider.${event.type}`, event),
     });
     let ollamaContextStored = false;
     if (Array.isArray(result.ollamaContext) && result.ollamaContext.length) {
@@ -1407,7 +1479,24 @@ async function streamProviderTurn(request, response) {
         ollamaContextStored,
       },
     });
+    traceServerEvent("provider.turn.done", {
+      campaignId: campaign.id,
+      requestId: result.requestId,
+      providerId: result.providerId,
+      model: result.model,
+      durationMs: result.durationMs,
+      parseError: result.parseError,
+      validationErrors: result.validationErrors,
+      textChars: result.text?.length ?? 0,
+      rawTextChars: result.rawText?.length ?? 0,
+    });
   } catch (error) {
+    traceServerEvent("provider.turn.error", {
+      campaignId: campaign.id,
+      providerId: settings.preferredProvider,
+      model: settings.selectedModel,
+      error: error instanceof Error ? error.message : String(error ?? "Provider generation failed."),
+    }, { level: "error" });
     await logCampaignError({
       campaignId: campaign.id,
       severity: "error",

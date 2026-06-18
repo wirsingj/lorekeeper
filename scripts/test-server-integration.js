@@ -28,6 +28,24 @@ try {
   assert.equal(runtime.authRequired, true);
   assert.equal(runtime.port, port);
 
+  const traceUnauthorized = await fetch(`${baseUrl}/api/diagnostics/trace`);
+  assert.equal(traceUnauthorized.status, 401);
+
+  const trace = await fetchJson(`${baseUrl}/api/diagnostics/trace?full=1`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  assert.equal(trace.redacted, false);
+  assert.ok(trace.events.some((event) => event.type === "api.request" && event.detail.path === "/api/runtime"));
+
+  const diagnosticsWithTrace = await fetchJson(`${baseUrl}/api/diagnostics?full=1`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  assert.ok(diagnosticsWithTrace.observability.serverTrace.events.some((event) => event.detail.path === "/api/diagnostics/trace"));
+  const traceAfterDiagnostics = await fetchJson(`${baseUrl}/api/diagnostics/trace?full=1`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  assert.ok(traceAfterDiagnostics.events.some((event) => event.detail.path === "/api/diagnostics"));
+
   const draftLobby = await fetchJson(`${baseUrl}/api/pretable-lobby/publish`, {
     method: "POST",
     headers: {

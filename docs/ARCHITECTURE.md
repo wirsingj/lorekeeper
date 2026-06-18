@@ -42,6 +42,7 @@ Domain engine:
 - `src/storage/*` owns campaign file persistence, SQLite import/export, migrations, and review commits.
 - `src/model-contract/*` owns provider response validation, rendering, fixtures, and agency guard rails.
 - `src/multiplayer/*` owns invites, table identity, waiting-room guests, guest snapshots, staged inputs, table talk, and seat assignments.
+- `src/observability/*` owns internal trace/log helpers used by diagnostics and automation harnesses. These hooks are hidden/internal, not player-facing UI.
 
 Tests:
 
@@ -51,6 +52,8 @@ Tests:
 - `scripts/test-sqlite-storage.js` exercises SQLite persistence, migrations, logs, errors, and bounded query helpers.
 - `scripts/test-server-security.js` and `scripts/test-server-integration.js` cover route exposure and real HTTP mutation behavior.
 - `scripts/test-high-risk-regressions.js` is the small fast pack for scary changes: provider rejection, stale guest identity, controlled-PC agency, combat narration-only advancement, staged input preservation, campaign switch wiring, and delete recycling.
+- `scripts/test-observability.js` covers the internal trace ring, redaction, bounded retention, and error serialization.
+- `scripts/test-ui-flow.js` is an opt-in Playwright smoke harness for hidden UI automation/introspection; it is not part of shipped player UI and is not in `test:all`.
 
 ## Identity And Authority
 
@@ -140,6 +143,13 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Produces the compact diagnostics blob used by renderer and server diagnostics.
 - Captures campaign/table/session identity, table phase, active turn/actor/controller, provider state, combat state, staged guest inputs, review/recovery state, and recent errors.
 - This should stay pure and redaction-friendly so it remains safe to copy during a stuck session.
+
+`ObservabilityTrace`
+
+- Lives in `src/observability/trace-log.js`.
+- Provides bounded in-memory traces for API requests, provider prompt/response lifecycle, and internal debugging hooks.
+- Server diagnostics expose it under `observability.serverTrace`; `/api/diagnostics/trace` and `/api/diagnostics/trace/clear` are hidden, host-authorized debugging endpoints.
+- Keep this internal. Do not add player-facing controls or rely on it as campaign canon.
 
 `LivingWorldEngine`
 
@@ -254,6 +264,7 @@ Start here when making changes:
 - Relationship continuity transitions: `src/engine/relationship-engine.js`
 - Faction/location durable memory: `src/engine/world-memory-engine.js`
 - One-blob state debugging: `src/engine/table-debug-snapshot.js`, diagnostics `debugSnapshot`
+- Internal trace/debug harness: `src/observability/trace-log.js`, `scripts/inspect-diagnostics.js`, `scripts/test-ui-flow.js`
 - Provider import/recovery wording: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
 - Stale combat prompt repair: `app/combat-prompt-repair-controller.js`
 - Provider-import combat fallback guardrails: `app/combat-import-controller.js`

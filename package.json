@@ -18,9 +18,12 @@
     "test:storage": "node ./scripts/test-sqlite-storage.js",
     "test:security": "node ./scripts/test-server-security.js && node ./scripts/test-server-integration.js",
     "test:regression": "node ./scripts/test-high-risk-regressions.js",
-    "test:all": "npm run test:engine && npm run test:contract && npm run test:multiplayer && npm run test:storage && npm run test:security && npm run test:regression",
+    "test:observability": "node ./scripts/test-observability.js",
+    "test:ui": "node ./scripts/test-ui-flow.js",
+    "test:all": "npm run test:engine && npm run test:contract && npm run test:multiplayer && npm run test:storage && npm run test:security && npm run test:regression && npm run test:observability",
     "new:campaign": "node ./scripts/new-campaign.js",
     "import:folder": "node ./scripts/import-campaign-folder.js",
+    "inspect:diagnostics": "node ./scripts/inspect-diagnostics.js",
     "api": "node ./scripts/serve.js 4174",
     "dev": "node ./scripts/dev.js",
     "vite": "vite --host 127.0.0.1",
@@ -47,6 +50,7 @@
     "vite": "^8.0.16"
   },
   "devDependencies": {
-    "electron": "^42.4.0"
+    "electron": "^42.4.0",
+    "playwright": "^1.61.0"
   }
 }

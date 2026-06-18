@@ -1931,6 +1931,7 @@ function playerInputsFromChoiceSelection(selection) {
   }));
 }
 
+installInternalDebugHarness();
 await boot();
 startMultiplayerPolling();
 
@@ -8165,6 +8166,33 @@ async function buildDiagnosticsSnapshot() {
       renderer,
     };
   }
+}
+
+function installInternalDebugHarness() {
+  const harness = {
+    version: 1,
+    diagnostics: () => buildDiagnosticsSnapshot(),
+    renderer: () => buildRendererDiagnostics(),
+    tableSession: () => state.tableSession ?? buildCurrentTableSessionProjection(),
+    turnProjection: () => state.turnFlow.getProjection(),
+    recentEvents: (limit = 80) => state.diagnosticsEvents.slice(-Math.max(1, Math.min(Number(limit) || 80, 200))),
+    recentTimeline: (limit = 80) => state.tableTimeline.slice(-Math.max(1, Math.min(Number(limit) || 80, 200))),
+    stateSummary: () => ({
+      campaignId: state.campaign?.id || "",
+      campaignTitle: state.campaign?.title || "",
+      sourceMode: state.sourceMode,
+      homeFlow: state.homeFlow,
+      clientMode,
+      activeGeneration: hasActiveGeneration(),
+      repair: summarizeTurnRepair(activeTurnRepair()),
+      tablePhase: state.tableSession?.phase || "",
+      playMessages: state.playMessages.length,
+    }),
+  };
+  Object.defineProperty(window, "__lorekeeperDebug", {
+    value: harness,
+    configurable: true,
+  });
 }
 
 function renderTableTimelineSummary(timeline = []) {
