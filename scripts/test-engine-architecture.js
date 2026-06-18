@@ -17,6 +17,7 @@ import { createImplicitCombatActorPromptChange, latestDmNarration } from "../app
 import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomDevJumpStart } from "../app/dev-jump-start.js";
+import { buildDmNudgePrompt } from "../app/dm-nudge-controller.js";
 import { buildHostResponseReviewProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
@@ -2133,6 +2134,15 @@ function testTableOpeningController() {
   assert.match(prompt, /Prefer choices\.options: \[\]/);
 }
 
+function testDmNudgeController() {
+  const prompt = buildDmNudgePrompt();
+  assert.match(prompt, /without inventing a player action/);
+  assert.match(prompt, /Prefer choices\.options: \[\]/);
+  assert.match(prompt, /do not roll, deal damage, move them, speak for them, choose their tactic, or advance initiative/i);
+  assert.match(prompt, /LoreKeeper resolves enemy mechanics before narration/);
+  assert.doesNotMatch(prompt, /bar fight simulator/i);
+}
+
 function testPlayLogProjectionBoundsLongSessions() {
   const messages = Array.from({ length: defaultPlayLogVisibleLimit + 75 }, (_, index) => ({
     id: `msg-${index + 1}`,
@@ -2649,6 +2659,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 
 async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  const dmNudgeController = await readFile(path.join("app", "dm-nudge-controller.js"), "utf8");
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
@@ -2735,6 +2746,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /renderTableFocus\(state\.tableSession\)/, "table session refresh should update the table focus cue");
   assert.match(appJs, /applyTableFocusProjection/, "command deck phase copy should be rendered through a focused projection");
   assert.match(appJs, /buildTableFocusProjection/, "renderer should consume a tested table focus projection");
+  assert.match(dmNudgeController, /function buildDmNudgePrompt/, "DM nudge prompt policy should live outside app.js");
+  assert.doesNotMatch(appJs, /function buildDmNudgePrompt/, "app.js should not own the normal DM nudge prompt policy");
   assert.match(styles, /\.command-context/);
   assert.match(styles, /\.command-context \.start-adventure-action/);
   assert.match(styles, /\[data-table-phase="combat"\] \.command-deck/);
@@ -2944,6 +2957,7 @@ testTableStatusVocabulary();
 testTableSessionEnginePhases();
 testTableFocusProjection();
 testTableOpeningController();
+testDmNudgeController();
 testPlayLogProjectionBoundsLongSessions();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
