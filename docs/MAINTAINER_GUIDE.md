@@ -1,6 +1,6 @@
 # LoreKeeper Maintainer Guide
 
-Updated: 2026-06-16
+Updated: 2026-06-18
 
 Start with:
 
@@ -38,9 +38,13 @@ npm run inspect:diagnostics -- --limit 20
 npm run inspect:diagnostics -- --sqlite data/campaigns/ruined-shrine-628.lorekeeper.sqlite --limit 20
 npm run test:ui
 npm run test:ui -- --scenario table-talk-posts-immediately
+npm run test:ui -- --chaos-only --chaos-runs 3 --seed chaos-edge-batch
+npm run test:ui -- --chaos --chaos-runs 3 --seed full-table-shake
 ```
 
-`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. It runs ten scenario permutations covering home load, settings tabs, pre-lobby party setup, binder party creation, campaign creation, RP posts, choice buttons, real Ollama contract parsing on a quick installed model, combat turn flow, Start Adventure visibility, and Table Talk posting. Failures write screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`. These are hidden/internal harnesses for maintainers and agents; do not turn them into visible player controls.
+`test:ui` uses Playwright and is intentionally opt-in. If Chromium is not installed locally, run `npx playwright install chromium`. It builds the app before running unless `--skip-build` is supplied, starts its own temporary server, uses a temporary campaign root, and cleans up test campaign SQLite files after successful scenarios. Failed runs keep screenshots, HTML, renderer diagnostics, and server output under `data/runtime/ui-flow-artifacts/`.
+
+The default run covers ten scenario permutations for home load, settings tabs, pre-lobby party setup, binder party creation, campaign creation, RP posts, choice buttons, real Ollama contract parsing on a quick installed model, combat turn flow, Start Adventure visibility, and Table Talk posting. Chaos mode adds seeded desktop/tabletop permutations for delayed DM generation, Table Talk during generation, cancel/retry, dialogs, pre-lobby Add Crew uniqueness, AI companion combat locks, app-owned combat turns, and common buttons. Narrow/mobile chaos is opt-in with `--mobile-chaos`; desktop/tabletop is the primary target. These are hidden/internal harnesses for maintainers and agents; do not turn them into visible player controls.
 
 Desktop:
 
@@ -137,7 +141,9 @@ npm run test:ui
 npm run test:ui -- --scenario create-campaign-and-hide-start-adventure-after-use
 ```
 
-The Playwright harness starts its own temporary server and campaign directory. It mocks provider generation inside scenarios that need deterministic DM output, and keeps one real Ollama provider-contract scenario to catch parser drift against an installed quick model.
+The Playwright harness starts its own temporary server and campaign directory. It mocks provider generation inside scenarios that need deterministic DM output with a persistent page route, and keeps one real Ollama provider-contract scenario to catch parser drift against an installed quick model. Use `--keep-temp` only when intentionally preserving a failed temp campaign root for inspection.
+
+Real multiplayer QA should model the intended release shape: one provider-hosting authority, often the Electron desktop app with Ollama/provider configured, plus guests using `http://<host-ip>:4173/guest` in a browser or another desktop install. "Host" means table/provider authority, not necessarily the only machine running the app.
 
 ## Debugging Owners
 

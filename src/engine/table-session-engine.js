@@ -26,7 +26,6 @@ const recoveryPhases = new Set([
   "recovering_turn",
   "dm_response_needs_review",
   "dm_timeout",
-  "dm_cancelled",
   "error",
 ]);
 

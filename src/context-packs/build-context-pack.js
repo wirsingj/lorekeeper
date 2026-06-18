@@ -363,7 +363,7 @@ function buildCombatSection(campaign) {
       const hp = actor.sheet.hp.current !== null && actor.sheet.hp.max !== null
         ? `HP ${actor.sheet.hp.current}/${actor.sheet.hp.max}`
         : "HP unknown";
-      const options = actor.legalOptions.slice(0, 5).map((option) => `${option.letter}) ${option.label}`).join("; ");
+      const options = actor.legalOptions.slice(0, 5).map((option) => `${option.letter}) ${formatCombatOptionLabel(option)}`).join("; ");
       return compactText(
         `${actor.name}: ${hp}; action ${actor.turnEconomy.action}; bonus ${actor.turnEconomy.bonusAction}; move ${actor.turnEconomy.movementRemainingFt} ft; legal options: ${options}`,
         MEDIUM_ENTRY_LIMIT,
@@ -379,7 +379,7 @@ function buildCombatSection(campaign) {
     if (Array.isArray(combat.turnOrder) && combat.turnOrder.length) {
       entries.push(`Turn order: ${combat.turnOrder.map((entry) => `${entry.name || labelEntity(campaign, entry.id)} (${entry.initiativeScore ?? "?"})`).join(" > ")}`);
     }
-    entries.push(`Enemies: ${combat.enemies.map((enemy) => `${enemy.name} (${enemy.hp ?? "HP unknown"})`).join(", ")}`);
+    entries.push(`Enemies: ${combat.enemies.map((enemy) => `${formatDisplayText(enemy.name || enemy.id || "Enemy")} (${formatCompactHp(enemy.hp)})`).join(", ")}`);
     entries.push(`Conditions: ${combat.conditions.join(", ") || "none recorded"}`);
   } else {
     entries.push("Outside combat or immediate danger, narrate consequences and keep the scene moving; do not present routine option panels.");
@@ -483,7 +483,7 @@ function uniqueById(records) {
 }
 
 function compactText(value, limit = SHORT_ENTRY_LIMIT) {
-  const stripped = stripUpdatePayloads(String(value ?? ""));
+  const stripped = stripUpdatePayloads(formatDisplayText(value));
   const compact = stripped.replace(/\s+/g, " ").trim();
   if (compact.length <= limit) {
     return compact;
@@ -507,6 +507,57 @@ function stripUpdatePayloads(value) {
   return fenced;
 }
 
+function formatCombatOptionLabel(option = {}) {
+  const label = formatDisplayText(option.label, "");
+  if (label && !label.includes("[object Object]")) {
+    return label;
+  }
+  if (option.type === "attack") {
+    return "Attack";
+  }
+  if (option.type === "spell") {
+    return "Cast spell";
+  }
+  if (option.type === "feature") {
+    return "Use feature";
+  }
+  if (option.type === "movement") {
+    return "Move";
+  }
+  if (option.type === "improvised") {
+    return "Try an improvised action";
+  }
+  return formatDisplayText(option.id, "Option");
+}
+
+function formatDisplayText(value, fallback = "") {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    const text = String(value);
+    return text === "[object Object]" ? fallback : text;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => formatDisplayText(entry)).filter(Boolean).join(", ");
+  }
+  if (typeof value === "object") {
+    const named = value.name ?? value.title ?? value.label ?? value.summary ?? value.text ?? value.id;
+    if (named !== undefined && named !== null) {
+      const text = formatDisplayText(named, "");
+      if (text && !text.includes("[object Object]")) {
+        return text;
+      }
+    }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 function formatCompactList(value, limit = 4) {
   if (!value) {
     return "";
@@ -528,9 +579,9 @@ function formatCompactList(value, limit = 4) {
 
 function compactListEntry(entry) {
   if (!entry || typeof entry !== "object") {
-    return entry;
+    return formatDisplayText(entry);
   }
-  return entry.name || entry.title || entry.label || entry.summary || JSON.stringify(entry);
+  return formatDisplayText(entry);
 }
 
 function formatAbilityScores(value) {

@@ -305,7 +305,12 @@ Risks:
 167. Opening narration now gives the model explicit neutral-presence examples for controlled party members, and DM Recovery summarizes agency blocks as table language instead of exposing raw `table[n]` validator diagnostics.
 168. Current-schema campaign SQLite files now repair a missing `errors` diagnostics table before server diagnostics read recent errors; older local files with current metadata but missing the table no longer stay in a half-current state.
 169. Internal observability harnesses now cover bounded/redacted trace logs, hidden server diagnostics trace endpoints, provider prompt/response lifecycle events, a SQLite diagnostics inspector, a hidden renderer debug hook, and an opt-in Playwright UI scenario script without adding player-facing chrome.
-170. The Playwright harness now runs ten hidden UI scenario permutations for home load, context-aware settings tabs, pre-lobby Add Crew uniqueness, binder party creation, campaign creation, RP posts, choice drafting, real Ollama contract parsing on a quick installed model, combat turn flow, Start Adventure button hiding after use, and immediate Table Talk posting; failures capture screenshots, HTML, and renderer diagnostics under `data/runtime/ui-flow-artifacts/`.
+170. The Playwright harness now runs ten hidden UI scenario permutations for home load, context-aware settings tabs, pre-lobby Add Crew uniqueness, binder party creation, campaign creation, RP posts, choice drafting, real Ollama contract parsing on a quick installed model, combat turn flow, Start Adventure button hiding after use, and immediate Table Talk posting; failures capture screenshots, HTML, renderer diagnostics, and server output under `data/runtime/ui-flow-artifacts/`.
+171. UI chaos mode now runs seeded desktop/tabletop permutations for delayed DM generation, Table Talk during generation, cancel/retry, dialog churn, pre-lobby Add Crew uniqueness, provider recovery, AI companion combat locks, app-owned combat turns, and common button affordances.
+172. `test:ui` builds before running by default, uses per-scenario temporary campaign roots, and cleans up test campaign SQLite files after successful scenarios so harness campaigns do not pollute real `data/campaigns`.
+173. The UI harness provider mock is now a persistent page route with a mutable response queue, so cancel/retry tests remain deterministic and do not accidentally fall through to a real Ollama request except in the explicit Ollama contract smoke scenario.
+174. Combat context pack text now sanitizes object-shaped action labels and enemy HP before provider prompts, preventing `[object Object]` leaks in legal options or enemy summaries.
+175. Windows SQLite saves now retry transient atomic-replace collisions, reducing `EPERM`/`EBUSY` failures when review commits, Table Talk, diagnostics, and provider saves overlap under test pressure.
 
 ### Still Risky
 
@@ -316,7 +321,7 @@ Risks:
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
 7. Guest "sent / host received / resolving / resolved" state is clearer, but still needs two-machine soak testing.
-8. Table Talk has a subtle unread cue and now refreshes during active DM generation, but should still be checked during two-machine play.
+8. Table Talk has a subtle unread cue and now refreshes during active DM generation, with hidden UI coverage proving local immediacy. It should still be checked during two-machine play.
 9. Provider narration can still restate the player's action or lean on option panels too much in real-model soak, though the contract now has stronger narration-first instructions.
 10. Failed staged inputs now remain visible and can be dropped by the host, but broader retry/cleanup guidance still needs real-session polish.
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
@@ -329,11 +334,12 @@ Risks:
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
 19. TableSessionEngine is currently a projection layer. The status strip, diagnostics, command deck, command input, and table-focus hook now consume it, but more UI surfaces still need to consume it directly before the table fully stops combining local flags.
 20. `app/app.js` and `scripts/serve.js` are better marked, but still large enough that future fixes can accidentally create hidden coupling if new decisions are added there.
-21. `debugSnapshot` summarizes current runtime state, but it is not yet a persisted session recorder or replay tool.
+21. `debugSnapshot` summarizes current runtime state, and the Playwright harness stores failure artifacts, but there is not yet a persisted session recorder or replay tool for whole provider/UI exchanges.
 22. Living-world memory now has projections, fixtures, relationship-state transitions, faction memory, and location-scar helpers, but provider output still needs real-model soak to prove it consistently creates useful relationship/consequence/faction/place updates.
 23. World-memory helpers are in place, but scene-ending capture still depends on provider proposals and host review rather than an app-owned post-scene summarizer.
 24. Guest-public routes are substantially covered, but every new multiplayer endpoint must keep proving whether it is a guest action or a host-authorized mutation; mixed-purpose routes are easy to get subtly wrong.
 25. The app still has too many visible controls across table rails and campaign/table management. Preferences are calmer now via top-level tabs, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and a fuller split between app preferences and table settings.
+26. Automated UI coverage is now much stronger, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
 
 ## Live Acceptance Matrix
 
@@ -546,7 +552,7 @@ Risks:
 - [x] Errors table records provider/session diagnostics. Current state: diagnostics now repair current-schema files that claim to be up to date but are missing the `errors` table.
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
-- [x] Add internal trace/debug harnesses for API/provider/renderer/UI investigation. Current state: server diagnostics include an auth-protected trace ring, provider generation emits prompt/response lifecycle events, `inspect:diagnostics` reads campaign SQLite diagnostics, and `test:ui` is an opt-in Playwright scenario harness.
+- [x] Add internal trace/debug harnesses for API/provider/renderer/UI investigation. Current state: server diagnostics include an auth-protected trace ring, provider generation emits prompt/response lifecycle events, `inspect:diagnostics` reads campaign SQLite diagnostics, and `test:ui` is an opt-in Playwright scenario harness with seeded desktop chaos mode, deterministic provider mocking, temp campaign roots, and failure artifacts.
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [x] Add local asset and path traversal integration coverage for the server.
@@ -636,6 +642,8 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-16: Remote party-choice voting is usable, with leader/tie language and a host draft action. Remaining work is two-machine feel testing to decide whether the normal Send Turn confirmation is enough.
 - 2026-06-16: Next local playtest target should be host app plus local browser guest through `/guest`: join waiting room, seat request, party vote, guest leave/rejoin, one combat turn, and one provider recovery.
 - 2026-06-18: Round 2 audit found stale "early scaffold/sidecar" product copy and visible disabled provider roadmap options. README, default campaign copy, prompt/template labels, server/check strings, and Preferences AI source now use current LoreKeeper/table DM language; stored prompt template IDs remain stable for compatibility.
+- 2026-06-18: Automated UI chaos should stay desktop/tabletop-first for now. Mobile/narrow viewports are useful only as an opt-in stress check; release confidence should prioritize Electron host plus `/guest` browser/desktop guest flows.
+- 2026-06-18: Test campaign SQLite files must stay isolated to temporary harness roots and be cleaned after successful bundles. Failed bundles may keep artifacts for debugging, but should not pollute real `data/campaigns`.
 
 ## How To Use This Doc
 

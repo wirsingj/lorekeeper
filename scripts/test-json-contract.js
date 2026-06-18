@@ -1016,6 +1016,19 @@ const hostAgencyRequest = buildTurnRequestEnvelope({
     metaInstructions: [],
   },
 });
+const hostAgencyPrompt = buildTurnJsonPrompt({
+  campaign: remoteAgencyCampaign,
+  contextPack: remoteAgencyContext,
+  playerTurn: "I wait and watch the guard.",
+  parsedMessage: {
+    raw: "I wait and watch the guard.",
+    inWorldText: "I wait and watch the guard.",
+    metaInstructions: [],
+  },
+});
+assert.match(hostAgencyPrompt, /already recorded user\.inWorld as the player's table input/);
+assert.match(hostAgencyPrompt, /Do not echo it back as a party-member table entry/);
+assert.match(hostAgencyPrompt, /speaker 'DM'/);
 const pilotedHostNarration = validTurnResponse({
   table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Jarin steps forward, draws his bow, and decides the guard is lying." }],
 });

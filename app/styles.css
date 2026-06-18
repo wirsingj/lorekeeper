@@ -3292,19 +3292,78 @@ textarea::placeholder {
 
 @media (max-width: 1280px) {
   .campaign-wizard-layout {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: auto minmax(360px, 1fr);
-    align-items: start;
+    display: block;
     overflow: auto;
   }
 
   .campaign-wizard-layout > .campaign-wizard-section {
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .campaign-wizard-layout > .campaign-wizard-section + .campaign-wizard-section {
+    margin-top: 12px;
+  }
+
+  .additional-characters-section {
+    min-height: 0;
+  }
+
+  .wizard-additional-characters {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  .campaign-dialog {
+    width: min(100vw - 24px, 420px);
+    height: auto;
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+  }
+
+  .campaign-dialog form {
+    height: auto;
+    max-height: calc(100vh - 48px);
+    grid-template-rows: auto;
+    overflow: auto;
+  }
+
+  .campaign-wizard-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    overflow: visible;
+  }
+
+  .campaign-wizard-layout > .campaign-wizard-section,
+  .additional-characters-section,
+  .wizard-additional-characters {
+    min-height: 0;
     overflow: visible;
   }
 
   .additional-characters-section {
-    grid-column: 1 / -1;
-    min-height: 360px;
+    grid-column: auto;
+  }
+
+  .campaign-wizard-grid,
+  .controller-choice-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pretable-lobby-heading,
+  .wizard-heading,
+  .wizard-character-card-heading,
+  .campaign-dialog .dialog-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pretable-lobby-heading .mini-action,
+  .wizard-heading-actions,
+  .wizard-character-actions,
+  .campaign-dialog .dialog-actions button {
+    width: 100%;
   }
 }
 

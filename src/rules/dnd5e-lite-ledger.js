@@ -404,11 +404,12 @@ function normalizeSpellList(value) {
   const list = normalizeList(value);
   return list.map((spell) => {
     if (typeof spell === "object") {
+      const name = recordName(spell.name || spell.title || spell.label || spell) || "Unnamed spell";
       return {
-        name: String(spell.name || spell.title || "Unnamed spell"),
-        level: Number(spell.level ?? spell.spellLevel ?? inferSpellLevel(spell.name)) || 0,
+        name,
+        level: Number(spell.level ?? spell.spellLevel ?? inferSpellLevel(name)) || 0,
         castingTime: normalizeCastingTime(spell.castingTime),
-        roll: spell.roll ?? inferSpellRoll(spell.name),
+        roll: spell.roll ?? inferSpellRoll(name),
         effect: spell.effect || spell.summary || "",
       };
     }
@@ -557,7 +558,7 @@ function numberOrNull(value) {
 
 function recordName(value) {
   if (value && typeof value === "object") {
-    return String(value.name || value.title || value.id || "");
+    return recordName(value.name || value.title || value.label || value.value || value.id || "");
   }
   return String(value ?? "");
 }

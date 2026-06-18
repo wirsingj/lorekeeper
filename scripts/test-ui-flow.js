@@ -14,8 +14,20 @@ try {
 
 const args = parseArgs(process.argv.slice(2));
 const selectedScenario = args.scenario || "";
+const chaosSeed = args.seed ?? "424242";
+const chaosRuns = Number.isInteger(args.chaosRuns) && args.chaosRuns > 0 ? args.chaosRuns : 3;
+const wantsChaos = Boolean(args.chaos || args.chaosOnly);
+const desktopChaosViewports = [
+  { width: 1440, height: 1000 },
+  { width: 1366, height: 900 },
+  { width: 1180, height: 820 },
+];
+const narrowChaosViewport = { width: 390, height: 844 };
 const token = "ui-flow-secret";
 const artifactsRoot = path.resolve("data/runtime/ui-flow-artifacts", timestampForPath(new Date()));
+if (!args.skipBuild) {
+  await runNpmScript("build");
+}
 const scenarios = [
   {
     name: "home-baseline",
@@ -265,8 +277,8 @@ const scenarios = [
           preferredProvider: "ollama",
           selectedModel: model,
           fastMode: true,
-          outputLimit: 260,
-          generationTimeoutMs: 45_000,
+          outputLimit: 700,
+          generationTimeoutMs: 60_000,
         },
       });
       const rpResult = await runProviderContractTurn(harness, {
@@ -365,13 +377,15 @@ const scenarios = [
     },
   },
 ];
+const chaosScenarios = wantsChaos ? buildChaosScenarios({ seed: chaosSeed, runs: chaosRuns }) : [];
+const allScenarios = [...scenarios, ...chaosScenarios];
 
 const runnableScenarios = selectedScenario
-  ? scenarios.filter((scenario) => scenario.name === selectedScenario)
-  : scenarios;
+  ? allScenarios.filter((scenario) => scenario.name === selectedScenario)
+  : args.chaosOnly ? chaosScenarios : allScenarios;
 
 if (selectedScenario && runnableScenarios.length === 0) {
-  throw new Error(`Unknown UI scenario "${selectedScenario}". Available: ${scenarios.map((scenario) => scenario.name).join(", ")}`);
+  throw new Error(`Unknown UI scenario "${selectedScenario}". Available: ${allScenarios.map((scenario) => scenario.name).join(", ")}`);
 }
 
 let browser;
@@ -385,6 +399,9 @@ try {
 
 let passed = 0;
 try {
+  if (wantsChaos) {
+    console.log(`UI chaos mode enabled: seed=${chaosSeed}, runs=${chaosRuns}${args.chaosOnly ? ", chaos-only=true" : ""}`);
+  }
   for (const scenario of runnableScenarios) {
     await runScenario(browser, scenario);
     passed += 1;
@@ -410,6 +427,14 @@ async function runScenario(browserInstance, scenario) {
   let context;
   let page;
   const browserErrors = [];
+  const responseChecks = [];
+  let serverOutput = "";
+  child.stdout.on("data", (chunk) => {
+    serverOutput += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    serverOutput += chunk.toString();
+  });
 
   try {
     const port = await waitForServerPort(child);
@@ -420,12 +445,81 @@ async function runScenario(browserInstance, scenario) {
     page = await context.newPage();
     page.on("console", (message) => {
       if (message.type() === "error") {
+        if (/Failed to load resource: the server responded with a status of/i.test(message.text())) {
+          return;
+        }
         browserErrors.push(`[console] ${message.text()}`);
       }
     });
     page.on("pageerror", (error) => {
       browserErrors.push(`[pageerror] ${error.message}`);
     });
+    page.on("response", (response) => {
+      responseChecks.push((async () => {
+        const status = response.status();
+        const url = response.url();
+        if (status === 404 && url.includes("/api/campaign/message/update")) {
+          return;
+        }
+        if (status >= 500) {
+          const body = await response.text().catch(() => "");
+          browserErrors.push(`[response ${status}] ${url}${body ? `: ${body.slice(0, 300)}` : ""}`);
+        }
+      })());
+    });
+
+    const providerQueue = [];
+    let providerRouteInstalled = false;
+    const installProviderRoute = async () => {
+      if (providerRouteInstalled) {
+        return;
+      }
+      providerRouteInstalled = true;
+      await page.route("**/api/provider/generate-turn", async (route) => {
+        const response = providerQueue.shift();
+        if (!response) {
+          await fulfillProviderRoute(route, {
+            status: 500,
+            contentType: "text/plain",
+            body: "UI harness provider queue exhausted.",
+          });
+          return;
+        }
+        if (response.__delayMs) {
+          await new Promise((resolve) => setTimeout(resolve, response.__delayMs));
+        }
+        if (response.__error) {
+          await fulfillProviderRoute(route, {
+            status: response.__error.status ?? 500,
+            contentType: "text/plain",
+            body: response.__error.body ?? "UI harness provider error.",
+          });
+          return;
+        }
+        const structured = stripHarnessResponseMeta(response);
+        const body = [
+          { type: "start", model: "ui-harness" },
+          {
+            type: "done",
+            result: {
+              ok: true,
+              providerId: "ui-harness",
+              model: "ui-harness",
+              durationMs: 5,
+              text: JSON.stringify(structured),
+              rawText: JSON.stringify(structured),
+              structured,
+              validationErrors: [],
+            },
+          },
+        ].map((event) => JSON.stringify(event)).join("\n") + "\n";
+        await fulfillProviderRoute(route, {
+          status: 200,
+          contentType: "application/x-ndjson; charset=utf-8",
+          body,
+        });
+      });
+    };
 
     const harness = {
       baseUrl,
@@ -442,49 +536,20 @@ async function runScenario(browserInstance, scenario) {
         await this.mockProviderTurns([response]);
       },
       async mockProviderTurns(responses) {
-        const queue = [...responses];
-        await page.route("**/api/provider/generate-turn", (route) => {
-          const response = queue.shift();
-          if (!response) {
-            route.fulfill({
-              status: 500,
-              contentType: "text/plain",
-              body: "UI harness provider queue exhausted.",
-            });
-            return;
-          }
-          const body = [
-            { type: "start", model: "ui-harness" },
-            {
-              type: "done",
-              result: {
-                ok: true,
-                providerId: "ui-harness",
-                model: "ui-harness",
-                durationMs: 5,
-                text: JSON.stringify(response),
-                rawText: JSON.stringify(response),
-                structured: response,
-                validationErrors: [],
-              },
-            },
-          ].map((event) => JSON.stringify(event)).join("\n") + "\n";
-          route.fulfill({
-            status: 200,
-            contentType: "application/x-ndjson; charset=utf-8",
-            body,
-          });
-        });
+        providerQueue.splice(0, providerQueue.length, ...responses);
+        await installProviderRoute();
       },
     };
 
     await scenario.run(harness);
+    await Promise.allSettled(responseChecks);
     await assertRendererHarness(page);
     assert.deepEqual(browserErrors, [], `${scenario.name} browser errors`);
     console.log(`PASS ${scenario.name}`);
   } catch (error) {
     if (page) {
       await writeFailureArtifacts({ scenarioName: scenario.name, page, baseUrl: page.url(), error });
+      await writeFile(path.join(artifactsRoot, `${scenario.name}.server.txt`), serverOutput).catch(() => {});
     }
     throw error;
   } finally {
@@ -496,6 +561,29 @@ async function runScenario(browserInstance, scenario) {
     if (!args.keepTemp) {
       await rm(tempDir, { recursive: true, force: true });
     }
+  }
+}
+
+async function runNpmScript(scriptName) {
+  const npmCommand = process.platform === "win32" ? "npm" : "npm";
+  const child = spawn(npmCommand, ["run", scriptName], {
+    cwd: process.cwd(),
+    stdio: ["ignore", "pipe", "pipe"],
+    shell: process.platform === "win32",
+  });
+  let output = "";
+  child.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  const exitCode = await new Promise((resolve) => {
+    child.on("exit", (code) => resolve(code ?? 1));
+    child.on("error", () => resolve(1));
+  });
+  if (exitCode !== 0) {
+    throw new Error(`npm run ${scriptName} failed before UI flow tests:\n${output}`);
   }
 }
 
@@ -579,17 +667,502 @@ async function assertNoDuplicateWizardCardNames(page) {
   assertUniqueStrings(names, "wizard character card names");
 }
 
-async function submitPlayerTurn(page, text) {
-  await page.locator("#player-input").waitFor({ state: "visible", timeout: 10000 });
-  await page.fill("#player-input", text);
-  await page.click("#build-turn");
-  await assertNoActiveGeneration(page);
+function buildChaosScenarios({ seed, runs }) {
+  return Array.from({ length: runs }, (_, index) => {
+    const runSeed = `${seed}:${index + 1}`;
+    return {
+      name: `chaos-table-flow-${sanitizeScenarioName(runSeed)}`,
+      viewport: args.mobileChaos && index === runs - 1
+        ? narrowChaosViewport
+        : desktopChaosViewports[index % desktopChaosViewports.length],
+      run: async (harness) => runChaosTableFlow(harness, { runIndex: index + 1, seed: runSeed }),
+    };
+  });
 }
 
-async function assertNoActiveGeneration(page) {
+async function runChaosTableFlow(harness, { runIndex, seed }) {
+  const rng = seededRandom(seed);
+  const page = harness.page;
+  await harness.gotoHome();
+  await assertHealthyUi(harness, `chaos ${runIndex}: home`);
+
+  await openCampaignWizard(page);
+  for (let count = 0, limit = randomInt(rng, 1, 4); count < limit; count += 1) {
+    await clickIfVisible(page, "#adventure-seed-preset");
+    await page.waitForTimeout(randomInt(rng, 30, 120));
+  }
+  const primaryName = `Ilyra Chaos ${runIndex}`;
+  await fillCampaignSeed(page, {
+    title: `Chaos Table ${runIndex}`,
+    premise: "A road ambush keeps changing shape while the table is still getting seated.",
+    startingLocation: "Switchback Road",
+    tone: "urgent, grounded fantasy",
+    primary: {
+      name: primaryName,
+      ancestry: "Half-elf",
+      characterClass: "Bard",
+      concept: "A watchful traveler who distrusts clean answers.",
+    },
+  });
+
+  for (let count = 0, limit = randomInt(rng, 3, 7); count < limit; count += 1) {
+    await clickIfVisible(page, rng() < 0.7 ? "#add-party-template" : "#add-wizard-party-member");
+    await page.waitForTimeout(randomInt(rng, 20, 90));
+    await assertNoDuplicateWizardCardNames(page);
+  }
+  if (await page.locator("[data-wizard-character-card]").count()) {
+    await fillWizardPartyCard(page.locator("[data-wizard-character-card]").last(), {
+      name: `Remote Seat ${runIndex}`,
+      ancestry: "Human",
+      characterClass: "Ranger",
+      concept: "A late-arriving scout who knows the ridge line.",
+      integrationPrompt: "They arrive with practical warnings, not exposition.",
+      controllerKind: "remote_invite",
+    });
+  }
+  await clickIfVisible(page, "#copy-pretable-guest-link");
+  const preTableSnapshot = await waitForPreTableParty(harness, { minSeats: 1 });
+  assertUniqueNames(preTableSnapshot.joinableSeats, "name", "chaos pre-table joinable seats");
+  assertUniqueIds(preTableSnapshot.joinableSeats, "chaos pre-table joinable seats");
+  await assertHealthyUi(harness, `chaos ${runIndex}: wizard party`);
+
+  await page.click("#start-campaign-submit");
+  await page.waitForFunction(() => document.querySelector("#campaign-dialog")?.open !== true, null, { timeout: 15000 });
+  await page.waitForFunction((title) => {
+    return window.__lorekeeperDebug?.stateSummary?.().campaignTitle === title;
+  }, `Chaos Table ${runIndex}`, { timeout: 10000 });
+  await assertHealthyUi(harness, `chaos ${runIndex}: campaign created`);
+
+  await exerciseTableChrome(harness, rng, runIndex);
+  await exerciseRecords(harness, rng, runIndex);
+
+  const campaign = await harness.fetchJson("/api/campaign");
+  const actor = campaign.campaign.party[0];
+  assert.ok(actor?.id && actor?.name, "chaos campaign should have a playable actor");
+  await harness.mockProviderTurns([
+    turnResponse({
+      text: `The ridge answers ${actor.name}'s move with a low horn and a flash of hidden steel.`,
+      sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+      __delayMs: runIndex % 2 === 0 ? 900 : 1200,
+    }),
+  ]);
+
+  await exerciseProviderAndTableTalk(harness, rng, runIndex, actor);
+  await commitPendingReviewIfAny(harness);
+  await harness.mockProviderTurns([
+    combatStartTurnResponse({
+      text: `The ambusher breaks cover, and ${actor.name} sees the attack before the road dust settles.`,
+      actor,
+      runIndex,
+    }),
+  ]);
+  await submitPlayerTurn(page, `${actor.name} forces the ambusher into the open.`);
+  const activeActor = await waitForActiveCombatActor(harness);
+  await expectCombatActor(page, activeActor.name);
+
+  if (!await isPlayerInputEnabled(page)) {
+    const placeholder = await page.locator("#player-input").getAttribute("placeholder");
+    assert.match(placeholder ?? "", new RegExp(escapeRegExp(activeActor.name), "i"), "locked combat input should name the active actor");
+    await harness.mockProviderTurns([
+      {
+        ...turnResponse({
+          text: `${activeActor.name} studies the Hidden Beast and waits for the host to stage the companion's move.`,
+          sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: true },
+        }),
+        table: [{
+          speaker: activeActor.name,
+          speakerId: activeActor.id,
+          role: "party",
+          kind: "dialogue",
+          visibility: "table",
+          text: "I can draw it off-balance if you want me to commit.",
+        }],
+      },
+      turnResponse({
+        text: `${activeActor.name} holds position while the table waits for the host's call.`,
+        sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: true },
+      }),
+    ]);
+    await clickIfVisible(page, "#nudge-dm");
+    await assertNoActiveGeneration(page);
+    await expectVisibleText(page, "draw it off-balance");
+    await assertHealthyUi(harness, `chaos ${runIndex}: companion combat lock`);
+    return;
+  }
+
+  await harness.mockProviderTurns([
+    turnResponse({
+      text: `${activeActor.name} drives the Hidden Beast back with a clean hit, forcing it into view.`,
+      sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+      mechanics: [{ type: "attack", actor: activeActor.name, target: "Hidden Beast", roll: "d20+5 = 19 vs AC 13", damage: "1d8+3 = 9 piercing", outcome: "success", text: `${activeActor.name} hits the Hidden Beast for 9 piercing damage.` }],
+      proposedChanges: [combatChange({
+        id: `chaos-player-advance-${runIndex}`,
+        summary: "The player attack resolves and initiative advances.",
+        data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: activeActor.id },
+      })],
+    }),
+  ]);
+
+  await submitPlayerTurn(page, `${activeActor.name} attacks the Hidden Beast.`);
+  const nextActor = await waitForActiveCombatActor(harness);
+  await expectCombatActor(page, nextActor.name);
+
+  if (nextActor.type === "enemy" || nextActor.id === "enemy-hidden-beast") {
+    await harness.mockProviderTurns([
+      turnResponse({
+        text: `${nextActor.name} snaps from the ditch, misses, and leaves claw marks in the wet road.`,
+        sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: false },
+        mechanics: [{ type: "attack", actor: nextActor.name, target: activeActor.name, roll: "d20+4 = 10 vs AC 15", outcome: "failure", text: `${nextActor.name} attacks ${activeActor.name}. Attack 10 vs AC 15: miss.` }],
+        proposedChanges: [combatChange({
+          id: `chaos-enemy-advance-${runIndex}`,
+          summary: "The enemy attack resolves and initiative returns to a party actor.",
+          data: { inCombat: true, turnResolved: true, advanceTurn: true, resolvedActorId: nextActor.id },
+        })],
+      }),
+    ]);
+    await page.click("#nudge-dm");
+    await expectVisibleText(page, "Attack 10 vs AC 15: miss");
+    const afterEnemy = await waitForActiveCombatActor(harness);
+    await expectCombatActor(page, afterEnemy.name);
+  }
+  await assertHealthyUi(harness, `chaos ${runIndex}: combat round`);
+}
+
+function combatStartTurnResponse({ text, actor, runIndex }) {
+  return turnResponse({
+    text,
+    sceneStatus: { mode: "combat", danger: "combat", awaitingPlayer: true },
+    mechanics: [{ type: "initiative", actor: actor.name, roll: `${actor.name} 17; Hidden Beast 11`, outcome: "pending", text: `Initiative begins: ${actor.name} acts before the Hidden Beast.` }],
+    flags: { startsCombat: true },
+    proposedChanges: [combatChange({
+      id: `chaos-combat-start-${runIndex}`,
+      summary: "Combat starts with a hidden beast.",
+      data: {
+        inCombat: true,
+        round: 1,
+        currentTurnId: actor.id,
+        initiative: [actor.id, "enemy-hidden-beast"],
+        turnOrder: [
+          { id: actor.id, name: actor.name, type: "party", initiativeScore: 17 },
+          { id: "enemy-hidden-beast", name: "Hidden Beast", type: "enemy", initiativeScore: 11 },
+        ],
+        enemies: [{ id: "enemy-hidden-beast", name: "Hidden Beast", hp: { current: 14, max: 14 }, armorClass: 13, attackBonus: 4, damage: "1d6+2" }],
+      },
+    })],
+  });
+}
+
+async function waitForActiveCombatActor(harness) {
+  return waitForAsync(async () => {
+    const snapshot = await harness.page.evaluate(() => window.__lorekeeperDebug?.renderer?.());
+    const actor = snapshot?.debugSnapshot?.turn?.activeActorId
+      ? {
+        id: snapshot.debugSnapshot.turn.activeActorId,
+        name: snapshot.debugSnapshot.turn.activeActorName,
+        controllerKind: snapshot.debugSnapshot.turn.controller?.kind ?? "",
+        type: snapshot.debugSnapshot.combat?.currentTurnId?.startsWith("enemy-") ? "enemy" : "party",
+      }
+      : null;
+    if (!actor?.id || !actor?.name) {
+      return null;
+    }
+    return actor;
+  }, {
+    timeoutMs: 10000,
+    description: "active combat actor",
+  });
+}
+
+async function isPlayerInputEnabled(page) {
+  return page.locator("#player-input").evaluate((input) => Boolean(input && !input.disabled && !input.readOnly)).catch(() => false);
+}
+
+async function exerciseTableChrome(harness, rng, runIndex) {
+  const page = harness.page;
+  await page.click("#open-setup");
+  await page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
+  for (const tab of shuffle(["app", "ai", "friends", "troubleshooting"], rng)) {
+    await clickIfVisible(page, `[data-settings-tab="${tab}"]`);
+    await page.waitForTimeout(randomInt(rng, 40, 140));
+  }
+  await clickIfVisible(page, "#refresh-diagnostics");
+  await clickIfVisible(page, "#start-local-table");
+  await clickIfVisible(page, "#copy-guest-link");
+  await clickIfVisible(page, "#copy-character-invite");
+  await page.click("#close-setup");
+  await page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
+
+  if (await clickIfVisible(page, "#delete-campaign")) {
+    await page.locator("#delete-campaign-dialog").waitFor({ state: "visible", timeout: 10000 });
+    await page.waitForTimeout(randomInt(rng, 40, 120));
+    await clickIfVisible(page, "#cancel-delete-campaign");
+    await page.waitForFunction(() => document.querySelector("#delete-campaign-dialog")?.open !== true, null, { timeout: 10000 });
+  }
+  await assertHealthyUi(harness, `chaos ${runIndex}: chrome`);
+}
+
+async function exerciseRecords(harness, rng, runIndex) {
+  const page = harness.page;
+  for (const domain of shuffle(["people", "places", "items", "quests"], rng).slice(0, 2)) {
+    if (!await clickIfVisible(page, `[data-add-domain='${domain}']`)) {
+      continue;
+    }
+    await page.locator("#record-dialog").waitFor({ state: "visible", timeout: 10000 });
+    await fillIfVisible(page, "#record-name", `Chaos ${domain} ${runIndex}`);
+    await fillIfVisible(page, "#record-role", domain === "people" ? "Witness" : "");
+    await fillIfVisible(page, "#record-notes", `Created by chaos UI flow ${runIndex}.`);
+    if (rng() < 0.5) {
+      await clickIfVisible(page, "#close-record-dialog");
+    } else {
+      await clickIfVisible(page, "#save-record");
+    }
+    await page.waitForFunction(() => document.querySelector("#record-dialog")?.open !== true, null, { timeout: 10000 });
+  }
+  await assertHealthyUi(harness, `chaos ${runIndex}: records`);
+}
+
+async function exerciseProviderAndTableTalk(harness, rng, runIndex, actor) {
+  const page = harness.page;
+  await page.locator("#player-input").waitFor({ state: "visible", timeout: 10000 });
+  await page.fill("#player-input", `${actor.name} studies the ridge while everyone else is still arguing.`);
+  await page.click("#build-turn");
+  await page.waitForFunction(() => window.__lorekeeperDebug?.stateSummary?.().activeGeneration === true, null, { timeout: 5000 });
+  for (let index = 0; index < 3; index += 1) {
+    const text = `chaos side chat ${runIndex}.${index}`;
+    await page.fill("#table-talk-input", text);
+    await page.click("#table-talk-send");
+    await expectVisibleText(page, text);
+    await page.waitForTimeout(randomInt(rng, 30, 110));
+  }
+  if (runIndex % 2 === 0) {
+    await clickIfVisible(page, "#cancel-generation");
+    await assertNoActiveGeneration(page);
+    await harness.mockProviderTurns([
+      turnResponse({
+        text: `The ridge answers ${actor.name}'s repeated watch with a low horn and a flash of hidden steel.`,
+        sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+      }),
+    ]);
+    await submitPlayerTurn(page, `${actor.name} repeats the ridge watch after the table settles.`);
+  }
+  await assertNoActiveGeneration(page);
+  await expectVisibleText(page, "ridge");
+  await assertHealthyUi(harness, `chaos ${runIndex}: provider and table talk`);
+}
+
+async function assertHealthyUi(harness, label) {
+  const page = harness.page;
+  await assertRendererHarness(page);
+  const bodyText = await page.locator("body").innerText();
+  assert.ok(!/\b(TypeError|ReferenceError|Unhandled|table\[\d+\])\b/.test(bodyText), `${label} leaked technical error text`);
+  const openDialogs = await page.locator("dialog[open]").evaluateAll((dialogs) => dialogs.map((dialog) => dialog.id || dialog.getAttribute("aria-label") || dialog.className));
+  assert.ok(openDialogs.length <= 1, `${label} has too many open dialogs: ${openDialogs.join(", ")}`);
+  if (await page.locator("#campaign-dialog").evaluate((dialog) => dialog?.open === true).catch(() => false)) {
+    await assertNoDuplicateWizardCardNames(page);
+  }
+  const campaign = await tryFetchJson(harness, "/api/campaign");
+  if (campaign?.campaign?.party?.length) {
+    assertUniqueNames(campaign.campaign.party, "name", `${label} campaign party`);
+    assertUniqueIds(campaign.campaign.party, `${label} campaign party`);
+  }
+  if (campaign?.campaign?.combat?.inCombat) {
+    const activeActor = await page.locator("#combat-active-actor").textContent().catch(() => "");
+    assert.ok(activeActor?.trim(), `${label} should render an active combat actor`);
+  }
+}
+
+async function commitPendingReviewIfAny(harness) {
+  const before = await harness.page.evaluate(() => window.__lorekeeperDebug?.renderer?.().reviewBatch);
+  if (!before?.proposedChanges?.length) {
+    return { committed: false, reason: "no_pending_review" };
+  }
+  const result = await harness.page.evaluate(() => window.__lorekeeperDebug?.commitPendingReview?.());
+  await harness.page.waitForFunction(() => !window.__lorekeeperDebug?.renderer?.().reviewBatch, null, { timeout: 10000 });
+  return result;
+}
+
+async function tryFetchJson(harness, pathname) {
+  try {
+    return await harness.fetchJson(pathname);
+  } catch {
+    return null;
+  }
+}
+
+async function clickIfVisible(page, selector) {
+  const locator = page.locator(selector).first();
+  if (!await locator.count()) {
+    return false;
+  }
+  if (!await locator.isVisible().catch(() => false)) {
+    return false;
+  }
+  await locator.click();
+  return true;
+}
+
+async function fillIfVisible(page, selector, value) {
+  const locator = page.locator(selector).first();
+  if (await locator.count() && await locator.isVisible().catch(() => false)) {
+    await locator.fill(value);
+    return true;
+  }
+  return false;
+}
+
+function stripHarnessResponseMeta(response) {
+  const { __delayMs, __error, ...structured } = response;
+  return structured;
+}
+
+async function fulfillProviderRoute(route, options) {
+  try {
+    await route.fulfill(options);
+  } catch (error) {
+    if (String(error?.message ?? "").includes("already handled")) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function seededRandom(seed) {
+  let state = hashString(seed);
+  return () => {
+    state |= 0;
+    state = state + 0x6D2B79F5 | 0;
+    let value = Math.imul(state ^ state >>> 15, 1 | state);
+    value = value + Math.imul(value ^ value >>> 7, 61 | value) ^ value;
+    return ((value ^ value >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+  for (const char of String(value)) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function randomInt(rng, min, maxInclusive) {
+  return Math.floor(rng() * (maxInclusive - min + 1)) + min;
+}
+
+function shuffle(values, rng) {
+  const output = [...values];
+  for (let index = output.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    [output[index], output[swapIndex]] = [output[swapIndex], output[index]];
+  }
+  return output;
+}
+
+function sanitizeScenarioName(value) {
+  return String(value).replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function submitPlayerTurn(page, text) {
+  await page.locator("#player-input").waitFor({ state: "visible", timeout: 10000 });
+  const ready = await waitForAsync(async () => {
+    if (!await setPlayerInput(page, text)) {
+      return null;
+    }
+    const ready = await page.evaluate((expectedText) => {
+      const button = document.querySelector("#build-turn");
+      const input = document.querySelector("#player-input");
+      return Boolean(button && input && input.value === expectedText && !button.disabled && !input.disabled);
+    }, text);
+    return ready ? true : null;
+  }, {
+    timeoutMs: 10000,
+    description: "player input ready to submit",
+  }).then(() => true).catch(() => false);
+  const clickAttempted = ready
+    ? await page.click("#build-turn", { timeout: 1200 }).then(() => true).catch(() => false)
+    : false;
+  const clicked = clickAttempted && await page.waitForFunction((expectedText) => {
+    return window.__lorekeeperDebug?.renderer?.().currentTurn?.playerMessage === expectedText;
+  }, text, { timeout: 2000 }).then(() => true).catch(() => false);
+  if (!clicked) {
+    const active = await page.evaluate(() => window.__lorekeeperDebug?.stateSummary?.().activeGeneration === true);
+    let fallbackResult = null;
+    if (!active) {
+      fallbackResult = await page.evaluate((fallbackText) => {
+        return window.__lorekeeperDebug?.submitPlayerTurn?.({ text: fallbackText });
+      }, text);
+      if (!fallbackResult) {
+        throw new Error("debug submit hook did not return a result");
+      }
+      if (fallbackResult?.providerReceived === false) {
+        throw new Error(`debug submit was blocked: ${fallbackResult.reason || "unknown"} ${JSON.stringify(fallbackResult.debug ?? {})}`);
+      }
+    }
+    const generationStarted = await page.evaluate(() => window.__lorekeeperDebug?.stateSummary?.().activeGeneration === true);
+    if (generationStarted) {
+      await assertNoActiveGeneration(page, 45000);
+    }
+    const advanced = await waitForSubmittedTurnEvidence(page, text, 12000);
+    if (!advanced) {
+      const diagnostics = await page.evaluate(() => ({
+        renderer: window.__lorekeeperDebug?.renderer?.(),
+        stateSummary: window.__lorekeeperDebug?.stateSummary?.(),
+      }));
+      throw new Error(`turn did not advance after submit; fallback=${JSON.stringify(fallbackResult)} diagnostics=${JSON.stringify({
+        activity: diagnostics.renderer?.providerActivity,
+        bridgeStatus: diagnostics.renderer?.bridgeStatus,
+        currentTurn: diagnostics.renderer?.currentTurn?.playerMessage,
+        turnProjection: diagnostics.renderer?.turnEngine,
+        tablePhase: diagnostics.stateSummary?.tablePhase,
+      })}`);
+    }
+  }
+  await assertNoActiveGeneration(page, 45000);
+}
+
+async function waitForSubmittedTurnEvidence(page, text, timeoutMs = 10000) {
+  return page.waitForFunction((expectedText) => {
+    const diagnostics = window.__lorekeeperDebug?.renderer?.();
+    if (diagnostics?.currentTurn?.playerMessage === expectedText) {
+      return true;
+    }
+    return (diagnostics?.recentPlayMessages ?? []).some((message) => {
+      return message?.role === "player" && message?.body === expectedText;
+    });
+  }, text, { timeout: timeoutMs }).then(() => true).catch(() => false);
+}
+
+async function setPlayerInput(page, text) {
+  const input = page.locator("#player-input");
+  const enabled = await input.evaluate((element) => Boolean(element && !element.disabled && !element.readOnly)).catch(() => false);
+  if (!enabled) {
+    return false;
+  }
+  await input.click({ timeout: 800 });
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type(text);
+  const typed = await page.waitForFunction((expectedText) => {
+    return document.querySelector("#player-input")?.value === expectedText;
+  }, text, { timeout: 1500 }).then(() => true).catch(() => false);
+  if (typed) {
+    return true;
+  }
+  await input.fill(text);
+  await page.waitForFunction((expectedText) => {
+    return document.querySelector("#player-input")?.value === expectedText;
+  }, text, { timeout: 10000 });
+  return true;
+}
+
+async function assertNoActiveGeneration(page, timeoutMs = 15000) {
   await page.waitForFunction(() => {
     return window.__lorekeeperDebug?.stateSummary?.().activeGeneration === false;
-  }, null, { timeout: 15000 });
+  }, null, { timeout: timeoutMs });
 }
 
 async function expectCombatActor(page, actorName) {
@@ -713,8 +1286,12 @@ function turnResponse({
   mechanics = [],
   proposedChanges = [],
   flags = {},
+  __delayMs = 0,
+  __error = null,
 } = {}) {
   return {
+    __delayMs,
+    __error,
     schemaVersion: 1,
     requestId: "ui-harness",
     table: [{
@@ -867,6 +1444,12 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const item = argv[index];
     if (item === "--scenario") output.scenario = argv[++index];
+    else if (item === "--chaos") output.chaos = true;
+    else if (item === "--chaos-only") output.chaosOnly = true;
+    else if (item === "--chaos-runs") output.chaosRuns = Number(argv[++index]);
+    else if (item === "--mobile-chaos") output.mobileChaos = true;
+    else if (item === "--seed") output.seed = argv[++index];
+    else if (item === "--skip-build") output.skipBuild = true;
     else if (item === "--keep-temp") output.keepTemp = true;
   }
   return output;

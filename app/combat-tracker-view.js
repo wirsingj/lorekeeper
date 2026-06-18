@@ -48,7 +48,7 @@ function buildActiveCombatCue(campaign, active, options = {}) {
     .slice(0, 5)
     .map((action) => ({
       id: action.id,
-      label: action.label || titleCaseToken(action.type || action.id),
+      label: readableActionLabel(action),
       type: action.type || "",
     }));
   const controlled = active.id === options.controlledActorId;
@@ -236,6 +236,20 @@ function isSpent(value) {
 function titleCaseToken(value) {
   const text = String(value ?? "").replace(/[_-]+/g, " ").trim();
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+function readableActionLabel(action = {}) {
+  const label = String(action.label ?? "").trim();
+  if (label && !/\[object Object\]/i.test(label)) {
+    return label;
+  }
+  const type = String(action.type || action.id || "").toLowerCase();
+  if (type.includes("attack")) return "Attack";
+  if (type.includes("spell")) return "Cast Spell";
+  if (type.includes("movement") || type.includes("move")) return "Move";
+  if (type.includes("dodge")) return "Dodge";
+  if (type.includes("help")) return "Help";
+  return titleCaseToken(action.type || action.id || "Action");
 }
 
 function normalizeList(value) {

@@ -1051,6 +1051,33 @@ function testCombatTrackerView() {
   const enemyTurnView = buildCombatTrackerView(campaign);
   assert.equal(enemyTurnView.activeCue.controllerLabel, "DM turn");
   assert.match(enemyTurnView.activeCue.instruction, /app resolves enemy mechanics/i);
+
+  campaign.party = campaign.party.map((member) => member.id === "karl"
+    ? {
+      ...member,
+      attacks: [{ name: { label: "Warhammer" }, attackBonus: 4, damage: "1d8+2" }],
+      spells: [{ name: { label: "Shield" }, level: 1 }],
+      resources: { spellSlots: { 1: { max: 1, used: 0 } } },
+    }
+    : member);
+  campaign.combat.currentTurnId = "karl";
+  campaign.combat.turnEconomy.karl = { action: "available", bonusAction: "available", movementRemainingFt: 30 };
+  const objectNamedActionView = buildCombatTrackerView(campaign);
+  const actionLabels = objectNamedActionView.activeCue.actions.map((action) => action.label).join(" / ");
+  assert.doesNotMatch(actionLabels, /\[object Object\]/);
+  assert.match(actionLabels, /Warhammer|Attack/);
+
+  campaign.combat.enemies = campaign.combat.enemies.map((enemy) => enemy.id === "miner"
+    ? { ...enemy, hp: { current: 7, max: 10 }, conditions: [] }
+    : enemy);
+  campaign.combat.inCombat = true;
+  const combatContextText = buildContextPack(campaign, { includeCombatDetail: true }).sections
+    .filter((section) => section.kind === "combat_state")
+    .flatMap((section) => section.entries)
+    .join("\n");
+  assert.doesNotMatch(combatContextText, /\[object Object\]/);
+  assert.match(combatContextText, /Warhammer|Attack/);
+  assert.match(combatContextText, /Drunk miner \(HP 7\/10\)/);
 }
 
 function testSceneImportController() {
@@ -2130,6 +2157,19 @@ function testTableSessionEnginePhases() {
   });
   assert.equal(recovery.phase, tablePhases.RECOVERY);
   assert.equal(recovery.recovery.active, true);
+
+  const cancelledGeneration = buildTableSessionProjection({
+    campaign,
+    providerActivity: {
+      state: "idle",
+      phase: "dm_cancelled",
+      text: "DM response canceled.",
+      raw: "Local generation canceled",
+    },
+    turnProjection: { state: "awaiting_input", canSubmit: true },
+  });
+  assert.equal(cancelledGeneration.phase, tablePhases.WAITING_FOR_PLAYER);
+  assert.equal(cancelledGeneration.recovery.active, false);
 
   const combatCampaign = startCombat(campaign, {
     reroll: false,

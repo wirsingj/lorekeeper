@@ -254,11 +254,34 @@ async function writeFileAtomically(outputPath, bytes) {
   await mkdir(directory, { recursive: true });
   try {
     await writeFile(tempPath, bytes);
-    await rename(tempPath, outputPath);
+    await renameWithWindowsRetry(tempPath, outputPath);
   } catch (error) {
     await rm(tempPath, { force: true }).catch(() => {});
     throw error;
   }
+}
+
+async function renameWithWindowsRetry(sourcePath, targetPath) {
+  const retryableCodes = new Set(["EPERM", "EBUSY", "EACCES"]);
+  const delays = [35, 75, 150, 300, 600, 1000];
+  let lastError = null;
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      await rename(sourcePath, targetPath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!retryableCodes.has(error?.code) || attempt === delays.length) {
+        throw error;
+      }
+      await delay(delays[attempt]);
+    }
+  }
+  throw lastError;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function readCampaignSqliteSummary(sqlitePath) {

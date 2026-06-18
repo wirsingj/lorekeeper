@@ -1707,7 +1707,7 @@ async function updatePlayerTurnEchoLifecycle(messageId, runResult = {}) {
       canceled: Boolean(runResult?.canceled),
       failureReason: runResult?.error instanceof Error ? runResult.error.message : "",
     },
-  });
+  }, { tolerateMissing: true });
 }
 
 function findUnresolvedDuplicatePlayerMessage(body, meta = "") {
@@ -8175,6 +8175,31 @@ function installInternalDebugHarness() {
     renderer: () => buildRendererDiagnostics(),
     tableSession: () => state.tableSession ?? buildCurrentTableSessionProjection(),
     turnProjection: () => state.turnFlow.getProjection(),
+    commitPendingReview: async () => {
+      if (!state.reviewBatch?.proposedChanges?.length) {
+        return { committed: false, reason: "no_pending_review" };
+      }
+      const result = await commitExtractedChanges(state.reviewBatch);
+      return {
+        committed: Boolean(result),
+        applied: result?.applied?.length ?? 0,
+      };
+    },
+    submitPlayerTurn: async (input) => {
+      const text = String(input && typeof input === "object" ? input.text ?? "" : input ?? "");
+      const beforeMessage = state.currentTurn?.playerMessage ?? "";
+      const result = await submitPlayerTurnFromInput(text);
+      return {
+        ...result,
+        debug: {
+          textLength: text.trim().length,
+          beforeMessage,
+          afterMessage: state.currentTurn?.playerMessage ?? "",
+          activeGeneration: hasActiveGeneration(),
+          bridgeStatus: elements.bridgeStatus?.textContent ?? "",
+        },
+      };
+    },
     recentEvents: (limit = 80) => state.diagnosticsEvents.slice(-Math.max(1, Math.min(Number(limit) || 80, 200))),
     recentTimeline: (limit = 80) => state.tableTimeline.slice(-Math.max(1, Math.min(Number(limit) || 80, 200))),
     stateSummary: () => ({
@@ -9280,7 +9305,7 @@ function partySuggestionInputFromMessage(message) {
   };
 }
 
-async function patchPlayMessage(messageId, patch = {}) {
+async function patchPlayMessage(messageId, patch = {}, options = {}) {
   patchPlayMessageLocal(messageId, patch);
   render();
 
@@ -9294,7 +9319,16 @@ async function patchPlayMessage(messageId, patch = {}) {
       }),
     });
     if (!response.ok) {
-      throw new Error(await response.text());
+      const message = await response.text();
+      if (options.tolerateMissing && response.status === 404) {
+        pushDiagnosticsEvent("message_lifecycle_patch_missing", {
+          messageId,
+          patchKeys: Object.keys(patch ?? {}),
+          message,
+        });
+        return;
+      }
+      throw new Error(message);
     }
     const result = await response.json();
     setCampaignFromPayload(result, "message_update");
