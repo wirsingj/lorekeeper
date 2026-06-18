@@ -33,8 +33,9 @@ import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-change
 import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
+import { applyTableActionProjection, buildTableActionProjection } from "./table-action-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
-import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
+import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 import {
@@ -2028,7 +2029,7 @@ function startMultiplayerPolling() {
       if (hasActiveGeneration()) {
         if (!guestWaitingRoomMode && state.campaign?.multiplayer?.localTable?.running) {
           await refreshMultiplayerSnapshot({ quiet: true });
-          renderWaitingGuestCue();
+          renderTableActions();
           announceWaitingGuestsIfNeeded();
         }
         return;
@@ -5770,6 +5771,7 @@ function renderProviderControls() {
     elements.ollamaStatus.textContent = "Join mode uses the host provider.";
     elements.ollamaBenchmark.textContent = "No local model or browser bridge is needed in this window.";
     applyThinModeChrome();
+    renderTableActions();
     return;
   }
 
@@ -5795,6 +5797,7 @@ function renderProviderControls() {
   elements.bridgeCard.hidden = settings.preferredProvider !== "bridge";
   elements.promptDrawer.hidden = settings.preferredProvider !== "bridge";
   applyFullModeChrome();
+  renderTableActions();
 }
 
 function applyThinModeChrome() {
@@ -6447,48 +6450,24 @@ function render() {
   renderProviderControls();
   renderDebugMetaControl();
   renderMultiplayerPanel();
-  renderWaitingGuestCue();
-  updateStartAdventureOpeningControl();
-}
-
-function renderWaitingGuestCue() {
-  if (!elements.seatWaitingGuest) {
-    return;
-  }
-  const waitingGuests = waitingGuestsForSeating();
-  if (!waitingGuests.length || clientMode) {
-    elements.seatWaitingGuest.hidden = true;
-    elements.seatWaitingGuest.disabled = true;
-    elements.seatWaitingGuest.textContent = "Seat Guest";
-    return;
-  }
-  const firstGuest = waitingGuests[0];
-  elements.seatWaitingGuest.hidden = false;
-  elements.seatWaitingGuest.disabled = false;
-  elements.seatWaitingGuest.textContent = waitingGuests.length === 1
-    ? `Seat ${firstGuest.displayName || "Guest"}`
-    : `Seat ${waitingGuests.length} Guests`;
-  elements.seatWaitingGuest.title = waitingGuests.length === 1
-    ? `${firstGuest.displayName || "A guest"} is waiting for a character seat`
-    : `${waitingGuests.length} guests are waiting for character seats`;
+  renderTableActions();
 }
 
 function isCampaignReadyForOpening(campaign = state.campaign) {
   return isOpeningReady(campaign, { isHost: !clientMode && !isRemoteTableClient() });
 }
 
-function updateStartAdventureOpeningControl() {
-  if (!elements.startAdventureOpening) {
-    return;
-  }
-  const projection = buildStartAdventureOpeningProjection({
+function renderTableActions() {
+  const repair = activeTurnRepair();
+  applyTableActionProjection(elements, buildTableActionProjection({
     campaign: state.campaign,
     turnProjection: turnProjection(),
+    repair,
+    repairHardBlocked: isHardBlockedTurnRepair(repair),
+    waitingGuests: waitingGuestsForSeating(),
+    preferredProvider: currentProviderSettings().preferredProvider,
     isHost: !clientMode && !isRemoteTableClient(),
-  });
-  elements.startAdventureOpening.hidden = !projection.visible;
-  elements.startAdventureOpening.disabled = projection.disabled;
-  elements.startAdventureOpening.title = projection.title;
+  }));
 }
 
 function announceWaitingGuestsIfNeeded() {
@@ -7795,7 +7774,7 @@ function setTurnRepair(repair) {
 
 function clearTurnRepair() {
   state.turnFlow.clearRepair();
-  updateTurnRepairControls();
+  renderTableActions();
   updateNudgeAvailability();
 }
 
@@ -7816,7 +7795,7 @@ async function retryTurnRepair() {
   const retryMessage = await markRepairTurnRetrying(repair);
   setProviderActivity("DM is reconsidering the response...", "working");
   state.turnFlow.retryLastTurn();
-  updateTurnRepairControls();
+  renderTableActions();
   updateNudgeAvailability();
   const runResult = await runPromptThroughLocalProvider(repair.turn);
   if (retryMessage?.id) {
@@ -8348,8 +8327,7 @@ function setProviderActivity(message, status = "idle") {
       status,
     });
   }
-  updateTurnRepairControls();
-  updateStartAdventureOpeningControl();
+  renderTableActions();
 }
 
 function updateNudgeAvailability() {
@@ -8365,30 +8343,6 @@ function updateNudgeAvailability() {
       : isRemoteTableClient()
         ? "Only the host can nudge the DM"
       : "Nudge DM";
-}
-
-function updateTurnRepairControls() {
-  const projection = turnProjection();
-  const active = projection.hasRepair;
-  const repair = activeTurnRepair();
-  const hardBlocked = isHardBlockedTurnRepair(repair);
-  if (elements.repairRetry) {
-    elements.repairRetry.hidden = !active;
-    elements.repairRetry.disabled = projection.hasActiveGeneration;
-  }
-  if (elements.repairInspect) {
-    elements.repairInspect.hidden = !active;
-  }
-  if (elements.repairImportAnyway) {
-    elements.repairImportAnyway.hidden = !active;
-    elements.repairImportAnyway.disabled = projection.hasActiveGeneration || hardBlocked;
-    elements.repairImportAnyway.title = hardBlocked
-      ? "Try Again: this response spoke or acted for a controlled character."
-      : "Use the visible DM text despite table-check warnings.";
-  }
-  if (elements.recheckProvider) {
-    elements.recheckProvider.hidden = active || clientMode || isRemoteTableClient() || currentProviderSettings().preferredProvider !== "bridge";
-  }
 }
 
 function setupSavedLayoutResizers() {

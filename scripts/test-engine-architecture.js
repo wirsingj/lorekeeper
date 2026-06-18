@@ -27,6 +27,7 @@ import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
+import { buildTableActionProjection } from "../app/table-action-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
 import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "../app/table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
@@ -2134,6 +2135,73 @@ function testTableOpeningController() {
   assert.match(prompt, /Prefer choices\.options: \[\]/);
 }
 
+function testTableActionProjection() {
+  const readyCampaign = {
+    scene: { status: "campaign_start" },
+    sessionLog: { messages: [] },
+  };
+  const freshTable = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    isHost: true,
+  });
+  assert.equal(freshTable.startAdventure.visible, true);
+  assert.equal(freshTable.startAdventure.disabled, false);
+  assert.equal(freshTable.seatGuest.visible, false);
+
+  const guestsWaiting = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    waitingGuests: [{ id: "guest-1", displayName: "Remotie" }],
+    isHost: true,
+  });
+  assert.equal(guestsWaiting.seatGuest.visible, true);
+  assert.equal(guestsWaiting.seatGuest.text, "Seat Remotie");
+  assert.match(guestsWaiting.seatGuest.title, /waiting for a character seat/i);
+
+  const recovery = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: true, hasActiveGeneration: false },
+    repair: { reason: "needs review" },
+    preferredProvider: "bridge",
+    isHost: true,
+  });
+  assert.equal(recovery.repairRetry.visible, true);
+  assert.equal(recovery.repairUseAnyway.visible, true);
+  assert.equal(recovery.repairUseAnyway.disabled, false);
+  assert.equal(recovery.readLatest.visible, false);
+  assert.equal(recovery.startAdventure.visible, false);
+
+  const hardBlocked = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: true, hasActiveGeneration: false },
+    repair: { reason: "controlled character agency" },
+    repairHardBlocked: true,
+    isHost: true,
+  });
+  assert.equal(hardBlocked.repairUseAnyway.disabled, true);
+  assert.match(hardBlocked.repairUseAnyway.title, /Try Again/);
+
+  const bridge = buildTableActionProjection({
+    campaign: { scene: { status: "active" }, sessionLog: { messages: [{ role: "dm" }] } },
+    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    preferredProvider: "bridge",
+    isHost: true,
+  });
+  assert.equal(bridge.readLatest.visible, true);
+
+  const guestClient = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, hasActiveGeneration: false },
+    waitingGuests: [{ id: "guest-1", displayName: "Remotie" }],
+    preferredProvider: "bridge",
+    isHost: false,
+  });
+  assert.equal(guestClient.startAdventure.visible, false);
+  assert.equal(guestClient.seatGuest.visible, false);
+  assert.equal(guestClient.readLatest.visible, false);
+}
+
 function testDmNudgeController() {
   const prompt = buildDmNudgePrompt();
   assert.match(prompt, /without inventing a player action/);
@@ -2660,6 +2728,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const dmNudgeController = await readFile(path.join("app", "dm-nudge-controller.js"), "utf8");
+  const tableActionController = await readFile(path.join("app", "table-action-controller.js"), "utf8");
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
@@ -2746,6 +2815,12 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /renderTableFocus\(state\.tableSession\)/, "table session refresh should update the table focus cue");
   assert.match(appJs, /applyTableFocusProjection/, "command deck phase copy should be rendered through a focused projection");
   assert.match(appJs, /buildTableFocusProjection/, "renderer should consume a tested table focus projection");
+  assert.match(appJs, /renderTableActions/, "renderer should consume the table action projection");
+  assert.match(tableActionController, /function buildTableActionProjection/, "table action visibility policy should live outside app.js");
+  assert.match(tableActionController, /buildStartAdventureOpeningProjection/, "Start Adventure action should flow through the unified table action projection");
+  assert.doesNotMatch(appJs, /function renderWaitingGuestCue/, "guest seating CTA policy should not be a standalone app.js function");
+  assert.doesNotMatch(appJs, /function updateTurnRepairControls/, "repair CTA policy should not be a standalone app.js function");
+  assert.doesNotMatch(appJs, /function updateStartAdventureOpeningControl/, "opening CTA policy should not be a standalone app.js function");
   assert.match(dmNudgeController, /function buildDmNudgePrompt/, "DM nudge prompt policy should live outside app.js");
   assert.doesNotMatch(appJs, /function buildDmNudgePrompt/, "app.js should not own the normal DM nudge prompt policy");
   assert.match(styles, /\.command-context/);
@@ -2826,7 +2901,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Start Adventure must remain host-controlled");
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");
   assert.match(appJs, /const multiplayerPollIntervalMs = 1000/, "host guest-request polling should feel live");
-  assert.match(appJs, /hasActiveGeneration\(\)[\s\S]*refreshMultiplayerSnapshot\(\{ quiet: true \}\)[\s\S]*renderWaitingGuestCue\(\)/, "waiting guest cues should refresh even while the DM is generating");
+  assert.match(appJs, /hasActiveGeneration\(\)[\s\S]*refreshMultiplayerSnapshot\(\{ quiet: true \}\)[\s\S]*renderTableActions\(\)/, "waiting guest cues should refresh through the table action projection even while the DM is generating");
   assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);
   assert.match(appJs, /wizardControllerSheetFields/);
   assert.match(appJs, /inviteIntent:\s*"remote_player"/);
@@ -2858,7 +2933,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
   assert.match(appJs, /createImplicitCombatAdvanceChange\(\{[\s\S]*campaign: state\.campaign/, "renderer should call the extracted combat import policy with explicit campaign context");
   assert.match(appJs, /seatWaitingGuestAtTable/);
-  assert.match(appJs, /renderWaitingGuestCue/);
+  assert.match(appJs, /renderTableActions/);
   assert.match(appJs, /announceWaitingGuestsIfNeeded/);
   assert.match(appJs, /effectiveWaitingGuests/);
   assert.match(appJs, /copyGuestLinkFromUi/);
@@ -2957,6 +3032,7 @@ testTableStatusVocabulary();
 testTableSessionEnginePhases();
 testTableFocusProjection();
 testTableOpeningController();
+testTableActionProjection();
 testDmNudgeController();
 testPlayLogProjectionBoundsLongSessions();
 testMultiplayerSessionProjection();
