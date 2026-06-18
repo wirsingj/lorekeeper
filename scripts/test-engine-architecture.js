@@ -2814,6 +2814,13 @@ function testSettingsSurfaceProjection() {
   const coerced = buildSettingsSurfaceProjection({ tab: "app", mode: "table" });
   assert.equal(coerced.activeTab, "friends");
   assert.equal(coerced.mode, "table");
+
+  const recoverySurface = buildSettingsSurfaceProjection({ tab: "troubleshooting", mode: "recovery" });
+  assert.deepEqual(recoverySurface.allowedTabs, ["troubleshooting"]);
+  assert.equal(recoverySurface.activeTab, "troubleshooting");
+  assert.equal(recoverySurface.visibleTabCount, 1);
+  assert.equal(recoverySurface.surfaceTarget, "recovery");
+  assert.equal(recoverySurface.copy.title, "Review DM Response");
 }
 
 async function testAppJsNoLongerOwnsExtractedStateMachines() {
@@ -3058,20 +3065,27 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /data-settings-panel="app"/);
   assert.match(appShell, /data-settings-panel="ai" hidden/);
   assert.match(appShell, /data-settings-panel="friends" hidden/);
-  assert.match(appShell, /data-settings-panel="troubleshooting" hidden/);
+  assert.match(appShell, /data-settings-panel="troubleshooting"/);
+  assert.match(appShell, /data-settings-surface-target="diagnostics"/);
+  assert.match(appShell, /id="dm-recovery-section"[\s\S]*data-settings-surface-target="recovery"/);
   assert.doesNotMatch(appShell, /id="new-campaign"/, "adventure creation belongs on the front door, not inside Preferences");
   assert.doesNotMatch(appShell, /id="load-imported"/, "saved adventure loading belongs on the front door, not inside Preferences");
   assert.match(appJs, /settings-surface-controller\.js/, "settings surface policy should live outside the main app renderer");
   assert.match(settingsSurfaceController, /settingsSurfaceModes = Object\.freeze/, "settings surfaces should declare allowed tab groups");
   assert.match(settingsSurfaceController, /app: \["app", "ai"\]/, "app preferences should only expose app-level tabs");
   assert.match(settingsSurfaceController, /table: \["friends", "troubleshooting"\]/, "table settings should only expose friends and troubleshooting");
+  assert.match(settingsSurfaceController, /recovery: \["troubleshooting"\]/, "DM response review should be able to open as a focused recovery surface");
+  assert.match(settingsSurfaceController, /surfaceTarget = validMode === "recovery" \? "recovery" : ""/, "recovery mode should target only the recovery panel");
   assert.match(settingsSurfaceController, /button\.hidden = !projection\.allowedTabs\.includes/, "irrelevant settings tabs should be hidden by surface mode");
+  assert.match(settingsSurfaceController, /panel\.dataset\.settingsSurfaceTarget === projection\.surfaceTarget/, "focused settings surfaces should hide unrelated panels");
   assert.match(styles, /\.settings-tabs\[data-visible-tabs="2"\]/, "settings tab grid should collapse when only two tabs are visible");
+  assert.match(styles, /\.settings-tabs\[data-visible-tabs="1"\]/, "settings tab grid should collapse when only one recovery tab is visible");
   assert.match(appJs, /function setSettingsTab\(tab = "app", \{ mode = state\.settingsMode/, "settings tab state should be explicit renderer state");
   assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends", mode: "table" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
   assert.match(appJs, /function openLocalTableSeating\(\) \{[\s\S]*openSetupDialog\(\{ tab: "friends", mode: "table" \}\)/, "Seat Guest should land on Friends And Seats");
   assert.match(appJs, /applySettingsSurfaceProjection\(elements, projection\)/);
-  assert.match(appJs, /openSetupDialog\(\{ tab: "troubleshooting" \}\)/, "DM response details should open the Troubleshooting tab directly");
+  assert.match(appJs, /openSetupDialog\(\{ tab: "troubleshooting", mode: "recovery" \}\)/, "DM response details should open the focused recovery surface");
+  assert.doesNotMatch(appJs, /DM response details are open in Troubleshooting/);
   assert.match(styles, /\.settings-tabs/);
   assert.match(styles, /\.settings-tab\.active/);
   assert.match(appShell, /Copy Details/);
@@ -3176,7 +3190,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(turnRepairController, /the DM response did not pass LoreKeeper's table checks/, "technical repair reasons should be softened for live play");
   assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);
   assert.doesNotMatch(turnRepairController, /imported despite contract failure/);
-  assert.match(appJs, /DM response details are open in Troubleshooting/);
+  assert.match(appJs, /DM response review is open/);
   assert.match(appJs, /The DM response was received, but the table has not applied it yet\./);
   assert.match(appJs, /The DM responded, but LoreKeeper needs the host to review it before play continues\./);
   assert.match(appJs, /launchInviteLink/);

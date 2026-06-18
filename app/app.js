@@ -7863,9 +7863,9 @@ async function inspectTurnRepair() {
   if (!activeTurnRepair()) {
     return;
   }
-  openSetupDialog({ tab: "troubleshooting" });
+  openSetupDialog({ tab: "troubleshooting", mode: "recovery" });
   await refreshDiagnostics();
-  setProviderActivity("DM response details are open in Troubleshooting", "waiting");
+  setProviderActivity("DM response review is open", "waiting");
 }
 
 async function importTurnRepairAnyway() {

@@ -869,7 +869,7 @@ function SetupDialog() {
           </details>
         </section>
 
-        <section className="setup-section diagnostics-section" data-settings-panel="troubleshooting" hidden>
+        <section className="setup-section diagnostics-section" data-settings-panel="troubleshooting" data-settings-surface-target="diagnostics" hidden>
           <div className="section-title">
             <h3>Troubleshooting</h3>
             <span id="diagnostics-status" className="count-pill">Idle</span>
@@ -901,7 +901,7 @@ function SetupDialog() {
           </details>
         </section>
 
-        <section className="setup-section" data-settings-panel="troubleshooting" hidden>
+        <section id="dm-recovery-section" className="setup-section" data-settings-panel="troubleshooting" data-settings-surface-target="recovery" hidden>
           <div className="section-title">
             <h3>DM Recovery</h3>
             <span id="review-count" className="count-pill">0</span>
