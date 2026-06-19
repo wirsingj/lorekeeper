@@ -2,7 +2,6 @@ import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { findById } from "../src/campaign-state/formatters.js";
 import { normalizeCampaign } from "../src/campaign-state/schema.js";
 import { createSampleCampaign } from "../src/campaign-state/sample-campaign.js";
-import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
 import { getActiveProviderConversation } from "../src/campaign-state/provider-conversations.js";
 import { createReviewBatch } from "../src/canon-review/proposals.js";
 import { extractLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
@@ -53,6 +52,13 @@ import {
   buildManualResponseFallbackProjection,
   renderHostResponseReview,
 } from "./host-response-review-controller.js";
+import {
+  activeCampaignDeleteTarget as projectedActiveCampaignDeleteTarget,
+  buildHomeCampaignPickerProjection,
+  isBackendStarterCampaign,
+  selectedHomeCampaign as projectedSelectedHomeCampaign,
+  visibleCampaigns as projectVisibleCampaigns,
+} from "./home-campaign-controller.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { buildJoinPreviewProjection } from "./join-preview-controller.js";
 import { buildMessageBlocks, latestChoiceBlockFromMessages } from "./message-block-controller.js";
@@ -5939,14 +5945,7 @@ function chooseHomeFlow(flow) {
 }
 
 function visibleCampaigns() {
-  return (state.campaigns ?? []).filter((campaign) => !isBackendStarterCampaign(campaign));
-}
-
-function isBackendStarterCampaign(campaign = {}) {
-  const title = String(campaign.title || "").trim();
-  const summary = String(campaign.summary || "").trim();
-  return /^Untitled Campaign(?: \d+)?$/i.test(title)
-    && summary === "A new D&D 5e-lite campaign ready to grow through play.";
+  return projectVisibleCampaigns(state.campaigns);
 }
 
 async function returnToMainMenu() {
@@ -5999,73 +5998,60 @@ function renderHomePanel() {
   elements.homePanel.hidden = !show;
   renderLobbyChrome({ homeVisible: show });
 
+  const projection = buildHomeCampaignPickerProjection({
+    campaigns: state.campaigns,
+    selectedSqlitePath: state.sqlitePath,
+  });
+
   if (elements.homeActiveCampaign) {
-    const campaignCount = visibleCampaigns().length;
-    elements.homeActiveCampaign.textContent = campaignCount
-      ? `${campaignCount} saved ${campaignCount === 1 ? "adventure" : "adventures"}`
-      : "No saved adventures yet";
+    elements.homeActiveCampaign.textContent = projection.savedText;
   }
 
   if (elements.homeCharacterCount) {
-    elements.homeCharacterCount.textContent = "Characters live with their campaigns";
+    elements.homeCharacterCount.textContent = projection.characterText;
   }
 
-  renderHomeCampaignPicker();
+  renderHomeCampaignPicker(projection);
 }
 
-function renderHomeCampaignPicker() {
+function renderHomeCampaignPicker(projection = buildHomeCampaignPickerProjection({
+  campaigns: state.campaigns,
+  selectedSqlitePath: state.sqlitePath,
+})) {
   if (!elements.homeCampaignSelect) {
     return;
   }
-  const campaigns = visibleCampaigns();
-  if (!campaigns.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No saved adventures yet";
-    option.selected = true;
-    elements.homeCampaignSelect.replaceChildren(option);
-    elements.homeCampaignSelect.disabled = true;
-    if (elements.homeHostFlow) {
-      elements.homeHostFlow.disabled = true;
-      elements.homeHostFlow.title = "Start a new adventure first.";
-    }
-    updateHomeDeleteButton();
-    return;
-  }
-  elements.homeCampaignSelect.disabled = false;
   elements.homeCampaignSelect.replaceChildren(
-    ...campaigns.map((campaign) => {
+    ...projection.options.map((campaign) => {
       const option = document.createElement("option");
-      option.value = campaign.sqlitePath;
-      option.textContent = campaign.title;
-      option.selected = campaign.sqlitePath === state.sqlitePath;
+      option.value = campaign.value;
+      option.textContent = campaign.label;
+      option.selected = campaign.selected;
       return option;
     }),
   );
+  elements.homeCampaignSelect.disabled = projection.selectDisabled;
   if (elements.homeHostFlow) {
-    elements.homeHostFlow.disabled = false;
-    elements.homeHostFlow.title = "Open the selected campaign as host.";
+    elements.homeHostFlow.disabled = projection.hostDisabled;
+    elements.homeHostFlow.title = projection.hostTitle;
   }
-  updateHomeDeleteButton();
+  updateHomeDeleteButton(projection);
 }
 
 function selectedHomeCampaign() {
-  const sqlitePath = String(elements.homeCampaignSelect?.value || "").trim();
-  if (!sqlitePath) {
-    return null;
-  }
-  return visibleCampaigns().find((campaign) => campaign.sqlitePath === sqlitePath) ?? null;
+  return projectedSelectedHomeCampaign(state.campaigns, elements.homeCampaignSelect?.value);
 }
 
-function updateHomeDeleteButton() {
+function updateHomeDeleteButton(projection = null) {
   if (!elements.homeDeleteCampaign) {
     return;
   }
-  const selected = selectedHomeCampaign();
-  elements.homeDeleteCampaign.disabled = !selected;
-  elements.homeDeleteCampaign.title = selected
-    ? "Delete the selected saved adventure."
-    : "No saved adventure to delete.";
+  const deleteProjection = projection ?? buildHomeCampaignPickerProjection({
+    campaigns: state.campaigns,
+    selectedSqlitePath: elements.homeCampaignSelect?.value,
+  });
+  elements.homeDeleteCampaign.disabled = deleteProjection.deleteDisabled;
+  elements.homeDeleteCampaign.title = deleteProjection.deleteTitle;
 }
 
 function renderLobbyChrome({ homeVisible = null, joinVisible = null } = {}) {
@@ -6317,13 +6303,10 @@ function openDeleteCampaignDialog(target = activeCampaignDeleteTarget()) {
 }
 
 function activeCampaignDeleteTarget() {
-  if (!state.sqlitePath || !state.campaign?.title || isBackendStarterCampaign(state.campaign)) {
-    return null;
-  }
-  return {
+  return projectedActiveCampaignDeleteTarget({
     sqlitePath: state.sqlitePath,
-    title: state.campaign.title,
-  };
+    campaign: state.campaign,
+  });
 }
 
 async function deleteActiveCampaign() {

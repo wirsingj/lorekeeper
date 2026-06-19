@@ -183,6 +183,7 @@ UI projections:
 - `app/message-block-controller.js` owns DM/provider play-message block parsing: prose grouping, mechanics block extraction, parsed choice panels, structured choice override, and latest-choice lookup. `app/app.js` should render the returned blocks, not parse provider text.
 - `app/provider-settings-controller.js` owns DM Voice settings projections: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and model summary chips. `app/app.js` should read/write controls and render projections, not import recommended-model policy directly.
 - `app/renderer-diagnostics-controller.js` owns renderer diagnostics serialization, debug play-log message normalization, session-health projection, readable table timeline projection, and turn-flow timeline wording. `app/app.js` should provide current state/elements and render the returned projections.
+- `app/home-campaign-controller.js` owns front-door saved-adventure projection: backend starter-campaign hiding, saved-adventure count copy, Continue/Delete enablement, selected campaign lookup, and safe delete-target projection.
 - Prefer extracting pure decisions into these modules with tests before adding more branches to `app/app.js`.
 
 ## Storage Model

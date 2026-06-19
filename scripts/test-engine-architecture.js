@@ -45,6 +45,13 @@ import {
   shouldScheduleGuestAutoResolve,
 } from "../app/guest-auto-resolve-controller.js";
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
+import {
+  activeCampaignDeleteTarget,
+  buildHomeCampaignPickerProjection,
+  isBackendStarterCampaign,
+  selectedHomeCampaign,
+  visibleCampaigns,
+} from "../app/home-campaign-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildJoinPreviewProjection, compactJoinPreviewLine } from "../app/join-preview-controller.js";
 import { buildMessageBlocks, latestChoiceBlockFromMessages } from "../app/message-block-controller.js";
@@ -3477,6 +3484,47 @@ function testProviderSettingsController() {
   assert.match(providerSetupHint({ state: "ollama_not_running" }, "qwen3:14b"), /Start Ollama/);
 }
 
+function testHomeCampaignController() {
+  const starter = {
+    title: "Untitled Campaign 42",
+    summary: "A new D&D 5e-lite campaign ready to grow through play.",
+    sqlitePath: "starter.sqlite",
+  };
+  const road = { title: "Road Ambush", sqlitePath: "road.sqlite" };
+  const shrine = { title: "Ruined Shrine", sqlitePath: "shrine.sqlite" };
+
+  assert.equal(isBackendStarterCampaign(starter), true);
+  assert.equal(isBackendStarterCampaign({ ...starter, summary: "Real table" }), false);
+  assert.deepEqual(visibleCampaigns([starter, road, shrine]).map((campaign) => campaign.title), ["Road Ambush", "Ruined Shrine"]);
+
+  const empty = buildHomeCampaignPickerProjection({ campaigns: [starter] });
+  assert.equal(empty.savedText, "No saved adventures yet");
+  assert.equal(empty.selectDisabled, true);
+  assert.equal(empty.hostDisabled, true);
+  assert.equal(empty.deleteDisabled, true);
+  assert.equal(empty.options[0].label, "No saved adventures yet");
+
+  const selected = buildHomeCampaignPickerProjection({
+    campaigns: [starter, road, shrine],
+    selectedSqlitePath: "shrine.sqlite",
+  });
+  assert.equal(selected.savedText, "2 saved adventures");
+  assert.equal(selected.hostDisabled, false);
+  assert.equal(selected.deleteTitle, "Delete the selected saved adventure.");
+  assert.deepEqual(selected.options.map((option) => [option.value, option.selected]), [
+    ["road.sqlite", false],
+    ["shrine.sqlite", true],
+  ]);
+  assert.equal(selected.selectedCampaign.title, "Ruined Shrine");
+  assert.equal(selectedHomeCampaign([starter, road], "starter.sqlite"), null);
+  assert.equal(selectedHomeCampaign([starter, road], "road.sqlite").title, "Road Ambush");
+  assert.deepEqual(activeCampaignDeleteTarget({ sqlitePath: "road.sqlite", campaign: road }), {
+    sqlitePath: "road.sqlite",
+    title: "Road Ambush",
+  });
+  assert.equal(activeCampaignDeleteTarget({ sqlitePath: "starter.sqlite", campaign: starter }), null);
+}
+
 function testJoinPreviewProjection() {
   const setupLine = "The table is set at Old South Road. Mira, Renn are at the table. Premise: A caravan road bends toward an old watchtower before sunset. Next: invite anyone else.";
   assert.equal(
@@ -3898,6 +3946,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
+  const homeCampaignController = await readFile(path.join("app", "home-campaign-controller.js"), "utf8");
   const providerImportController = await readFile(path.join("app", "provider-import-controller.js"), "utf8");
   const providerSettingsController = await readFile(path.join("app", "provider-settings-controller.js"), "utf8");
   const providerResultController = await readFile(path.join("app", "provider-result-controller.js"), "utf8");
@@ -3926,6 +3975,11 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.doesNotMatch(appJs, /function tableLabelForTurnEvent/, "renderer should not own turn-flow timeline wording");
   assert.match(appJs, /buildPlayLogProjection/, "play log rendering should use a bounded projection for long sessions");
   assert.match(appJs, /renderLoadEarlierMessages/, "older play log entries should remain reachable on demand");
+  assert.match(appJs, /home-campaign-controller\.js/, "front-door campaign filtering should live outside the renderer");
+  assert.match(appJs, /buildHomeCampaignPickerProjection/, "front-door saved-adventure picker should consume a projection");
+  assert.match(homeCampaignController, /function isBackendStarterCampaign/, "backend starter campaign hiding should live in home-campaign-controller");
+  assert.match(homeCampaignController, /function buildHomeCampaignPickerProjection/, "saved-adventure picker policy should live in home-campaign-controller");
+  assert.doesNotMatch(appJs, /function isBackendStarterCampaign/, "renderer should not own backend starter campaign filtering");
   assert.match(appJs, /buildMessageBlocks/, "play-message body parsing should be projected outside the renderer");
   assert.match(appJs, /latestChoiceBlockFromMessages/, "latest choice lookup should be projected outside the renderer");
   assert.match(messageBlockController, /function normalizeMessageBlocks/, "message block parsing should live in message-block-controller");
@@ -4410,6 +4464,7 @@ testHostResponseReviewProjection();
 testProviderImportOutcomeProjection();
 testProviderResultController();
 testProviderSettingsController();
+testHomeCampaignController();
 testProviderChatProjection();
 testTableTalkProjection();
 testCharacterAutocompleteProjection();
