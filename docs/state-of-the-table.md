@@ -342,6 +342,7 @@ Risks:
 204. Remaining visible provider/settings/state-save copy in the app-mode, DM Voice settings, join-mode, and review-commit paths now uses DM Voice/table-memory language instead of provider, bridge, AI, or extracted-state wording.
 205. New Adventure companion setup now says "Scene cue for DM Voice" instead of "Host note for the DM," keeping table setup focused on story fit rather than software roles.
 206. Guest table previews now filter starter scaffold ids/threads and strip host-only "Next:" setup instructions, so `/guest` sees table fiction, party, and useful seat context instead of backend placeholder records.
+207. Combat active-turn labels now render host-controlled party turns as "Your turn" in the host app while preserving "Host turn" for observer contexts and separate friend/companion/DM/table turn labels.
 
 ### Still Risky
 
@@ -712,6 +713,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Visible copy sweep replaced remaining provider/bridge/AI/extracted-state wording in app-mode notes, Join-mode DM Voice status, DM Voice settings save states, empty DM paste fallback, and review commit status. Verification: focused `settings-navigation-and-diagnostics` UI passed.
 - 2026-06-18: New Adventure companion setup wording now uses scene-cue/DM Voice language, and the provider prompt prefix for those cues is table-facing. Verification: focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
 - 2026-06-18: Visual audit found `/guest` lobby previews leaking starter scaffold chips (`place-starting-location`, "Open the first thread") and host-only setup instructions. Join preview rendering now resolves friendly place names, filters scaffold records, and strips `Next:` setup copy. Verification: `npm run build`, focused remote pre-lobby UI, and visual-audit UI passed.
+- 2026-06-18: Combat rail copy now treats the host app as the player seat for host-controlled active party turns ("Your turn") while keeping remote, companion, DM, and unassigned table turns distinct. Verification: `npm run test:engine`, focused combat UI, `npm run build`, and visual-audit UI passed.
 
 ## How To Use This Doc
 

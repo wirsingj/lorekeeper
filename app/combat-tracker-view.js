@@ -57,13 +57,13 @@ function buildActiveCombatCue(campaign, active, options = {}) {
     actorId: active.id,
     actorName: active.name || labelById(campaign, active.id),
     controllerKind: controller.kind,
-    controllerLabel: activeControllerLabel(controller.kind, { controlled, type }),
+    controllerLabel: activeControllerLabel(controller.kind, { controlled, type, isHostView: options.isHostView === true }),
     instruction: activeCombatInstruction(controller.kind, { controlled, type }),
     actions,
   };
 }
 
-function activeControllerLabel(kind, { controlled = false, type = "" } = {}) {
+function activeControllerLabel(kind, { controlled = false, type = "", isHostView = false } = {}) {
   if (controlled) {
     return "Your turn";
   }
@@ -77,7 +77,7 @@ function activeControllerLabel(kind, { controlled = false, type = "" } = {}) {
     return "Companion turn";
   }
   if (kind === controllerKinds.HOST) {
-    return "Host turn";
+    return isHostView ? "Your turn" : "Host turn";
   }
   return "Table turn";
 }

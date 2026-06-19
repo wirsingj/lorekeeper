@@ -1065,11 +1065,13 @@ function testCombatTrackerView() {
     ...campaign.combat.turnEconomy,
     thor: { action: "spent", movementRemainingFt: 10 },
   };
-  const view = buildCombatTrackerView(campaign, { controlledActorId: "karl" });
+  const view = buildCombatTrackerView(campaign, { controlledActorId: "karl", isHostView: true });
   assert.equal(view.inCombat, true);
   assert.equal(view.activeCue.actorName, "Thor");
-  assert.equal(view.activeCue.controllerLabel, "Host turn");
+  assert.equal(view.activeCue.controllerLabel, "Your turn");
   assert.match(view.activeCue.instruction, /Choose an action/i);
+  const observerView = buildCombatTrackerView(campaign, { controlledActorId: "karl" });
+  assert.equal(observerView.activeCue.controllerLabel, "Host turn");
   assert.ok(view.activeCue.actions.some((action) => action.id === "move"), "active combat cue should respect spent action economy and show legal options");
   assert.equal(view.rows.some((row) => row.name === "Drunk miner" && row.meta === "DM"), true);
   assert.equal(view.rows.find((row) => row.id === "miner").hpLabel, "10/10");

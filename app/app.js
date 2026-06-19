@@ -9295,6 +9295,7 @@ function renderCombatTracker(campaign) {
   const view = buildCombatTrackerView(campaign, {
     controlledActorId: state.guestSession?.partyMemberId,
     hideEnemyHp: Boolean(state.guestSession?.partyMemberId || state.guestSnapshot),
+    isHostView: !clientMode && !isRemoteTableClient(),
   });
   elements.combatTrackerSection.hidden = !view.inCombat;
   if (!view.inCombat) {
