@@ -505,6 +505,7 @@ const server = createServer(async (request, response) => {
           sessionId: body.sessionId,
           tableSessionId: body.tableSessionId,
           preferredPartyMemberId: body.preferredPartyMemberId,
+          proposedCharacter: body.proposedCharacter,
         });
         return { campaign: waitingResult.campaign };
       });
@@ -514,6 +515,7 @@ const server = createServer(async (request, response) => {
           displayName: waitingResult.waitingGuest.displayName,
           status: waitingResult.waitingGuest.status,
           preferredPartyMemberId: waitingResult.waitingGuest.preferredPartyMemberId ?? null,
+          proposedCharacter: waitingResult.waitingGuest.proposedCharacter ?? null,
         },
         waitingSecret: waitingResult.waitingSecret,
         campaignTitle: payload.campaign?.title ?? "",
@@ -991,6 +993,7 @@ function registerPreTableWaitingGuest(lobby, input = {}) {
   const displayName = compactLobbyLine(input.playerName || "Guest Player", 80);
   const clientId = compactLobbyLine(input.clientId || "", 120);
   const preferredPartyMemberId = normalizePreTableSeatId(lobby, input.preferredPartyMemberId);
+  const proposedCharacter = normalizePreTableCharacterProposal(input.proposedCharacter, displayName);
   const existing = clientId
     ? lobby.waitingGuests.find((guest) => guest.clientId === clientId && (guest.status === "waiting" || guest.status === "seated"))
     : null;
@@ -999,6 +1002,9 @@ function registerPreTableWaitingGuest(lobby, input = {}) {
     existing.preferredPartyMemberId = preferredPartyMemberId || existing.preferredPartyMemberId || null;
     existing.lastSeenAt = new Date().toISOString();
     existing.secret = existing.secret || randomLobbyToken(24);
+    if (proposedCharacter) {
+      existing.proposedCharacter = proposedCharacter;
+    }
     return { waitingGuest: existing, waitingSecret: existing.secret };
   }
   const waitingGuest = {
@@ -1013,6 +1019,7 @@ function registerPreTableWaitingGuest(lobby, input = {}) {
     requestedAt: new Date().toISOString(),
     lastSeenAt: new Date().toISOString(),
     preferredPartyMemberId,
+    proposedCharacter,
   };
   lobby.waitingGuests = [...(lobby.waitingGuests ?? []), waitingGuest];
   return { waitingGuest, waitingSecret: waitingGuest.secret };
@@ -1178,6 +1185,7 @@ function publicPreTableWaitingGuest(guest) {
     displayName: guest.displayName,
     status: guest.status,
     preferredPartyMemberId: guest.preferredPartyMemberId ?? null,
+    proposedCharacter: guest.proposedCharacter ?? null,
     requestedAt: guest.requestedAt,
     lastSeenAt: guest.lastSeenAt,
   };
@@ -1197,6 +1205,45 @@ function localGuestUrl(table = {}) {
 function compactLobbyLine(value, limit = 240) {
   const compact = String(value ?? "").replace(/\s+/g, " ").trim();
   return compact.length <= limit ? compact : `${compact.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
+function normalizePreTableCharacterProposal(proposal = {}, playerName = "") {
+  if (!hasPreTableCharacterProposal(proposal)) {
+    return null;
+  }
+  const level = Number(proposal.level);
+  return {
+    name: compactLobbyLine(proposal.name || playerName || "", 80),
+    ancestry: compactLobbyLine(proposal.ancestry || "", 80),
+    characterClass: compactLobbyLine(proposal.characterClass || proposal.class || "", 80),
+    level: Number.isFinite(level) ? Math.max(1, Math.min(20, Math.floor(level))) : 1,
+    roleIntent: compactLobbyLine(proposal.roleIntent || proposal.role || "", 240),
+    appearance: compactLobbyLine(proposal.appearance || proposal.vibe || "", 1000),
+    backstory: compactLobbyLine(proposal.backstory || proposal.background || proposal.concept || "", 1600),
+    integrationPrompt: compactLobbyLine(proposal.integrationPrompt || proposal.integration || proposal.partyConnection || "", 1600),
+  };
+}
+
+function hasPreTableCharacterProposal(proposal = {}) {
+  if (!proposal || typeof proposal !== "object") {
+    return false;
+  }
+  return [
+    proposal.name,
+    proposal.ancestry,
+    proposal.characterClass,
+    proposal.class,
+    proposal.roleIntent,
+    proposal.role,
+    proposal.appearance,
+    proposal.vibe,
+    proposal.backstory,
+    proposal.background,
+    proposal.concept,
+    proposal.integrationPrompt,
+    proposal.integration,
+    proposal.partyConnection,
+  ].some((value) => String(value ?? "").trim());
 }
 
 function randomLobbyToken(size = 12) {

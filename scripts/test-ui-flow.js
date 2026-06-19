@@ -645,7 +645,27 @@ const scenarios = [
       assert.ok(preTableSnapshot.joinableSeats.some((seat) => seat.name === "Renn"), "Renn should be joinable before campaign launch");
 
       const guestPage = await harness.newGuestPage("guest-prelobby");
-      await requestGuestSeat(guestPage, { playerName: "Remote Jess", seatName: "Renn" });
+      await requestGuestSeat(guestPage, {
+        playerName: "Remote Jess",
+        seatName: "Renn",
+        proposedCharacter: {
+          name: "Jessamine",
+          ancestry: "Elf",
+          characterClass: "Druid",
+          roleIntent: "river-wise healer",
+          integrationPrompt: "Jessamine knows why the ferry bells stopped.",
+        },
+      });
+      const preTableGuestDraft = await waitForAsync(async () => {
+        const candidate = await harness.fetchJson("/api/pretable-lobby/host-snapshot");
+        return candidate.waitingGuests?.find((guest) => guest.displayName === "Remote Jess")?.proposedCharacter ?? null;
+      }, {
+        timeoutMs: 10000,
+        description: "pre-table guest character draft",
+      });
+      assert.equal(preTableGuestDraft.name, "Jessamine");
+      assert.equal(preTableGuestDraft.characterClass, "Druid");
+      await expectVisibleText(harness.page, "Bringing: Jessamine - Elf - Druid");
       await seatPreTableGuest(harness, { playerName: "Remote Jess", seatName: "Renn" });
       await expectVisibleText(guestPage, "Seat reserved");
 
@@ -707,10 +727,16 @@ const scenarios = [
       await startAdventureOpeningForHarness(harness, "Lantern Road Camp opens with torchlight moving against the wind.");
       await submitGuestTurn(guestPage, "Renn checks the road dust for a second set of tracks.");
       await waitForHostStagedGuestInput(harness.page, "Renn checks the road dust");
-      await harness.mockProviderTurn(turnResponse({
-        text: "Renn finds a second set of tracks cutting through the camp perimeter, and Ilyra spots the lantern that tried to hide them.",
-        sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
-      }));
+      await harness.mockProviderTurns([
+        turnResponse({
+          text: "Renn finds a second set of tracks cutting through the camp perimeter, and Ilyra spots the lantern that tried to hide them.",
+          sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+        }),
+        turnResponse({
+          text: "Ilyra keeps the camp quiet while Renn marks the second trail with a sliver of chalk.",
+          sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+        }),
+      ]);
       await submitPlayerTurn(harness.page, "Ilyra keeps the camp quiet while Renn points out the tracks.");
       await expectVisibleText(guestPage, "second set of tracks");
 
@@ -1144,7 +1170,7 @@ async function waitForPreTableParty(harness, { minSeats }) {
   });
 }
 
-async function requestGuestSeat(guestPage, { playerName, seatName }) {
+async function requestGuestSeat(guestPage, { playerName, seatName, proposedCharacter = null }) {
   if (!await guestPage.locator("#guest-waiting-room-panel").isVisible().catch(() => false)) {
     await clickIfVisible(guestPage, "#home-join-flow");
   }
@@ -1171,6 +1197,13 @@ async function requestGuestSeat(guestPage, { playerName, seatName }) {
     await guestPage.locator("[data-guest-seat-id]").first().click();
   }
   await guestPage.fill("#guest-waiting-player-name", playerName);
+  if (proposedCharacter) {
+    await fillIfVisible(guestPage, "#join-client-character-name", proposedCharacter.name || "");
+    await fillIfVisible(guestPage, "#join-client-character-ancestry", proposedCharacter.ancestry || "");
+    await fillIfVisible(guestPage, "#join-client-character-class", proposedCharacter.characterClass || "");
+    await fillIfVisible(guestPage, "#join-client-character-role", proposedCharacter.roleIntent || "");
+    await fillIfVisible(guestPage, "#join-client-character-integration", proposedCharacter.integrationPrompt || "");
+  }
   await guestPage.click("#guest-waiting-register");
   await guestPage.waitForFunction(() => {
     return /waiting|seat request sent/i.test(document.querySelector("#guest-waiting-status")?.textContent ?? "");

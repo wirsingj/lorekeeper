@@ -2872,6 +2872,17 @@ function renderPreTableLobby(snapshot = {}) {
       ? `${guest.displayName || "Guest"} is seated as ${seatName}.`
       : `${guest.displayName || "Guest"} requested ${seatName}.`;
     row.append(text);
+    const proposal = guest.proposedCharacter ?? {};
+    const proposalLine = [proposal.name, proposal.ancestry, proposal.characterClass]
+      .filter(Boolean)
+      .join(" - ");
+    if (proposalLine || proposal.roleIntent) {
+      const proposalDetail = document.createElement("small");
+      proposalDetail.textContent = proposalLine
+        ? `Bringing: ${proposalLine}${proposal.roleIntent ? ` (${proposal.roleIntent})` : ""}`
+        : `Bringing: ${proposal.roleIntent}`;
+      row.append(proposalDetail);
+    }
     if (guest.status !== "seated" && joinableSeats.length) {
       const actions = document.createElement("div");
       actions.className = "pretable-seat-actions";
@@ -3308,19 +3319,23 @@ async function requestJoinFromJoinClientPanel() {
   await requestJoinWithValues({
     inviteLink: elements.joinClientInviteLink?.value,
     playerName: elements.joinClientPlayerName?.value,
-    proposedCharacter: {
-      name: elements.joinClientCharacterName?.value,
-      ancestry: elements.joinClientCharacterAncestry?.value,
-      characterClass: elements.joinClientCharacterClass?.value,
-      level: elements.joinClientCharacterLevel?.value,
-      roleIntent: elements.joinClientCharacterRole?.value,
-      appearance: elements.joinClientCharacterAppearance?.value,
-      backstory: elements.joinClientCharacterBackstory?.value,
-      integrationPrompt: elements.joinClientCharacterIntegration?.value,
-    },
+    proposedCharacter: joinClientCharacterProposal(),
     statusElement: elements.joinClientStatus,
     submitButton: elements.joinClientSubmit,
   });
+}
+
+function joinClientCharacterProposal() {
+  return {
+    name: elements.joinClientCharacterName?.value,
+    ancestry: elements.joinClientCharacterAncestry?.value,
+    characterClass: elements.joinClientCharacterClass?.value,
+    level: elements.joinClientCharacterLevel?.value,
+    roleIntent: elements.joinClientCharacterRole?.value,
+    appearance: elements.joinClientCharacterAppearance?.value,
+    backstory: elements.joinClientCharacterBackstory?.value,
+    integrationPrompt: elements.joinClientCharacterIntegration?.value,
+  };
 }
 
 async function refreshGuestLobbyPreview({ quiet = false } = {}) {
@@ -3422,6 +3437,7 @@ async function registerGuestWaitingRoom() {
       playerName,
       clientId,
       preferredPartyMemberId: state.selectedGuestSeatId || "",
+      proposedCharacter: joinClientCharacterProposal(),
     });
     saveWaitingRoomSession({
       hostBaseUrl,
@@ -6668,7 +6684,14 @@ function renderJoinClientPanel() {
   if (guestWaitingRoomMode) {
     renderGuestLobbyPreview();
   }
-  document.querySelector(".join-client-character")?.toggleAttribute("hidden", guestWaitingRoomMode);
+  const joinCharacterCard = document.querySelector(".join-client-character");
+  joinCharacterCard?.toggleAttribute("hidden", false);
+  const joinCharacterCopy = joinCharacterCard?.querySelector(".join-client-copy");
+  if (joinCharacterCopy) {
+    joinCharacterCopy.textContent = guestWaitingRoomMode
+      ? "Optional: add character notes so the host knows what you are bringing to the table."
+      : "Fill this out when you are bringing someone new to the party.";
+  }
   document.querySelector(".join-client-actions")?.toggleAttribute("hidden", guestWaitingRoomMode);
   if (elements.joinClientCopy) {
     elements.joinClientCopy.textContent = guestWaitingRoomMode
@@ -9279,7 +9302,7 @@ function partyControllerActions(member, pendingConnection = null) {
     for (const guest of waitingGuests.slice(0, 2)) {
       actions.push({
         label: `Seat ${guest.displayName || "Guest"}`,
-        title: `Seat ${guest.displayName || "Guest"} as ${member.name}`,
+        title: waitingGuestSeatTitle(guest, member),
         onClick: () => seatWaitingGuestAtTable(guest.id, member.id),
       });
     }
@@ -9338,6 +9361,17 @@ function partyControllerActions(member, pendingConnection = null) {
     onClick: () => createInviteForMember(member),
   });
   return actions;
+}
+
+function waitingGuestSeatTitle(guest = {}, member = {}) {
+  const proposal = guest.proposedCharacter ?? {};
+  const proposalLine = [proposal.name, proposal.ancestry, proposal.characterClass]
+    .filter(Boolean)
+    .join(" - ");
+  const context = proposalLine || proposal.roleIntent
+    ? ` Draft: ${proposalLine || proposal.roleIntent}.`
+    : "";
+  return `Seat ${guest.displayName || "Guest"} as ${member.name || "this character"}.${context}`;
 }
 
 function waitingGuestsForSeating() {

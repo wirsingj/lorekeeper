@@ -561,7 +561,7 @@ Risks:
 - [x] Post-start host-created character flow uses same compact creator.
 - [x] Guest join and LoreKeeper Join use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
-- [ ] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character.
+- [x] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character. Current state: `/guest` shows the table preview, open character seats, and an optional character draft card; waiting-room registrations carry the draft through pre-table and active-table seating so the host can see what the guest is bringing.
 - [x] Let Host New Remote Invite slots appear on `/guest` before campaign start and preserve waiting guest requests after Create And Start.
 - [x] Let the host seat waiting guests from Host New before Create And Start.
 - [x] Make auto-complete campaign-aware without overriding user facts.
@@ -725,6 +725,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Guest auto-resolve timers are now pinned to the campaign/table/session that scheduled them and are cleared when scheduling becomes invalid. This hardens host plus `/guest` campaign switching against delayed remote actions landing in the wrong table. Verification: `npm run test:engine`, `npm run build`, focused remote active leave/rejoin/new-game UI, and seeded remote chaos (`stale-guest-pin-remote-chaos`, 4 runs) passed.
 - 2026-06-18: Choice selection parsing, structured choice normalization, audience labels, edited-choice preservation, pending clicked-choice matching, and provider choice meta copy moved into `app/choice-vote-controller.js`, with architecture guards keeping that grammar out of `app/app.js`. Verification: `npm run test:engine`, `npm run build`, focused remote party-vote UI, and focused RP import UI passed.
 - 2026-06-18: Long-session scroll soak is now automated through hidden UI harness play-log seeding/append hooks. Verification: `npm run build` and focused `long-session-scroll-soak` UI passed.
+- 2026-06-18: `/guest` waiting-room joins now expose the optional character draft card and carry those notes through pre-table and active waiting-room seating. Verification: `npm run test:multiplayer`, focused remote pre-lobby UI, and focused remote active leave/rejoin/new-game UI passed.
 
 ## How To Use This Doc
 

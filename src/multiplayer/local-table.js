@@ -284,7 +284,16 @@ export function createCharacterRequestInvite(campaign, { host, port } = {}) {
   };
 }
 
-export function registerWaitingGuest(campaign, { playerName, clientId, campaignId, tableId, sessionId, tableSessionId, preferredPartyMemberId } = {}) {
+export function registerWaitingGuest(campaign, {
+  playerName,
+  clientId,
+  campaignId,
+  tableId,
+  sessionId,
+  tableSessionId,
+  preferredPartyMemberId,
+  proposedCharacter,
+} = {}) {
   const next = normalizeMultiplayerCampaign(campaign);
   if (!next.multiplayer.localTable?.running) {
     throw publicMultiplayerError("The host local table is not open yet.", 409);
@@ -293,6 +302,9 @@ export function registerWaitingGuest(campaign, { playerName, clientId, campaignI
   const normalizedClientId = compactLine(clientId || "", 120);
   const displayName = compactLine(playerName || "Guest Player", 80);
   const preferredSeatId = normalizePreferredSeatId(next, preferredPartyMemberId);
+  const characterProposal = hasCharacterProposal(proposedCharacter)
+    ? normalizeCharacterProposal(proposedCharacter, displayName)
+    : null;
   const existing = normalizedClientId
     ? next.multiplayer.waitingGuests.find((guest) =>
       guest.clientId === normalizedClientId &&
@@ -303,6 +315,9 @@ export function registerWaitingGuest(campaign, { playerName, clientId, campaignI
     existing.displayName = displayName || existing.displayName;
     existing.lastSeenAt = nowIso();
     existing.preferredPartyMemberId = preferredSeatId || existing.preferredPartyMemberId || null;
+    if (characterProposal) {
+      existing.proposedCharacter = characterProposal;
+    }
     if (!existing.secret) {
       existing.secret = randomToken(24);
     }
@@ -328,6 +343,7 @@ export function registerWaitingGuest(campaign, { playerName, clientId, campaignI
     connectionId: null,
     partyMemberId: null,
     preferredPartyMemberId: preferredSeatId,
+    proposedCharacter: characterProposal,
     deniedAt: null,
   };
   next.multiplayer.waitingGuests = upsertById(next.multiplayer.waitingGuests, waitingGuest);
@@ -460,7 +476,7 @@ export function seatWaitingGuest(campaign, { waitingGuestId, partyMemberId } = {
     displayName: player.displayName,
     inviteId: invite.id,
     partyMemberId: member.id,
-    proposedCharacter: null,
+    proposedCharacter: waitingGuest.proposedCharacter ?? null,
     requestedNewCharacter: false,
     status: "connected",
     secret: randomToken(24),
@@ -1970,6 +1986,7 @@ function publicWaitingGuest(waitingGuest) {
     connectionId: waitingGuest.connectionId ?? null,
     partyMemberId: waitingGuest.partyMemberId ?? null,
     preferredPartyMemberId: waitingGuest.preferredPartyMemberId ?? null,
+    proposedCharacter: publicData(waitingGuest.proposedCharacter),
   };
 }
 

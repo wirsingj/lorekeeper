@@ -42,6 +42,13 @@ let waitingResult = registerWaitingGuest(campaign, {
   playerName: "Nora",
   clientId: "waiting-client",
   preferredPartyMemberId: "lysa",
+  proposedCharacter: {
+    name: "Nora",
+    ancestry: "Human",
+    characterClass: "Ranger",
+    roleIntent: "quiet scout",
+    integrationPrompt: "Nora has been tracking the same wagon.",
+  },
 });
 campaign = waitingResult.campaign;
 assert.ok(waitingResult.waitingSecret);
@@ -49,6 +56,8 @@ let waitingHostSnapshot = createHostSnapshot(campaign);
 assert.equal(waitingHostSnapshot.waitingGuests.length, 1);
 assert.equal(waitingHostSnapshot.waitingGuests[0].displayName, "Nora");
 assert.equal(waitingHostSnapshot.waitingGuests[0].preferredPartyMemberId, "lysa");
+assert.equal(waitingHostSnapshot.waitingGuests[0].proposedCharacter.name, "Nora");
+assert.equal(waitingHostSnapshot.waitingGuests[0].proposedCharacter.characterClass, "Ranger");
 assert.equal("secret" in waitingHostSnapshot.waitingGuests[0], false);
 const lobbyPreview = createJoinPreview(campaign, "");
 assert.equal(lobbyPreview.invite, null);
@@ -119,6 +128,7 @@ const heartbeatResult = heartbeatWaitingGuest(campaign, {
 });
 campaign = heartbeatResult.campaign;
 assert.equal(heartbeatResult.snapshot.waitingGuest.displayName, "Nora");
+assert.equal(heartbeatResult.snapshot.waitingGuest.proposedCharacter.roleIntent, "quiet scout");
 campaign = seatWaitingGuest(campaign, {
   waitingGuestId: waitingResult.waitingGuest.id,
   partyMemberId: "lysa",
@@ -132,6 +142,7 @@ const seatedStatus = createWaitingGuestSnapshot(campaign, {
 });
 assert.equal(seatedStatus.seated, true);
 assert.equal(seatedStatus.snapshot.assignedCharacter.id, "lysa");
+assert.equal(seatedStatus.connection.proposedCharacter.integrationPrompt, "Nora has been tracking the same wagon.");
 assert.equal(campaign.party.find((member) => member.id === "lysa").controllerKind, controllerKinds.REMOTE_PLAYER);
 const restartedCampaign = startLocalTable(JSON.parse(JSON.stringify(campaign)), {
   host: "0.0.0.0",
