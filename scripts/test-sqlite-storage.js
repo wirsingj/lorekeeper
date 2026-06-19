@@ -6,13 +6,16 @@ import path from "node:path";
 import { performance } from "node:perf_hooks";
 import initSqlJs from "sql.js";
 import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
+import { createReviewBatch } from "../src/canon-review/proposals.js";
 import {
   createNewActiveCampaign,
   deleteCampaign,
   listCampaigns,
   loadActiveCampaign,
   loadImportedCampaign,
+  updateActiveCampaign,
 } from "../src/storage/campaign-repository.js";
+import { commitReviewBatch } from "../src/storage/review-commit.js";
 import { createCampaignBundle, serializeCampaignBundle } from "../src/storage/campaign-bundle.js";
 import {
   appendCampaignErrorToSqliteFile,
@@ -331,6 +334,55 @@ try {
   assert.ok(afterCorruptCreate.campaigns.some((entry) => entry.title === "New After Corrupt Index"));
   const repairedIndex = JSON.parse(await readFile(path.join(corruptIndexRoot, "data", "campaigns", "campaign-index.json"), "utf8"));
   assert.ok(repairedIndex.campaigns.length >= 2);
+
+  const reviewRaceRoot = path.join(tempDir, "review-race-repo");
+  await createNewActiveCampaign(reviewRaceRoot, {
+    title: "Review Race",
+    premise: "Review commits must not erase live table side channels.",
+  });
+  await updateActiveCampaign(reviewRaceRoot, (latestCampaign) => ({
+    campaign: {
+      ...latestCampaign,
+      multiplayer: {
+        ...latestCampaign.multiplayer,
+        tableTalk: [
+          ...(latestCampaign.multiplayer?.tableTalk ?? []),
+          {
+            id: "talk-during-dm-import",
+            playerName: "Host",
+            role: "host",
+            text: "Side chat should survive review commit.",
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      },
+    },
+  }));
+  const reviewRaceCampaign = (await loadActiveCampaign(reviewRaceRoot)).campaign;
+  const reviewBatch = createReviewBatch({
+    campaignId: reviewRaceCampaign.id,
+    source: "storage-test",
+    rawResponse: "A new witness enters the scene.",
+    proposedChanges: [{
+      operation: "add",
+      domain: "people",
+      summary: "Add a witness",
+      data: {
+        id: "witness-review-race",
+        name: "Race Witness",
+        role: "witness",
+        summary: "Saw the side chat survive the review commit.",
+      },
+    }],
+  });
+  reviewBatch.proposedChanges = reviewBatch.proposedChanges.map((change) => ({
+    ...change,
+    status: "approved",
+  }));
+  await commitReviewBatch(reviewRaceRoot, reviewBatch);
+  const afterReviewRaceCommit = (await loadActiveCampaign(reviewRaceRoot)).campaign;
+  assert.ok(afterReviewRaceCommit.people.some((person) => person.id === "witness-review-race"));
+  assert.ok(afterReviewRaceCommit.multiplayer.tableTalk.some((message) => message.id === "talk-during-dm-import"));
 
   const assetSourceDir = path.join(tempDir, "source-assets");
   await mkdir(assetSourceDir, { recursive: true });

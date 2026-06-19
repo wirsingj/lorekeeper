@@ -1345,10 +1345,12 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
   await assertHealthyUi(harness, `chaos ${runIndex}: campaign created`);
   await assertPreOpeningDmNudgeDisabled(harness);
   await assertFirstPreOpeningAiCompanionNudgeDisabled(harness);
+  const remoteGuest = await exerciseRemoteGuestPreOpeningChaos(harness, rng, runIndex, `Remote Seat ${runIndex}`);
   await startAdventureOpeningForHarness(
     harness,
     `The switchback road comes alive as the first table beat begins for Chaos Table ${runIndex}.`,
   );
+  await exerciseRemoteGuestActiveChaos(harness, remoteGuest, rng, runIndex);
 
   await exerciseTableChrome(harness, rng, runIndex);
   await exerciseRandomButtonMash(harness, rng, `chaos ${runIndex}: table mash`, {
@@ -1669,6 +1671,43 @@ async function exerciseProviderAndTableTalk(harness, rng, runIndex, actor) {
   await assertNoActiveGeneration(page);
   await expectVisibleText(page, "ridge");
   await assertHealthyUi(harness, `chaos ${runIndex}: provider and table talk`);
+}
+
+async function exerciseRemoteGuestPreOpeningChaos(harness, rng, runIndex, seatName) {
+  await waitForActiveJoinableSeat(harness, seatName);
+  const guestPage = await harness.newGuestPage(`chaos-guest-${runIndex}`);
+  const playerName = `Chaos Guest ${runIndex}`;
+  await requestGuestSeat(guestPage, { playerName, seatName });
+  await seatActiveWaitingGuest(harness, { playerName, seatName });
+  const session = await waitForGuestConnected(guestPage, {
+    characterName: seatName,
+    campaignTitle: `Chaos Table ${runIndex}`,
+  });
+  assert.equal(session.assignedCharacter.name, seatName);
+  await expectGuestActionRejected(
+    harness,
+    await guestDebugSession(guestPage),
+    `${seatName} tries to act before Start Adventure in chaos.`,
+  );
+  const guestText = `chaos guest hello ${runIndex}.${randomInt(rng, 1, 999)}`;
+  await sendTableTalk(guestPage, guestText);
+  await expectVisibleText(harness.page, guestText);
+  return guestPage;
+}
+
+async function exerciseRemoteGuestActiveChaos(harness, guestPage, rng, runIndex) {
+  const hostText = `chaos host reply ${runIndex}.${randomInt(rng, 1, 999)}`;
+  await sendTableTalk(harness.page, hostText);
+  await expectVisibleText(guestPage, hostText);
+  const actionText = `Remote Seat ${runIndex} checks the switchback edge for a second trail.`;
+  await harness.mockProviderTurn(turnResponse({
+    text: `Remote Seat ${runIndex} finds a second trail under the switchback grass while the host watches the table react.`,
+    sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+  }));
+  await submitGuestTurn(guestPage, actionText);
+  await assertNoActiveGeneration(harness.page);
+  await expectVisibleText(harness.page, "second trail");
+  await expectVisibleText(guestPage, "second trail");
 }
 
 async function assertHealthyUi(harness, label) {
