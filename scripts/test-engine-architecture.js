@@ -7,14 +7,20 @@ import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-ut
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "../app/campaign-adoption-controller.js";
 import {
+  buildChoiceSelectionFromText,
+  buildChoiceSelectionMeta,
   choicePanelKey,
+  choiceSelectionInWorldText,
   choiceSelectionActivityText,
   choiceVoteCounts,
   choiceVoteState,
   choiceVoteSummaryText,
   currentChoiceVotesForBlock,
   currentGuestVoteForChoice,
+  extractChoiceTokenText,
   leadingChoiceVoteEntry,
+  parseChoiceIndexes,
+  pendingSelectionMatchesText,
 } from "../app/choice-vote-controller.js";
 import {
   createImplicitCombatAdvanceChange,
@@ -2908,6 +2914,24 @@ function testChoiceVoteController() {
   assert.equal(choiceVoteState(block, tiedVotes).tied, true);
   assert.match(choiceVoteSummaryText(block, tiedVotes), /Tie at the table/);
   assert.equal(leadingChoiceVoteEntry(block, { choiceVotes: tiedVotes, isHost: true }), null);
+
+  assert.equal(extractChoiceTokenText("I choose A and 3."), "A and 3");
+  assert.deepEqual(parseChoiceIndexes("A and 3 and A", 3), [0, 2]);
+  const selection = buildChoiceSelectionFromText({ text: "choose A + C", panel: block });
+  assert.deepEqual(selection.labels, ["A", "C"]);
+  assert.deepEqual(selection.selectedOptionIds, ["ridge", "dawn"]);
+  assert.equal(selection.inWorldText, "I choose A + C: Take the ridge Also, Wait for dawn");
+  assert.equal(choiceSelectionInWorldText(selection, "A + C"), selection.inWorldText);
+  assert.equal(
+    choiceSelectionInWorldText(selection, "I choose A + C and point Mira toward the safest ridge approach."),
+    "I choose A + C and point Mira toward the safest ridge approach.",
+  );
+  assert.equal(pendingSelectionMatchesText(selection, "I choose ridge because the high ground matters"), true);
+  assert.match(buildChoiceSelectionMeta(selection, { actualAction: selection.inWorldText }), /Resolve the selected choice text/);
+  assert.match(
+    buildChoiceSelectionMeta(selection, { actualAction: "I choose A, but quietly scout first.", inCombat: true }),
+    /combat action for the active initiative actor/,
+  );
 }
 
 function testTurnRepairController() {
@@ -3955,6 +3979,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /choice-vote-action/);
   assert.match(appJs, /Draft leading choice \$\{leadingVote\.label\}/);
   assert.match(choiceVoteController, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
+  assert.match(choiceVoteController, /function buildChoiceSelectionFromText/);
+  assert.match(choiceVoteController, /function extractChoiceTokenText/);
+  assert.match(choiceVoteController, /function buildChoiceSelectionMeta/);
+  assert.doesNotMatch(appJs, /function extractChoiceTokenText/, "renderer should not own choice token parsing");
+  assert.doesNotMatch(appJs, /function choiceSelectionMeta/, "renderer should not own provider choice-selection meta copy");
   assert.match(appJs, /buildProviderImportPlan\(\{[\s\S]*campaign: state\.campaign/, "renderer should pass explicit campaign context into provider import planning");
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderTableActions/);

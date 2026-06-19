@@ -21,14 +21,19 @@ import {
   choiceLabelForIndex,
   choiceOptionId,
   choicePanelKey,
+  buildChoiceSelectionFromText,
+  buildChoiceSelectionMeta,
+  choiceSelectionInWorldText,
   choiceSelectionActivityText,
   choiceVoteCounts,
   choiceVoteState,
   choiceVoteSummaryText,
   currentChoiceVotesForBlock,
   currentGuestVoteForChoice as projectedGuestVoteForChoice,
+  extractChoiceTokenText,
   isPartyVoteChoiceBlock,
   leadingChoiceVoteEntry as projectedLeadingChoiceVoteEntry,
+  pendingSelectionMatchesText,
 } from "./choice-vote-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "./combat-prompt-repair-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
@@ -1205,7 +1210,10 @@ function normalizeSubmittedPlayerMessage(originalInput, options = {}) {
     return text;
   }
 
-  const selectedChoices = expandChoiceSelection(text) || (pendingSelectionMatchesText(pendingSelection, text) ? pendingSelection : null);
+  const selectedChoices = buildChoiceSelectionFromText({
+    text,
+    panel: latestChoicePanelFromMessages(),
+  }) || (pendingSelectionMatchesText(pendingSelection, text) ? pendingSelection : null);
   if (!selectedChoices) {
     return text;
   }
@@ -1215,141 +1223,11 @@ function normalizeSubmittedPlayerMessage(originalInput, options = {}) {
   const inWorldText = choiceSelectionInWorldText(selectedChoices, text);
   return [
     inWorldText,
-    choiceSelectionMeta(selectedChoices, { actualAction: inWorldText }),
+    buildChoiceSelectionMeta(selectedChoices, {
+      actualAction: inWorldText,
+      inCombat: state.campaign?.combat?.inCombat,
+    }),
   ].join("\n\n");
-}
-
-function expandChoiceSelection(text) {
-  const choiceTokenText = extractChoiceTokenText(text);
-  if (!choiceTokenText) {
-    return null;
-  }
-
-  const panel = latestChoicePanelFromMessages();
-  if (!panel?.items?.length) {
-    return null;
-  }
-
-  const selectedIndexes = parseChoiceIndexes(choiceTokenText, panel.items.length);
-  if (!selectedIndexes.length) {
-    return null;
-  }
-
-  const labels = selectedIndexes.map((index) => choiceLabelForIndex(index));
-  const choices = selectedIndexes.map((index) => panel.items[index]).filter(Boolean);
-  if (!choices.length) {
-    return null;
-  }
-
-  return {
-    labels,
-    choices,
-    optionRecords: selectedIndexes.map((index) => panel.options?.[index] ?? null),
-    prompt: panel.prompt,
-    scope: panel.scope || "",
-    forActorId: panel.forActorId ?? null,
-    forActor: panel.forActor || "",
-    forActorIds: Array.isArray(panel.forActorIds) ? panel.forActorIds : [],
-    allowVote: panel.allowVote === true,
-    selectedOptionIds: selectedIndexes.map((index) => panel.options?.[index]?.id ?? choiceLabelForIndex(index)),
-    inWorldText: `I choose ${labels.join(" + ")}: ${choices.join(" Also, ")}`,
-  };
-}
-
-function extractChoiceTokenText(text) {
-  const trimmed = String(text ?? "").trim();
-  if (/^(?:[A-Ha-h]|\d+)(?:\s*(?:,|\+|and|&)\s*(?:[A-Ha-h]|\d+))*$/.test(trimmed)) {
-    return trimmed;
-  }
-  const match = trimmed.match(/^(?:i\s+)?(?:choose|chose|pick|picked|select|selected|option|choice)\s+((?:[A-Ha-h]|\d+)(?:\s*(?:,|\+|and|&)\s*(?:[A-Ha-h]|\d+))*)(?:\b|[:.)-])/i);
-  return match?.[1] ?? "";
-}
-
-function choiceSelectionInWorldText(selection, visibleText = "") {
-  const text = String(visibleText ?? "").trim();
-  if (!text) {
-    return selection.inWorldText;
-  }
-
-  const tokenText = extractChoiceTokenText(text);
-  if (!tokenText) {
-    return text;
-  }
-
-  if (isBareChoiceSelectionText(text) || isExactChoiceDraft(selection, text)) {
-    return selection.inWorldText;
-  }
-
-  // The player edited the clicked choice draft with extra intent. Preserve that
-  // text as the actual action while retaining structured selection metadata.
-  return text;
-}
-
-function isBareChoiceSelectionText(text) {
-  const trimmed = String(text ?? "").trim();
-  return /^(?:[A-Ha-h]|\d+)(?:\s*(?:,|\+|and|&)\s*(?:[A-Ha-h]|\d+))*$/.test(trimmed) ||
-    /^(?:i\s+)?(?:choose|chose|pick|picked|select|selected|option|choice)\s+(?:[A-Ha-h]|\d+)(?:\s*(?:,|\+|and|&)\s*(?:[A-Ha-h]|\d+))*\s*$/i.test(trimmed);
-}
-
-function isExactChoiceDraft(selection, text) {
-  const normalizedText = compactCompareText(text);
-  if (!normalizedText) {
-    return false;
-  }
-  if (normalizedText === compactCompareText(selection.inWorldText)) {
-    return true;
-  }
-  return (selection.selectedOptionIds ?? []).some((id, index) => {
-    const choice = selection.choices?.[index] ?? "";
-    return normalizedText === compactCompareText(`I choose ${id}: ${choice}`) ||
-      normalizedText === compactCompareText(`I choose ${id}. ${choice}`) ||
-      normalizedText === compactCompareText(`I choose ${id} ${choice}`) ||
-      normalizedText === compactCompareText(`${id}. ${choice}`);
-  });
-}
-
-function pendingSelectionMatchesText(selection, text = "") {
-  if (!selection?.choices?.length) {
-    return false;
-  }
-  const normalizedText = compactCompareText(text);
-  if (!normalizedText) {
-    return false;
-  }
-  if (normalizedText === compactCompareText(selection.inWorldText)) {
-    return true;
-  }
-  return selection.selectedOptionIds?.some((id) =>
-    new RegExp(`^(?:i\\s+)?(?:choose|chose|pick|picked|select|selected|option|choice)\\s+${escapeRegExp(id)}\\b`, "i").test(text)
-  );
-}
-
-function choiceSelectionMeta(selection, { actualAction = "" } = {}) {
-  const combatInstruction = state.campaign?.combat?.inCombat
-    ? " This is a combat action for the active initiative actor; resolve it with visible mechanics, HP/resource updates, and advance the turn. Do not resolve or narrate the next initiative actor's attack/action in this response."
-    : "";
-  const audienceInstruction = choiceSelectionAudienceMeta(selection);
-  const editedInstruction = actualAction && compactCompareText(actualAction) !== compactCompareText(selection.inWorldText)
-    ? " The player edited/expanded the selected option; user.inWorld is the authoritative action and overrides the original option wording."
-    : " Resolve the selected choice text, not the bare numbers/letters.";
-  return `(meta: The player selected ${selection.labels.join(", ")} from the latest visible choice panel.${audienceInstruction}${editedInstruction} Preserve concrete player details, props, positioning, dialogue, and intent from user.inWorld. Do not ask the same choice question again unless new information changes the options.${combatInstruction})`;
-}
-
-function choiceSelectionAudienceMeta(selection = {}) {
-  const pieces = [];
-  if (selection.scope) {
-    pieces.push(`choice scope: ${selection.scope}`);
-  }
-  if (selection.forActor) {
-    pieces.push(`targeted actor: ${selection.forActor}`);
-  }
-  if (selection.forActorId) {
-    pieces.push(`targeted actor id: ${selection.forActorId}`);
-  }
-  if (selection.allowVote) {
-    pieces.push("this was a party vote prompt; host breaks ties");
-  }
-  return pieces.length ? ` ${pieces.join("; ")}.` : "";
 }
 
 function latestChoicePanelFromMessages() {
@@ -1444,33 +1322,6 @@ function choiceAudienceLabel(choices = {}) {
     return choices.forActor ? `For ${choices.forActor}` : "For selected characters";
   }
   return "";
-}
-
-function parseChoiceIndexes(text, maxChoices) {
-  const seen = new Set();
-  return String(text)
-    .split(/\s*(?:,|\+|and|&)\s*/i)
-    .map((token) => choiceTokenToIndex(token))
-    .filter((index) => Number.isInteger(index) && index >= 0 && index < maxChoices)
-    .filter((index) => {
-      if (seen.has(index)) {
-        return false;
-      }
-      seen.add(index);
-      return true;
-    });
-}
-
-function choiceTokenToIndex(token) {
-  const trimmed = String(token ?? "").trim();
-  if (/^\d+$/.test(trimmed)) {
-    return Number(trimmed) - 1;
-  }
-  const letter = trimmed.toUpperCase();
-  if (/^[A-H]$/.test(letter)) {
-    return letter.charCodeAt(0) - 65;
-  }
-  return -1;
 }
 
 function currentChoiceVotes(block = {}) {
