@@ -171,10 +171,12 @@ const scenarios = [
       await harness.page.click("#home-settings");
       await harness.page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
       await harness.page.locator("[data-settings-panel='app']").first().waitFor({ state: "visible", timeout: 10000 });
+      assert.equal(await harness.page.locator("#settings-tabs").isHidden(), true, "App Preferences should open as its own surface");
       await harness.page.click("#close-setup");
       await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
       await harness.page.click("#home-provider-setup");
       await harness.page.locator("[data-settings-panel='ai']").first().waitFor({ state: "visible", timeout: 10000 });
+      assert.equal(await harness.page.locator("#settings-tabs").isHidden(), true, "DM Voice should open as its own surface");
       await harness.page.click("#close-setup");
       await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
 
@@ -193,15 +195,19 @@ const scenarios = [
       await harness.page.click("#open-setup");
       await harness.page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
       await harness.page.locator("[data-settings-panel='friends']").first().waitFor({ state: "visible", timeout: 10000 });
+      assert.equal(await harness.page.locator("#settings-tabs").isHidden(), true, "Friends And Seats should open as its own surface");
       assert.equal(
         await harness.page.locator("#provider-setup-section").isHidden(),
         true,
         "DM Voice panel should stay hidden inside Friends And Seats",
       );
-      for (const tab of ["friends", "troubleshooting"]) {
-        await harness.page.click(`[data-settings-tab="${tab}"]`);
-        await harness.page.locator(`[data-settings-panel="${tab}"]`).first().waitFor({ state: "visible", timeout: 10000 });
-      }
+      assert.equal(
+        await harness.page.locator("[data-settings-panel='troubleshooting']").first().isHidden(),
+        true,
+        "Troubleshooting should not be a normal neighbor of Friends And Seats",
+      );
+      await harness.page.evaluate(() => window.__lorekeeperDebug?.openSurface?.("troubleshooting"));
+      await harness.page.locator(".diagnostics-section").waitFor({ state: "visible", timeout: 10000 });
       await harness.page.click("#refresh-diagnostics");
       await expectVisibleText(harness.page, "Ready To Start");
       await harness.page.click("#close-setup");
@@ -1428,6 +1434,10 @@ async function exerciseTableChrome(harness, rng, runIndex) {
   for (const tab of shuffle(["app", "ai", "friends", "troubleshooting"], rng)) {
     await clickIfVisible(page, `[data-settings-tab="${tab}"]`);
     await page.waitForTimeout(randomInt(rng, 40, 140));
+  }
+  if (rng() < 0.45) {
+    await page.evaluate(() => window.__lorekeeperDebug?.openSurface?.("troubleshooting"));
+    await page.locator(".diagnostics-section").waitFor({ state: "visible", timeout: 10000 });
   }
   await clickIfVisible(page, "#refresh-diagnostics");
   await clickIfVisible(page, "#start-local-table");

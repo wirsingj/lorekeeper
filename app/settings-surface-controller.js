@@ -1,8 +1,8 @@
 export const settingsSurfaceModes = Object.freeze({
-  app: ["app", "ai"],
-  ai: ["ai", "app"],
-  table: ["friends", "troubleshooting"],
-  troubleshooting: ["troubleshooting", "friends"],
+  app: ["app"],
+  ai: ["ai"],
+  table: ["friends"],
+  troubleshooting: ["troubleshooting"],
   recovery: ["troubleshooting"],
 });
 
@@ -54,7 +54,11 @@ export function buildSettingsSurfaceProjection({ tab = "app", mode = "" } = {}) 
   const validMode = settingsSurfaceModes[mode] ? mode : settingsModeForTab(tab);
   const allowedTabs = settingsSurfaceModes[validMode] ?? settingsSurfaceModes.app;
   const activeTab = allowedTabs.includes(tab) ? tab : allowedTabs[0];
-  const surfaceTarget = validMode === "recovery" ? "recovery" : "";
+  const surfaceTarget = validMode === "recovery"
+    ? "recovery"
+    : validMode === "troubleshooting"
+      ? "diagnostics"
+      : "";
   return {
     mode: validMode,
     activeTab,
@@ -73,6 +77,7 @@ export function applySettingsSurfaceProjection(elements, projection) {
   }
   if (elements.settingsTabsNav) {
     elements.settingsTabsNav.dataset.visibleTabs = String(projection.visibleTabCount);
+    elements.settingsTabsNav.hidden = projection.visibleTabCount <= 1;
   }
   if (elements.setupDialogEyebrow) {
     elements.setupDialogEyebrow.textContent = projection.copy.eyebrow;

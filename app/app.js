@@ -8099,6 +8099,23 @@ function installInternalDebugHarness() {
       tablePhase: state.tableSession?.phase || "",
       playMessages: state.playMessages.length,
     }),
+    openSurface: (surface = "app") => {
+      const key = String(surface || "app").toLowerCase();
+      const targets = {
+        app: { tab: "app", mode: "app" },
+        preferences: { tab: "app", mode: "app" },
+        dm: { tab: "ai", mode: "ai" },
+        "dm-voice": { tab: "ai", mode: "ai" },
+        friends: { tab: "friends", mode: "table" },
+        table: { tab: "friends", mode: "table" },
+        troubleshooting: { tab: "troubleshooting", mode: "troubleshooting" },
+        diagnostics: { tab: "troubleshooting", mode: "troubleshooting" },
+        recovery: { tab: "troubleshooting", mode: "recovery" },
+      };
+      const target = targets[key] ?? targets.app;
+      openSetupDialog(target);
+      return target;
+    },
   };
   Object.defineProperty(window, "__lorekeeperDebug", {
     value: harness,

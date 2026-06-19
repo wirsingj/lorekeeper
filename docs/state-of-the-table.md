@@ -28,7 +28,7 @@ Every table surface should answer the same practical questions a real table answ
 LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 
 - The front door should answer only three questions: continue hosting, start a new table, or join someone else's table.
-- Provider/model setup should feel like AI readiness, not a core gameplay mode.
+- Provider/model setup should feel like DM Voice readiness, not a core gameplay mode.
 - Normal play surfaces should use table language: Host, Join, Guests, DM, Table, Seat, Continue, Troubleshooting.
 - Technical language such as SQLite, provider import, raw payloads, bridge/manual sync, and diagnostics belongs behind troubleshooting or developer details.
 - Settings should become two calmer surfaces: app preferences before play, and table settings while hosting.
@@ -149,7 +149,7 @@ Risks:
 11. Guest inputs can drive provider turns through structured `user.playerInputs[]`.
 12. Failed provider turns preserve approved/remote inputs as visibly staged rather than silently consuming them.
 13. CombatEngine can now resolve app-owned attacks, DC checks, opposed checks/contests, simple spell saves, spell-slot spending, conditions, logged rolls/effects, and initiative advancement.
-14. The unified front door now treats Host, Join, and Provider Setup as first-class app-level flows.
+14. The unified front door now treats Host, Join, and DM Voice readiness as first-class app-level flows.
 15. The app starts in a neutral lobby mode instead of visibly sitting at the last active table.
 16. Join before connection is now a lobby flow with a Back control, not an in-campaign table view.
 17. Provider/App Settings open from the lobby without implicitly entering the last campaign.
@@ -268,7 +268,7 @@ Risks:
 130. Use Anyway is now hard-blocked for DM responses that speak or act for controlled party members. Format/proposed-change weirdness can still be reviewed by the host, but controlled-character agency failures require Try Again or Details instead of becoming table text.
 131. Host New pre-lobby waiting guests now show seat buttons for every open Invite Friend slot, even when the guest did not pick a specific character before asking to join.
 132. Character Auto-Complete now behaves like a reroll for generated flavor: it preserves hard facts such as name, ancestry, class, and level, while rotating the pitch, party tie, and DM note on each click.
-133. Preferences now open as calmer App, AI, Friends, and Troubleshooting tabs, with local-table tools, diagnostics, and DM recovery hidden until that section is chosen.
+133. Preferences now open as calmer App, DM Voice, Friends, and Troubleshooting tabs, with local-table tools, diagnostics, and DM recovery hidden until that section is chosen.
 134. Settings entry points are now intent-aware: front-door Preferences opens App Preferences, DM Voice opens the storyteller setup surface, and the in-table gear opens Friends And Seats instead of app-level options.
 135. The in-table settings gear is now a labeled Friends control, so normal play points hosts toward seating/share actions instead of generic configuration.
 136. The front door now gives primary weight to Continue Adventure and Join A Table, with DM Voice demoted to the lower utility strip so setup no longer reads as a third play mode.
@@ -278,7 +278,7 @@ Risks:
 140. The default action prompt is now campaign-neutral instead of heist-specific, so new tables do not inherit an unrelated tone from placeholder copy.
 141. New tables now open with a clearer multi-line setup beat: location, seated party, premise, and a direct Next instruction to press Start Adventure for the opening DM narration.
 142. Table focus projection now lives in `app/table-focus-controller.js`, so phase-to-surface decisions are tested outside `app/app.js`; combat, party/waiting, and review states can visually elevate the right rail/section through a single `data-table-focus` hook.
-143. Preferences now open as scoped surfaces: App Preferences shows only App/DM Voice, DM Voice shows DM/App, and in-table Friends And Seats shows only Friends/Troubleshooting instead of exposing every settings tab at once.
+143. Preferences now open as separate intent surfaces: App Preferences shows only app startup behavior, DM Voice shows only storyteller setup, in-table Friends And Seats shows only seating/share controls, and diagnostics/recovery stay behind explicit troubleshooting or recovery entry points.
 144. Settings surface mode/copy/tab visibility now lives in `app/settings-surface-controller.js` with direct tests, so future settings UX changes do not have to add more policy to `app/app.js`.
 145. Start Adventure now has an in-wizard progress/error status and repeat-submit guard, so campaign creation failures no longer look like a dead button while the global table status is hidden.
 146. Freshly created ready tables now expose a table-level Start Adventure action that runs a dedicated first-session opening narration prompt after the host finishes last-minute invites and party edits.
@@ -330,6 +330,7 @@ Risks:
 192. Visual audit caught DM Voice leaking into Friends And Seats because host chrome refreshes were unhiding whole settings panels after the settings-surface projection ran. Host chrome no longer overrides scoped settings-panel visibility, and the UI harness asserts DM Voice stays hidden inside Friends And Seats.
 193. Host-controlled combat input now prompts the host to choose the active character's action, spell, movement, or tactic instead of saying "Act as..." a party member.
 194. Product docs now explicitly separate host and DM roles: the host is a party member plus software-side table owner for setup/invites/provider access/recovery, while the provider/DM Voice is the DM at the table inside app-owned rails.
+195. Settings surfaces are now single-purpose at runtime: Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery no longer expose cross-surface tabs to normal users, while the hidden UI harness can still open diagnostics directly for chaos/audit coverage.
 
 ### Still Risky
 
@@ -346,7 +347,7 @@ Risks:
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Rail containment is improved, but long-session scroll behavior still needs a real campaign soak with many party members, notes, and combatants.
 13. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
-14. Settings are still physically one dialog, but entry points now route to App Preferences, DM Voice, Friends And Seats, or Troubleshooting. App-level preferences and campaign/table settings still need a fuller split after the front-door shell stabilizes.
+14. Settings still share one dialog component internally, but entry points now behave like separate App Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery surfaces instead of a tabbed control panel. A later visual pass can give each surface more bespoke layout.
 15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request and reserve Remote Invite seats before Create And Start, and the host can seat waiting guests from the draft lobby. Guests cannot yet edit their own character sheet in the shared draft lobby.
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
@@ -401,7 +402,7 @@ Risks:
 12. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
 13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
-15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door DM Voice readiness is now secondary, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
+15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door DM Voice readiness is now secondary, settings entry points are single-purpose instead of visibly tabbed, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
 16. Keep the host-surface stance explicit: the host is a party member and software-side table owner, not the DM. Host-only controls should collect setup, invites, provider/model access, party ownership, recovery, and tie-breaking without making the main table feel like a DM console.
 
 ### Medium
@@ -509,7 +510,7 @@ Risks:
 - [x] Desktop protocol invite links preload the Join screen and clear stale saved sessions for different invites.
 - [x] Fixed-seat invite joins require a table-visible guest name.
 - [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
-- [x] Provider Setup is reachable as a first-class front-door flow.
+- [x] DM Voice setup is reachable as a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
 - [x] Browser `/guest` previews the active host table and lets guests request an available non-host character seat.
 - [x] Host can copy a same-network Guest Link from Local Table.
@@ -554,16 +555,16 @@ Risks:
 - [x] Debug meta toggle available in Settings diagnostics.
 - [x] Right rail separates Campaign Notes from Player Notes, with Table Talk kept at the bottom.
 - [x] Empty states use more table-shaped language.
-- [x] Main menu separates Host, Join, and Provider Setup from the in-campaign rails.
+- [x] Main menu separates Host, Join, and DM Voice setup from the in-campaign rails.
 - [x] Main menu hides last-table rails, notes, and command input until a flow is chosen.
 - [x] Host on the main menu opens a selected campaign instead of implicitly resuming the last active campaign.
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
-- [ ] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog now uses a tested `settings-surface-controller` for mode-scoped App/AI/Table/Troubleshooting surfaces that hide irrelevant tabs per entry point, but it is not yet physically separate full screens.
-- [x] Rename first-pass technical UI language so normal users see Host/Join/AI/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
-- [x] Reduce visible Preferences controls to App, AI, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
+- [x] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog component remains, but the runtime surfaces are single-purpose App Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery views with cross-surface tabs hidden from normal entry points.
+- [x] Rename first-pass technical UI language so normal users see Host/Join/DM Voice/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
+- [x] Reduce visible Preferences controls to App, DM Voice, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
 - [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, fresh-table Start Adventure, Seat Guest, and DM recovery actions live beside that cue, `app/table-action-controller.js` owns the main table CTA visibility policy, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; the party, combat, notebook, and Table Talk rails now receive tested primary/supporting/quiet focus states, provider-status updates repaint the composer to keep phase copy aligned, Start Adventure hides after the host requests the opening for the current table session, pre-opening DM/AI companion nudges and Send Turn are disabled until that opening has begun, backend starter seed campaigns are hidden from the front door, combat has an active-turn cue with controller responsibility plus legal actions, and Inspect opens a focused recovery settings surface. Deeper combat action workflows and broader settings split work still need phase-specific behavior.
-- [x] Make the front door feel closer to a game launcher: recent campaign, new table, join table, AI readiness, and no hidden last-table background. Current state: the primary grid now presents Continue Adventure, New Adventure, and Join A Table as first-class choices, with DM Voice and Preferences in the lower utility strip.
+- [x] Make the front door feel closer to a game launcher: recent campaign, new table, join table, DM Voice readiness, and no hidden last-table background. Current state: the primary grid now presents Continue Adventure, New Adventure, and Join A Table as first-class choices, with DM Voice and Preferences in the lower utility strip.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [ ] Soak-test scroll behavior during long sessions.
 - [x] Keep debug/repair tools tucked away unless action is required.

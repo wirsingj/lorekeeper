@@ -3242,23 +3242,28 @@ function testReviewPanelProjection() {
 
 function testSettingsSurfaceProjection() {
   const appSurface = buildSettingsSurfaceProjection({ tab: "app", mode: "app" });
-  assert.deepEqual(appSurface.allowedTabs, ["app", "ai"]);
+  assert.deepEqual(appSurface.allowedTabs, ["app"]);
   assert.equal(appSurface.activeTab, "app");
   assert.equal(appSurface.copy.title, "App Preferences");
 
   const aiSurface = buildSettingsSurfaceProjection({ tab: "ai", mode: "ai" });
-  assert.deepEqual(aiSurface.allowedTabs, ["ai", "app"]);
+  assert.deepEqual(aiSurface.allowedTabs, ["ai"]);
   assert.equal(aiSurface.activeTab, "ai");
   assert.equal(aiSurface.copy.title, "DM Voice");
 
   const tableSurface = buildSettingsSurfaceProjection({ tab: "friends", mode: "table" });
-  assert.deepEqual(tableSurface.allowedTabs, ["friends", "troubleshooting"]);
+  assert.deepEqual(tableSurface.allowedTabs, ["friends"]);
   assert.equal(tableSurface.activeTab, "friends");
   assert.equal(tableSurface.copy.title, "Friends And Seats");
 
   const coerced = buildSettingsSurfaceProjection({ tab: "app", mode: "table" });
   assert.equal(coerced.activeTab, "friends");
   assert.equal(coerced.mode, "table");
+
+  const diagnosticsSurface = buildSettingsSurfaceProjection({ tab: "troubleshooting", mode: "troubleshooting" });
+  assert.deepEqual(diagnosticsSurface.allowedTabs, ["troubleshooting"]);
+  assert.equal(diagnosticsSurface.surfaceTarget, "diagnostics");
+  assert.equal(diagnosticsSurface.copy.title, "Table Diagnostics");
 
   const recoverySurface = buildSettingsSurfaceProjection({ tab: "troubleshooting", mode: "recovery" });
   assert.deepEqual(recoverySurface.allowedTabs, ["troubleshooting"]);
@@ -3436,7 +3441,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   );
   assert.ok(
     appShell.indexOf('className="home-library-strip"') < appShell.indexOf('id="home-provider-setup"'),
-    "AI readiness should live in the lower utility strip, not as a primary front-door mode",
+    "DM Voice readiness should live in the lower utility strip, not as a primary front-door mode",
   );
   assert.doesNotMatch(appShell, /home-flow-card-setup/);
   assert.doesNotMatch(styles, /home-flow-card-setup/);
@@ -3526,10 +3531,13 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appShell, /id="load-imported"/, "saved adventure loading belongs on the front door, not inside Preferences");
   assert.match(appJs, /settings-surface-controller\.js/, "settings surface policy should live outside the main app renderer");
   assert.match(settingsSurfaceController, /settingsSurfaceModes = Object\.freeze/, "settings surfaces should declare allowed tab groups");
-  assert.match(settingsSurfaceController, /app: \["app", "ai"\]/, "app preferences should only expose app-level tabs");
-  assert.match(settingsSurfaceController, /table: \["friends", "troubleshooting"\]/, "table settings should only expose friends and troubleshooting");
+  assert.match(settingsSurfaceController, /app: \["app"\]/, "app preferences should open as a single-purpose surface");
+  assert.match(settingsSurfaceController, /ai: \["ai"\]/, "DM Voice should open as a single-purpose surface");
+  assert.match(settingsSurfaceController, /table: \["friends"\]/, "Friends And Seats should open as a single-purpose surface");
+  assert.match(settingsSurfaceController, /troubleshooting: \["troubleshooting"\]/, "diagnostics should remain a separate troubleshooting surface");
   assert.match(settingsSurfaceController, /recovery: \["troubleshooting"\]/, "DM response review should be able to open as a focused recovery surface");
-  assert.match(settingsSurfaceController, /surfaceTarget = validMode === "recovery" \? "recovery" : ""/, "recovery mode should target only the recovery panel");
+  assert.match(settingsSurfaceController, /validMode === "recovery"[\s\S]*\? "recovery"[\s\S]*validMode === "troubleshooting"[\s\S]*\? "diagnostics"/, "diagnostics and recovery should target separate troubleshooting panels");
+  assert.match(settingsSurfaceController, /elements\.settingsTabsNav\.hidden = projection\.visibleTabCount <= 1/, "single-purpose settings surfaces should hide the tab rail");
   assert.match(settingsSurfaceController, /button\.hidden = !projection\.allowedTabs\.includes/, "irrelevant settings tabs should be hidden by surface mode");
   assert.match(settingsSurfaceController, /panel\.dataset\.settingsSurfaceTarget === projection\.surfaceTarget/, "focused settings surfaces should hide unrelated panels");
   assert.match(styles, /\.settings-tabs\[data-visible-tabs="2"\]/, "settings tab grid should collapse when only two tabs are visible");
