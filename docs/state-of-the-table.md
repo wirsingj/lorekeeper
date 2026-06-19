@@ -343,6 +343,7 @@ Risks:
 205. New Adventure companion setup now says "Scene cue for DM Voice" instead of "Host note for the DM," keeping table setup focused on story fit rather than software roles.
 206. Guest table previews now filter starter scaffold ids/threads and strip host-only "Next:" setup instructions, so `/guest` sees table fiction, party, and useful seat context instead of backend placeholder records.
 207. Combat active-turn labels now render host-controlled party turns as "Your turn" in the host app while preserving "Host turn" for observer contexts and separate friend/companion/DM/table turn labels.
+208. The stale renderer-local provider speaker-splitting helper is removed; provider response speaker parsing now has one owner in `app/provider-import-controller.js`, and architecture tests guard against `app.js` growing that import policy back.
 
 ### Still Risky
 

@@ -7159,27 +7159,6 @@ function compactSceneSituation(text = "") {
   return cleaned.length > 520 ? `${cleaned.slice(0, 519).trimEnd()}...` : cleaned;
 }
 
-function parseSpeakerLine(line, speakerLookup) {
-  if (isChoiceLikeLine(line)) {
-    return null;
-  }
-  const normalized = line.replace(/^[-*]\s+/, "").replace(/^\*\*(.+?)\*\*/, "$1").trim();
-  for (const speaker of speakerLookup) {
-    const escaped = escapeRegExp(speaker.alias);
-    const pattern = new RegExp(`^(?:["“”']?)(?:\\*\\*)?${escaped}(?:\\*\\*)?\\s*[:\\-]\\s*(.+)$`, "i");
-    const match = normalized.match(pattern);
-    if (match) {
-      return {
-        name: speaker.name,
-        body: match[1].trim(),
-        record: speaker.record,
-      };
-    }
-  }
-
-  return null;
-}
-
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

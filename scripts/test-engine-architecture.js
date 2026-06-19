@@ -3539,6 +3539,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
   assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
+  assert.match(providerImportController, /function parseSpeakerLine/, "provider import speaker splitting should live in the provider import controller");
+  assert.doesNotMatch(appJs, /function parseSpeakerLine/, "renderer should not keep stale provider speaker-splitting helpers");
   assert.match(appJs, /provider-chat-controller\.js/, "campaign chat fallback policy should live outside the main app renderer");
   assert.match(appJs, /buildCampaignChatFallbackPlan/, "renderer should execute campaign chat fallback projections");
   assert.match(appJs, /buildCampaignChatProgressSteps/, "campaign chat progress timing copy should be projected outside app.js");
