@@ -27,7 +27,7 @@ export function buildInputComposerProjection({
       return {
         inputDisabled: true,
         sendDisabled: true,
-        placeholder: "Host is starting the adventure. Wait for the opening scene.",
+        placeholder: "Waiting for the host to begin the opening scene.",
         buttonText: "Send To Host",
       };
     }
@@ -148,7 +148,7 @@ function guestComposerPhaseOverride(tableSession, guestSnapshot) {
     return "DM is thinking. Wait for the table to continue.";
   }
   if (phase === "opening_ready") {
-    return "Host is starting the adventure. Wait for the opening scene.";
+    return "Waiting for the host to begin the opening scene.";
   }
   if (phase === "recovery" || phase === "host_review") {
     return "Host is reviewing the table before play continues.";

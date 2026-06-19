@@ -402,7 +402,6 @@ const elements = {
   joinClientCharacterIntegration: document.querySelector("#join-client-character-integration"),
   joinClientCharacterAutocomplete: document.querySelector("#join-client-character-autocomplete"),
   joinClientSubmit: document.querySelector("#join-client-submit"),
-  joinClientOpenDialog: document.querySelector("#join-client-open-dialog"),
   joinClientStatus: document.querySelector("#join-client-status"),
   joinBackHome: document.querySelector("#join-back-home"),
   bridgeCard: document.querySelector("#bridge-card"),
@@ -844,10 +843,6 @@ elements.joinCampaignMain?.addEventListener("click", () => {
 
 elements.inviteNewCharacterMain?.addEventListener("click", async () => {
   await createCharacterRequestInviteFromUi();
-});
-
-elements.joinClientOpenDialog?.addEventListener("click", () => {
-  openJoinCampaignDialog();
 });
 
 elements.joinClientSubmit?.addEventListener("click", async () => {
@@ -2837,7 +2832,7 @@ function setCampaignWizardBusy(isBusy) {
     return;
   }
   elements.startCampaignSubmit.disabled = state.campaignWizardCreating;
-  elements.startCampaignSubmit.textContent = state.campaignWizardCreating ? "Starting..." : "Start Adventure";
+  elements.startCampaignSubmit.textContent = state.campaignWizardCreating ? "Setting..." : "Set The Table";
 }
 
 function normalizeList(value) {
@@ -2852,7 +2847,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     return;
   }
   setCampaignWizardBusy(true);
-  setCampaignWizardStatus("Starting adventure...", "working");
+  setCampaignWizardStatus("Setting the table...", "working");
   const trimmedTitle = String(title ?? "").trim() || "Untitled Campaign";
   const trimmedPremise = String(premise ?? "").trim() || "Start a new D&D 5e-lite campaign. Ask for missing essentials, then open with a playable scene.";
   const trimmedStartingLocation = String(startingLocation ?? "").trim();
@@ -2866,9 +2861,9 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     startingPartyMembers: joinerSeeds,
   });
   try {
-    elements.bridgeStatus.textContent = "Creating new campaign...";
-    setCampaignWizardStatus("Creating adventure file...", "working");
-    setProviderActivity("Creating campaign...", "working");
+    elements.bridgeStatus.textContent = "Setting the table...";
+    setCampaignWizardStatus("Creating table file...", "working");
+    setProviderActivity("Setting the table...", "working");
     const response = await fetch(apiNewCampaignUrl, {
       method: "POST",
       headers: {
@@ -2911,27 +2906,27 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     elements.campaignDialog.close();
     elements.campaignForm.reset();
     resetCampaignWizardDefaults();
-    elements.bridgeStatus.textContent = "New campaign saved";
-    setCampaignWizardStatus("Adventure started.", "idle");
+    elements.bridgeStatus.textContent = "Table set";
+    setCampaignWizardStatus("Table set.", "idle");
     setCampaignWizardBusy(false);
     elements.playerInput.value = "";
     if (remoteInviteLobby?.link) {
       setProviderActivity(
         remoteInviteLobby.copied
-          ? "Guest page copied; friend seats are open"
-          : "Friend seats are open; copy the Guest Page link from Table Options",
+          ? "Guest link copied; friend seats are open."
+          : "Friend seats are open; copy the Guest Page link from Friends.",
         remoteInviteLobby.copied ? "idle" : "waiting",
       );
     } else {
-      setProviderActivity("Table ready. Invite friends or press Start Adventure when everyone is seated.", "idle");
+      setProviderActivity("Table set. Invite friends or press Start Adventure when everyone is seated.", "idle");
     }
   } catch (error) {
     render();
     const message = error instanceof Error ? error.message : "Unknown error";
-    elements.bridgeStatus.textContent = `New campaign failed: ${message}`;
-    setCampaignWizardStatus(`Could not start: ${message}`, "error");
+    elements.bridgeStatus.textContent = `Could not set the table: ${message}`;
+    setCampaignWizardStatus(`Could not set table: ${message}`, "error");
     setCampaignWizardBusy(false);
-    setProviderActivity(`New campaign failed: ${message}`, "error");
+    setProviderActivity(`Could not set the table: ${message}`, "error");
   }
 }
 

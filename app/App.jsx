@@ -137,7 +137,7 @@ export function LorekeeperShell() {
                     <p>Set the opening situation, create your character, and invite companions before the first narration.</p>
                   </div>
                   <div className="home-flow-actions">
-                    <button id="home-new-campaign" type="button">Start New</button>
+                    <button id="home-new-campaign" type="button">Set Up Table</button>
                   </div>
                 </article>
                 <article className="home-flow-card home-flow-card-compact">
@@ -154,7 +154,7 @@ export function LorekeeperShell() {
               <div className="home-library-strip" aria-label="Local library summary">
                 <span id="home-active-campaign">Campaigns loading...</span>
                 <span id="home-character-count">Characters stay with their adventures</span>
-                <button id="home-provider-setup" className="secondary-action" type="button">Check AI</button>
+                <button id="home-provider-setup" className="secondary-action" type="button">DM Voice</button>
                 <button id="home-settings" className="secondary-action" type="button">Preferences</button>
               </div>
             </div>
@@ -274,7 +274,6 @@ export function LorekeeperShell() {
               </div>
               <div className="join-client-actions">
                 <button id="join-client-submit" type="button">Join Table</button>
-                <button id="join-client-open-dialog" className="secondary-action" type="button">Advanced</button>
               </div>
               <p id="join-client-status" className="join-client-status">Paste an invite link to begin.</p>
             </div>
@@ -714,9 +713,9 @@ function CampaignDialog() {
 
         <footer className="dialog-actions">
           <p id="campaign-wizard-status" className="campaign-wizard-status" aria-live="polite">
-            Ready when your table is.
+            Set the table when the seats feel right.
           </p>
-          <button id="start-campaign-submit" type="submit">Start Adventure</button>
+          <button id="start-campaign-submit" type="submit">Set The Table</button>
         </footer>
       </form>
     </dialog>
@@ -759,10 +758,10 @@ function SetupDialog() {
 
         <section id="provider-setup-section" className="setup-section provider-setup-section" data-settings-panel="ai" hidden>
           <div className="section-title">
-            <h3>Local AI</h3>
+            <h3>DM Voice</h3>
           </div>
           <label>
-            <span>AI Source</span>
+            <span>DM Source</span>
             <select id="provider-mode">
               <option value="ollama">Local AI</option>
               <option value="bridge">Campaign Chat</option>
@@ -775,7 +774,7 @@ function SetupDialog() {
             </div>
             <div className="model-picker-row">
               <label>
-                <span>Local Model</span>
+                <span>Local DM Model</span>
                 <select id="ollama-model">
                   <option value="llama3.1:8b">Llama 3.1 8B</option>
                   <option value="mistral-nemo">Mistral Nemo</option>
@@ -785,7 +784,7 @@ function SetupDialog() {
               <button id="pull-ollama-model" type="button">Download</button>
             </div>
             <div id="ollama-model-summary" className="model-summary" aria-live="polite"></div>
-            <p id="ollama-benchmark" className="setup-note">Local AI status will appear here.</p>
+            <p id="ollama-benchmark" className="setup-note">Local DM status will appear here.</p>
             <details className="advanced-provider-settings">
               <summary>Advanced</summary>
               <div className="settings-grid">
@@ -803,8 +802,8 @@ function SetupDialog() {
                 </label>
               </div>
               <div className="button-stack two-up">
-                <button id="refresh-ollama" type="button">Refresh AI</button>
-                <button id="test-ollama" type="button">Test AI</button>
+                <button id="refresh-ollama" type="button">Refresh Voice</button>
+                <button id="test-ollama" type="button">Test Voice</button>
               </div>
             </details>
           </div>
@@ -926,7 +925,7 @@ function SetupDialog() {
           <details id="manual-response-fallback" className="manual-response-fallback">
             <summary id="manual-response-fallback-summary">Replacement DM Response</summary>
             <p id="manual-response-fallback-hint" className="manual-response-fallback-hint">
-              Rare fallback for a deliberately copied DM response. Most tables should use Check AI or Read Latest instead.
+              Rare fallback for a deliberately copied DM response. Most tables should use DM Voice or Read Latest instead.
             </p>
             <textarea
               id="response-import"

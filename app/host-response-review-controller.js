@@ -65,7 +65,7 @@ export function buildManualResponseFallbackProjection({ repair = null, reviewBat
   return {
     state: "idle",
     summary: "Replacement DM Response",
-    hint: "Rare fallback for a deliberately copied DM response. Most tables should use Check AI or Read Latest instead.",
+    hint: "Rare fallback for a deliberately copied DM response. Most tables should use DM Voice or Read Latest instead.",
     open: Boolean(hasDraftText),
     pasteLabel: "Paste Response",
     useLabel: "Use Response",
