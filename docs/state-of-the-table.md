@@ -337,6 +337,7 @@ Risks:
 199. AI companion approval projection now lives in `app/party-suggestion-controller.js`: provider-authored filtering, Stage For DM / Resolve Now / Pass copy, status labels, meta/activity text, and structured companion input packaging are tested outside the renderer.
 200. Party-vote choice projection now lives in `app/choice-vote-controller.js`: vote counts, tie/leader state, host leading-choice projection, guest vote lookup, and selected-choice activity text are tested outside the renderer. Choice identity keys are shared with multiplayer authority through `src/engine/choice-vote-identity.js`.
 201. Remote party-vote UI coverage now exercises a second `/guest` tab voting on provider-authored semantic option ids, then verifies the host sees the vote count and can draft the leading party choice.
+202. Removed the stale `multiplayer.lastChoices` guest snapshot field. Choice prompts now have one visible source of truth: public play-log message metadata plus the authoritative choice-vote records.
 
 ### Still Risky
 
@@ -702,6 +703,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: DM Recovery now hides the copied-response fallback unless bridge/manual handoff is active or pasted draft text exists, idle recovery no longer tells users to open the replacement-response path, and slow ChatGPT DM progress no longer promises a hidden fallback control. Verification: `npm run test:engine`, `npm run build`, and focused `visual-audit-screenshots` UI passed.
 - 2026-06-18: UI chaos gained random non-destructive button-mashing in wizard, table, and combat phases. The first smoke found a harness false-positive where seed reroll could rewrite the fixed test title after setup; the mash pool now avoids post-fill seed rerolls. Verification: seeded chaos smoke (`afk-mash-smoke`, 2 runs) and ramp (`afk-mash-ramp`, 8 runs) passed.
 - 2026-06-18: Remote party-vote harness coverage found duplicated choice-key identity logic between the renderer projection and multiplayer authority. Shared choice identity now lives in `src/engine/choice-vote-identity.js`, and the focused remote `/guest` scenario verifies semantic provider option ids can be voted on and drafted by the host. Verification: focused remote party-vote UI, `npm run test:multiplayer`, `npm run test:engine`, and `npm run build` passed.
+- 2026-06-18: Follow-up choice-state audit removed the never-populated `multiplayer.lastChoices` guest snapshot path so future guest choice work cannot accidentally consume stale sidecar state. Verification: `npm run test:multiplayer` passed and no `lastChoices`/snapshot choice-field references remain.
 
 ## How To Use This Doc
 

@@ -1334,7 +1334,6 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
         combat: null,
         messages: [],
         tableTalk: [],
-        choices: null,
         pendingInput: null,
       },
     };
@@ -1361,7 +1360,6 @@ export function createGuestSnapshot(campaign, connectionId, options = {}) {
     combat: tableState.combat,
     messages: tableState.messages,
     tableTalk: tableState.tableTalk,
-    choices: tableState.choices,
     hostTurnState: normalized.multiplayer.hostTurnState,
     settings: normalized.multiplayer.settings,
     pendingInput: tableState.pendingInput,
@@ -1552,7 +1550,6 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
       ? multiplayer.tableTalk.slice(-tableStateLimits.tableTalk).map(normalizeTableTalkMessage).filter(Boolean)
       : [],
     events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
-    lastChoices: multiplayer.lastChoices ?? null,
   };
 }
 
@@ -2038,7 +2035,6 @@ function createVisibleTableState(campaign, connection) {
       .slice(-tableStateLimits.messages)
       .map(publicMessage),
     tableTalk: campaign.multiplayer.tableTalk.map(publicTableTalkMessage),
-    choices: campaign.multiplayer.lastChoices ?? null,
     choiceVotes: campaign.multiplayer.choiceVotes.map(publicChoiceVote),
     pendingInput: campaign.multiplayer.pendingTurnInputs
       .find((input) => input.playerId === connection.playerId && input.characterId === connection.partyMemberId) ?? null,
