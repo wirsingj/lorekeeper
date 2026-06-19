@@ -2610,7 +2610,7 @@ function addWizardPartyMemberCard(input = {}) {
     </div>
     <label><span>Character pitch</span><textarea data-character-field="concept" rows="3" placeholder="Who are they, what do they care about, and what do they bring?"></textarea></label>
     <label><span>Why they are with the party</span><textarea data-character-field="integration" rows="3" placeholder="Old friend, squadmate, hired guide, sibling, rival..."></textarea></label>
-    <label><span>Host note for the DM</span><textarea data-character-field="hostContext" rows="3" placeholder="Scene-specific glue for the DM."></textarea></label>
+    <label><span>Scene cue for DM Voice</span><textarea data-character-field="hostContext" rows="3" placeholder="How they fit into the opening scene."></textarea></label>
     <label class="check-row"><input data-character-field="autoSheet" type="checkbox" checked /><span>Auto-fill a 5E-lite sheet for this party member</span></label>
   `;
   container.append(card);
@@ -4757,7 +4757,7 @@ async function seedWizardStartingPartyMember(character) {
       ...(Array.isArray(baseSheet.notes) ? baseSheet.notes : []),
       `Created from the new campaign wizard as ${wizardPlayerRoleForController(character.controllerKind || "ai_companion").toLowerCase()}.`,
       character.integrationPrompt ? `Party integration: ${character.integrationPrompt}` : "",
-      character.hostIntegrationPrompt ? `Host scene context: ${character.hostIntegrationPrompt}` : "",
+      character.hostIntegrationPrompt ? `Table scene cue: ${character.hostIntegrationPrompt}` : "",
     ].filter(Boolean),
   };
 
