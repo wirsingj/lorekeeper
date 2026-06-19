@@ -93,9 +93,9 @@ import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { buildTurnContentGate, buildTurnSubmitGate } from "./turn-submit-controller.js";
 import { createTurnFlowRuntime } from "./turn-flow-runtime.js";
 import {
+  buildTurnRepairActionGate,
   isHardBlockedTurnRepair,
   turnRepairActivityText,
-  turnRepairBlockedMessage,
   turnRepairImportOptions,
   turnRepairStatusText,
   turnRepairUseAnywayDialog,
@@ -7518,9 +7518,14 @@ function cleanMessageMeta(value) {
 
 async function retryTurnRepair() {
   const repair = activeTurnRepair();
-  if (!repair?.turn) {
-    setProviderActivity("No DM response is available to try again", "error");
-    return;
+  const gate = buildTurnRepairActionGate({
+    repair,
+    action: "retry",
+    activeGeneration: hasActiveGeneration(),
+  });
+  if (gate.blocked) {
+    setProviderActivity(gate.activityText, gate.activityState);
+    return { providerReceived: false, reason: gate.reason };
   }
   const retryMessage = await markRepairTurnRetrying(repair);
   setProviderActivity("DM is reconsidering the response...", "working");
@@ -7579,14 +7584,17 @@ async function importTurnRepairAnyway() {
   // escape hatch. Future target: a guided recovery flow without raw response
   // import controls in normal play.
   const repair = activeTurnRepair();
-  if (!repair?.responseText) {
-    setProviderActivity("No reviewed DM response is available", "error");
-    return;
-  }
-  if (isHardBlockedTurnRepair(repair)) {
-    setProviderActivity(turnRepairBlockedMessage(repair), "error");
-    await inspectTurnRepair();
-    return;
+  const gate = buildTurnRepairActionGate({
+    repair,
+    action: "use_anyway",
+    activeGeneration: hasActiveGeneration(),
+  });
+  if (gate.blocked) {
+    setProviderActivity(gate.activityText, gate.activityState);
+    if (gate.inspect) {
+      await inspectTurnRepair();
+    }
+    return { imported: false, reason: gate.reason };
   }
 
   const confirmed = await confirmInApp(turnRepairUseAnywayDialog());

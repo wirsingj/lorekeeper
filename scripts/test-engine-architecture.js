@@ -80,6 +80,7 @@ import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.
 import { buildTurnContentGate, buildTurnSubmitGate } from "../app/turn-submit-controller.js";
 import { createTurnFlowRuntime } from "../app/turn-flow-runtime.js";
 import {
+  buildTurnRepairActionGate,
   isHardBlockedTurnRepair,
   tableRepairReason,
   turnRepairActivityText,
@@ -2979,9 +2980,19 @@ function testTurnRepairController() {
   assert.match(turnRepairActivityText(technicalRepair), /Try Again, Details, or Use Anyway/);
   assert.equal(tableRepairReason("The DM contradicted the last seated guest."), "The DM contradicted the last seated guest.");
   assert.equal(isHardBlockedTurnRepair(technicalRepair), false);
+  assert.equal(buildTurnRepairActionGate({
+    repair: technicalRepair,
+    action: "retry",
+    activeGeneration: true,
+  }).reason, "busy");
+  assert.equal(buildTurnRepairActionGate({
+    repair: {},
+    action: "retry",
+  }).reason, "no_repair_turn");
 
   const agencyRepair = {
     reason: "table[1] appears to speak, decide, or act for controlled party member Thora without submitted controller input",
+    responseText: "Thora speaks without player input.",
     validationErrors: [
       "proposedChanges[0].operation must be one of: add, update, remove, note",
       "table[1] appears to speak, decide, or act for controlled party member Thora without submitted controller input",
@@ -2992,6 +3003,16 @@ function testTurnRepairController() {
   assert.match(turnRepairActivityText(agencyRepair), /blocked it because it spoke or acted for a controlled character/);
   assert.match(turnRepairBlockedMessage(agencyRepair), /controlled party member/);
   assert.doesNotMatch(turnRepairActivityText(agencyRepair), /Use Anyway/);
+  assert.equal(buildTurnRepairActionGate({
+    repair: {},
+    action: "use_anyway",
+  }).reason, "no_reviewed_response");
+  const agencyGate = buildTurnRepairActionGate({
+    repair: agencyRepair,
+    action: "use_anyway",
+  });
+  assert.equal(agencyGate.reason, "hard_blocked");
+  assert.equal(agencyGate.inspect, true);
 
   const dialog = turnRepairUseAnywayDialog();
   assert.equal(dialog.title, "Use This DM Response?");

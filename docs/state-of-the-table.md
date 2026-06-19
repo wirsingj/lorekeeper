@@ -55,6 +55,7 @@ Trust rule: every action must be allowed, visible, outcome-clear, recoverable, a
 - Guest leave/rejoin and campaign-switch flows clear stale connection/controller state instead of silently reviving old approvals.
 - Table Talk refreshes while DM Voice is generating so side chat does not appear to vanish until the DM response posts.
 - Review commits now save through the active campaign update queue, preserving route-side Table Talk and remote guest state that land during provider import.
+- Recovery Retry and Use Anyway now share a pure action gate so hidden/debug clicks cannot run recovery actions while another DM response is generating or when no reviewed response is active.
 - AI companion Nudge is gated by table phase, guest/client role, and combat active actor; disabled nudge buttons are tested to prove they cannot start generation or trigger recovery.
 - Common combat resolution owns active actor, initiative, legal options, action economy, and enemy-turn advancement enough to reject provider phrasing that would skip or resolve the wrong actor.
 - Campaign delete is visible from the front door and recycles local SQLite files instead of exposing undeletable backend placeholder campaigns.
@@ -386,6 +387,7 @@ Risks:
 214. Guest lobby previews now collapse fresh-table setup scaffolding down to table fiction/premise and the remote join helper asserts guests do not see "The table is set..." or host-only Next instructions.
 215. Rejected remote guest actions, passes, and choice votes now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
 216. Start Adventure duplicate-click coverage now proves a rapid second click cannot create a second provider call or duplicate opening narration.
+217. Recovery Retry/Use Anyway action gating now lives in `app/turn-repair-controller.js`; handlers block busy/no-repair/no-reviewed-response/hard-blocked states even if a hidden recovery button or debug path is invoked directly.
 
 ### Still Risky
 
@@ -768,6 +770,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-19: Trust pass started. SotT now tracks Trust Risks explicitly, and rejected guest-action probes compare host trust snapshots before/after to catch silent mutation, not just HTTP rejection. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-invariant-smoke`, 2 runs) passed.
 - 2026-06-19: Trust route probes now cover pre-opening guest action, pass, and choice-vote attempts with the same no-mutation host snapshot invariant. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-route-smoke`, 2 runs) passed.
 - 2026-06-19: Start Adventure duplicate-click trust coverage now fires two clicks on the opening control and asserts only one provider generation plus one visible opening narration. Verification: `node --check scripts/test-ui-flow.js` and focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
+- 2026-06-19: Recovery action handlers now use a tested repair-action gate so Retry/Use Anyway cannot run from hidden/debug entry points during active generation, without an active repair, without reviewed text, or after a hard agency block. Verification: `npm run test:engine`, node syntax checks, and visual-audit UI passed.
 
 ## How To Use This Doc
 

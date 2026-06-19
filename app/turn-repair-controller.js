@@ -69,6 +69,51 @@ export function turnRepairUseAnywayDialog() {
   };
 }
 
+export function buildTurnRepairActionGate({
+  repair = null,
+  action = "retry",
+  activeGeneration = false,
+} = {}) {
+  if (activeGeneration) {
+    return {
+      blocked: true,
+      reason: "busy",
+      activityText: "Wait for the current DM response before using recovery actions.",
+      activityState: "waiting",
+    };
+  }
+
+  if (action === "retry" && !repair?.turn) {
+    return {
+      blocked: true,
+      reason: "no_repair_turn",
+      activityText: "No DM response is available to try again",
+      activityState: "error",
+    };
+  }
+
+  if (action === "use_anyway" && !repair?.responseText) {
+    return {
+      blocked: true,
+      reason: "no_reviewed_response",
+      activityText: "No reviewed DM response is available",
+      activityState: "error",
+    };
+  }
+
+  if (action === "use_anyway" && isHardBlockedTurnRepair(repair)) {
+    return {
+      blocked: true,
+      reason: "hard_blocked",
+      activityText: turnRepairBlockedMessage(repair),
+      activityState: "error",
+      inspect: true,
+    };
+  }
+
+  return { blocked: false };
+}
+
 export function turnRepairImportOptions(repair) {
   return {
     source: repair?.source || "ollama_repair",
