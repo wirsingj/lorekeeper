@@ -1255,6 +1255,11 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
     await page.waitForTimeout(randomInt(rng, 20, 90));
     await assertNoDuplicateWizardCardNames(page);
   }
+  await exerciseRandomButtonMash(harness, rng, `chaos ${runIndex}: wizard mash`, {
+    steps: randomInt(rng, 5, 10),
+    selectors: wizardMashSelectors(),
+    keepCampaignDialogOpen: true,
+  });
   if (await page.locator("[data-wizard-character-card]").count()) {
     await fillWizardPartyCard(page.locator("[data-wizard-character-card]").last(), {
       name: `Remote Seat ${runIndex}`,
@@ -1285,6 +1290,10 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
   );
 
   await exerciseTableChrome(harness, rng, runIndex);
+  await exerciseRandomButtonMash(harness, rng, `chaos ${runIndex}: table mash`, {
+    steps: randomInt(rng, 8, 16),
+    selectors: tableMashSelectors(),
+  });
   await exerciseRecords(harness, rng, runIndex);
 
   const campaign = await harness.fetchJson("/api/campaign");
@@ -1375,6 +1384,10 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
     const afterEnemy = await waitForActiveCombatActor(harness);
     await expectCombatActor(page, afterEnemy.name);
   }
+  await exerciseRandomButtonMash(harness, rng, `chaos ${runIndex}: combat mash`, {
+    steps: randomInt(rng, 5, 10),
+    selectors: combatMashSelectors(),
+  });
   await assertHealthyUi(harness, `chaos ${runIndex}: combat round`);
 }
 
@@ -1425,6 +1438,99 @@ async function waitForActiveCombatActor(harness) {
 
 async function isPlayerInputEnabled(page) {
   return page.locator("#player-input").evaluate((input) => Boolean(input && !input.disabled && !input.readOnly)).catch(() => false);
+}
+
+function wizardMashSelectors() {
+  return [
+    "#add-party-template",
+    "#add-wizard-party-member",
+    "#copy-pretable-guest-link",
+  ];
+}
+
+function tableMashSelectors() {
+  return [
+    "#open-setup",
+    "#close-setup",
+    "#start-local-table",
+    "#stop-local-table",
+    "#copy-guest-link",
+    "#copy-character-invite",
+    "#sync-guest-table",
+    "#refresh-diagnostics",
+    "#copy-diagnostics",
+    "[data-add-domain='people']",
+    "[data-add-domain='places']",
+    "[data-add-domain='items']",
+    "[data-add-domain='quests']",
+    "#close-record-dialog",
+    "#cancel-delete-campaign",
+    "#close-delete-campaign",
+  ];
+}
+
+function combatMashSelectors() {
+  return [
+    "#open-setup",
+    "#close-setup",
+    "#start-local-table",
+    "#stop-local-table",
+    "#copy-guest-link",
+    "#refresh-diagnostics",
+    "#copy-diagnostics",
+    "[data-add-domain='people']",
+    "#close-record-dialog",
+  ];
+}
+
+async function exerciseRandomButtonMash(harness, rng, label, {
+  steps = 8,
+  selectors = tableMashSelectors(),
+  keepCampaignDialogOpen = false,
+} = {}) {
+  const page = harness.page;
+  for (let step = 0; step < steps; step += 1) {
+    const clicked = await clickRandomVisibleSelector(page, shuffle(selectors, rng));
+    await page.waitForTimeout(randomInt(rng, 60, 220));
+    await closeTransientChaosDialogs(page, { keepCampaignDialogOpen });
+    await assertHealthyUi(harness, `${label} step ${step + 1}`);
+    if (!clicked) {
+      break;
+    }
+  }
+}
+
+async function clickRandomVisibleSelector(page, selectors) {
+  for (const selector of selectors) {
+    const locator = page.locator(selector).first();
+    if (!await locator.count()) {
+      continue;
+    }
+    if (!await locator.isVisible().catch(() => false)) {
+      continue;
+    }
+    if (await locator.isDisabled?.().catch(() => false)) {
+      continue;
+    }
+    return locator.click({ timeout: 1200 }).then(() => true).catch(() => false);
+  }
+  return false;
+}
+
+async function closeTransientChaosDialogs(page, { keepCampaignDialogOpen = false } = {}) {
+  if (await page.locator("#record-dialog").evaluate((dialog) => dialog?.open === true).catch(() => false)) {
+    await clickIfVisible(page, "#close-record-dialog");
+  }
+  if (await page.locator("#delete-campaign-dialog").evaluate((dialog) => dialog?.open === true).catch(() => false)) {
+    await clickIfVisible(page, "#cancel-delete-campaign");
+    await clickIfVisible(page, "#close-delete-campaign");
+  }
+  if (await page.locator("#setup-dialog").evaluate((dialog) => dialog?.open === true).catch(() => false)) {
+    await clickIfVisible(page, "#close-setup");
+  }
+  if (!keepCampaignDialogOpen && await page.locator("#campaign-dialog").evaluate((dialog) => dialog?.open === true).catch(() => false)) {
+    await clickIfVisible(page, "#close-campaign-dialog");
+  }
 }
 
 async function exerciseTableChrome(harness, rng, runIndex) {
