@@ -9,7 +9,6 @@ import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
-import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
 import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
@@ -101,6 +100,7 @@ import {
   turnFlowTimelineEventDetail,
 } from "./renderer-diagnostics-controller.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
+import { buildSceneIntelligenceProjection, buildSceneNotebookProjection } from "./scene-notebook-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { applyTableActionProjection, buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
 import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "./table-background-polling-controller.js";
@@ -6076,27 +6076,18 @@ function renderSceneIntelligence(campaign) {
   if (!elements.sceneIntelligence) {
     return;
   }
-  const retrieval = buildSceneRetrieval(campaign);
-  const scene = retrieval.scene;
-  const tensions = scene?.tensions ?? campaign.scene?.tensions ?? [];
-  const consequences = retrieval.activeConsequences;
-  const hasFirstClassScene = Boolean(campaign.scene?.activeSceneId || (campaign.scenes ?? []).some((record) => record.status === "active"));
-  const hasDetails = Boolean(hasFirstClassScene || tensions.length || consequences.length);
-  elements.sceneIntelligence.hidden = !hasDetails;
+  const projection = buildSceneIntelligenceProjection(campaign);
+  elements.sceneIntelligence.hidden = !projection.visible;
   if (elements.sceneIntelligenceTitle) {
-    elements.sceneIntelligenceTitle.textContent = scene?.title || "Current scene";
+    elements.sceneIntelligenceTitle.textContent = projection.title;
   }
   if (elements.sceneIntelligenceTensions) {
-    elements.sceneIntelligenceTensions.textContent = tensions.length
-      ? `Tension: ${tensions.slice(0, 2).join("; ")}`
-      : "";
-    elements.sceneIntelligenceTensions.hidden = tensions.length === 0;
+    elements.sceneIntelligenceTensions.textContent = projection.tensionText;
+    elements.sceneIntelligenceTensions.hidden = !projection.tensionText;
   }
   if (elements.sceneIntelligenceConsequences) {
-    elements.sceneIntelligenceConsequences.textContent = consequences.length
-      ? `Consequence: ${consequences.slice(0, 2).map((consequence) => consequence.title).join("; ")}`
-      : "";
-    elements.sceneIntelligenceConsequences.hidden = consequences.length === 0;
+    elements.sceneIntelligenceConsequences.textContent = projection.consequenceText;
+    elements.sceneIntelligenceConsequences.hidden = !projection.consequenceText;
   }
 }
 
@@ -6104,56 +6095,11 @@ function renderSceneNotebook(campaign) {
   if (!elements.sceneNoteList || !elements.sceneNoteCount) {
     return;
   }
-  const retrieval = buildSceneRetrieval(campaign);
-  const scene = retrieval.scene;
-  const records = [];
-  if (scene) {
-    const location = scene.locationId ? labelById(campaign, scene.locationId) : "";
-    records.push(binderRecordElement({
-      title: scene.title || "Current scene",
-      subtitle: location || scene.type || "scene",
-      body: detailLines([
-        scene.immediateSituation,
-        scene.whyHere ? `Why here: ${scene.whyHere}` : "",
-        ...(scene.tensions ?? []).slice(0, 3).map((tension) => `Tension: ${tension}`),
-        ...(scene.unresolvedQuestions ?? []).slice(0, 3).map((question) => `Open: ${question}`),
-      ]),
-    }));
-  }
-
-  for (const consequence of retrieval.activeConsequences.slice(0, 3)) {
-    records.push(binderRecordElement({
-      title: consequence.title || "Consequence",
-      subtitle: consequence.scope || consequence.importance || "consequence",
-      body: detailLines([
-        consequence.description,
-        consequence.status ? `Status: ${consequence.status}` : "",
-      ]),
-    }));
-  }
-
-  for (const thread of retrieval.activeThreads.slice(0, 3)) {
-    records.push(binderRecordElement({
-      title: thread.title || "Open thread",
-      subtitle: thread.status || "thread",
-      body: detailLines([
-        thread.stakes,
-        ...(thread.openQuestions ?? []).slice(0, 2).map((question) => `Open: ${question}`),
-      ]),
-    }));
-  }
-
-  for (const relationship of retrieval.relevantRelationships.slice(0, 2)) {
-    records.push(binderRecordElement({
-      title: `${labelById(campaign, relationship.sourceId)} / ${labelById(campaign, relationship.targetId)}`,
-      subtitle: relationship.type || "relationship",
-      body: detailLines([relationship.summary, relationship.notes]),
-    }));
-  }
-
-  elements.sceneNoteCount.textContent = String(records.length);
+  const projection = buildSceneNotebookProjection(campaign);
+  const records = projection.records.map((record) => binderRecordElement(record));
+  elements.sceneNoteCount.textContent = String(projection.count);
   elements.sceneNoteList.replaceChildren(
-    ...emptyOrRecords(records, "Scene focus, consequences, and active threads will appear here as play creates them."),
+    ...emptyOrRecords(records, projection.emptyText),
   );
 }
 

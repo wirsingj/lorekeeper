@@ -93,6 +93,7 @@ import {
 } from "../app/renderer-diagnostics-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
+import { buildSceneIntelligenceProjection, buildSceneNotebookProjection } from "../app/scene-notebook-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "../app/table-action-controller.js";
@@ -1249,6 +1250,49 @@ function testSceneAndConsequenceEngines() {
   });
   assert.equal(resolved.consequences.find((item) => item.id === "consequence-barkeep-memory").state, "resolved");
   assert.equal(buildSceneRetrieval(resolved).activeConsequences.length, 0);
+}
+
+function testSceneNotebookProjection() {
+  let campaign = transitionScene(campaignFixture(), {
+    id: "scene-shrine",
+    title: "Shrine road watch",
+    type: "exploration",
+    locationId: "tavern",
+    presentPartyMemberIds: ["thor"],
+    activeQuestIds: ["quest-1"],
+    tensions: ["A hidden watcher tracks the party."],
+    unresolvedQuestions: ["Who left the fresh offering?"],
+    immediateSituation: "The party studies a half-buried shrine beside the road.",
+    whyHere: "The road omen points at the active thread.",
+  }, { now: "2026-01-01T00:00:00.000Z" });
+  campaign = addConsequence(campaign, {
+    id: "consequence-watcher",
+    title: "Watcher knows Thor's route",
+    description: "Someone unseen can report where the party went.",
+    sourceSceneId: "scene-shrine",
+    participantIds: ["thor"],
+    threadIds: ["quest-1"],
+    importance: "high",
+  }, { now: "2026-01-01T00:00:01.000Z" });
+
+  const intelligence = buildSceneIntelligenceProjection(campaign);
+  assert.equal(intelligence.visible, true);
+  assert.equal(intelligence.title, "Shrine road watch");
+  assert.match(intelligence.tensionText, /hidden watcher/);
+  assert.match(intelligence.consequenceText, /Watcher knows Thor/);
+
+  const notebook = buildSceneNotebookProjection(campaign);
+  assert.ok(notebook.count >= 3);
+  assert.equal(notebook.records[0].title, "Shrine road watch");
+  assert.match(notebook.records[0].body, /Why here: The road omen/);
+  assert.ok(notebook.records.some((record) => record.title === "Watcher knows Thor's route"));
+  assert.ok(notebook.records.some((record) => record.title === "Calm the brawl"));
+  assert.ok(notebook.records.some((record) => /Thor/.test(record.title) && /Barkeep/.test(record.title)));
+  assert.match(notebook.emptyText, /Scene focus/);
+
+  const empty = buildSceneNotebookProjection({ scene: {}, party: [], people: [], places: [], items: [], quests: [] });
+  assert.equal(empty.count, 0);
+  assert.deepEqual(empty.records, []);
 }
 
 function testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds() {
@@ -4089,6 +4133,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
   const turnSubmitController = await readFile(path.join("app", "turn-submit-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
+  const sceneNotebookController = await readFile(path.join("app", "scene-notebook-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
@@ -4281,9 +4326,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appShell, /id="scene-note-list"/, "notebook should include a current-scene section");
   assert.match(appShell, /id="scene-note-count"/);
-  assert.match(appJs, /function renderSceneNotebook/, "scene notebook projection should be explicit renderer behavior");
-  assert.match(appJs, /buildSceneRetrieval\(campaign\)/, "scene notebook should use the same scene retrieval as DM context");
-  assert.match(appJs, /relevantRelationships\.slice\(0, 2\)/, "scene notebook should surface relationship context without flooding the rail");
+  assert.match(appJs, /buildSceneNotebookProjection/, "scene notebook rendering should consume a projection");
+  assert.match(sceneNotebookController, /buildSceneRetrieval\(campaign\)/, "scene notebook should use the same scene retrieval as DM context");
+  assert.match(sceneNotebookController, /relevantRelationships\.slice\(0, 2\)/, "scene notebook should surface relationship context without flooding the rail");
+  assert.doesNotMatch(appJs, /buildSceneRetrieval\(campaign\)/, "renderer should not own scene retrieval policy for the notebook rail");
   assert.match(styles, /\.scene-notes-section/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
@@ -4448,6 +4494,7 @@ testCombatImportController();
 testCombatTrackerView();
 testSceneImportController();
 testSceneAndConsequenceEngines();
+testSceneNotebookProjection();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
 testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise();
