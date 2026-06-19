@@ -695,11 +695,11 @@ function CampaignDialog() {
                   ></textarea>
                 </label>
                 <label>
-                  <span>Host note for the DM</span>
+                  <span>Scene cue for DM Voice</span>
                   <textarea
                     id="new-joiner-host-context"
                     rows="3"
-                    placeholder="Scene-specific glue for the DM: how to introduce them, what not to contradict, what goal they bring."
+                    placeholder="How they fit into the opening scene."
                   ></textarea>
                 </label>
                 <label className="check-row">

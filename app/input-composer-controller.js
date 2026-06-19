@@ -7,6 +7,8 @@ export function buildInputComposerProjection({
   guestSnapshot = null,
   turnProjection = {},
   tableSession = null,
+  hasDraftText = false,
+  hasSubmitContent = false,
   collectStagedRemoteInputs = () => [],
   findPartyMember = () => null,
   isHostControlledPartyRecord = () => false,
@@ -41,7 +43,7 @@ export function buildInputComposerProjection({
     }
     return {
       inputDisabled: !connected || !isGuestCombatTurn,
-      sendDisabled: !connected || !isGuestCombatTurn,
+      sendDisabled: !connected || !isGuestCombatTurn || !hasDraftText,
       placeholder: !connected
         ? "Join a hosted LoreKeeper table before sending party-member actions."
         : isGuestCombatTurn
@@ -72,7 +74,7 @@ export function buildInputComposerProjection({
   const phaseLocksComposer = Boolean(phaseOverride?.lock);
   return {
     inputDisabled: phaseLocksComposer || combatGate.inputDisabled,
-    sendDisabled: phaseLocksComposer || !turnProjection.canSubmit || combatGate.sendDisabled,
+    sendDisabled: phaseLocksComposer || !turnProjection.canSubmit || combatGate.sendDisabled || !hasSubmitContent,
     placeholder: phaseOverride?.placeholder || combatGate.placeholder || "Describe what your character does, says, or asks.",
     buttonText: "Send Turn",
   };

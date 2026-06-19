@@ -1078,6 +1078,10 @@ elements.playerForm.addEventListener("submit", async (event) => {
   await submitPlayerTurnFromInput(elements.playerInput.value);
 });
 
+elements.playerInput?.addEventListener("input", () => {
+  renderInputComposer();
+});
+
 async function nudgeDm() {
   const gate = buildNudgeDmCommandGate({
     isHost: !clientMode && !isRemoteTableClient(),
@@ -1511,6 +1515,7 @@ function chooseVisibleOption(block, index) {
   };
   elements.playerInput.value = `I choose ${label}: ${item}`;
   elements.playerInput.focus();
+  renderInputComposer();
   const voteCount = choiceVoteCounts(block, currentChoiceVotes(block)).get(optionId) || 0;
   setProviderActivity(choiceSelectionActivityText(label, voteCount), "idle");
 }
@@ -1636,6 +1641,7 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
   } else if (!runResult?.providerReceived && !options.preserveInput && !elements.playerInput.value.trim()) {
     elements.playerInput.value = originalInput;
   }
+  renderInputComposer();
   schedulePostTurnRecovery(runResult?.imported ? "turn_imported" : "turn_not_imported");
   return runResult;
 }
@@ -1738,6 +1744,7 @@ function clearResolvedRecoveredInputDraft(reason = "unknown") {
     return false;
   }
   elements.playerInput.value = "";
+  renderInputComposer();
   pushDiagnosticsEvent("stale_input_draft_cleared", {
     reason,
     matchedMessageId: state.playMessages[matchingPlayerIndex]?.id,
@@ -2852,6 +2859,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
     setCampaignWizardStatus("Table set.", "idle");
     setCampaignWizardBusy(false);
     elements.playerInput.value = "";
+    renderInputComposer();
     if (remoteInviteLobby?.link) {
       setProviderActivity(
         remoteInviteLobby.copied
@@ -4141,6 +4149,7 @@ async function submitGuestActionFromUi({ pass = false } = {}) {
     renderGuestSnapshot(result.snapshot);
     if (!pass) {
       elements.playerInput.value = "";
+      renderInputComposer();
     }
     const pendingInput = result.snapshot?.pendingInput;
     if (pass || pendingInput?.passed) {
@@ -4168,6 +4177,7 @@ async function submitGuestChoiceVote(block, index) {
     extractChoiceTokenText(elements.playerInput.value)
   )) {
     elements.playerInput.value = "";
+    renderInputComposer();
   }
   state.pendingChoiceSelection = null;
   try {
@@ -5960,6 +5970,7 @@ function renderInputComposer(tableSession = state.tableSession ?? refreshTableSe
   if (!state.campaign || !elements.playerInput || !elements.buildTurn) {
     return;
   }
+  const hasDraftText = Boolean(elements.playerInput.value.trim());
   if (clientMode) {
     applyInputComposerProjection(elements, buildInputComposerProjection({
       clientMode: true,
@@ -5967,14 +5978,20 @@ function renderInputComposer(tableSession = state.tableSession ?? refreshTableSe
       guestSession: state.guestSession,
       guestSnapshot: state.guestSnapshot,
       tableSession,
+      hasDraftText,
       labelById: (id) => labelById(state.campaign, id),
     }));
     return;
   }
+  const hasSubmitContent = hasDraftText
+    || collectApprovedPartyInputs().length > 0
+    || collectStagedRemoteInputs().length > 0;
   applyInputComposerProjection(elements, buildInputComposerProjection({
     campaign: state.campaign,
     turnProjection: turnProjection(),
     tableSession,
+    hasDraftText,
+    hasSubmitContent,
     collectStagedRemoteInputs,
     findPartyMember: (id) => findById(state.campaign.party, id),
     isHostControlledPartyRecord,

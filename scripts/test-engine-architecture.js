@@ -2008,8 +2008,18 @@ function testInputComposerProjection() {
     },
   });
   assert.equal(snapshotConnectedGuest.inputDisabled, false);
-  assert.equal(snapshotConnectedGuest.sendDisabled, false);
+  assert.equal(snapshotConnectedGuest.sendDisabled, true);
   assert.match(snapshotConnectedGuest.placeholder, /Type as Thor/);
+  assert.equal(buildInputComposerProjection({
+    clientMode: true,
+    campaign,
+    guestSession: null,
+    guestSnapshot: {
+      connection: { status: "connected", partyMemberId: "thor" },
+      assignedCharacter: { name: "Thor" },
+    },
+    hasDraftText: true,
+  }).sendDisabled, false);
 
   const guestPendingInput = buildInputComposerProjection({
     clientMode: true,
@@ -2031,9 +2041,15 @@ function testInputComposerProjection() {
     turnProjection: { canSubmit: true },
   });
   assert.equal(defaultHostProjection.inputDisabled, false);
-  assert.equal(defaultHostProjection.sendDisabled, false);
+  assert.equal(defaultHostProjection.sendDisabled, true);
   assert.equal(defaultHostProjection.placeholder, "Describe what your character does, says, or asks.");
   assert.doesNotMatch(defaultHostProjection.placeholder, /heist|alley/i);
+  assert.equal(buildInputComposerProjection({
+    campaign,
+    turnProjection: { canSubmit: true },
+    hasDraftText: true,
+    hasSubmitContent: true,
+  }).sendDisabled, false);
 
   const openingCampaign = {
     ...campaign,
@@ -2093,7 +2109,7 @@ function testInputComposerProjection() {
     tableSession: { phase: tablePhases.PARTY_VOTE },
   });
   assert.equal(hostPartyVote.inputDisabled, false);
-  assert.equal(hostPartyVote.sendDisabled, false);
+  assert.equal(hostPartyVote.sendDisabled, true);
   assert.match(hostPartyVote.placeholder, /party vote/i);
 
   campaign.combat = {
@@ -2126,6 +2142,7 @@ function testInputComposerProjection() {
   const remoteStaged = buildInputComposerProjection({
     campaign,
     turnProjection: { canSubmit: true },
+    hasSubmitContent: true,
     collectStagedRemoteInputs: () => [{ characterId: "karl", text: "Karl fires." }],
     findPartyMember: (id) => campaign.party.find((member) => member.id === id),
     isHostControlledPartyRecord: (member) => member.controllerKind === controllerKinds.HOST,

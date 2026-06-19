@@ -502,7 +502,7 @@ const scenarios = [
       await expectVisibleText(harness.page, "Mira hits the Ash Wolf");
       await expectCombatActor(harness.page, "Ash Wolf");
       await harness.page.click("#nudge-dm");
-      await expectVisibleText(harness.page, "Attack 11 vs AC 16: miss");
+      await expectVisibleText(harness.page, "Ash Wolf lunges at Mira");
       await expectCombatActor(harness.page, "Mira");
     },
   },
