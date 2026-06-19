@@ -714,11 +714,14 @@ const scenarios = [
       const firstSession = await waitForGuestConnected(guestPage, { characterName: "Renn", campaignTitle: "Harness Remote Active A" });
       assert.equal(firstSession.assignedCharacter.name, "Renn");
       await waitForHostPreOpeningSeatSettled(harness.page);
+      const preOpeningSession = await guestDebugSession(guestPage);
       await expectGuestActionRejected(
         harness,
-        await guestDebugSession(guestPage),
+        preOpeningSession,
         "Renn tries to act before the host starts the adventure.",
       );
+      await expectGuestPassRejected(harness, preOpeningSession);
+      await expectGuestChoiceVoteRejected(harness, preOpeningSession);
 
       await sendTableTalk(guestPage, "Remote Jess says hello from the guest tab.");
       await expectVisibleText(harness.page, "Remote Jess says hello from the guest tab.");
@@ -1463,12 +1466,16 @@ async function waitForHostResolvedTurnSettled(page) {
   });
 }
 
-async function expectGuestActionRejected(harness, session, text) {
+async function expectGuestRouteRejectedWithoutMutation(harness, session, {
+  path,
+  body = {},
+  label = "rejected guest route",
+} = {}) {
   if (!session?.connectionId) {
     return;
   }
   const before = await captureTrustSnapshot(harness.page);
-  const response = await fetch(`${harness.baseUrl}/api/multiplayer/action`, {
+  const response = await fetch(`${harness.baseUrl}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -1476,17 +1483,48 @@ async function expectGuestActionRejected(harness, session, text) {
       clientId: session.clientId,
       connectionSecret: session.connectionSecret,
       characterId: session.partyMemberId,
-      text,
-      ready: true,
       campaignId: session.campaignId,
       tableId: session.tableId,
       sessionId: session.sessionId,
+      ...body,
     }),
   });
-  assert.equal(response.ok, false, "stale or disconnected guest credentials should not submit actions");
+  assert.equal(response.ok, false, `${label} should fail safely`);
   await harness.page.waitForTimeout(600);
   const after = await captureTrustSnapshot(harness.page);
-  assertTrustSnapshotUnchanged(before, after, "rejected guest action");
+  assertTrustSnapshotUnchanged(before, after, label);
+}
+
+async function expectGuestActionRejected(harness, session, text) {
+  await expectGuestRouteRejectedWithoutMutation(harness, session, {
+    path: "/api/multiplayer/action",
+    body: {
+      text,
+      ready: true,
+    },
+    label: "rejected guest action",
+  });
+}
+
+async function expectGuestPassRejected(harness, session) {
+  await expectGuestRouteRejectedWithoutMutation(harness, session, {
+    path: "/api/multiplayer/pass",
+    label: "rejected guest pass",
+  });
+}
+
+async function expectGuestChoiceVoteRejected(harness, session) {
+  await expectGuestRouteRejectedWithoutMutation(harness, session, {
+    path: "/api/multiplayer/choice-vote",
+    body: {
+      choiceKey: "stale-choice",
+      optionId: "A",
+      optionLabel: "A",
+      optionText: "A stale or unavailable choice.",
+      prompt: "A stale or unavailable prompt.",
+    },
+    label: "rejected guest choice vote",
+  });
 }
 
 async function assertNoDuplicateWizardCardNames(page) {
@@ -1908,11 +1946,14 @@ async function exerciseRemoteGuestPreOpeningChaos(harness, rng, runIndex, seatNa
   });
   assert.equal(session.assignedCharacter.name, seatName);
   await waitForHostPreOpeningSeatSettled(harness.page);
+  const preOpeningSession = await guestDebugSession(guestPage);
   await expectGuestActionRejected(
     harness,
-    await guestDebugSession(guestPage),
+    preOpeningSession,
     `${seatName} tries to act before Start Adventure in chaos.`,
   );
+  await expectGuestPassRejected(harness, preOpeningSession);
+  await expectGuestChoiceVoteRejected(harness, preOpeningSession);
   const guestText = `chaos guest hello ${runIndex}.${randomInt(rng, 1, 999)}`;
   await sendTableTalk(guestPage, guestText);
   await expectVisibleText(harness.page, guestText);

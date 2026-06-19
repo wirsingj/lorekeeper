@@ -384,7 +384,7 @@ Risks:
 212. The New Adventure wizard's first companion card now uses the same "Scene cue for DM Voice" wording as dynamically added party cards, removing the last visible "Host note for the DM" setup leak.
 213. Additional visible copy leaks now use table language: returning home points to Continue/New Adventure/Join/DM Voice, local model readiness says local DM Voice instead of local AI, and delete confirmation describes a local backup instead of SQLite/deleted-campaigns/manual recovery internals.
 214. Guest lobby previews now collapse fresh-table setup scaffolding down to table fiction/premise and the remote join helper asserts guests do not see "The table is set..." or host-only Next instructions.
-215. Rejected remote guest actions now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
+215. Rejected remote guest actions, passes, and choice votes now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
 
 ### Still Risky
 
@@ -637,7 +637,7 @@ Risks:
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add internal trace/debug harnesses for API/provider/renderer/UI investigation. Current state: server diagnostics include an auth-protected trace ring, provider generation emits prompt/response lifecycle events, `inspect:diagnostics` reads campaign SQLite diagnostics, and `test:ui` is an opt-in Playwright scenario harness with seeded desktop chaos mode, deterministic provider mocking, temp campaign roots, pre-opening DM/companion Nudge and Send Turn checks, and failure artifacts.
-- [x] Add trust-invariant assertions to the UI harness for rejected role/session actions. Current state: forbidden/stale guest action probes now capture host state before and after the route call and assert no provider generation, play-log, staged-input, turn, combat, recovery, phase, or waiting-room mutation.
+- [x] Add trust-invariant assertions to the UI harness for rejected role/session actions. Current state: forbidden/stale guest action, pass, and choice-vote probes now capture host state before and after the route call and assert no provider generation, play-log, staged-input, turn, combat, recovery, phase, or waiting-room mutation.
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [x] Add local asset and path traversal integration coverage for the server.
@@ -765,6 +765,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: `/guest` waiting-room joins now expose the optional character draft card and carry those notes through pre-table and active waiting-room seating. Verification: `npm run test:multiplayer`, focused remote pre-lobby UI, and focused remote active leave/rejoin/new-game UI passed.
 - 2026-06-18: Provider result metadata and contract-issue selection moved into `app/provider-result-controller.js`, with architecture guards keeping that pure repair/import policy out of `app/app.js`. Verification: `npm run test:engine` and `npm run build` passed.
 - 2026-06-19: Trust pass started. SotT now tracks Trust Risks explicitly, and rejected guest-action probes compare host trust snapshots before/after to catch silent mutation, not just HTTP rejection. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-invariant-smoke`, 2 runs) passed.
+- 2026-06-19: Trust route probes now cover pre-opening guest action, pass, and choice-vote attempts with the same no-mutation host snapshot invariant. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-route-smoke`, 2 runs) passed.
 
 ## How To Use This Doc
 
