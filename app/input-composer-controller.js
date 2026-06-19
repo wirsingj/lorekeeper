@@ -102,7 +102,7 @@ export function buildHostCombatGate({
     return {
       inputDisabled: false,
       sendDisabled: false,
-      placeholder: `Act as ${activeMember.name}. It is their combat turn.`,
+      placeholder: `Choose ${activeMember.name}'s action, spell, movement, or tactic.`,
     };
   }
   const stagedForActive = collectStagedRemoteInputs().length > 0;

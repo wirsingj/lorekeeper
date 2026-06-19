@@ -2089,7 +2089,7 @@ function testInputComposerProjection() {
     labelById: (id) => campaign.party.find((member) => member.id === id)?.name ?? id,
   });
   assert.equal(hostProjection.inputDisabled, false);
-  assert.match(hostProjection.placeholder, /Act as Thor/);
+  assert.match(hostProjection.placeholder, /Choose Thor's action/);
 
   campaign.combat.currentTurnId = "karl";
   const remoteBlocked = buildInputComposerProjection({
