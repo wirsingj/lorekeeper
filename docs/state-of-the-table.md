@@ -341,6 +341,7 @@ Risks:
 203. Review commits now apply through the active campaign update queue instead of saving a stale full snapshot, preserving live route-side mutations such as Table Talk and remote guest state that land while a DM response is still importing.
 204. Remaining visible provider/settings/state-save copy in the app-mode, DM Voice settings, join-mode, and review-commit paths now uses DM Voice/table-memory language instead of provider, bridge, AI, or extracted-state wording.
 205. New Adventure companion setup now says "Scene cue for DM Voice" instead of "Host note for the DM," keeping table setup focused on story fit rather than software roles.
+206. Guest table previews now filter starter scaffold ids/threads and strip host-only "Next:" setup instructions, so `/guest` sees table fiction, party, and useful seat context instead of backend placeholder records.
 
 ### Still Risky
 
@@ -710,6 +711,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Remote chaos now opens a real `/guest` page in every chaos run, verifies pre-opening action rejection, Table Talk both directions, and post-opening guest auto-resolution. The ramp found review commits could overwrite route-side Table Talk when provider import saved from a stale campaign snapshot; review commits now run through `updateActiveCampaign`. Verification: seeded remote chaos ramp (`afk-remote-chaos-ramp`, 3 runs), `npm run test:engine`, `npm run test:regression`, and `npm run build` passed.
 - 2026-06-18: Visible copy sweep replaced remaining provider/bridge/AI/extracted-state wording in app-mode notes, Join-mode DM Voice status, DM Voice settings save states, empty DM paste fallback, and review commit status. Verification: focused `settings-navigation-and-diagnostics` UI passed.
 - 2026-06-18: New Adventure companion setup wording now uses scene-cue/DM Voice language, and the provider prompt prefix for those cues is table-facing. Verification: focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
+- 2026-06-18: Visual audit found `/guest` lobby previews leaking starter scaffold chips (`place-starting-location`, "Open the first thread") and host-only setup instructions. Join preview rendering now resolves friendly place names, filters scaffold records, and strips `Next:` setup copy. Verification: `npm run build`, focused remote pre-lobby UI, and visual-audit UI passed.
 
 ## How To Use This Doc
 

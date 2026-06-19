@@ -3844,7 +3844,9 @@ function renderJoinPreview(preview, container, options = {}) {
 
   const facts = document.createElement("div");
   facts.className = "join-preview-facts";
-  const place = scene.currentPlaceId || scene.location || scene.place || "";
+  const rawPlace = scene.currentPlaceId || scene.location || scene.place || "";
+  const scenePlace = (preview.places ?? []).find((placeRecord) => placeRecord.id === rawPlace);
+  const place = scenePlace?.name || scenePlace?.title || (looksLikeRecordId(rawPlace) ? "" : rawPlace);
   if (place) {
     facts.append(joinPreviewPill(`Scene: ${place}`));
   }
@@ -3852,7 +3854,10 @@ function renderJoinPreview(preview, container, options = {}) {
   if (partyNames.length) {
     facts.append(joinPreviewPill(`Party: ${partyNames.join(", ")}`));
   }
-  const placeNames = (preview.places ?? []).map((placeRecord) => placeRecord.name || placeRecord.title).filter(Boolean).slice(0, 3);
+  const placeNames = (preview.places ?? [])
+    .map((placeRecord) => placeRecord.name || placeRecord.title)
+    .filter((name) => name && name !== place && !isScaffoldJoinPreviewText(name))
+    .slice(0, 3);
   if (placeNames.length) {
     facts.append(joinPreviewPill(`Places: ${placeNames.join(", ")}`));
   }
@@ -3860,7 +3865,10 @@ function renderJoinPreview(preview, container, options = {}) {
   if (peopleNames.length) {
     facts.append(joinPreviewPill(`Known faces: ${peopleNames.join(", ")}`));
   }
-  const questNames = (preview.quests ?? []).map((quest) => quest.title || quest.name).filter(Boolean).slice(0, 2);
+  const questNames = (preview.quests ?? [])
+    .map((quest) => quest.title || quest.name)
+    .filter((name) => name && !isScaffoldJoinPreviewText(name))
+    .slice(0, 2);
   if (questNames.length) {
     facts.append(joinPreviewPill(`Threads: ${questNames.join(", ")}`));
   }
@@ -3885,7 +3893,20 @@ function joinPreviewPill(text) {
 }
 
 function compactJoinPreviewLine(text) {
-  return String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 420);
+  return String(text ?? "")
+    .replace(/\s+Next:\s+.*$/i, "")
+    .replace(/opening DM narration/gi, "opening narration")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 420);
+}
+
+function looksLikeRecordId(value) {
+  return /^[a-z]+-[a-z0-9-]+$/i.test(String(value ?? "").trim());
+}
+
+function isScaffoldJoinPreviewText(value) {
+  return /^(?:open the first thread|place-starting-location|draft-starting-place)$/i.test(String(value ?? "").trim());
 }
 
 async function requestJoinWithValues({ inviteLink, playerName, proposedCharacter = null, statusElement, submitButton } = {}) {
