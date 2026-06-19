@@ -722,6 +722,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Visual audit found `/guest` lobby previews leaking starter scaffold chips (`place-starting-location`, "Open the first thread") and host-only setup instructions. Join preview rendering now resolves friendly place names, filters scaffold records, and strips `Next:` setup copy. Verification: `npm run build`, focused remote pre-lobby UI, and visual-audit UI passed.
 - 2026-06-18: Combat rail copy now treats the host app as the player seat for host-controlled active party turns ("Your turn") while keeping remote, companion, DM, and unassigned table turns distinct. Verification: `npm run test:engine`, focused combat UI, `npm run build`, and visual-audit UI passed.
 - 2026-06-18: Guest join-preview cleanup/projection policy now lives in `app/join-preview-controller.js` instead of renderer orchestration. Direct tests cover setup-line collapse, scaffold record filtering, friendly place names, and join hints; focused remote pre-lobby, active leave/rejoin/new-game, and party-vote UI scenarios passed.
+- 2026-06-18: Guest auto-resolve timers are now pinned to the campaign/table/session that scheduled them and are cleared when scheduling becomes invalid. This hardens host plus `/guest` campaign switching against delayed remote actions landing in the wrong table. Verification: `npm run test:engine`, `npm run build`, focused remote active leave/rejoin/new-game UI, and seeded remote chaos (`stale-guest-pin-remote-chaos`, 4 runs) passed.
 
 ## How To Use This Doc
 

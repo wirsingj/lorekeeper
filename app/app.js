@@ -36,7 +36,11 @@ import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyComb
 import { readTextWithFallback, writeTextWithFallback } from "./clipboard-utils.js";
 import { randomAdventureSeedPreset } from "./adventure-seed-presets.js";
 import { buildDmNudgePrompt } from "./dm-nudge-controller.js";
-import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "./guest-auto-resolve-controller.js";
+import {
+  buildGuestAutoResolvePin,
+  buildGuestAutoResolvePlan,
+  shouldScheduleGuestAutoResolve,
+} from "./guest-auto-resolve-controller.js";
 import {
   applyManualResponseFallbackProjection,
   buildHostResponseReviewProjection,
@@ -4247,20 +4251,38 @@ function scheduleAutoResolveGuestInputs(reason = "snapshot") {
     hasGuestHostBaseUrl: Boolean(state.guestSession?.hostBaseUrl),
     campaignWizardCreating: state.campaignWizardCreating,
   })) {
+    clearAutoResolveGuestInputsTimer();
     return;
   }
   if (state.autoResolveGuestInputsTimer) {
-    window.clearTimeout(state.autoResolveGuestInputsTimer);
+    clearAutoResolveGuestInputsTimer();
   }
+  const expectedPin = buildGuestAutoResolvePin(state.campaign);
   state.autoResolveGuestInputsTimer = window.setTimeout(() => {
     state.autoResolveGuestInputsTimer = null;
-    maybeAutoResolveGuestInputs(reason);
+    maybeAutoResolveGuestInputs(reason, expectedPin);
   }, 150);
 }
 
-async function maybeAutoResolveGuestInputs(reason = "snapshot") {
-  const plan = guestAutoResolvePlan();
+function clearAutoResolveGuestInputsTimer() {
+  if (!state.autoResolveGuestInputsTimer) {
+    return;
+  }
+  window.clearTimeout(state.autoResolveGuestInputsTimer);
+  state.autoResolveGuestInputsTimer = null;
+}
+
+async function maybeAutoResolveGuestInputs(reason = "snapshot", expectedPin = null) {
+  const plan = guestAutoResolvePlan(expectedPin);
   if (!plan.shouldResolve) {
+    if (plan.reason === "stale_table_session") {
+      pushDiagnosticsEvent("guest_inputs_auto_resolve_skipped", {
+        reason,
+        skipReason: plan.reason,
+        expectedPin,
+        currentPin: buildGuestAutoResolvePin(state.campaign),
+      });
+    }
     return;
   }
   state.autoResolvingGuestInputs = true;
@@ -4283,9 +4305,10 @@ function shouldAutoResolveGuestInputs() {
   return guestAutoResolvePlan().shouldResolve;
 }
 
-function guestAutoResolvePlan() {
+function guestAutoResolvePlan(expectedPin = null) {
   return buildGuestAutoResolvePlan({
     campaign: state.campaign,
+    expectedPin,
     campaignWizardCreating: state.campaignWizardCreating,
     autoResolvingGuestInputs: state.autoResolvingGuestInputs,
     turnFlowBlocksNewTurn: turnFlowBlocksNewTurn(),

@@ -29,7 +29,12 @@ import { buildCombatTrackerView } from "../app/combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "../app/combat-resolution-controller.js";
 import { randomAdventureSeedPreset } from "../app/adventure-seed-presets.js";
 import { buildDmNudgePrompt } from "../app/dm-nudge-controller.js";
-import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "../app/guest-auto-resolve-controller.js";
+import {
+  buildGuestAutoResolvePin,
+  buildGuestAutoResolvePlan,
+  guestAutoResolvePinMatches,
+  shouldScheduleGuestAutoResolve,
+} from "../app/guest-auto-resolve-controller.js";
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildJoinPreviewProjection, compactJoinPreviewLine } from "../app/join-preview-controller.js";
@@ -2156,8 +2161,9 @@ function testInputComposerProjection() {
 
 function testGuestAutoResolveController() {
   const campaign = {
+    id: "campaign-1",
     multiplayer: {
-      localTable: { running: true },
+      localTable: { running: true, tableId: "table-1", sessionId: "session-1" },
       settings: {
         requireGuestActionApproval: false,
         holdGuestActionsForGroupInput: false,
@@ -2176,6 +2182,22 @@ function testGuestAutoResolveController() {
   assert.equal(ready.reason, "ready");
   assert.match(ready.activityText, /Renn sent an action/);
   assert.deepEqual(ready.inputs, stagedInputs);
+  assert.deepEqual(buildGuestAutoResolvePin(campaign), {
+    campaignId: "campaign-1",
+    tableId: "table-1",
+    sessionId: "session-1",
+  });
+  assert.equal(guestAutoResolvePinMatches(campaign, buildGuestAutoResolvePin(campaign)), true);
+  assert.equal(guestAutoResolvePinMatches(campaign, {
+    campaignId: "campaign-2",
+    tableId: "table-1",
+    sessionId: "session-1",
+  }), false);
+  assert.equal(buildGuestAutoResolvePlan({
+    campaign,
+    expectedPin: { campaignId: "campaign-2", tableId: "table-1", sessionId: "session-1" },
+    stagedInputs,
+  }).reason, "stale_table_session");
 
   assert.equal(buildGuestAutoResolvePlan({ campaign: null, stagedInputs }).reason, "local_table_not_running");
   assert.equal(buildGuestAutoResolvePlan({ campaign, campaignWizardCreating: true, stagedInputs }).reason, "campaign_wizard_creating");

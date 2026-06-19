@@ -8,6 +8,7 @@ export function shouldScheduleGuestAutoResolve({
 
 export function buildGuestAutoResolvePlan({
   campaign = null,
+  expectedPin = null,
   campaignWizardCreating = false,
   requireGuestActionApproval = campaign?.multiplayer?.settings?.requireGuestActionApproval,
   holdGuestActionsForGroupInput = campaign?.multiplayer?.settings?.holdGuestActionsForGroupInput,
@@ -19,6 +20,9 @@ export function buildGuestAutoResolvePlan({
 } = {}) {
   if (campaignWizardCreating) {
     return blocked("campaign_wizard_creating");
+  }
+  if (expectedPin && !guestAutoResolvePinMatches(campaign, expectedPin)) {
+    return blocked("stale_table_session");
   }
   if (!localTableRunning) {
     return blocked("local_table_not_running");
@@ -51,6 +55,25 @@ export function buildGuestAutoResolvePlan({
       ? `${inputs[0].characterName || "Guest"} sent an action; resolving...`
       : "Guest actions received; resolving...",
   };
+}
+
+export function buildGuestAutoResolvePin(campaign = null) {
+  const localTable = campaign?.multiplayer?.localTable ?? {};
+  return {
+    campaignId: String(campaign?.id ?? ""),
+    tableId: String(localTable.tableId ?? ""),
+    sessionId: String(localTable.sessionId ?? ""),
+  };
+}
+
+export function guestAutoResolvePinMatches(campaign = null, expectedPin = null) {
+  if (!expectedPin) {
+    return true;
+  }
+  const currentPin = buildGuestAutoResolvePin(campaign);
+  return currentPin.campaignId === String(expectedPin.campaignId ?? "")
+    && currentPin.tableId === String(expectedPin.tableId ?? "")
+    && currentPin.sessionId === String(expectedPin.sessionId ?? "");
 }
 
 function blocked(reason) {
