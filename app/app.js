@@ -5956,9 +5956,6 @@ function applyHostModeChrome() {
   renderAppModeControls();
   document.body.classList.remove("lorekeeper-join-mode");
   elements.deleteCampaign.hidden = false;
-  hideSetupSection(elements.providerMode, false);
-  hideSetupSection(elements.newCampaign, false);
-  hideSetupSection(elements.responseImport, false);
   elements.startLocalTable.hidden = false;
   elements.stopLocalTable.hidden = false;
   if (elements.copyCharacterInvite) {

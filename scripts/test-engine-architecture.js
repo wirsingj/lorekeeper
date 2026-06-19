@@ -3535,6 +3535,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(styles, /\.settings-tabs\[data-visible-tabs="2"\]/, "settings tab grid should collapse when only two tabs are visible");
   assert.match(styles, /\.settings-tabs\[data-visible-tabs="1"\]/, "settings tab grid should collapse when only one recovery tab is visible");
   assert.match(appJs, /function setSettingsTab\(tab = "app", \{ mode = state\.settingsMode/, "settings tab state should be explicit renderer state");
+  assert.doesNotMatch(
+    appJs,
+    /function applyHostModeChrome\(\) \{[\s\S]*?hideSetupSection\(elements\.providerMode, false\)/,
+    "host chrome refreshes must not unhide the DM Voice settings panel inside table-scoped Friends And Seats",
+  );
   assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends", mode: "table" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
   assert.match(appJs, /function openLocalTableSeating\(\) \{[\s\S]*openSetupDialog\(\{ tab: "friends", mode: "table" \}\)/, "Seat Guest should land on Friends And Seats");
   assert.match(appJs, /applySettingsSurfaceProjection\(elements, projection\)/);

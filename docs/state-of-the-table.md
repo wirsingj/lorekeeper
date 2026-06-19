@@ -327,6 +327,7 @@ Risks:
 189. New Adventure now says Set The Table while campaign files/seats are being prepared, leaving Start Adventure as the single explicit first-DM-narration action on the table. Guest pre-opening composer copy now says it is waiting for the host to begin instead of implying the host already started.
 190. The front door now uses Set Up Table and DM Voice language, the DM Voice panel uses table-facing DM Source/model/test labels, and the join panel no longer exposes a duplicate Advanced join dialog beside the normal invite-link flow.
 191. DM Voice and Friends setup copy no longer exposes "AI" tabs, Guest Page labels, provider prompts, provider bridge, manual fallback, or campaign-chat status wording in normal live paths; visible host status now uses DM Voice, ChatGPT DM, Guest Lobby, and handoff language.
+192. Visual audit caught DM Voice leaking into Friends And Seats because host chrome refreshes were unhiding whole settings panels after the settings-surface projection ran. Host chrome no longer overrides scoped settings-panel visibility, and the UI harness asserts DM Voice stays hidden inside Friends And Seats.
 
 ### Still Risky
 
@@ -685,6 +686,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Launcher wording pass removed the duplicate "Start Adventure" mental model from campaign creation. New Adventure now sets the table, and Start Adventure remains the table-level opening beat. Verification: `npm run test:engine`, `npm run build`, and focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
 - 2026-06-18: Front-door/join/DM Voice polish changed Start New to Set Up Table, Check AI to DM Voice, softened the DM Voice panel's visible source/model/test labels, and removed the duplicate Advanced join button from the normal join panel. Verification: `npm run test:engine`, `npm run build`, focused `home-baseline`, and focused `settings-navigation-and-diagnostics` UI passed.
 - 2026-06-18: DM Voice/Friends copy pass changed the Settings tab from AI to DM, changed Guest Page actions to Guest Lobby, replaced provider-prompt/bridge/manual-fallback live statuses with DM turn/ChatGPT DM/handoff wording, and tightened `table-status` matching so readiness does not look like active DM thinking. Verification: `npm run test:engine`, focused `settings-navigation-and-diagnostics`, `create-campaign-and-hide-start-adventure-after-use`, and `rp-post-narration-import` UI passed.
+- 2026-06-18: Visual audit found Friends And Seats still rendering the DM Voice panel. Root cause: `applyHostModeChrome()` used an old broad setup-section unhide helper after scoped settings projection. Fix keeps host chrome from overriding panel visibility and adds a UI assertion for the Friends surface.
 
 ## How To Use This Doc
 

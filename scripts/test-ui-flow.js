@@ -192,6 +192,12 @@ const scenarios = [
       });
       await harness.page.click("#open-setup");
       await harness.page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.locator("[data-settings-panel='friends']").first().waitFor({ state: "visible", timeout: 10000 });
+      assert.equal(
+        await harness.page.locator("#provider-setup-section").isHidden(),
+        true,
+        "DM Voice panel should stay hidden inside Friends And Seats",
+      );
       for (const tab of ["friends", "troubleshooting"]) {
         await harness.page.click(`[data-settings-tab="${tab}"]`);
         await harness.page.locator(`[data-settings-panel="${tab}"]`).first().waitFor({ state: "visible", timeout: 10000 });
