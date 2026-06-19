@@ -339,6 +339,7 @@ Risks:
 201. Remote party-vote UI coverage now exercises a second `/guest` tab voting on provider-authored semantic option ids, then verifies the host sees the vote count and can draft the leading party choice.
 202. Removed the stale `multiplayer.lastChoices` guest snapshot field. Choice prompts now have one visible source of truth: public play-log message metadata plus the authoritative choice-vote records.
 203. Review commits now apply through the active campaign update queue instead of saving a stale full snapshot, preserving live route-side mutations such as Table Talk and remote guest state that land while a DM response is still importing.
+204. Remaining visible provider/settings/state-save copy in the app-mode, DM Voice settings, join-mode, and review-commit paths now uses DM Voice/table-memory language instead of provider, bridge, AI, or extracted-state wording.
 
 ### Still Risky
 
@@ -706,6 +707,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Remote party-vote harness coverage found duplicated choice-key identity logic between the renderer projection and multiplayer authority. Shared choice identity now lives in `src/engine/choice-vote-identity.js`, and the focused remote `/guest` scenario verifies semantic provider option ids can be voted on and drafted by the host. Verification: focused remote party-vote UI, `npm run test:multiplayer`, `npm run test:engine`, and `npm run build` passed.
 - 2026-06-18: Follow-up choice-state audit removed the never-populated `multiplayer.lastChoices` guest snapshot path so future guest choice work cannot accidentally consume stale sidecar state. Verification: `npm run test:multiplayer` passed and no `lastChoices`/snapshot choice-field references remain.
 - 2026-06-18: Remote chaos now opens a real `/guest` page in every chaos run, verifies pre-opening action rejection, Table Talk both directions, and post-opening guest auto-resolution. The ramp found review commits could overwrite route-side Table Talk when provider import saved from a stale campaign snapshot; review commits now run through `updateActiveCampaign`. Verification: seeded remote chaos ramp (`afk-remote-chaos-ramp`, 3 runs), `npm run test:engine`, `npm run test:regression`, and `npm run build` passed.
+- 2026-06-18: Visible copy sweep replaced remaining provider/bridge/AI/extracted-state wording in app-mode notes, Join-mode DM Voice status, DM Voice settings save states, empty DM paste fallback, and review commit status. Verification: focused `settings-navigation-and-diagnostics` UI passed.
 
 ## How To Use This Doc
 

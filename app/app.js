@@ -5705,8 +5705,8 @@ function renderAppModeControls() {
   }
   if (elements.appModeNote) {
     elements.appModeNote.textContent = clientMode
-      ? "Join connects to a host and receives visible table state without local provider setup."
-      : "Host runs campaigns, saves your table, manages AI, and can also join another host when needed.";
+      ? "Join connects to a host and receives visible table state without local DM Voice setup."
+      : "Host runs campaigns, saves your table, manages DM Voice, and can also join another host when needed.";
   }
 }
 
@@ -5740,7 +5740,7 @@ async function saveProviderSettingsFromControls() {
   };
 
   try {
-    setProviderActivity("Saving provider settings...", "working");
+    setProviderActivity("Saving DM Voice settings...", "working");
     const response = await fetch(apiProviderSettingsUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -5756,10 +5756,10 @@ async function saveProviderSettingsFromControls() {
     rememberProviderSettings(currentProviderSettings());
     state.providerStatus = payload.providerStatus ?? state.providerStatus;
     render();
-    setProviderActivity("Provider settings saved", "idle");
+    setProviderActivity("DM Voice settings saved", "idle");
   } catch (error) {
-    elements.bridgeStatus.textContent = error instanceof Error ? `Provider settings failed: ${error.message}` : "Provider settings failed";
-    setProviderActivity("Provider settings save failed", "error");
+    elements.bridgeStatus.textContent = error instanceof Error ? `DM Voice settings failed: ${error.message}` : "DM Voice settings failed";
+    setProviderActivity("DM Voice settings save failed", "error");
   }
 }
 
@@ -5810,8 +5810,8 @@ function renderProviderControls() {
     elements.recheckProvider.hidden = true;
     elements.bridgeCard.hidden = true;
     elements.promptDrawer.hidden = true;
-    elements.ollamaStatus.textContent = "Join mode uses the host provider.";
-    elements.ollamaBenchmark.textContent = "No local model or browser bridge is needed in this window.";
+    elements.ollamaStatus.textContent = "Join mode uses the host's DM Voice.";
+    elements.ollamaBenchmark.textContent = "No local storyteller setup is needed in this window.";
     applyJoinClientChrome();
     renderTableActions();
     return;
@@ -7027,8 +7027,8 @@ async function deleteActiveCampaign() {
 
 async function importProviderResponse(responseText, options = {}) {
   if (!responseText) {
-    elements.bridgeStatus.textContent = "Paste a provider response first";
-    setProviderActivity("Paste a provider response first", "idle");
+    elements.bridgeStatus.textContent = "Paste a DM response first";
+    setProviderActivity("Paste a DM response first", "idle");
     return;
   }
 
@@ -7165,7 +7165,7 @@ function escapeRegExp(value) {
 
 async function commitExtractedChanges(reviewBatch) {
   try {
-    elements.bridgeStatus.textContent = "Saving extracted campaign state...";
+    elements.bridgeStatus.textContent = "Saving table memory...";
     const response = await fetch(apiCommitReviewUrl, {
       method: "POST",
       headers: {
@@ -7191,7 +7191,7 @@ async function commitExtractedChanges(reviewBatch) {
     render();
     return result;
   } catch (error) {
-    elements.bridgeStatus.textContent = "State save failed; response text was still imported";
+    elements.bridgeStatus.textContent = "Table memory save failed; DM response was still added";
     return null;
   }
 }
