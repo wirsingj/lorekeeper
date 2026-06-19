@@ -47,6 +47,8 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 
 Trust rule: every action must be allowed, visible, outcome-clear, recoverable, and unable to silently fail or silently mutate table state.
 
+Current trust score: 6 open "that was weird" risks. Count one point for any remaining behavior likely to make a player ask "why was I able to do that?" or "why did that happen?"
+
 ### Fixed Trust Violations
 
 - Fresh tables now have an explicit pre-opening phase. Start Adventure is the only first provider turn; DM Nudge, companion Nudge, Send Turn, debug submit, and pre-opening guest actions are gated until the opening starts.
@@ -77,6 +79,20 @@ Trust rule: every action must be allowed, visible, outcome-clear, recoverable, a
 - Rejected actions should prove a negative: no provider call, no play-log message, no staged input, no combat turn advance, no controller transfer, no recovery modal.
 - Harness provider queues can hide mistakes if a test only checks the happy-path text. Chaos tests should verify state before and after actions, not only the visible response.
 - Copy changes can create trust debt when labels drift from ownership reality. Host is the software-side owner and party member; DM Voice/provider is the DM.
+
+## State Invariant Matrix
+
+| State | Allowed actions | Forbidden actions | Hidden/disabled expectations |
+| --- | --- | --- | --- |
+| App front door | Continue a selected adventure, create New Adventure, Join A Table, open DM Voice or Preferences, delete selected visible campaign. | Provider turns, guest actions, combat changes, hidden starter campaign selection/deletion. | Table rails, notes, command input, diagnostics, and last-table controls stay hidden until a flow is chosen. |
+| Host setup / New Adventure | Edit premise/hero/party, add AI/remote/host seats, copy pre-table guest link, seat pre-table guests, create the ready table. | Provider calls, combat starts, guest character actions, deleting unrelated campaigns from the setup workspace. | Start Adventure is not shown until the campaign exists; old table rails stay hidden during setup. |
+| Adventure draft / opening ready | Host may Start Adventure, invite/seat guests, edit party/notes where safe, use Table Talk. | DM Nudge, Send Turn, AI companion Nudge, guest action/pass/vote, debug submit, combat advancement. | Composer disabled with Start Adventure copy; Start Adventure visible once per current table session; duplicate clicks do not call provider twice. |
+| Adventure live / roleplay | Host sends party action, guest sends assigned character action, Table Talk both directions, Nudge DM, stage/resolve approved companion or remote inputs. | Guest acting for other characters, stale-session actions, provider generation from empty input, hidden-state mutation from rejected requests. | Send Turn wakes only for text/staged inputs; guest pending/resolved states remain visible; host-only controls stay out of the shared play surface where possible. |
+| Guest waiting room | Guest previews public table, chooses a requestable seat, edits join draft, asks to join, leaves/back home. | Seeing hidden notes/enemy HP, sending table actions, voting, provider settings, host mutations. | Composer/action controls hidden or disabled until seated; host sees waiting guest without diagnostics. |
+| Guest seated | Guest Table Talk, assigned-character action/pass/vote only when table phase and combat turn allow it, leave/rejoin. | Host settings, other-character actions, pre-opening actions, wrong-combat-turn actions, stale-table/session actions. | Public routes reject wrong campaign/table/session; rejected guest routes must not alter host phase, messages, inputs, combat, or recovery. |
+| Provider generating | Cancel current generation, Table Talk refresh, wait for DM Voice. | New provider turn, recovery actions, duplicate Start Adventure, campaign-switch carryover. | Send/Nudge/Start/recovery actions disabled; side chat remains live; stale provider completions are ignored if campaign/session changed. |
+| Combat active | Active host/guest/AI/enemy actor resolves one turn at a time through app-owned mechanics and visible rolls/effects. | Non-active actor actions, provider advancing initiative by phrasing alone, guest acting outside assigned combat turn, duplicate enemy turn resolution. | Combat rail names active actor/controller; legal actions are phase-specific; enemy HP is redacted for guests. |
+| Recovery / review | Try Again, Details, Use Anyway only when allowed; hard agency violations force Try Again/Details; host can inspect review summary. | New turn submission, hidden Use Anyway on hard agency block, recovery actions during active generation, silent import of bad response. | Recovery CTA visible beside Now/Next; raw fallback stays tucked away; handlers guard the same states as disabled buttons. |
 
 ## Product UX/UI Redesign Audit
 
