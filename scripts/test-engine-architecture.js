@@ -32,6 +32,7 @@ import { buildDmNudgePrompt } from "../app/dm-nudge-controller.js";
 import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "../app/guest-auto-resolve-controller.js";
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
+import { buildJoinPreviewProjection, compactJoinPreviewLine } from "../app/join-preview-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import {
   buildPartyApprovalControlsProjection,
@@ -3169,6 +3170,43 @@ sceneStatus: {"mode":"exploration"}`);
   assert.equal(prepareAutoCommitReviewBatch({ proposedChanges: [{ importance: "major" }] }), null);
 }
 
+function testJoinPreviewProjection() {
+  const setupLine = "The table is set at Old South Road. Mira, Renn are at the table. Premise: A caravan road bends toward an old watchtower before sunset. Next: invite anyone else.";
+  assert.equal(
+    compactJoinPreviewLine(setupLine),
+    "A caravan road bends toward an old watchtower before sunset.",
+  );
+
+  const projection = buildJoinPreviewProjection({
+    campaignTitle: "Audit Table Road",
+    campaignSummary: "A fallback campaign premise.",
+    scene: {
+      currentPlaceId: "place-starting-location",
+      immediateSituation: setupLine,
+    },
+    places: [
+      { id: "place-starting-location", name: "Old South Road" },
+      { id: "draft-starting-place", name: "draft-starting-place" },
+    ],
+    party: [{ name: "Mira" }, { name: "Renn" }],
+    quests: [{ title: "Open the first thread" }, { title: "Find the missing courier" }],
+  });
+  assert.equal(projection.title, "Audit Table Road");
+  assert.equal(projection.summary, "A caravan road bends toward an old watchtower before sunset.");
+  assert.deepEqual(projection.facts, [
+    "Scene: Old South Road",
+    "Party: Mira, Renn",
+    "Threads: Find the missing courier",
+  ]);
+  assert.match(projection.hint, /Mira/);
+
+  const hiddenRecordIdPlace = buildJoinPreviewProjection({
+    scene: { currentPlaceId: "place-abcd1234", immediateSituation: "Fog gathers near the ford." },
+    places: [],
+  });
+  assert.deepEqual(hiddenRecordIdPlace.facts, []);
+}
+
 function testProviderChatProjection() {
   const unavailable = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.EXTENSION_UNAVAILABLE);
   assert.equal(unavailable.bridgeMode, "manual");
@@ -3998,6 +4036,7 @@ testTableTalkProjection();
 testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();
+testJoinPreviewProjection();
 testGuestAutoResolveController();
 testCampaignAdoptionController();
 testMultiplayerPollingController();

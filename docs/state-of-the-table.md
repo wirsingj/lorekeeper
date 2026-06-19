@@ -721,6 +721,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: New Adventure companion setup wording now uses scene-cue/DM Voice language, and the provider prompt prefix for those cues is table-facing. Verification: focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
 - 2026-06-18: Visual audit found `/guest` lobby previews leaking starter scaffold chips (`place-starting-location`, "Open the first thread") and host-only setup instructions. Join preview rendering now resolves friendly place names, filters scaffold records, and strips `Next:` setup copy. Verification: `npm run build`, focused remote pre-lobby UI, and visual-audit UI passed.
 - 2026-06-18: Combat rail copy now treats the host app as the player seat for host-controlled active party turns ("Your turn") while keeping remote, companion, DM, and unassigned table turns distinct. Verification: `npm run test:engine`, focused combat UI, `npm run build`, and visual-audit UI passed.
+- 2026-06-18: Guest join-preview cleanup/projection policy now lives in `app/join-preview-controller.js` instead of renderer orchestration. Direct tests cover setup-line collapse, scaffold record filtering, friendly place names, and join hints; focused remote pre-lobby, active leave/rejoin/new-game, and party-vote UI scenarios passed.
 
 ## How To Use This Doc
 
