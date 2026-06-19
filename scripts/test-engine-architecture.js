@@ -9,6 +9,7 @@ import { buildCampaignAdoptionPlan } from "../app/campaign-adoption-controller.j
 import {
   buildChoiceSelectionFromText,
   buildChoiceSelectionMeta,
+  choiceAudienceLabel,
   choicePanelKey,
   choiceSelectionInWorldText,
   choiceSelectionActivityText,
@@ -21,6 +22,8 @@ import {
   leadingChoiceVoteEntry,
   parseChoiceIndexes,
   pendingSelectionMatchesText,
+  structuredChoiceBlockFromMessageData,
+  structuredChoicesForMessage,
 } from "../app/choice-vote-controller.js";
 import {
   createImplicitCombatAdvanceChange,
@@ -2932,6 +2935,34 @@ function testChoiceVoteController() {
     buildChoiceSelectionMeta(selection, { actualAction: "I choose A, but quietly scout first.", inCombat: true }),
     /combat action for the active initiative actor/,
   );
+  assert.equal(choiceAudienceLabel({ scope: "combat_actor", forActor: "Vessa" }), "Combat turn: Vessa");
+  assert.equal(choiceAudienceLabel({ allowVote: true }), "Party vote - host breaks ties");
+  assert.deepEqual(structuredChoicesForMessage({
+    choices: {
+      prompt: "How does Vessa press the advantage?",
+      scope: "combat_actor",
+      forActor: "Vessa",
+      options: [
+        { id: "strike", text: "Strike with the spear", legalOptionId: "attack" },
+        { label: "Hold the line" },
+      ],
+    },
+  })?.options.map((option) => [option.id, option.text]), [
+    ["strike", "Strike with the spear"],
+    ["B", "Hold the line"],
+  ]);
+  const structuredBlock = structuredChoiceBlockFromMessageData({
+    choiceOwner: true,
+    choices: {
+      prompt: "Who takes point?",
+      scope: "party",
+      options: [
+        { id: "vessa", actor: "Vessa", text: "Lead from the front" },
+      ],
+    },
+  });
+  assert.equal(structuredBlock.audienceLabel, "For the party");
+  assert.deepEqual(structuredBlock.items, ["Vessa: Lead from the front"]);
 }
 
 function testTurnRepairController() {
@@ -3610,6 +3641,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const partySuggestionController = await readFile(path.join("app", "party-suggestion-controller.js"), "utf8");
+  const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
@@ -3649,7 +3681,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /Do not roll dice, deal damage, spend resources, apply conditions, move initiative, resolve the action/, "AI companion combat suggestion must not resolve mechanics before host approval");
   assert.match(combatImportController, /if\s*\(!enemies\.length\)\s*{\s*return null;\s*}/, "implicit combat starts must require at least one enemy");
   assert.match(providerImportController, /stripInlineResponseJsonTail/, "provider import cleanup should remove inline provider JSON tails outside the renderer");
-  assert.match(appJs, /choiceAudienceLabel/, "structured choice panels should surface party/character/vote audience metadata");
+  assert.match(choiceVoteController, /function choiceAudienceLabel/, "structured choice panels should project party/character/vote audience metadata outside the renderer");
+  assert.doesNotMatch(appJs, /function choiceAudienceLabel/, "renderer should not own structured choice audience labels");
   assert.match(appJs, /choice-audience/, "choice panels should render the selected audience near the prompt");
   assert.equal(/label:\s*"Play"/.test(appJs), false, "AI companion cards should use Nudge instead of a Play button");
   assert.match(

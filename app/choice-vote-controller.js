@@ -102,6 +102,76 @@ export function choiceSelectionActivityText(label, voteCount = 0) {
   return `Selected choice ${label}${voteText}; edit or send`;
 }
 
+export function structuredChoicesForMessage(turnResponse) {
+  const choices = turnResponse?.choices;
+  if (!choices?.options?.length) {
+    return null;
+  }
+  return {
+    prompt: choices.prompt || "What do you do?",
+    scope: choices.scope || "",
+    forActorId: choices.forActorId ?? null,
+    forActor: choices.forActor || "",
+    forActorIds: Array.isArray(choices.forActorIds) ? choices.forActorIds : [],
+    allowVote: choices.allowVote === true,
+    voteTieBreaker: choices.voteTieBreaker || "host",
+    allowOther: choices.allowOther !== false,
+    options: choices.options.map((option, index) => ({
+      id: String(option.id || choiceLabelForIndex(index)),
+      actorId: option.actorId ?? null,
+      actor: option.actor || "",
+      targetActorId: option.targetActorId ?? null,
+      targetActor: option.targetActor || "",
+      legalOptionId: option.legalOptionId ?? null,
+      text: option.text || option.label || "",
+    })).filter((option) => option.text),
+  };
+}
+
+export function structuredChoiceBlockFromMessageData(data = {}) {
+  if (data.choiceOwner !== true) {
+    return null;
+  }
+  const choices = data.choices;
+  if (!choices?.options?.length) {
+    return null;
+  }
+  return {
+    type: "choices",
+    prompt: choices.prompt || "What do you do?",
+    audienceLabel: choiceAudienceLabel(choices),
+    scope: choices.scope || "",
+    forActorId: choices.forActorId ?? null,
+    forActor: choices.forActor || "",
+    forActorIds: Array.isArray(choices.forActorIds) ? choices.forActorIds : [],
+    allowVote: choices.allowVote === true,
+    items: choices.options.map(formatStructuredChoiceOption),
+    options: choices.options,
+    allowOther: choices.allowOther !== false,
+    structured: true,
+  };
+}
+
+export function choiceAudienceLabel(choices = {}) {
+  const scope = String(choices.scope || "").trim();
+  if (choices.allowVote === true || scope === "vote") {
+    return "Party vote - host breaks ties";
+  }
+  if (scope === "party") {
+    return "For the party";
+  }
+  if (scope === "combat_actor") {
+    return choices.forActor ? `Combat turn: ${choices.forActor}` : "Current combat actor";
+  }
+  if (scope === "character") {
+    return choices.forActor ? `For ${choices.forActor}` : "For one character";
+  }
+  if (scope === "subset") {
+    return choices.forActor ? `For ${choices.forActor}` : "For selected characters";
+  }
+  return "";
+}
+
 export function buildChoiceSelectionFromText({ text = "", panel = null } = {}) {
   const choiceTokenText = extractChoiceTokenText(text);
   if (!choiceTokenText || !panel?.items?.length) {
@@ -241,6 +311,11 @@ function choiceSelectionAudienceMeta(selection = {}) {
     pieces.push("this was a party vote prompt; host breaks ties");
   }
   return pieces.length ? ` ${pieces.join("; ")}.` : "";
+}
+
+function formatStructuredChoiceOption(option) {
+  const actor = option.actor || option.targetActor ? `${option.actor || option.targetActor}: ` : "";
+  return `${actor}${option.text}`;
 }
 
 function choiceTokenToIndex(token) {
