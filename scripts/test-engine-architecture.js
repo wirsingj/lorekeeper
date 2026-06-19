@@ -76,6 +76,14 @@ import {
   selectedModelSummaryProjection,
 } from "../app/provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "../app/provider-result-controller.js";
+import {
+  buildRendererDiagnosticsSnapshot,
+  buildSessionHealthSummary as buildSessionHealthSummaryProjection,
+  buildTableTimelineSummaryProjection,
+  normalizeDebugPlayMessages,
+  summarizeTurnRepair,
+  turnFlowTimelineEventDetail,
+} from "../app/renderer-diagnostics-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
@@ -2374,6 +2382,92 @@ function testTableStatusVocabulary() {
   assert.equal(event.at, "2026-01-01T00:00:00.000Z");
 }
 
+function testRendererDiagnosticsController() {
+  const debugMessages = normalizeDebugPlayMessages(
+    [{ meta: "  meta text  " }, { role: "party", body: "Mira checks the door." }],
+    {
+      offset: 4,
+      sessionId: "session-1",
+      nowMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      cleanMeta: (value) => String(value).trim().toUpperCase(),
+    },
+  );
+  assert.equal(debugMessages[0].id, "debug-message-5");
+  assert.equal(debugMessages[0].sessionId, "session-1");
+  assert.equal(debugMessages[0].role, "player");
+  assert.equal(debugMessages[0].meta, "META TEXT");
+  assert.equal(debugMessages[1].title, "DM");
+  assert.equal(debugMessages[1].body, "Mira checks the door.");
+
+  const timeline = buildTableTimelineSummaryProjection([
+    { label: "Older", at: "2026-01-01T00:00:00.000Z" },
+    { message: "Newer", at: "2026-01-01T00:01:00.000Z" },
+  ], { formatTime: (value) => `time:${value}` });
+  assert.equal(timeline.empty, false);
+  assert.deepEqual(timeline.items.map((item) => item.label), ["Newer", "Older"]);
+  assert.equal(timeline.items[0].timeText, "time:2026-01-01T00:01:00.000Z");
+  assert.equal(buildTableTimelineSummaryProjection([]).emptyText, "No table timeline yet.");
+
+  const health = buildSessionHealthSummaryProjection({
+    headline: "Waiting",
+    tone: "waiting",
+    phase: "waiting_for_dm",
+    lines: [],
+  });
+  assert.equal(health.headline, "Waiting");
+  assert.deepEqual(health.lines, ["No blockers detected."]);
+
+  const turnEvent = turnFlowTimelineEventDetail({
+    type: "turn_flow_reset",
+    reason: "campaign_changed",
+    projection: { turnId: "turn-1", activeRequestId: "request-1" },
+  });
+  assert.equal(turnEvent.type, "turn_flow_reset");
+  assert.equal(turnEvent.detail.message, "Campaign switched; table state reset.");
+  assert.equal(turnEvent.detail.turnId, "turn-1");
+
+  const repair = summarizeTurnRepair({
+    reason: "bad response",
+    responseText: "response",
+    rawText: "raw",
+    providerResult: { model: "qwen3" },
+  });
+  assert.equal(repair.responseTextChars, 8);
+  assert.equal(repair.rawTextChars, 3);
+  assert.equal(repair.model, "qwen3");
+
+  const diagnostics = buildRendererDiagnosticsSnapshot({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    url: "http://127.0.0.1/table",
+    providerActivity: { text: "DM is thinking", state: "working" },
+    turnProjection: { state: "generating" },
+    currentTurn: {
+      playerMessage: "Open the door",
+      contextPack: { sections: [{ id: "scene", title: "Scene", entries: ["Door"] }] },
+      providerPrompt: "x".repeat(6100),
+    },
+    prompt: "y".repeat(6101),
+    repair: { reason: "repair", responseText: "abc" },
+    tableSession: { headline: "Roleplay", phase: "roleplay", lines: ["Ready"] },
+    playMessages: Array.from({ length: 40 }, (_, index) => ({ id: `m-${index}` })),
+    tableTimeline: Array.from({ length: 90 }, (_, index) => ({ id: `t-${index}` })),
+    diagnosticsEvents: Array.from({ length: 90 }, (_, index) => ({ id: `e-${index}` })),
+    campaign: { party: [1], people: [1, 2], places: [], items: [1], quests: [1], sessionLog: { messages: [1, 2, 3] } },
+  });
+  assert.equal(diagnostics.currentTurn.providerPromptChars, 6100);
+  assert.equal(diagnostics.promptTail.length, 6000);
+  assert.equal(diagnostics.recentPlayMessages.length, 30);
+  assert.equal(diagnostics.tableTimeline.length, 80);
+  assert.deepEqual(diagnostics.campaignCounts, {
+    party: 1,
+    people: 2,
+    places: 0,
+    items: 1,
+    threads: 1,
+    messages: 3,
+  });
+}
+
 function testTableSessionEnginePhases() {
   const campaign = campaignFixture();
   const roleplay = buildTableSessionProjection({ campaign });
@@ -3811,6 +3905,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const messageBlockController = await readFile(path.join("app", "message-block-controller.js"), "utf8");
+  const rendererDiagnosticsController = await readFile(path.join("app", "renderer-diagnostics-controller.js"), "utf8");
   const partySuggestionController = await readFile(path.join("app", "party-suggestion-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
@@ -3822,7 +3917,13 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     /!turn\?\.playerMessage\?\.trim\(\)\s*&&\s*!turn\?\.playerInputs\?\.length/,
     "local provider runner must accept remote-only structured player inputs",
   );
-  assert.match(appJs, /tableTimeline: state\.tableTimeline\.slice\(-80\)/, "renderer diagnostics should include the table-facing timeline");
+  assert.match(appJs, /buildRendererDiagnosticsSnapshot/, "renderer diagnostics should use a projected snapshot");
+  assert.match(appJs, /buildTableTimelineSummaryProjection/, "diagnostics timeline rendering should consume a projection");
+  assert.match(rendererDiagnosticsController, /function buildRendererDiagnosticsSnapshot/, "renderer diagnostics serialization should live in renderer-diagnostics-controller");
+  assert.match(rendererDiagnosticsController, /function turnFlowTimelineLabel/, "turn-flow timeline wording should live in renderer-diagnostics-controller");
+  assert.match(rendererDiagnosticsController, /tableTimeline: \(Array\.isArray\(tableTimeline\)/, "renderer diagnostics should include a bounded table-facing timeline");
+  assert.doesNotMatch(appJs, /function summarizeCurrentTurn/, "renderer should not own diagnostics turn serialization");
+  assert.doesNotMatch(appJs, /function tableLabelForTurnEvent/, "renderer should not own turn-flow timeline wording");
   assert.match(appJs, /buildPlayLogProjection/, "play log rendering should use a bounded projection for long sessions");
   assert.match(appJs, /renderLoadEarlierMessages/, "older play log entries should remain reachable on demand");
   assert.match(appJs, /buildMessageBlocks/, "play-message body parsing should be projected outside the renderer");
@@ -3848,8 +3949,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     "Try Again should update the original player action after the retry result",
   );
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
-  assert.match(appJs, /buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
-  assert.match(appJs, /sessionHealth: buildSessionHealthSummary\(\)/, "renderer diagnostics should serialize session health");
+  assert.match(rendererDiagnosticsController, /function buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
+  assert.match(rendererDiagnosticsController, /sessionHealth: buildSessionHealthSummary/, "renderer diagnostics should serialize session health");
   assert.match(tableSessionEngine, /phaseNextStep/, "table session projection should name the next table action");
   assert.match(tableSessionEngine, /Host resolves the staged table input when ready/, "host should get a clear next step for queued guest input");
   assert.match(tableSessionEngine, /takes the active combat turn/, "combat waits should name the active turn");
@@ -4321,6 +4422,7 @@ testCampaignAdoptionController();
 testMultiplayerPollingController();
 testTurnSubmitGates();
 testTableStatusVocabulary();
+testRendererDiagnosticsController();
 testTableSessionEnginePhases();
 testTableFocusProjection();
 testTableOpeningController();

@@ -86,6 +86,14 @@ import {
 } from "./provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
+import {
+  buildRendererDiagnosticsSnapshot,
+  buildSessionHealthSummary as buildSessionHealthProjection,
+  buildTableTimelineSummaryProjection,
+  normalizeDebugPlayMessages as normalizeDebugPlayMessagesProjection,
+  summarizeTurnRepair,
+  turnFlowTimelineEventDetail,
+} from "./renderer-diagnostics-controller.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { applyTableActionProjection, buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
@@ -7391,19 +7399,10 @@ function installInternalDebugHarness() {
 }
 
 function normalizeDebugPlayMessages(messages = [], offset = 0) {
-  return (Array.isArray(messages) ? messages : []).map((message, index) => {
-    const role = message.role || (index % 2 === 0 ? "player" : "dm");
-    return {
-      id: message.id || `debug-message-${offset + index + 1}`,
-      sessionId: message.sessionId || state.campaign?.activeSessionId || "debug-session",
-      role,
-      title: message.title || (role === "player" ? "Harness Player" : "DM"),
-      body: message.body || `Harness table message ${offset + index + 1}.`,
-      meta: cleanMessageMeta(message.meta || ""),
-      source: message.source || "debug_harness",
-      data: message.data || {},
-      createdAt: message.createdAt || new Date(Date.now() + index).toISOString(),
-    };
+  return normalizeDebugPlayMessagesProjection(messages, {
+    offset,
+    sessionId: state.campaign?.activeSessionId || "debug-session",
+    cleanMeta: cleanMessageMeta,
   });
 }
 
@@ -7411,24 +7410,24 @@ function renderTableTimelineSummary(timeline = []) {
   if (!elements.tableTimelineSummary) {
     return;
   }
-  const recent = Array.isArray(timeline) ? timeline.slice(-8).reverse() : [];
-  if (!recent.length) {
+  const projection = buildTableTimelineSummaryProjection(timeline, { formatTime: formatMessageTime });
+  if (projection.empty) {
     const empty = document.createElement("p");
-    empty.textContent = "No table timeline yet.";
+    empty.textContent = projection.emptyText;
     elements.tableTimelineSummary.replaceChildren(empty);
     return;
   }
 
   const list = document.createElement("ol");
   list.className = "table-timeline-list";
-  for (const event of recent) {
+  for (const event of projection.items) {
     const item = document.createElement("li");
     const label = document.createElement("span");
     label.className = "table-timeline-label";
-    label.textContent = event.label || event.message || event.type || "Table event";
+    label.textContent = event.label;
     const time = document.createElement("time");
-    time.dateTime = event.at || "";
-    time.textContent = formatMessageTime(event.at);
+    time.dateTime = event.dateTime;
+    time.textContent = event.timeText;
     item.append(label, time);
     list.append(item);
   }
@@ -7437,7 +7436,7 @@ function renderTableTimelineSummary(timeline = []) {
 
 function buildRendererDiagnostics() {
   const tableSession = state.tableSession ?? buildCurrentTableSessionProjection();
-  return {
+  return buildRendererDiagnosticsSnapshot({
     generatedAt: new Date().toISOString(),
     url: redactedRendererUrl(),
     clientMode,
@@ -7448,13 +7447,12 @@ function buildRendererDiagnostics() {
       state: elements.providerActivity?.dataset.state || "",
     },
     bridgeStatus: elements.bridgeStatus?.textContent || "",
-    turnEngine: state.turnFlow.getProjection(),
-    currentTurn: summarizeCurrentTurn(state.currentTurn),
-    promptChars: state.prompt?.length ?? 0,
-    promptTail: state.prompt ? state.prompt.slice(-6000) : "",
+    turnProjection: state.turnFlow.getProjection(),
+    currentTurn: state.currentTurn,
+    prompt: state.prompt,
     reviewBatch: state.reviewBatch,
     bridge: state.bridge,
-    turnRepair: summarizeTurnRepair(activeTurnRepair()),
+    repair: activeTurnRepair(),
     tableSession,
     debugSnapshot: buildTableDebugSnapshot({
       campaign: state.campaign,
@@ -7473,19 +7471,11 @@ function buildRendererDiagnostics() {
       guestSnapshot: state.guestSnapshot,
       recentErrors: state.diagnosticsEvents,
     }),
-    sessionHealth: buildSessionHealthSummary(),
-    recentPlayMessages: state.playMessages.slice(-30),
-    tableTimeline: state.tableTimeline.slice(-80),
-    diagnosticsEvents: state.diagnosticsEvents.slice(-80),
-    campaignCounts: state.campaign ? {
-      party: state.campaign.party?.length ?? 0,
-      people: state.campaign.people?.length ?? 0,
-      places: state.campaign.places?.length ?? 0,
-      items: state.campaign.items?.length ?? 0,
-      threads: state.campaign.quests?.length ?? 0,
-      messages: state.campaign.sessionLog?.messages?.length ?? 0,
-    } : {},
-  };
+    playMessages: state.playMessages,
+    tableTimeline: state.tableTimeline,
+    diagnosticsEvents: state.diagnosticsEvents,
+    campaign: state.campaign,
+  });
 }
 
 function renderSessionHealthSummary(summary = buildSessionHealthSummary()) {
@@ -7512,13 +7502,7 @@ function renderSessionHealthSummary(summary = buildSessionHealthSummary()) {
 
 function buildSessionHealthSummary() {
   const tableSession = state.tableSession ?? refreshTableSessionProjection();
-  return {
-    headline: tableSession.headline,
-    tone: tableSession.tone,
-    phase: tableSession.phase,
-    lines: tableSession.lines?.length ? tableSession.lines : ["No blockers detected."],
-    tableSession,
-  };
+  return buildSessionHealthProjection(tableSession);
 }
 
 function refreshTableSessionProjection() {
@@ -7567,39 +7551,6 @@ function redactedRendererUrl() {
   }
 }
 
-function summarizeCurrentTurn(turn) {
-  if (!turn) {
-    return null;
-  }
-
-  return {
-    playerMessage: turn.playerMessage,
-    playerInputs: turn.playerInputs ?? [],
-    parsedMessage: turn.parsedMessage,
-    contextSections: turn.contextPack?.sections?.map((section) => ({
-      id: section.id,
-      title: section.title,
-      entries: section.entries?.length ?? 0,
-    })) ?? [],
-    providerPromptChars: turn.providerPrompt?.length ?? 0,
-  };
-}
-
-function summarizeTurnRepair(repair) {
-  if (!repair) {
-    return null;
-  }
-  return {
-    reason: repair.reason,
-    validationErrors: repair.validationErrors,
-    parseError: repair.parseError,
-    responseTextChars: repair.responseText?.length ?? 0,
-    rawTextChars: repair.rawText?.length ?? 0,
-    model: repair.providerResult?.model,
-    createdAt: repair.createdAt,
-  };
-}
-
 function pushDiagnosticsEvent(type, detail = {}) {
   state.diagnosticsEvents.push({
     type,
@@ -7621,34 +7572,11 @@ function pushTableTimelineEvent(type, detail = {}) {
 }
 
 function handleTurnFlowVisibilityEvent(event = {}) {
-  const type = event.type || "turn_state_changed";
-  const label = tableLabelForTurnEvent(type, event);
-  if (!label) {
+  const timelineEvent = turnFlowTimelineEventDetail(event);
+  if (!timelineEvent) {
     return;
   }
-  pushTableTimelineEvent(type, {
-    message: label,
-    turnId: event.turnId || event.projection?.turnId || "",
-    requestId: event.requestId || event.projection?.activeRequestId || "",
-    reason: event.reason || event.error || "",
-  });
-}
-
-function tableLabelForTurnEvent(type, event = {}) {
-  if (type === "turn_locked") return "Turn submitted; DM is resolving it.";
-  if (type === "generation_started") return "DM started thinking.";
-  if (type === "generation_completed") return "DM response received.";
-  if (type === "generation_cancelled") return "DM response canceled.";
-  if (type === "generation_failed") return "DM response failed; retry is available.";
-  if (type === "turn_retrying") return "Retrying the DM response.";
-  if (type === "turn_repair_required") return "DM response needs review.";
-  if (type === "turn_repair_cleared") return "DM response review cleared.";
-  if (type === "turn_flow_reset") {
-    return event.reason === "campaign_changed"
-      ? "Campaign switched; table state reset."
-      : "Table turn state reset.";
-  }
-  return "";
+  pushTableTimelineEvent(timelineEvent.type, timelineEvent.detail);
 }
 
 function reportUiError(error) {
