@@ -306,7 +306,12 @@ const scenarios = [
         sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
       }));
       await harness.page.locator("#start-adventure-opening").waitFor({ state: "visible", timeout: 10000 });
-      await harness.page.click("#start-adventure-opening");
+      const beforeStart = await captureTrustSnapshot(harness.page);
+      await harness.page.evaluate(() => {
+        const button = document.querySelector("#start-adventure-opening");
+        button?.click();
+        button?.click();
+      });
       await harness.page.waitForFunction(() => {
         const button = document.querySelector("#start-adventure-opening");
         return !button || button.hidden || getComputedStyle(button).display === "none";
@@ -317,6 +322,17 @@ const scenarios = [
       const summary = await harness.page.evaluate(() => window.__lorekeeperDebug.stateSummary());
       assert.equal(summary.activeGeneration, false);
       await expectVisibleText(harness.page, "watchtower bell rings");
+      const afterStart = await captureTrustSnapshot(harness.page);
+      assert.equal(
+        afterStart.generationStarts,
+        beforeStart.generationStarts + 1,
+        "double Start Adventure should only call the provider once",
+      );
+      assert.equal(
+        await harness.page.locator(".play-message.dm", { hasText: "watchtower bell rings" }).count(),
+        1,
+        "double Start Adventure should only add one opening narration",
+      );
     },
   },
   {

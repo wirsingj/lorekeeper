@@ -50,7 +50,7 @@ Trust rule: every action must be allowed, visible, outcome-clear, recoverable, a
 ### Fixed Trust Violations
 
 - Fresh tables now have an explicit pre-opening phase. Start Adventure is the only first provider turn; DM Nudge, companion Nudge, Send Turn, debug submit, and pre-opening guest actions are gated until the opening starts.
-- Start Adventure now disappears after the host requests opening narration for the current local-table session, and can return only when a fresh re-hosted table is still pre-opening.
+- Start Adventure now disappears after the host requests opening narration for the current local-table session, duplicate clicks are ignored, and the action can return only when a fresh re-hosted table is still pre-opening.
 - Guest actions, guest snapshots, guest choice votes, waiting-room registrations, and auto-resolve timers are pinned to campaign/table/session identity so stale joins and delayed work cannot mutate a new table.
 - Guest leave/rejoin and campaign-switch flows clear stale connection/controller state instead of silently reviving old approvals.
 - Table Talk refreshes while DM Voice is generating so side chat does not appear to vanish until the DM response posts.
@@ -385,6 +385,7 @@ Risks:
 213. Additional visible copy leaks now use table language: returning home points to Continue/New Adventure/Join/DM Voice, local model readiness says local DM Voice instead of local AI, and delete confirmation describes a local backup instead of SQLite/deleted-campaigns/manual recovery internals.
 214. Guest lobby previews now collapse fresh-table setup scaffolding down to table fiction/premise and the remote join helper asserts guests do not see "The table is set..." or host-only Next instructions.
 215. Rejected remote guest actions, passes, and choice votes now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
+216. Start Adventure duplicate-click coverage now proves a rapid second click cannot create a second provider call or duplicate opening narration.
 
 ### Still Risky
 
@@ -766,6 +767,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Provider result metadata and contract-issue selection moved into `app/provider-result-controller.js`, with architecture guards keeping that pure repair/import policy out of `app/app.js`. Verification: `npm run test:engine` and `npm run build` passed.
 - 2026-06-19: Trust pass started. SotT now tracks Trust Risks explicitly, and rejected guest-action probes compare host trust snapshots before/after to catch silent mutation, not just HTTP rejection. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-invariant-smoke`, 2 runs) passed.
 - 2026-06-19: Trust route probes now cover pre-opening guest action, pass, and choice-vote attempts with the same no-mutation host snapshot invariant. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-route-smoke`, 2 runs) passed.
+- 2026-06-19: Start Adventure duplicate-click trust coverage now fires two clicks on the opening control and asserts only one provider generation plus one visible opening narration. Verification: `node --check scripts/test-ui-flow.js` and focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
 
 ## How To Use This Doc
 
