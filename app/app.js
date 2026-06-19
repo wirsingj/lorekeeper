@@ -33,7 +33,7 @@ import {
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
-import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
+import { buildMessageLifecycleProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "./provider-chat-controller.js";
 import {
   buildProviderImportOutcome,
@@ -8949,7 +8949,7 @@ function renderPlayLog() {
 
       header.append(title, timestamp);
       bubble.append(header, ...messageBodyElements(message.body, message.role, message.data));
-      const lifecycle = messageLifecycleForMessage(message);
+      const lifecycle = buildMessageLifecycleProjection(message);
       if (lifecycle) {
         const lifecycleBadge = document.createElement("small");
         lifecycleBadge.className = `message-lifecycle ${lifecycle.tone}`;
@@ -9290,158 +9290,6 @@ function pendingInputActionForMessage(message) {
   }
   return (state.campaign.multiplayer?.pendingTurnInputs ?? [])
     .find((input) => input.id === pendingInputId && input.ready && !input.passed && input.text);
-}
-
-function messageLifecycleForMessage(message) {
-  const status = message?.data?.status || "";
-  const lifecycle = message?.data?.lifecycle || "";
-  if (message.role === "player" || message.role === "party") {
-    const key = lifecycle || status;
-    const labels = {
-      waiting_for_dm: {
-        label: "Waiting for DM",
-        title: "This action is submitted. The table is waiting for the DM response.",
-        tone: "waiting",
-      },
-      turn_waiting_for_dm: {
-        label: "Waiting for DM",
-        title: "This action is submitted. The table is waiting for the DM response.",
-        tone: "waiting",
-      },
-      waiting_for_import: {
-        label: "Waiting for DM result",
-        title: "The DM response was received, but the table has not applied it yet.",
-        tone: "waiting",
-      },
-      turn_waiting_for_import: {
-        label: "Waiting for DM result",
-        title: "The DM response was received, but the table has not applied it yet.",
-        tone: "waiting",
-      },
-      recovering: {
-        label: "Recovering",
-        title: "The app is replaying this unresolved action so the DM can answer it.",
-        tone: "waiting",
-      },
-      turn_recovering: {
-        label: "Recovering",
-        title: "The app is replaying this unresolved action so the DM can answer it.",
-        tone: "waiting",
-      },
-      retrying: {
-        label: "Trying again",
-        title: "The host asked the DM to try this response again.",
-        tone: "waiting",
-      },
-      turn_retrying: {
-        label: "Trying again",
-        title: "The host asked the DM to try this response again.",
-        tone: "waiting",
-      },
-      resolved: {
-        label: "DM answered",
-        title: "The DM response for this action was imported.",
-        tone: "done",
-      },
-      turn_resolved: {
-        label: "DM answered",
-        title: "The DM response for this action was imported.",
-        tone: "done",
-      },
-      needs_review: {
-        label: "DM response needs review",
-        title: "The DM responded, but LoreKeeper needs the host to review it before play continues.",
-        tone: "review",
-      },
-      turn_needs_review: {
-        label: "DM response needs review",
-        title: "The DM responded, but LoreKeeper needs the host to review it before play continues.",
-        tone: "review",
-      },
-      timed_out: {
-        label: "DM timed out",
-        title: "The DM response timed out. Retry is available.",
-        tone: "error",
-      },
-      turn_timed_out: {
-        label: "DM timed out",
-        title: "The DM response timed out. Retry is available.",
-        tone: "error",
-      },
-      canceled: {
-        label: "Canceled",
-        title: "This DM response was canceled.",
-        tone: "muted",
-      },
-      turn_canceled: {
-        label: "Canceled",
-        title: "This DM response was canceled.",
-        tone: "muted",
-      },
-      dropped: {
-        label: "Dropped",
-        title: "The host removed this staged action before the DM resolved it.",
-        tone: "muted",
-      },
-      guest_input_dropped: {
-        label: "Dropped",
-        title: "The host removed this staged action before the DM resolved it.",
-        tone: "muted",
-      },
-      failed: {
-        label: "DM failed",
-        title: message.data?.failureReason || "The DM response failed. Retry is available.",
-        tone: "error",
-      },
-      turn_failed: {
-        label: "DM failed",
-        title: message.data?.failureReason || "The DM response failed. Retry is available.",
-        tone: "error",
-      },
-      dm_failed_still_staged: {
-        label: "Still staged",
-        title: message.data?.failureReason || "The DM did not resolve this staged input. It is still available for retry.",
-        tone: "review",
-      },
-      pending_model_submit: {
-        label: remotePendingInputLabel(message),
-        title: remotePendingInputTitle(message),
-        tone: "waiting",
-      },
-      submitted_to_model: {
-        label: "DM answered",
-        title: "The host table resolved this guest action with the DM.",
-        tone: "done",
-      },
-      submitted_to_dm: {
-        label: "Submitted to DM",
-        title: "This party action was sent to the DM.",
-        tone: "done",
-      },
-    };
-    return labels[key] || null;
-  }
-  return null;
-}
-
-function remotePendingInputLabel(message) {
-  if (!message.data?.hostStaged) {
-    return "Waiting for host";
-  }
-  if (message.data?.holdForGroup) {
-    return "Waiting for group turn";
-  }
-  return "Queued for DM";
-}
-
-function remotePendingInputTitle(message) {
-  if (!message.data?.hostStaged) {
-    return "This action reached the table and is waiting for host review.";
-  }
-  if (message.data?.holdForGroup) {
-    return "This guest action reached the host table and is waiting for the grouped table turn.";
-  }
-  return "This guest action reached the host table and is queued for the DM.";
 }
 
 function isLocalControllerMessage(message) {

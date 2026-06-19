@@ -23,7 +23,7 @@ import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "../ap
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
-import { buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
+import { buildMessageLifecycleProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "../app/provider-chat-controller.js";
 import {
   buildProviderImportOutcome,
@@ -2693,6 +2693,38 @@ function testPlayLogProjectionBoundsLongSessions() {
   assert.equal(expanded.visibleMessages[0].id, "msg-1");
 }
 
+function testMessageLifecycleProjection() {
+  assert.deepEqual(
+    buildMessageLifecycleProjection({ role: "player", data: { lifecycle: "turn_waiting_for_dm" } }),
+    {
+      label: "Waiting for DM",
+      title: "This action is submitted. The table is waiting for the DM response.",
+      tone: "waiting",
+    },
+  );
+  assert.deepEqual(
+    buildMessageLifecycleProjection({ role: "party", data: { status: "pending_model_submit", hostStaged: true, holdForGroup: true } }),
+    {
+      label: "Waiting for group turn",
+      title: "This guest action reached the host table and is waiting for the grouped table turn.",
+      tone: "waiting",
+    },
+  );
+  assert.equal(
+    buildMessageLifecycleProjection({ role: "party", data: { status: "guest_input_dropped" } })?.label,
+    "Dropped",
+  );
+  assert.deepEqual(
+    buildMessageLifecycleProjection({ role: "player", data: { lifecycle: "turn_failed", failureReason: "Ollama exploded" } }),
+    {
+      label: "DM failed",
+      title: "Ollama exploded",
+      tone: "error",
+    },
+  );
+  assert.equal(buildMessageLifecycleProjection({ role: "dm", data: { lifecycle: "turn_waiting_for_dm" } }), null);
+}
+
 function testTurnRepairController() {
   const technicalRepair = {
     reason: "sceneStatus.awaitingPlayer must be boolean.",
@@ -3292,6 +3324,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const providerImportController = await readFile(path.join("app", "provider-import-controller.js"), "utf8");
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
+  const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
@@ -3304,14 +3337,16 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /tableTimeline: state\.tableTimeline\.slice\(-80\)/, "renderer diagnostics should include the table-facing timeline");
   assert.match(appJs, /buildPlayLogProjection/, "play log rendering should use a bounded projection for long sessions");
   assert.match(appJs, /renderLoadEarlierMessages/, "older play log entries should remain reachable on demand");
-  assert.match(appJs, /messageLifecycleForMessage/, "play bubbles should surface turn lifecycle state");
+  assert.match(appJs, /buildMessageLifecycleProjection/, "play bubbles should consume projected lifecycle state");
+  assert.doesNotMatch(appJs, /function messageLifecycleForMessage/, "renderer should not own play-message lifecycle wording");
+  assert.match(playLogController, /function buildMessageLifecycleProjection/, "play-message lifecycle wording should live in play-log-controller");
   assert.match(appJs, /turn_waiting_for_dm/, "submitted turns should be visibly marked while waiting for the DM");
   assert.match(appJs, /updatePlayerTurnEchoLifecycle/, "submitted turn bubbles should update after provider completion or failure");
   assert.match(appJs, /markPendingPlayerTurnRecovering/, "auto-resumed player turns should get a visible recovery lifecycle before replay");
-  assert.match(appJs, /turn_recovering[\s\S]*?label:\s*"Recovering"/, "recovering player turns should use table-facing lifecycle wording");
+  assert.match(playLogController, /turn_recovering[\s\S]*?label:\s*"Recovering"/, "recovering player turns should use table-facing lifecycle wording");
   assert.match(appJs, /markRepairTurnRetrying/, "Try Again should mark the original player action as retrying");
   assert.match(appJs, /findPlayerTurnMessageForRepair/, "Try Again should find the original action by repair turn id");
-  assert.match(appJs, /turn_retrying[\s\S]*?label:\s*"Trying again"/, "repair retry bubbles should use table-facing lifecycle wording");
+  assert.match(playLogController, /turn_retrying[\s\S]*?label:\s*"Trying again"/, "repair retry bubbles should use table-facing lifecycle wording");
   assert.match(
     appJs,
     /const runResult = await runPromptThroughLocalProvider\(repair\.turn\);[\s\S]*?await updatePlayerTurnEchoLifecycle\(retryMessage\.id/,
@@ -3345,9 +3380,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /Companion beat staged; add host text or press Send Turn when ready\./);
   assert.match(appJs, /markApprovedPartyInputsStillStaged/, "failed DM turns should keep approved party inputs visibly staged");
   assert.match(appJs, /markRemoteInputsStillStaged/, "failed DM turns should keep remote party inputs visibly staged");
-  assert.match(appJs, /dm_failed_still_staged[\s\S]*?label:\s*"Still staged"/, "failed staged inputs should use table-facing retry wording");
+  assert.match(playLogController, /dm_failed_still_staged[\s\S]*?label:\s*"Still staged"/, "failed staged inputs should use table-facing retry wording");
   assert.match(appJs, /dropPendingRemoteInput/, "host should be able to drop a stale staged guest action");
-  assert.match(appJs, /label:\s*"Dropped"/, "dropped staged guest actions should not read as DM-resolved");
+  assert.match(playLogController, /label:\s*"Dropped"/, "dropped staged guest actions should not read as DM-resolved");
   assert.match(appJs, /Remove this staged guest action without sending it to the DM/);
   assert.match(appJs, /buildStagedInputRecoveryPlan/, "staged input recovery policy should be outside the renderer turn body");
   assert.match(appJs, /applyStagedInputRecoveryPlan/, "renderer should execute the staged input recovery plan");
@@ -3389,6 +3424,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const turnSubmitController = await readFile(path.join("app", "turn-submit-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
+  const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
@@ -3678,8 +3714,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /Opening scene needs JSON repair/);
   assert.doesNotMatch(turnRepairController, /imported despite contract failure/);
   assert.match(appJs, /DM response review is open/);
-  assert.match(appJs, /The DM response was received, but the table has not applied it yet\./);
-  assert.match(appJs, /The DM responded, but LoreKeeper needs the host to review it before play continues\./);
+  assert.match(playLogController, /The DM response was received, but the table has not applied it yet\./);
+  assert.match(playLogController, /The DM responded, but LoreKeeper needs the host to review it before play continues\./);
   assert.match(appJs, /launchInviteLink/);
   assert.match(appJs, /applyLaunchInviteLink/);
   assert.match(appJs, /clearGuestSession\(\{\s*keepRecent:\s*false\s*\}\)/);
@@ -3764,6 +3800,7 @@ testTableOpeningController();
 testTableActionProjection();
 testDmNudgeController();
 testPlayLogProjectionBoundsLongSessions();
+testMessageLifecycleProjection();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 testSettingsSurfaceProjection();
