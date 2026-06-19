@@ -332,6 +332,7 @@ Risks:
 194. Product docs now explicitly separate host and DM roles: the host is a party member plus software-side table owner for setup/invites/provider access/recovery, while the provider/DM Voice is the DM at the table inside app-owned rails.
 195. Settings surfaces are now single-purpose at runtime: Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery no longer expose cross-surface tabs to normal users, while the hidden UI harness can still open diagnostics directly for chaos/audit coverage.
 196. DM Recovery no longer invites users to open a replacement-response path when nothing is waiting, and the copied-response fallback is hidden unless it is actually relevant to a bridge/manual handoff or pasted draft.
+197. Slow ChatGPT DM progress copy no longer promises the replacement-response fallback while the app is still in extension/waiting mode; it tells the host they can keep waiting or start a new DM chat.
 
 ### Still Risky
 
@@ -694,7 +695,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Combat command-deck copy now asks the host to choose the active character's action/spell/movement/tactic instead of "Act as" that character. Verification: `npm run test:engine`, `npm run build`, and focused `combat-player-and-enemy-turns` UI passed.
 - 2026-06-18: Product stance clarified: the host is not the DM. The host is a party member and the software-side table owner for campaign setup, invites, party management, provider/model access, recovery, and tie-breaking. The provider/DM Voice is the DM inside app-owned rails.
 - 2026-06-18: Settings entry points now behave like single-purpose surfaces instead of a visible tabbed preferences console. Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery no longer expose cross-surface tabs to normal users; diagnostics remain reachable through the hidden UI harness. Verification: `npm run test:engine`, `npm run build`, and focused `settings-navigation-and-diagnostics` UI passed.
-- 2026-06-18: DM Recovery now hides the copied-response fallback unless bridge/manual handoff is active or pasted draft text exists, and idle recovery no longer tells users to open the replacement-response path. Verification: `npm run test:engine`, `npm run build`, and focused `visual-audit-screenshots` UI passed.
+- 2026-06-18: DM Recovery now hides the copied-response fallback unless bridge/manual handoff is active or pasted draft text exists, idle recovery no longer tells users to open the replacement-response path, and slow ChatGPT DM progress no longer promises a hidden fallback control. Verification: `npm run test:engine`, `npm run build`, and focused `visual-audit-screenshots` UI passed.
 
 ## How To Use This Doc
 

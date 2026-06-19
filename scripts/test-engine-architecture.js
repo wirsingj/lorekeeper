@@ -2997,7 +2997,8 @@ function testProviderChatProjection() {
   const progress = buildCampaignChatProgressSteps();
   assert.deepEqual(progress.map((step) => step.delayMs), [8000, 30000, 65000]);
   assert.ok(progress.every((step) => step.activityState === "waiting"));
-  assert.match(progress[2].bridgeStatus, /replacement response fallback/);
+  assert.match(progress[2].bridgeStatus, /keep waiting or start a new DM chat/);
+  assert.doesNotMatch(progress[2].bridgeStatus, /fallback/i);
 }
 
 function testCharacterAutocompleteProjection() {

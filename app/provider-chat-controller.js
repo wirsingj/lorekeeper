@@ -67,8 +67,8 @@ export function buildCampaignChatProgressSteps() {
     },
     {
       delayMs: 65000,
-      bridgeStatus: "DM Voice chat is taking a while; replacement response fallback remains available",
-      activityText: "ChatGPT is taking a while; replacement response fallback is ready",
+      bridgeStatus: "DM Voice chat is taking a while; you can keep waiting or start a new DM chat",
+      activityText: "ChatGPT is taking a while; you can keep waiting or start a new DM chat",
       activityState: "waiting",
     },
   ];
