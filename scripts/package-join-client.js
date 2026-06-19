@@ -75,7 +75,7 @@ writeFileSync(
     "5. Approve the join request in LoreKeeper. New-character requests become party members when approved.",
     "",
     "LoreKeeper Join does not need Ollama, Node.js, or campaign files.",
-    "The host owns campaign state, dice, AI/DM generation, and saves.",
+    "The host owns campaign state, dice/rules, provider access, guest approvals, and saves; the provider is the DM voice.",
     "",
     "If it cannot connect:",
     "- Make sure both computers are on the same Wi-Fi/LAN.",

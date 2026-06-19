@@ -146,7 +146,7 @@ npm run test:ui -- --scenario create-campaign-and-hide-start-adventure-after-use
 
 The Playwright harness starts its own temporary server and campaign directory. It can open multiple pages in one browser context, so host and `/guest` tabs share the same local server while preserving separate renderer/session state. It mocks provider generation inside scenarios that need deterministic DM output with a persistent page route, and keeps one real Ollama provider-contract scenario to catch parser drift against an installed quick model. Use `--keep-temp` only when intentionally preserving a failed temp campaign root for inspection.
 
-Real multiplayer QA should model the intended release shape: one provider-hosting authority, often the Electron desktop app with Ollama/provider configured, plus guests using `http://<host-ip>:4173/guest` in a browser or another desktop install. "Host" means table/provider authority, not necessarily the only machine running the app.
+Real multiplayer QA should model the intended release shape: one software-side host authority, often the Electron desktop app with Ollama/provider configured, plus guests using `http://<host-ip>:4173/guest` in a browser or another desktop install. "Host" means lobby/table owner and provider access point, not the DM and not necessarily the only machine running the app.
 
 ## Debugging Owners
 

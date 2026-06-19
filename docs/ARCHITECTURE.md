@@ -10,9 +10,10 @@ LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a loca
 
 The north-star table model is:
 
-- the app and provider together are the DM,
-- the app owns canon, rules, persistence, authority, and recovery,
-- the provider owns narration, atmosphere, NPC behavior, and proposed state changes,
+- the host is a party member plus the software-side table owner for setup, invites, provider access, recovery decisions, and persistence,
+- the provider/DM Voice is the DM at the table,
+- the app owns canon, rules, persistence, authority, and recovery rails,
+- the provider owns narration, atmosphere, NPC behavior, and proposed state changes inside those rails,
 - party members are player-facing table voices with controller ownership,
 - SQLite/app state is canon; provider memory is only scratch context.
 

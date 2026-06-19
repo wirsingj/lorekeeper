@@ -17,7 +17,7 @@ Status legend:
 
 LoreKeeper should feel like sitting at a natural D&D 5E table.
 
-The party members are the people around the table. The DM is the app plus the AI provider. The app owns continuity, state, rules, recovery, and table flow. The model provides narration, NPC behavior, atmosphere, suggested checks, and structured proposals inside app-owned rails.
+The party members are the people around the table. The host is one of those party members, plus the software-side table owner for setup, invites, provider access, and recovery decisions. The DM at the table is the provider/DM Voice operating inside app-owned rails. The app owns continuity, state, rules, recovery, and table flow; the provider supplies narration, NPC behavior, atmosphere, suggested checks, and structured proposals.
 
 The user should not feel like they are debugging a model, managing queue machinery, or translating software concepts while trying to play.
 
@@ -129,7 +129,7 @@ Risks:
 3. AI companions are party members, not NPCs. They can make brief low-stakes RP contributions when nudged or when the table is idle, but major choices and combat turns still need host/controller approval.
 4. Enemies and NPCs are DM actors. They may act on their turns without player input, but combat state should remain structured and visible.
 5. The DM can address the whole party, one character, a subset, the current combat actor, or call for a party vote.
-6. The host is authoritative for campaign state, remote approvals, model calls, canon review, and tie-breaking.
+6. The host is software-authoritative for campaign state, remote approvals, provider/model calls, canon review, and tie-breaking, while remaining a party member rather than the DM.
 7. SQLite/app state is canon. Provider context memory is only scratch memory and must never be trusted as canon.
 
 ## Current State Snapshot
@@ -329,6 +329,7 @@ Risks:
 191. DM Voice and Friends setup copy no longer exposes "AI" tabs, Guest Page labels, provider prompts, provider bridge, manual fallback, or campaign-chat status wording in normal live paths; visible host status now uses DM Voice, ChatGPT DM, Guest Lobby, and handoff language.
 192. Visual audit caught DM Voice leaking into Friends And Seats because host chrome refreshes were unhiding whole settings panels after the settings-surface projection ran. Host chrome no longer overrides scoped settings-panel visibility, and the UI harness asserts DM Voice stays hidden inside Friends And Seats.
 193. Host-controlled combat input now prompts the host to choose the active character's action, spell, movement, or tactic instead of saying "Act as..." a party member.
+194. Product docs now explicitly separate host and DM roles: the host is a party member plus software-side table owner for setup/invites/provider access/recovery, while the provider/DM Voice is the DM at the table inside app-owned rails.
 
 ### Still Risky
 
@@ -359,7 +360,7 @@ Risks:
 25. The app still has too many visible controls across table rails and campaign/table management. Preferences are calmer now via top-level tabs, but Steam-ready UX still needs fewer always-visible surfaces, clearer phase-specific actions, stronger empty-table guidance, and a fuller split between app preferences and table settings.
 26. Automated UI coverage is now much stronger, including host plus `/guest` browser-tab flows, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
 27. The Playwright harness now has a stable visual-audit screenshot mode for core host, guest, combat, and recovery states, but it remains a local browser harness. Visual QA still needs occasional Electron-host and real LAN guest review to catch shell/window/device details.
-28. Host play still blends DM-screen responsibilities and shared table experience in one shell. That is functional for authority, but the UX needs a clearer stance: host-only controls should feel like a tucked-away DM screen while the center surface feels shared with the players.
+28. Host play still blends party-member table play with software-owner controls in one shell. That is functional for authority, but the UX needs a clearer stance: host-only controls should feel like a tucked-away table-owner surface, while the center surface feels shared with the players and the provider remains the DM voice.
 
 ## Live Acceptance Matrix
 
@@ -400,8 +401,8 @@ Risks:
 12. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
 13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
-15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door AI readiness is now secondary, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
-16. Decide and document the host-surface stance: "shared table with tucked-away DM screen" versus "host DM console plus player-facing table." Current implementation leans console-like because settings, AI readiness, guest controls, and recovery all live near the main table shell.
+15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door DM Voice readiness is now secondary, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
+16. Keep the host-surface stance explicit: the host is a party member and software-side table owner, not the DM. Host-only controls should collect setup, invites, provider/model access, party ownership, recovery, and tie-breaking without making the main table feel like a DM console.
 
 ### Medium
 
@@ -411,7 +412,7 @@ Risks:
 20. Continue combat tracker density work: concentration, richer resources, reactions, conditions, movement, action state.
 21. Continue expanding route-level API/security tests as new routes are added; current coverage includes classification, API-token protection, stale identity rejection, local asset blocking, and real mutation routes.
 22. Wire bounded SQLite query helpers into more live surfaces and eventually upgrade the play log from chunked rendering to true virtualization if needed.
-23. Expand visual audit coverage as the UX evolves: add richer table phases, a cleaner host-only DM screen once it exists, and any release-critical Electron shell states that the local browser harness cannot see.
+23. Expand visual audit coverage as the UX evolves: add richer table phases, a cleaner host-only table-owner surface once it exists, and any release-critical Electron shell states that the local browser harness cannot see.
 
 ### Low
 
@@ -498,7 +499,7 @@ Risks:
 
 ### Multiplayer And LoreKeeper Join
 
-- [x] Host owns SQLite, model calls, canon review, and persistence.
+- [x] Host owns software-side campaign files, provider access/model calls, canon review, guest approvals, and persistence; the provider remains the DM voice.
 - [x] Guest/join clients do not need Ollama or provider controls.
 - [x] Join-as flow supports richer character proposal and host integration note.
 - [x] Guest inputs are visible table messages and can become structured `user.playerInputs[]`.
@@ -676,7 +677,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Follow-up fixed the combat identity drift plus related remote/new-campaign stale-turn and background-poll races. Verification: `npm run build`, `npm run test:engine`, focused combat UI, focused remote leave/rejoin/new-game UI, seeded chaos UI (`combat-sync-polish`, 3 runs), full `npm run test:ui -- --skip-build`, and `npm run test:all` all passed.
 - 2026-06-18: Guest auto-resolution policy was extracted from `app.js` into a tested controller. Verification: `npm run build`, `npm run test:engine`, focused remote leave/rejoin/new-game UI, seeded chaos UI (`guest-auto-resolve-policy`, 3 runs), full `npm run test:ui -- --skip-build`, and `npm run test:all` all passed.
 - 2026-06-18: Campaign adoption and multiplayer background polling policy were extracted from `app.js` into tested controllers. This keeps campaign-switch transient resets, local-table polling pauses during Host New, guest waiting-room refreshes, and Table Talk refresh during DM generation explicit and regression-covered. Verification: `npm run build`, `npm run test:engine`, focused Table Talk UI, focused remote leave/rejoin/new-game UI, `npm run test:regression`, and `npm run test:all` passed.
-- 2026-06-18: Table-sim alignment audit: architecture is moving the right direction through app-owned state/combat/continuity and extracted renderer policies, but the host UX still reads partly like a DM console/settings hub. Highest product gaps are phase-specific combat actions, host-only controls as a tucked-away DM screen, manual recovery escape hatch polish, guest-editable pre-table drafts, two-machine soak, and a first-class visual-audit screenshot mode.
+- 2026-06-18: Table-sim alignment audit: architecture is moving the right direction through app-owned state/combat/continuity and extracted renderer policies, but the host UX still reads partly like a software console/settings hub. Highest product gaps are phase-specific combat actions, host-only controls as a tucked-away table-owner surface, manual recovery escape hatch polish, guest-editable pre-table drafts, two-machine soak, and a first-class visual-audit screenshot mode.
 - 2026-06-18: Visual audit screenshots are now first-class in the hidden UI harness. Verification: `npm run test:ui -- --scenario visual-audit-screenshots --skip-build` passed and produced home, App Preferences, New Adventure, ready table, Friends and Seats, guest lobby, combat, and DM Recovery screenshots.
 - 2026-06-18: Provider response import planning was extracted from `app.js` into `provider-import-controller`, covering implicit scene/combat fallback changes, review-batch creation, and message import metadata. Verification: `npm run build`, `npm run test:all`, focused RP import UI, and focused combat import UI passed.
 - 2026-06-18: Provider response cleanup and table-message splitting moved into `provider-import-controller`, including readable choice cleanup and host-controlled PC autopost suppression hooks. Verification: `npm run build`, `npm run test:all`, focused RP import UI, and focused combat import UI passed.
@@ -689,6 +690,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: DM Voice/Friends copy pass changed the Settings tab from AI to DM, changed Guest Page actions to Guest Lobby, replaced provider-prompt/bridge/manual-fallback live statuses with DM turn/ChatGPT DM/handoff wording, and tightened `table-status` matching so readiness does not look like active DM thinking. Verification: `npm run test:engine`, focused `settings-navigation-and-diagnostics`, `create-campaign-and-hide-start-adventure-after-use`, and `rp-post-narration-import` UI passed.
 - 2026-06-18: Visual audit found Friends And Seats still rendering the DM Voice panel. Root cause: `applyHostModeChrome()` used an old broad setup-section unhide helper after scoped settings projection. Fix keeps host chrome from overriding panel visibility and adds a UI assertion for the Friends surface.
 - 2026-06-18: Combat command-deck copy now asks the host to choose the active character's action/spell/movement/tactic instead of "Act as" that character. Verification: `npm run test:engine`, `npm run build`, and focused `combat-player-and-enemy-turns` UI passed.
+- 2026-06-18: Product stance clarified: the host is not the DM. The host is a party member and the software-side table owner for campaign setup, invites, party management, provider/model access, recovery, and tie-breaking. The provider/DM Voice is the DM inside app-owned rails.
 
 ## How To Use This Doc
 
