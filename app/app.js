@@ -7,7 +7,6 @@ import { getActiveProviderConversation } from "../src/campaign-state/provider-co
 import { createReviewBatch } from "../src/canon-review/proposals.js";
 import { extractLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
-import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
@@ -75,6 +74,16 @@ import {
   prepareAutoCommitReviewBatch,
   splitProviderTableMessages,
 } from "./provider-import-controller.js";
+import {
+  buildModelOptionsProjection,
+  campaignCreationProviderSettings,
+  installedOllamaModelIds,
+  modelDisplayName,
+  providerSetupHint,
+  providerStatusLabel,
+  resolveProviderSettings,
+  selectedModelSummaryProjection,
+} from "./provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
@@ -2687,25 +2696,10 @@ async function adoptPreTableLobbyIntoActiveCampaign() {
 }
 
 function providerSettingsForNewCampaign() {
-  const settings = currentProviderSettings();
-  if (settings.preferredProvider !== "ollama") {
-    return settings;
-  }
-
-  const installed = installedOllamaModelIds();
-  if (isOllamaModelInstalled(settings.selectedModel, installed)) {
-    return settings;
-  }
-
-  const selectedControlModel = elements.ollamaModel?.value;
-  const fallbackModel = [selectedControlModel, ...installed]
-    .filter(Boolean)
-    .find((model) => isOllamaModelInstalled(model, installed));
-
-  return {
-    ...settings,
-    selectedModel: fallbackModel || settings.selectedModel,
-  };
+  return campaignCreationProviderSettings(currentProviderSettings(), {
+    selectedControlModel: elements.ollamaModel?.value,
+    installedModels: installedOllamaModelIds(state.providerStatus?.providers?.ollama),
+  });
 }
 
 function openCampaignDialog({ returnToMainMenu = false } = {}) {
@@ -5075,19 +5069,7 @@ function resetTurnCarryover() {
 }
 
 function currentProviderSettings() {
-  const settings = state.campaign?.providerSettings ?? {};
-  const saved = loadLastProviderSettings();
-  const preferredProvider = settings.preferredProvider === "chatgpt"
-    ? "bridge"
-    : settings.preferredProvider || saved.preferredProvider || "ollama";
-  return {
-    preferredProvider,
-    selectedModel: settings.selectedModel || saved.selectedModel || "llama3.1:8b",
-    generationTimeoutMs: Number(settings.generationTimeoutMs || saved.generationTimeoutMs) || 120000,
-    outputLimit: Math.max(1800, Number(settings.outputLimit || saved.outputLimit) || 1800),
-    fastMode: settings.fastMode ?? saved.fastMode ?? false,
-    ollamaBaseUrl: settings.ollamaBaseUrl || saved.ollamaBaseUrl || "http://127.0.0.1:11434",
-  };
+  return resolveProviderSettings(state.campaign?.providerSettings ?? {}, loadLastProviderSettings());
 }
 
 function turnProjection() {
@@ -5414,77 +5396,30 @@ function hideSetupSection(element, hidden) {
 
 function renderModelOptions(settings) {
   const ollama = state.providerStatus?.providers?.ollama;
-  const installed = installedOllamaModelIds();
-  const recommended = (ollama?.recommendedModels ?? []).map((model) => model.id);
-  const options = dedupeModelOptions([settings.selectedModel, ...installed, ...recommended].filter(Boolean), settings.selectedModel);
+  const options = buildModelOptionsProjection({
+    selectedModel: settings.selectedModel,
+    ollama,
+  });
 
   elements.ollamaModel.replaceChildren(
-    ...options.map((model) => {
+    ...options.map((modelOption) => {
       const option = document.createElement("option");
-      option.value = model;
-      option.textContent = formatModelOptionLabel(model, isOllamaModelInstalled(model, installed));
-      option.selected = normalizeOllamaModelId(model) === normalizeOllamaModelId(settings.selectedModel);
+      option.value = modelOption.value;
+      option.textContent = modelOption.label;
+      option.selected = modelOption.selected;
       return option;
     }),
   );
 }
 
-function installedOllamaModelIds() {
-  const ollama = state.providerStatus?.providers?.ollama;
-  return (ollama?.models ?? []).map((model) => model.name || model.model).filter(Boolean);
-}
-
-function dedupeModelOptions(modelIds, selectedModel) {
-  const byCanonicalId = new Map();
-  const selectedCanonicalId = normalizeOllamaModelId(selectedModel);
-  for (const modelId of modelIds) {
-    const canonicalId = normalizeOllamaModelId(modelId);
-    if (!canonicalId) {
-      continue;
-    }
-
-    const current = byCanonicalId.get(canonicalId);
-    const candidateIsSelected = canonicalId === selectedCanonicalId;
-    const currentIsSelected = normalizeOllamaModelId(current) === selectedCanonicalId;
-    if (!current || (candidateIsSelected && !currentIsSelected)) {
-      byCanonicalId.set(canonicalId, modelId);
-    }
-  }
-
-  return [...byCanonicalId.values()];
-}
-
-function isOllamaModelInstalled(modelId, installedModels) {
-  const canonicalId = normalizeOllamaModelId(modelId);
-  return installedModels.some((installed) => normalizeOllamaModelId(installed) === canonicalId);
-}
-
-function formatModelOptionLabel(modelId, isInstalled) {
-  const descriptor = getRecommendedModelDescriptor(modelId);
-  const label = descriptor?.label ?? modelId;
-  const badges = [
-    isInstalled ? "installed" : "download needed",
-    descriptor?.recommended ? "recommended" : null,
-    descriptor?.spec ? `${descriptor.spec} spec` : null,
-  ].filter(Boolean);
-  return `${label} - ${badges.join(" / ")}`;
-}
-
 function renderSelectedModelSummary(settings, ollama) {
-  const modelId = settings.selectedModel;
-  const installedModelNames = (ollama.models ?? []).map((model) => model.name || model.model).filter(Boolean);
-  const installed = isOllamaModelInstalled(modelId, installedModelNames);
-  const descriptor = getRecommendedModelDescriptor(modelId);
-  const chips = [
-    descriptor?.recommended ? "Recommended" : null,
-    descriptor?.spec ? `${descriptor.spec} Spec` : null,
-    descriptor?.speed ? `Speed: ${descriptor.speed}` : null,
-    descriptor?.quality ? `Quality: ${descriptor.quality}` : null,
-    installed ? "Installed" : "Not Downloaded",
-  ].filter(Boolean);
+  const summary = selectedModelSummaryProjection({
+    selectedModel: settings.selectedModel,
+    ollama,
+  });
 
   elements.ollamaModelSummary.replaceChildren(
-    ...chips.map((chip) => {
+    ...summary.chips.map((chip) => {
       const span = document.createElement("span");
       span.className = `model-chip ${chip === "Not Downloaded" ? "missing" : ""}`;
       span.textContent = chip;
@@ -5492,70 +5427,10 @@ function renderSelectedModelSummary(settings, ollama) {
     }),
   );
 
-  elements.pullOllamaModel.hidden = installed;
-  elements.pullOllamaModel.disabled = ollama.state === "ollama_not_installed" || ollama.state === "ollama_not_running";
-  elements.pullOllamaModel.textContent = "Download";
-  elements.pullOllamaModel.title = `Download ${modelId} with Ollama`;
-}
-
-function getRecommendedModelDescriptor(modelId) {
-  const canonicalId = normalizeOllamaModelId(modelId);
-  const model = recommendedOllamaModels.find((candidate) => normalizeOllamaModelId(candidate.id) === canonicalId);
-  if (!model) {
-    return {
-      label: modelId,
-      spec: "Custom",
-      speed: null,
-      quality: null,
-      recommended: false,
-    };
-  }
-
-  return {
-    ...model,
-    spec: model.spec ?? inferModelSpec(model.id),
-    recommended: Boolean(model.recommended),
-  };
-}
-
-function inferModelSpec(modelId) {
-  if (/14b|27b|70b/i.test(modelId)) {
-    return "High";
-  }
-  if (/nemo|12b/i.test(modelId)) {
-    return "Medium";
-  }
-  return "Low";
-}
-
-function providerStatusLabel(ollama) {
-  if (ollama.state === "ready") {
-    return `Ollama ready: ${modelDisplayName(ollama.selectedModel)}`;
-  }
-  if (ollama.state === "selected_model_missing") {
-    return `Ollama running; ${modelDisplayName(ollama.selectedModel)} is not downloaded`;
-  }
-  if (ollama.state === "ollama_not_running") {
-    return "Ollama installed but not running";
-  }
-  if (ollama.state === "ollama_not_installed") {
-    return "Ollama is not installed";
-  }
-  return ollama.runtimeMessage || "Ollama status unknown";
-}
-
-function providerSetupHint(ollama, selectedModel) {
-  if (ollama.state === "ollama_not_installed") {
-    return "Install Ollama from ollama.com, then reopen DM Voice and refresh.";
-  }
-  if (ollama.state === "ollama_not_running") {
-    return "Start Ollama, then refresh DM Voice.";
-  }
-  return `${modelDisplayName(selectedModel)} is missing. Use Download to pull it locally.`;
-}
-
-function modelDisplayName(modelId) {
-  return getRecommendedModelDescriptor(modelId)?.label ?? modelId;
+  elements.pullOllamaModel.hidden = summary.pullHidden;
+  elements.pullOllamaModel.disabled = summary.pullDisabled;
+  elements.pullOllamaModel.textContent = summary.pullLabel;
+  elements.pullOllamaModel.title = summary.pullTitle;
 }
 
 async function testOllamaModel() {

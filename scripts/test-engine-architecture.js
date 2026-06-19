@@ -67,6 +67,14 @@ import {
   shouldAutoApproveProviderChange,
   splitProviderTableMessages,
 } from "../app/provider-import-controller.js";
+import {
+  buildModelOptionsProjection,
+  campaignCreationProviderSettings,
+  providerSetupHint,
+  providerStatusLabel,
+  resolveProviderSettings,
+  selectedModelSummaryProjection,
+} from "../app/provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "../app/provider-result-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
@@ -3330,6 +3338,51 @@ function testProviderResultController() {
   assert.equal(contractIssueFromProviderResult({ validationErrors: ["table[0].text required"] }), "table[0].text required");
 }
 
+function testProviderSettingsController() {
+  assert.deepEqual(
+    resolveProviderSettings({ preferredProvider: "chatgpt", outputLimit: 120 }, { selectedModel: "qwen3:8b" }),
+    {
+      preferredProvider: "bridge",
+      selectedModel: "qwen3:8b",
+      generationTimeoutMs: 120000,
+      outputLimit: 1800,
+      fastMode: false,
+      ollamaBaseUrl: "http://127.0.0.1:11434",
+    },
+  );
+
+  const ollama = {
+    state: "selected_model_missing",
+    selectedModel: "qwen3:14b",
+    models: [{ name: "qwen3:4b" }, { model: "llama3.1:8b" }],
+    recommendedModels: [{ id: "qwen3:14b" }, { id: "qwen3:4b" }],
+  };
+  const options = buildModelOptionsProjection({ selectedModel: "qwen3:14b", ollama });
+  assert.equal(options[0].value, "qwen3:14b");
+  assert.equal(options[0].selected, true);
+  assert.match(options[0].label, /download needed/);
+  assert.ok(options.some((option) => option.value === "qwen3:4b" && /installed/.test(option.label)));
+
+  const missingSummary = selectedModelSummaryProjection({ selectedModel: "qwen3:14b", ollama });
+  assert.equal(missingSummary.installed, false);
+  assert.equal(missingSummary.pullHidden, false);
+  assert.equal(missingSummary.pullDisabled, false);
+  assert.ok(missingSummary.chips.includes("Not Downloaded"));
+
+  const installedSettings = campaignCreationProviderSettings(
+    { preferredProvider: "ollama", selectedModel: "qwen3:14b" },
+    { selectedControlModel: "qwen3:4b", installedModels: ["qwen3:4b"] },
+  );
+  assert.equal(installedSettings.selectedModel, "qwen3:4b");
+  assert.equal(
+    campaignCreationProviderSettings({ preferredProvider: "bridge", selectedModel: "qwen3:14b" }).selectedModel,
+    "qwen3:14b",
+  );
+
+  assert.equal(providerStatusLabel({ state: "ready", selectedModel: "qwen3:14b" }), "Ollama ready: Qwen3 14B");
+  assert.match(providerSetupHint({ state: "ollama_not_running" }, "qwen3:14b"), /Start Ollama/);
+}
+
 function testJoinPreviewProjection() {
   const setupLine = "The table is set at Old South Road. Mira, Renn are at the table. Premise: A caravan road bends toward an old watchtower before sunset. Next: invite anyone else.";
   assert.equal(
@@ -3752,6 +3805,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
   const providerImportController = await readFile(path.join("app", "provider-import-controller.js"), "utf8");
+  const providerSettingsController = await readFile(path.join("app", "provider-settings-controller.js"), "utf8");
   const providerResultController = await readFile(path.join("app", "provider-result-controller.js"), "utf8");
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
@@ -3836,6 +3890,12 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
   assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
+  assert.match(appJs, /provider-settings-controller\.js/, "DM Voice settings projection should live outside the main app renderer");
+  assert.match(providerSettingsController, /function providerStatusLabel/, "DM Voice status labels should live in provider-settings-controller");
+  assert.match(providerSettingsController, /function buildModelOptionsProjection/, "DM Voice model option projection should live in provider-settings-controller");
+  assert.doesNotMatch(appJs, /function providerStatusLabel/, "renderer should not own DM Voice status labels");
+  assert.doesNotMatch(appJs, /function dedupeModelOptions/, "renderer should not own local model option policy");
+  assert.doesNotMatch(appJs, /recommendedOllamaModels/, "renderer should not import recommended model policy directly");
   assert.match(appJs, /provider-result-controller\.js/, "provider result validation summary policy should live outside the renderer");
   assert.match(providerResultController, /function contractIssueFromProviderResult/);
   assert.doesNotMatch(appJs, /function contractIssueFromProviderResult/, "renderer should not own provider result contract issue selection");
@@ -4248,6 +4308,7 @@ testStagedInputRecoveryController();
 testHostResponseReviewProjection();
 testProviderImportOutcomeProjection();
 testProviderResultController();
+testProviderSettingsController();
 testProviderChatProjection();
 testTableTalkProjection();
 testCharacterAutocompleteProjection();

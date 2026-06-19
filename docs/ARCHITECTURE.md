@@ -181,6 +181,7 @@ UI projections:
 
 - `app/*controller.js` files should keep growing as small projection/policy modules.
 - `app/message-block-controller.js` owns DM/provider play-message block parsing: prose grouping, mechanics block extraction, parsed choice panels, structured choice override, and latest-choice lookup. `app/app.js` should render the returned blocks, not parse provider text.
+- `app/provider-settings-controller.js` owns DM Voice settings projections: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and model summary chips. `app/app.js` should read/write controls and render projections, not import recommended-model policy directly.
 - Prefer extracting pure decisions into these modules with tests before adding more branches to `app/app.js`.
 
 ## Storage Model
