@@ -1,11 +1,11 @@
 const ACTIVITY_RULES = [
   {
-    match: /generating locally|ollama generating|asking dm|waiting on chatgpt|campaign chat is taking/i,
+    match: /generating locally|ollama generating|asking dm|waiting on chatgpt|(?:campaign|dm voice) chat is taking|sending turn to chatgpt dm|chatgpt dm answered/i,
     text: "DM is thinking...",
     phase: "dm_thinking",
   },
   {
-    match: /building provider prompt|build(?:ing)? a table turn/i,
+    match: /preparing the dm turn|build(?:ing)? a table turn/i,
     text: "Preparing the table turn...",
     phase: "preparing_turn",
   },

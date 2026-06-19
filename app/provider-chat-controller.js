@@ -10,11 +10,11 @@ export function buildCampaignChatFallbackPlan(reason) {
     case campaignChatFallbackReasons.EXTENSION_UNAVAILABLE:
       return {
         copy: {
-          successMessage: "Extension not connected; prompt copied",
-          failureMessage: "Extension not connected; copy from DM Instructions",
+          successMessage: "ChatGPT helper not connected; prompt copied",
+          failureMessage: "ChatGPT helper not connected; copy from DM Instructions",
         },
         bridgeMode: "manual",
-        activityText: "Extension unavailable; prompt copied for manual paste",
+        activityText: "ChatGPT helper unavailable; prompt copied for handoff",
         activityState: "error",
       };
     case campaignChatFallbackReasons.LOGIN_REQUIRED:
@@ -30,8 +30,8 @@ export function buildCampaignChatFallbackPlan(reason) {
     case campaignChatFallbackReasons.NO_RESPONSE:
       return {
         copy: {
-          successMessage: "Campaign chat did not return a response; prompt copied",
-          failureMessage: "Campaign chat did not return a response; copy from DM Instructions",
+          successMessage: "ChatGPT DM did not return a response; prompt copied",
+          failureMessage: "ChatGPT DM did not return a response; copy from DM Instructions",
         },
         bridgeMode: "extension",
         activityText: "No DM response returned; prompt copied",
@@ -41,11 +41,11 @@ export function buildCampaignChatFallbackPlan(reason) {
     default:
       return {
         copy: {
-          successMessage: "Campaign chat failed; prompt copied",
-          failureMessage: "Campaign chat failed; copy from DM Instructions",
+          successMessage: "ChatGPT DM failed; prompt copied",
+          failureMessage: "ChatGPT DM failed; copy from DM Instructions",
         },
         bridgeMode: "manual",
-        activityText: "Provider run failed; prompt copied for manual paste",
+        activityText: "ChatGPT DM failed; prompt copied for handoff",
         activityState: "error",
       };
   }
@@ -61,14 +61,14 @@ export function buildCampaignChatProgressSteps() {
     },
     {
       delayMs: 30000,
-      bridgeStatus: "Still waiting on the campaign chat...",
+      bridgeStatus: "Still waiting on the DM Voice chat...",
       activityText: "Still waiting on ChatGPT...",
       activityState: "waiting",
     },
     {
       delayMs: 65000,
-      bridgeStatus: "Campaign chat is taking a while; manual fallback remains available",
-      activityText: "ChatGPT is taking a while; manual fallback is ready",
+      bridgeStatus: "DM Voice chat is taking a while; replacement response fallback remains available",
+      activityText: "ChatGPT is taking a while; replacement response fallback is ready",
       activityState: "waiting",
     },
   ];

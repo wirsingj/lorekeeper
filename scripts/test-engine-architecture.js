@@ -2967,8 +2967,8 @@ sceneStatus: {"mode":"exploration"}`);
 function testProviderChatProjection() {
   const unavailable = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.EXTENSION_UNAVAILABLE);
   assert.equal(unavailable.bridgeMode, "manual");
-  assert.match(unavailable.copy.successMessage, /Extension not connected/);
-  assert.match(unavailable.activityText, /manual paste/);
+  assert.match(unavailable.copy.successMessage, /ChatGPT helper not connected/);
+  assert.match(unavailable.activityText, /handoff/);
 
   const login = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.LOGIN_REQUIRED);
   assert.equal(login.bridgeMode, "extension");
@@ -2976,17 +2976,17 @@ function testProviderChatProjection() {
   assert.equal(login.activityState, "error");
 
   const noResponse = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.NO_RESPONSE);
-  assert.match(noResponse.copy.successMessage, /Campaign chat did not return/);
+  assert.match(noResponse.copy.successMessage, /ChatGPT DM did not return/);
   assert.match(noResponse.activityText, /No DM response/);
 
   const failed = buildCampaignChatFallbackPlan(campaignChatFallbackReasons.RUN_FAILED);
   assert.equal(failed.bridgeMode, "manual");
-  assert.match(failed.copy.failureMessage, /Campaign chat failed/);
+  assert.match(failed.copy.failureMessage, /ChatGPT DM failed/);
 
   const progress = buildCampaignChatProgressSteps();
   assert.deepEqual(progress.map((step) => step.delayMs), [8000, 30000, 65000]);
   assert.ok(progress.every((step) => step.activityState === "waiting"));
-  assert.match(progress[2].bridgeStatus, /manual fallback/);
+  assert.match(progress[2].bridgeStatus, /replacement response fallback/);
 }
 
 function testCharacterAutocompleteProjection() {
@@ -3395,7 +3395,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /local-table-guidance/);
   assert.match(appShell, /local-table-guest-link/);
   assert.match(appShell, /copy-guest-link/);
-  assert.match(appShell, /Open Guest Page/);
+  assert.match(appShell, /Open Guest Lobby/);
   assert.match(appShell, /Send Friend Actions/);
   assert.match(appShell, /className="friend-share-card"/, "Friends tab should lead with a simple guest-link share card");
   assert.match(appShell, /className="advanced-table-settings"/, "less common table controls should live behind Table Options");

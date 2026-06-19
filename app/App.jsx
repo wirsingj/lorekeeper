@@ -67,7 +67,7 @@ export function LorekeeperShell() {
             <p id="scene-intelligence-tensions"></p>
             <p id="scene-intelligence-consequences"></p>
           </div>
-          <span id="provider-status" className="visually-hidden">DM voice: campaign chat</span>
+          <span id="provider-status" className="visually-hidden">DM voice: ChatGPT DM</span>
         </section>
 
         <section id="party-rail-section" className="rail-section party-rail-section">
@@ -737,7 +737,7 @@ function SetupDialog() {
 
         <nav id="settings-tabs" className="settings-tabs" aria-label="Preferences sections" role="tablist" data-visible-tabs="4">
           <button className="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="app">App</button>
-          <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="ai">AI</button>
+          <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="ai">DM</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="friends">Friends</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="troubleshooting">Troubleshooting</button>
         </nav>
@@ -763,8 +763,8 @@ function SetupDialog() {
           <label>
             <span>DM Source</span>
             <select id="provider-mode">
-              <option value="ollama">Local AI</option>
-              <option value="bridge">Campaign Chat</option>
+              <option value="ollama">Local DM</option>
+              <option value="bridge">ChatGPT DM</option>
             </select>
           </label>
           <div className="local-ai-card">
@@ -810,10 +810,10 @@ function SetupDialog() {
           <div id="bridge-card" className="bridge-card">
             <div className="status-line">
               <span className="status-dot"></span>
-              <span id="bridge-status">Campaign chat ready</span>
+              <span id="bridge-status">ChatGPT DM ready</span>
             </div>
             <div className="button-stack">
-              <button id="check-sidecar" type="button">Open Campaign Chat</button>
+              <button id="check-sidecar" type="button">Open ChatGPT DM</button>
               <button id="copy-provider-prompt" type="button">Copy DM Instructions</button>
               <button id="new-provider-chat" type="button">New DM Chat</button>
             </div>
@@ -833,7 +833,7 @@ function SetupDialog() {
             <span id="local-table-state" className="count-pill">Off</span>
           </div>
           <div className="friend-share-card">
-            <p id="local-table-address" className="setup-note">Open the guest page when friends are joining from another device.</p>
+            <p id="local-table-address" className="setup-note">Open the guest lobby when friends are joining from another device.</p>
             <label className="field-stack local-table-share">
               <span>Guest Link</span>
               <input
@@ -844,9 +844,9 @@ function SetupDialog() {
               />
             </label>
             <div className="button-stack two-up">
-              <button id="start-local-table" type="button">Open Guest Page</button>
+              <button id="start-local-table" type="button">Open Guest Lobby</button>
               <button id="copy-guest-link" type="button">Copy Guest Link</button>
-              <button id="stop-local-table" type="button">Close Guest Page</button>
+              <button id="stop-local-table" type="button">Close Guest Lobby</button>
             </div>
           </div>
           <div id="waiting-guests" className="local-table-list"></div>

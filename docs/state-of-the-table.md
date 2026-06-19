@@ -56,13 +56,13 @@ Permanent screen space should be reserved for play. The table should not ask pla
 
 ### Screen Review
 
-1. Front Door: improved, but still should eventually feel more like a game launcher with big Continue/New/Join affordances and AI readiness as secondary.
+1. Front Door: improved, but still should eventually feel more like a game launcher with big Continue/New/Join affordances and DM Voice as secondary.
 2. New Adventure: improved by using full-screen setup, but still reads like a form. It should evolve into an adventure-builder flow with sections for Premise, Hero, Party, Friends.
 3. Join Flow: plain `/guest` is the right direction. The next UX step is a friendly table list plus seat cards, with direct links treated as shortcuts.
 4. Main Table: highest debt. Story must dominate; rails should be notebook/party shelves, not dashboards. Current pass collapses notes by default and compacts party cards, but phase-specific table chrome is still needed.
 5. Combat: mechanically stronger, but visually still too similar to roleplay. Combat should eventually emphasize initiative, current actor, available actions, visible rolls/effects, and clear end-turn flow.
 6. Notes: should feel like a notebook/codex opened when needed. Current pass moves toward this by collapsing World and Player notes by default.
-7. Preferences: still too much one-dialog surface. Split into App Preferences, Table Settings, AI Readiness, and Developer Tools.
+7. Preferences: still too much one-dialog surface. Split into App Preferences, Table Settings, DM Voice, and Developer Tools.
 8. Local Table: should become "Invite Friends" and "Seats" in normal play, with network details hidden behind advanced details.
 9. Diagnostics: should remain available but never visually compete with play unless the table is stuck.
 10. Recovery: table-facing copy is better, but the long-term design should feel like "DM needs a ruling" rather than software repair.
@@ -82,7 +82,7 @@ High:
 6. Party cards still carry too much descriptive text for permanent rail space, though now clamped by default.
 7. Notes are records rather than a true notebook/codex experience.
 8. Local-table/guest tools still expose hosting mechanics in places.
-9. AI readiness/provider setup still feels like configuration, not choosing a DM voice.
+9. DM Voice setup still feels like configuration, not choosing a storyteller.
 10. Guest seat requests need more immediate, friendly host-side presentation.
 
 Medium:
@@ -278,13 +278,13 @@ Risks:
 140. The default action prompt is now campaign-neutral instead of heist-specific, so new tables do not inherit an unrelated tone from placeholder copy.
 141. New tables now open with a clearer multi-line setup beat: location, seated party, premise, and a direct Next instruction to press Start Adventure for the opening DM narration.
 142. Table focus projection now lives in `app/table-focus-controller.js`, so phase-to-surface decisions are tested outside `app/app.js`; combat, party/waiting, and review states can visually elevate the right rail/section through a single `data-table-focus` hook.
-143. Preferences now open as scoped surfaces: App Preferences shows only App/AI, AI Readiness shows AI/App, and in-table Friends And Seats shows only Friends/Troubleshooting instead of exposing every settings tab at once.
+143. Preferences now open as scoped surfaces: App Preferences shows only App/DM Voice, DM Voice shows DM/App, and in-table Friends And Seats shows only Friends/Troubleshooting instead of exposing every settings tab at once.
 144. Settings surface mode/copy/tab visibility now lives in `app/settings-surface-controller.js` with direct tests, so future settings UX changes do not have to add more policy to `app/app.js`.
 145. Start Adventure now has an in-wizard progress/error status and repeat-submit guard, so campaign creation failures no longer look like a dead button while the global table status is hidden.
 146. Freshly created ready tables now expose a table-level Start Adventure action that runs a dedicated first-session opening narration prompt after the host finishes last-minute invites and party edits.
 147. Friends And Seats now leads with the normal Guest Link/open/copy flow and tucks seat-link/check/collection controls under Table Options, reducing the old wall-of-settings feeling for host seating.
 148. Start Adventure opening readiness, button state, and first-session prompt policy now live in `app/table-opening-controller.js` with direct tests instead of being renderer-owned string/visibility logic.
-149. The front door now presents Continue Adventure, New Adventure, and Join A Table as three first-class launcher choices, with AI/preferences still demoted to utility actions.
+149. The front door now presents Continue Adventure, New Adventure, and Join A Table as three first-class launcher choices, with DM Voice/preferences still demoted to utility actions.
 150. Fresh-table Start Adventure now appears in the command deck next-step area instead of the status-strip action pile, making the first real table action harder to miss.
 151. Normal DM Nudge prompt policy now lives in `app/dm-nudge-controller.js` with direct tests, reducing another renderer-owned table-flow instruction string.
 152. Table action visibility for Nudge, Cancel DM Response, Start Adventure, Seat Guest, Review DM Response, Use Anyway, Try Again, and Read Latest now flows through `app/table-action-controller.js`, giving phase-aware CTAs one tested projection instead of scattered renderer functions.
@@ -326,6 +326,7 @@ Risks:
 188. Failure-pattern audit tightened alternate entry points that bypassed visible button gates: public guest actions/passes now reject pre-opening submissions and wrong combat turns in `src/multiplayer/local-table.js`, guest choice votes must match the current DM-authored choice/options, the remote UI harness directly probes pre-opening guest action rejection, and companion "Resolve Now" checks the turn gate before mutating message status.
 189. New Adventure now says Set The Table while campaign files/seats are being prepared, leaving Start Adventure as the single explicit first-DM-narration action on the table. Guest pre-opening composer copy now says it is waiting for the host to begin instead of implying the host already started.
 190. The front door now uses Set Up Table and DM Voice language, the DM Voice panel uses table-facing DM Source/model/test labels, and the join panel no longer exposes a duplicate Advanced join dialog beside the normal invite-link flow.
+191. DM Voice and Friends setup copy no longer exposes "AI" tabs, Guest Page labels, provider prompts, provider bridge, manual fallback, or campaign-chat status wording in normal live paths; visible host status now uses DM Voice, ChatGPT DM, Guest Lobby, and handoff language.
 
 ### Still Risky
 
@@ -600,12 +601,12 @@ Risks:
 
 1. Open LoreKeeper on the host machine and choose Host.
 2. Open the campaign to show.
-3. Confirm Local AI/provider ready.
+3. Confirm DM Voice is ready.
 4. Confirm debug meta in play log is off.
 5. Confirm Local Table is off until ready.
 6. Create/confirm host character.
 7. Add AI companions before invite if desired.
-8. Start Local Table.
+8. Open the Guest Lobby.
 9. Copy the Guest Link and send it to the guest.
 10. Use Join-As links only as an advanced bypass when you intentionally want a one-click fixed seat.
 
@@ -683,6 +684,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Failure-pattern audit of the latest bug cluster found the shared smell: new phase/session rules often landed in visible controls first, while alternate entry points stayed permissive. Hardened public guest action/pass routes, choice-vote authority, and companion Resolve Now side effects. Verification: `npm run test:multiplayer`, focused remote `/guest` UI scenario, `npm run test:regression`, and `npm run test:engine` passed.
 - 2026-06-18: Launcher wording pass removed the duplicate "Start Adventure" mental model from campaign creation. New Adventure now sets the table, and Start Adventure remains the table-level opening beat. Verification: `npm run test:engine`, `npm run build`, and focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
 - 2026-06-18: Front-door/join/DM Voice polish changed Start New to Set Up Table, Check AI to DM Voice, softened the DM Voice panel's visible source/model/test labels, and removed the duplicate Advanced join button from the normal join panel. Verification: `npm run test:engine`, `npm run build`, focused `home-baseline`, and focused `settings-navigation-and-diagnostics` UI passed.
+- 2026-06-18: DM Voice/Friends copy pass changed the Settings tab from AI to DM, changed Guest Page actions to Guest Lobby, replaced provider-prompt/bridge/manual-fallback live statuses with DM turn/ChatGPT DM/handoff wording, and tightened `table-status` matching so readiness does not look like active DM thinking. Verification: `npm run test:engine`, focused `settings-navigation-and-diagnostics`, `create-campaign-and-hide-start-adventure-after-use`, and `rp-post-narration-import` UI passed.
 
 ## How To Use This Doc
 

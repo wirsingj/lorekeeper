@@ -13,14 +13,14 @@ const settingsCopy = Object.freeze({
     subtitle: "Choose how LoreKeeper starts and behaves before you sit down.",
   },
   ai: {
-    eyebrow: "AI Readiness",
+    eyebrow: "DM Voice",
     title: "DM Voice",
-    subtitle: "Check or tune the storyteller before you host.",
+    subtitle: "Choose or tune the storyteller before you host.",
   },
   friends: {
     eyebrow: "Table Settings",
     title: "Friends And Seats",
-    subtitle: "Open the guest page, share the table link, and seat friends.",
+    subtitle: "Open the guest lobby, share the table link, and seat friends.",
   },
   troubleshooting: {
     eyebrow: "Troubleshooting",

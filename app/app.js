@@ -694,7 +694,7 @@ elements.checkSidecar.addEventListener("click", async () => {
     return;
   }
 
-  elements.bridgeStatus.textContent = "No saved campaign chat found; use New Campaign Chat first";
+  elements.bridgeStatus.textContent = "No saved ChatGPT DM chat found; use New DM Chat first";
 });
 
 elements.newProviderChat.addEventListener("click", async () => {
@@ -1608,7 +1608,7 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
     return { providerReceived: false, reason: contentGate.reason };
   }
 
-  setProviderActivity("Building provider prompt...", "working");
+  setProviderActivity("Preparing the DM turn...", "working");
   state.currentTurn = createPlayerTurn({
     campaign: state.campaign,
     playerMessage,
@@ -2914,7 +2914,7 @@ async function createNewCampaign({ title, premise, startingLocation, tone, playe
       setProviderActivity(
         remoteInviteLobby.copied
           ? "Guest link copied; friend seats are open."
-          : "Friend seats are open; copy the Guest Page link from Friends.",
+          : "Friend seats are open; copy the Guest Link from Friends.",
         remoteInviteLobby.copied ? "idle" : "waiting",
       );
     } else {
@@ -6535,11 +6535,11 @@ function render() {
   const providerSettings = currentProviderSettings();
   elements.providerStatus.textContent = providerSettings.preferredProvider === "ollama"
     ? `DM voice: Local AI ${providerSettings.selectedModel}`
-    : "DM voice: campaign chat/manual";
+    : "DM voice: ChatGPT DM";
   if (providerSettings.preferredProvider === "bridge" && state.bridge.mode === "extension") {
     elements.providerStatus.textContent = state.bridge.ready
-      ? "DM voice: campaign chat ready"
-      : "DM voice: campaign chat waiting";
+      ? "DM voice: ChatGPT DM ready"
+      : "DM voice: ChatGPT DM waiting";
   }
   elements.saveStatus.textContent = clientMode || isRemoteTableClient()
     ? "Hosted table"
@@ -7347,8 +7347,8 @@ async function ensureCampaignChatSession({ openIfMissing = false, focusProvider 
       lastRun: null,
       lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
-    elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
-    setProviderActivity("Provider bridge unavailable; manual copy/import ready", "error");
+    elements.bridgeStatus.textContent = "ChatGPT helper not connected; reload the browser helper";
+    setProviderActivity("ChatGPT helper unavailable; DM Instructions are ready for handoff", "error");
     return probe;
   }
 
@@ -7368,8 +7368,8 @@ async function ensureCampaignChatSession({ openIfMissing = false, focusProvider 
   };
 
   try {
-    elements.bridgeStatus.textContent = "Checking campaign ChatGPT conversation...";
-    setProviderActivity("Checking ChatGPT campaign chat...", "working");
+    elements.bridgeStatus.textContent = "Checking ChatGPT DM conversation...";
+    setProviderActivity("Checking ChatGPT DM...", "working");
     const result = await sendExtensionMessage(message, 35000);
     return handleCompanionCheckResult(result);
   } catch (error) {
@@ -7379,8 +7379,8 @@ async function ensureCampaignChatSession({ openIfMissing = false, focusProvider 
       lastRun: null,
       lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
-    elements.bridgeStatus.textContent = "Extension not connected; reload Firefox extension";
-    setProviderActivity("Provider bridge unavailable; manual copy/import ready", "error");
+    elements.bridgeStatus.textContent = "ChatGPT helper not connected; reload the browser helper";
+    setProviderActivity("ChatGPT helper unavailable; DM Instructions are ready for handoff", "error");
     return {
       ready: false,
       error: error instanceof Error ? error.message : "Extension bridge unavailable.",
@@ -7390,8 +7390,8 @@ async function ensureCampaignChatSession({ openIfMissing = false, focusProvider 
 
 async function startNewProviderConversation() {
   try {
-    elements.bridgeStatus.textContent = "Creating fresh campaign chat record...";
-    setProviderActivity("Creating campaign chat record...", "working");
+    elements.bridgeStatus.textContent = "Preparing a new ChatGPT DM chat...";
+    setProviderActivity("Preparing a new ChatGPT DM chat...", "working");
     const response = await fetch(apiProviderConversationUrl, {
       method: "POST",
       headers: {
@@ -7420,8 +7420,8 @@ async function startNewProviderConversation() {
       lastImportedProviderText: state.bridge.lastImportedProviderText,
     };
     const conversation = getActiveProviderConversation(state.campaign, defaultCompanionOptions.providerId);
-    elements.bridgeStatus.textContent = `Opening fresh campaign chat: ${conversation.conversationHint}`;
-    setProviderActivity(`Opening ChatGPT chat for ${conversation.conversationHint}...`, "working");
+    elements.bridgeStatus.textContent = `Opening new ChatGPT DM: ${conversation.conversationHint}`;
+    setProviderActivity(`Opening ChatGPT DM for ${conversation.conversationHint}...`, "working");
     render();
     const result = await ensureCampaignChatSession({
       openIfMissing: true,
@@ -7434,7 +7434,7 @@ async function startNewProviderConversation() {
     }
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error ? `New chat failed: ${error.message}` : "New chat failed";
-    setProviderActivity("New provider chat failed", "error");
+    setProviderActivity("New DM chat failed", "error");
   }
 }
 
@@ -7451,11 +7451,11 @@ async function bootstrapProviderConversation() {
     "Do not add campaign canon from this bootstrap message.",
     "LoreKeeper SQLite is the source of truth; provider chat history is only scratch memory.",
     "",
-    "Reply with one short sentence confirming the campaign chat is ready.",
+    "Reply with one short sentence confirming the DM chat is ready.",
   ].join("\n");
 
   try {
-    elements.bridgeStatus.textContent = `Creating provider chat entry for ${conversation.conversationHint}...`;
+    elements.bridgeStatus.textContent = `Preparing DM chat for ${conversation.conversationHint}...`;
     setProviderActivity(`Bootstrapping ${conversation.conversationHint} in ChatGPT...`, "working");
     const result = await sendExtensionMessage(
       {
@@ -7482,20 +7482,20 @@ async function bootstrapProviderConversation() {
       return;
     }
 
-    elements.bridgeStatus.textContent = `Provider chat created for ${conversation.conversationHint}`;
-    setProviderActivity(`Provider chat ready: ${conversation.conversationHint}`, "idle");
+    elements.bridgeStatus.textContent = `ChatGPT DM ready for ${conversation.conversationHint}`;
+    setProviderActivity(`ChatGPT DM ready: ${conversation.conversationHint}`, "idle");
   } catch (error) {
     elements.bridgeStatus.textContent = error instanceof Error
-      ? `Provider chat opened; bootstrap failed: ${error.message}`
-      : "Provider chat opened; bootstrap failed";
-    setProviderActivity("Provider chat opened; bootstrap needs manual follow-up", "error");
+      ? `ChatGPT DM opened; setup failed: ${error.message}`
+      : "ChatGPT DM opened; setup failed";
+    setProviderActivity("ChatGPT DM opened; setup needs a handoff", "error");
   }
 }
 
 async function runPromptThroughCampaignChat(prompt) {
   if (!prompt.trim()) {
-    elements.bridgeStatus.textContent = "Build a provider prompt first";
-    setProviderActivity("Build a provider prompt first", "idle");
+    elements.bridgeStatus.textContent = "Build a DM turn first";
+    setProviderActivity("Build a DM turn first", "idle");
     return { providerReceived: false };
   }
 
@@ -7518,7 +7518,7 @@ async function runPromptThroughCampaignChat(prompt) {
 
     const baselineResponse = await readLatestCompanionResponse().catch(() => null);
     baselineProviderText = baselineResponse?.text ?? "";
-    elements.bridgeStatus.textContent = "Sending turn to campaign ChatGPT conversation...";
+    elements.bridgeStatus.textContent = "Sending turn to ChatGPT DM...";
     setProviderActivity("Submitting turn to ChatGPT...", "working");
     const progress = startProviderChatProgress();
     const result = await sendExtensionMessage(
@@ -7546,14 +7546,14 @@ async function runPromptThroughCampaignChat(prompt) {
     }
 
     if (result.sent && result.response?.text) {
-      setProviderActivity("ChatGPT response received; importing...", "working");
+      setProviderActivity("ChatGPT DM answered; bringing it to the table...", "working");
       await importProviderResponse(result.response.text);
       return { providerReceived: true, imported: true };
     }
 
     if (result.response?.needsManualSubmit) {
-      elements.bridgeStatus.textContent = "Prompt is in the campaign chat; press the send arrow";
-      setProviderActivity("Prompt inserted in ChatGPT; press send in provider tab", "waiting");
+      elements.bridgeStatus.textContent = "Prompt is in ChatGPT DM; press the send arrow";
+      setProviderActivity("Prompt inserted in ChatGPT; press send in the ChatGPT tab", "waiting");
       state.bridge = {
         mode: "extension",
         ready: true,
@@ -7970,7 +7970,7 @@ async function readLatestCompanionResponse() {
 
 async function copyPromptToClipboard(prompt, messages = {}) {
   if (!prompt?.trim()) {
-    elements.bridgeStatus.textContent = messages.emptyMessage ?? "No provider prompt ready";
+    elements.bridgeStatus.textContent = messages.emptyMessage ?? "No DM turn ready";
     return false;
   }
 
@@ -8802,15 +8802,15 @@ async function handleCompanionCheckResult(result) {
 
   if (result.ready) {
     elements.bridgeStatus.textContent = result.created
-      ? `Campaign chat opened for ${result.settings?.conversationHint ?? "this campaign"}`
-      : `Campaign chat ready for ${result.settings?.conversationHint ?? "this campaign"}`;
-    setProviderActivity(`ChatGPT campaign chat ready: ${result.settings?.conversationHint ?? state.campaign.title}`, "idle");
+      ? `ChatGPT DM opened for ${result.settings?.conversationHint ?? "this campaign"}`
+      : `ChatGPT DM ready for ${result.settings?.conversationHint ?? "this campaign"}`;
+    setProviderActivity(`ChatGPT DM ready: ${result.settings?.conversationHint ?? state.campaign.title}`, "idle");
   } else if (result.loginRequired) {
-    elements.bridgeStatus.textContent = "ChatGPT needs login, project selection, or campaign chat selection";
-    setProviderActivity("ChatGPT needs login or campaign chat selection", "error");
+    elements.bridgeStatus.textContent = "ChatGPT needs login, project selection, or DM chat selection";
+    setProviderActivity("ChatGPT needs login or DM chat selection", "error");
   } else {
-    elements.bridgeStatus.textContent = "No campaign ChatGPT conversation found";
-    setProviderActivity("No campaign ChatGPT conversation found", "idle");
+    elements.bridgeStatus.textContent = "No ChatGPT DM conversation found";
+    setProviderActivity("No ChatGPT DM conversation found", "idle");
   }
 
   render();
