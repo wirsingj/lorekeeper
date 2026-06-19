@@ -682,6 +682,67 @@ const scenarios = [
       assert.equal(newGameSession.assignedCharacter.name, "Tavi");
     },
   },
+  {
+    name: "remote-guest-party-vote-drafts-host-choice",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Remote Vote",
+        premise: "A dusk road offers three bad promises and one honest silence.",
+        startingLocation: "Dusk Road Shrine",
+        tone: "quiet table dilemma",
+        primary: {
+          name: "Ilyra",
+          ancestry: "Half-elf",
+          characterClass: "Bard",
+          concept: "A careful traveler who asks the table before choosing.",
+        },
+        companions: [{
+          name: "Renn",
+          ancestry: "Human",
+          characterClass: "Ranger",
+          concept: "A scout with practical instincts about road danger.",
+          integrationPrompt: "Renn knows the old road signs.",
+          controllerKind: "remote_invite",
+        }],
+      });
+      await waitForActiveJoinableSeat(harness, "Renn");
+      const guestPage = await harness.newGuestPage("guest-vote");
+      await requestGuestSeat(guestPage, { playerName: "Remote Jess", seatName: "Renn" });
+      await seatActiveWaitingGuest(harness, { playerName: "Remote Jess", seatName: "Renn" });
+      await waitForGuestConnected(guestPage, { characterName: "Renn", campaignTitle: "Harness Remote Vote" });
+
+      await startAdventureOpeningForHarness(harness, "The Dusk Road Shrine asks the table to choose how it will pass.");
+      await harness.mockProviderTurn(turnResponse({
+        text: "The shrine's stones warm as the road waits for the party to choose its promise.",
+        sceneStatus: { mode: "social", danger: "tense", awaitingPlayer: true },
+        choices: {
+          prompt: "Which promise does the party make?",
+          scope: "vote",
+          options: [
+            { id: "oath", text: "Promise to return the stolen mile marker." },
+            { id: "watch", text: "Promise to keep watch until dawn." },
+            { id: "silence", text: "Promise nothing and leave an offering." },
+          ],
+          allowVote: true,
+          allowOther: true,
+        },
+      }));
+      await submitPlayerTurn(harness.page, "Ilyra asks the table which promise feels honest.");
+      await guestPage.locator(".choice-option").first().waitFor({ state: "visible", timeout: 15000 });
+      await guestPage.locator(".choice-option").first().click();
+      await harness.page.waitForFunction(() => {
+        return [...document.querySelectorAll(".choice-vote-count")]
+          .some((node) => node.textContent?.trim() === "1");
+      }, null, { timeout: 15000 });
+      await expectVisibleText(harness.page, "Table leaning");
+      await expectVisibleText(harness.page, "Draft leading choice A");
+      await harness.page.click(".choice-vote-action");
+      await harness.page.waitForFunction(() => {
+        return /stolen mile marker/i.test(document.querySelector("#player-input")?.value ?? "");
+      }, null, { timeout: 10000 });
+    },
+  },
 ];
 const chaosScenarios = wantsChaos ? buildChaosScenarios({ seed: chaosSeed, runs: chaosRuns }) : [];
 const allScenarios = [...scenarios, ...chaosScenarios];

@@ -4,6 +4,7 @@ import { touchCampaign } from "../campaign-state/schema.js";
 import { isAllowedInviteHost } from "./invite-security.js";
 import { buildAggregatedPlayerTurn as buildAggregatedPlayerTurnPure } from "./turn-inputs.js";
 import { addMissingCombatantsToTurnOrder } from "../rules/combat-turns.js";
+import { choiceLabelForIndex, choicePanelKey } from "../engine/choice-vote-identity.js";
 
 // Current local-table authority center.
 // Campaign state is still persisted as a single campaign snapshot, but every
@@ -893,7 +894,7 @@ function activeChoiceForVote(campaign) {
     const message = messages[index];
     const choices = message?.data?.choices;
     if ((message?.role === "dm" || message?.role === "provider") && choices?.options?.length) {
-      const key = choiceKeyForStructuredChoices(choices);
+      const key = choicePanelKey(choices);
       const optionIds = new Set(choices.options.map((option, optionIndex) =>
         String(option?.id || choiceLabelForIndex(optionIndex))
       ));
@@ -904,21 +905,6 @@ function activeChoiceForVote(campaign) {
     }
   }
   return null;
-}
-
-function choiceKeyForStructuredChoices(choices = {}) {
-  return compactCompareText([
-    choices.prompt || "",
-    choices.scope || "",
-    choices.forActorId || "",
-    (choices.options ?? []).map((option, index) =>
-      `${String(option?.id || choiceLabelForIndex(index))}:${option?.text || ""}`
-    ).join("|"),
-  ].join("::")).slice(0, 500);
-}
-
-function choiceLabelForIndex(index) {
-  return String.fromCharCode(65 + index);
 }
 
 export function passGuestAction(campaign, { connectionId, clientId, connectionSecret, characterId, campaignId = "", tableId = "", sessionId = "" } = {}) {

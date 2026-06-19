@@ -28,6 +28,7 @@ import {
   waitingGuestHeartbeatTimeoutMs,
 } from "../src/multiplayer/local-table.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
+import { choicePanelKey } from "../src/engine/choice-vote-identity.js";
 
 let campaign = testCampaign();
 campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
@@ -257,9 +258,9 @@ const activeRiverChoice = {
   prompt: "What do you do?",
   scope: "vote",
   options: [
-    { id: "A", text: "Keep watch from the bank." },
-    { id: "B", text: "Offer to help load the last boat." },
-    { id: "C", text: "Sneak onto the boat." },
+    { id: "keep-watch", text: "Keep watch from the bank." },
+    { id: "load-boat", text: "Offer to help load the last boat." },
+    { id: "sneak-boat", text: "Sneak onto the boat." },
   ],
   allowVote: true,
   allowOther: true,
@@ -286,7 +287,7 @@ campaign = submitGuestChoiceVote(campaign, {
   connectionSecret,
   characterId: "kevric",
   choiceKey: activeRiverChoiceKey,
-  optionId: "B",
+  optionId: "load-boat",
   optionLabel: "B",
   optionText: "Offer to help load the last boat.",
   prompt: "What do you do?",
@@ -304,7 +305,7 @@ campaign = submitGuestChoiceVote(campaign, {
   connectionSecret,
   characterId: "kevric",
   choiceKey: activeRiverChoiceKey,
-  optionId: "C",
+  optionId: "sneak-boat",
   optionLabel: "C",
   optionText: "Sneak onto the boat.",
   prompt: "What do you do?",
@@ -334,7 +335,7 @@ assert.throws(
     connectionSecret,
     characterId: "kevric",
     choiceKey: activeRiverChoiceKey,
-    optionId: "Z",
+    optionId: "missing-option",
     optionLabel: "Z",
   }),
   /option is no longer active/i,
@@ -346,7 +347,7 @@ assert.throws(
     connectionSecret,
     characterId: "jarin",
     choiceKey: activeRiverChoiceKey,
-    optionId: "A",
+    optionId: "keep-watch",
     optionLabel: "A",
   }),
   /assigned party member/i,
@@ -941,18 +942,7 @@ assert.equal(wrongInviteCampaign.multiplayer.connections.find((connection) => co
 console.log("LoreKeeper multiplayer tests passed.");
 
 function testChoiceKey(choices = {}) {
-  return compactCompareText([
-    choices.prompt || "",
-    choices.scope || "",
-    choices.forActorId || "",
-    (choices.options ?? []).map((option, index) =>
-      `${String(option?.id || String.fromCharCode(65 + index))}:${option?.text || ""}`
-    ).join("|"),
-  ].join("::")).slice(0, 500);
-}
-
-function compactCompareText(value) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  return choicePanelKey(choices);
 }
 
 function testCampaign() {

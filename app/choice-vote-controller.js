@@ -1,19 +1,14 @@
-export function choiceLabelForIndex(index) {
-  return String.fromCharCode(65 + index);
-}
+export {
+  choiceLabelForIndex,
+  choiceOptionId,
+  choicePanelKey,
+} from "../src/engine/choice-vote-identity.js";
 
-export function choiceOptionId(block, index) {
-  return String(block.options?.[index]?.id || choiceLabelForIndex(index));
-}
-
-export function choicePanelKey(block = {}) {
-  return compactCompareText([
-    block.prompt || "",
-    block.scope || "",
-    block.forActorId || "",
-    (block.options ?? []).map((option, index) => `${choiceOptionId(block, index)}:${option?.text || block.items?.[index] || ""}`).join("|"),
-  ].join("::")).slice(0, 500);
-}
+import {
+  choiceLabelForIndex,
+  choiceOptionId,
+  choicePanelKey,
+} from "../src/engine/choice-vote-identity.js";
 
 export function isPartyVoteChoiceBlock(block = {}) {
   const scope = String(block.scope || "").trim();
@@ -105,12 +100,4 @@ export function currentGuestVoteForChoice(block = {}, {
 export function choiceSelectionActivityText(label, voteCount = 0) {
   const voteText = voteCount ? ` with ${voteCount} ${voteCount === 1 ? "vote" : "votes"}` : "";
   return `Selected choice ${label}${voteText}; edit or send`;
-}
-
-function compactCompareText(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
