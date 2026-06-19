@@ -20,6 +20,7 @@ import {
   buildQuestNotebookSection,
   buildThingsNotebookSection,
 } from "./campaign-notebook-controller.js";
+import { buildCharacterSheetPayload, buildCharacterSheetProjection, mergeSheetText } from "./character-sheet-controller.js";
 import {
   choiceLabelForIndex,
   choiceOptionId,
@@ -8769,36 +8770,29 @@ function openCharacterSheet(member) {
 }
 
 function renderCharacterSheet(member) {
-  elements.characterSheetTitle.textContent = member.name || "Unnamed party member";
-  elements.characterSheetSubtitle.textContent = [
-    member.ancestryClass,
-    member.playerRole,
-    member.role,
-    member.type,
-  ].filter(Boolean).join(" / ") || "Party member";
-  const hp = normalizeHpForForm(member.stats?.hp ?? member.hp ?? member.hitPoints);
-  const scores = characterAbilityScores(member);
-
-  elements.sheetName.value = member.name || "";
-  elements.sheetAncestryClass.value = member.ancestryClass || member.class || "";
-  elements.sheetRole.value = member.playerRole || member.role || "";
-  elements.sheetLevel.value = member.level ?? member.stats?.level ?? member.characterLevel ?? "";
-  elements.sheetXp.value = member.experience ?? member.xp ?? member.stats?.experience ?? member.stats?.xp ?? "";
-  elements.sheetHpCurrent.value = hp.current ?? "";
-  elements.sheetHpMax.value = hp.max ?? "";
-  elements.sheetAc.value = member.stats?.armorClass ?? member.armorClass ?? member.ac ?? "";
-  elements.sheetProf.value = member.proficiencyBonus ?? member.stats?.proficiencyBonus ?? member.prof ?? "";
-  elements.sheetBackground.value = member.background || member.backstory || member.summary || member.description || "";
-  elements.sheetStr.value = scores.STR ?? "";
-  elements.sheetDex.value = scores.DEX ?? "";
-  elements.sheetCon.value = scores.CON ?? "";
-  elements.sheetInt.value = scores.INT ?? "";
-  elements.sheetWis.value = scores.WIS ?? "";
-  elements.sheetCha.value = scores.CHA ?? "";
-  elements.sheetSkills.value = characterSkills(member).join("\n");
-  elements.sheetAbilities.value = characterAbilities(member).join("\n");
-  elements.sheetSpells.value = uniqueTextList([member.spells, member.stats?.spells]).join("\n");
-  elements.sheetNotes.value = (member.notes ?? []).join("\n");
+  const projection = buildCharacterSheetProjection(member);
+  elements.characterSheetTitle.textContent = projection.title;
+  elements.characterSheetSubtitle.textContent = projection.subtitle;
+  elements.sheetName.value = projection.fields.name;
+  elements.sheetAncestryClass.value = projection.fields.ancestryClass;
+  elements.sheetRole.value = projection.fields.role;
+  elements.sheetLevel.value = projection.fields.level;
+  elements.sheetXp.value = projection.fields.xp;
+  elements.sheetHpCurrent.value = projection.fields.hpCurrent;
+  elements.sheetHpMax.value = projection.fields.hpMax;
+  elements.sheetAc.value = projection.fields.armorClass;
+  elements.sheetProf.value = projection.fields.proficiencyBonus;
+  elements.sheetBackground.value = projection.fields.background;
+  elements.sheetStr.value = projection.fields.str;
+  elements.sheetDex.value = projection.fields.dex;
+  elements.sheetCon.value = projection.fields.con;
+  elements.sheetInt.value = projection.fields.int;
+  elements.sheetWis.value = projection.fields.wis;
+  elements.sheetCha.value = projection.fields.cha;
+  elements.sheetSkills.value = projection.fields.skills;
+  elements.sheetAbilities.value = projection.fields.abilities;
+  elements.sheetSpells.value = projection.fields.spells;
+  elements.sheetNotes.value = projection.fields.notes;
 }
 
 function autoFillOpenCharacterSheet() {
@@ -8832,12 +8826,37 @@ function autoFillOpenCharacterSheet() {
   elements.sheetInt.value = sheet.stats.abilityScores.INT ?? "";
   elements.sheetWis.value = sheet.stats.abilityScores.WIS ?? "";
   elements.sheetCha.value = sheet.stats.abilityScores.CHA ?? "";
-  elements.sheetSkills.value = mergeMultiline(elements.sheetSkills.value, sheet.skills);
-  elements.sheetAbilities.value = mergeMultiline(elements.sheetAbilities.value, sheet.abilities);
-  elements.sheetSpells.value = mergeMultiline(elements.sheetSpells.value, sheet.spells);
-  elements.sheetNotes.value = mergeMultiline(elements.sheetNotes.value, ["Auto-filled with a 5E-lite standard array."]);
+  elements.sheetSkills.value = mergeSheetText(elements.sheetSkills.value, sheet.skills);
+  elements.sheetAbilities.value = mergeSheetText(elements.sheetAbilities.value, sheet.abilities);
+  elements.sheetSpells.value = mergeSheetText(elements.sheetSpells.value, sheet.spells);
+  elements.sheetNotes.value = mergeSheetText(elements.sheetNotes.value, ["Auto-filled with a 5E-lite standard array."]);
   state.activeCharacterSheetAutofill = sheet;
   elements.bridgeStatus.textContent = `${sheet.name} sheet auto-filled; review and save when ready`;
+}
+
+function readCharacterSheetFormValues() {
+  return {
+    name: elements.sheetName.value,
+    ancestryClass: elements.sheetAncestryClass.value,
+    role: elements.sheetRole.value,
+    level: elements.sheetLevel.value,
+    xp: elements.sheetXp.value,
+    hpCurrent: elements.sheetHpCurrent.value,
+    hpMax: elements.sheetHpMax.value,
+    armorClass: elements.sheetAc.value,
+    proficiencyBonus: elements.sheetProf.value,
+    background: elements.sheetBackground.value,
+    str: elements.sheetStr.value,
+    dex: elements.sheetDex.value,
+    con: elements.sheetCon.value,
+    int: elements.sheetInt.value,
+    wis: elements.sheetWis.value,
+    cha: elements.sheetCha.value,
+    skills: elements.sheetSkills.value,
+    abilities: elements.sheetAbilities.value,
+    spells: elements.sheetSpells.value,
+    notes: elements.sheetNotes.value,
+  };
 }
 
 async function saveCharacterSheet() {
@@ -8847,40 +8866,11 @@ async function saveCharacterSheet() {
     return;
   }
 
-  const autoSheet = state.activeCharacterSheetAutofill;
-  const preservedResources = autoSheet?.resources ?? member.resources ?? member.stats?.resources ?? {};
-  const preservedAttacks = autoSheet?.attacks ?? member.attacks ?? member.weapons ?? member.equipment?.weapons ?? [];
-  const preservedConditions = member.conditions ?? member.stats?.conditions ?? autoSheet?.conditions ?? [];
-  const payload = {
-    domain: "party",
-    id: member.id,
-    name: elements.sheetName.value.trim(),
-    role: elements.sheetRole.value.trim(),
-    playerRole: elements.sheetRole.value.trim(),
-    ancestryClass: elements.sheetAncestryClass.value.trim(),
-    level: parseOptionalNumber(elements.sheetLevel.value),
-    experience: parseOptionalNumber(elements.sheetXp.value),
-    proficiencyBonus: parseOptionalNumber(elements.sheetProf.value),
-    background: elements.sheetBackground.value.trim(),
-    stats: {
-      hp: buildHpPayload(),
-      armorClass: parseOptionalNumber(elements.sheetAc.value),
-      abilityScores: buildAbilityScorePayload(),
-      spellSlots: preservedResources.spellSlots ?? member.stats?.spellSlots ?? null,
-      resources: preservedResources,
-      conditions: preservedConditions,
-      spells: splitMultiline(elements.sheetSpells.value),
-    },
-    speedFt: autoSheet?.speedFt ?? member.speedFt ?? member.speed ?? member.stats?.speedFt ?? member.stats?.speed ?? null,
-    resources: preservedResources,
-    attacks: preservedAttacks,
-    conditions: preservedConditions,
-    inventory: member.inventory ?? member.equipment ?? member.items ?? [],
-    skills: splitMultiline(elements.sheetSkills.value),
-    abilities: splitMultiline(elements.sheetAbilities.value),
-    spells: splitMultiline(elements.sheetSpells.value),
-    notes: splitMultiline(elements.sheetNotes.value),
-  };
+  const payload = buildCharacterSheetPayload({
+    member,
+    autoSheet: state.activeCharacterSheetAutofill,
+    values: readCharacterSheetFormValues(),
+  });
 
   if (!payload.name) {
     elements.bridgeStatus.textContent = "Character name is required";
@@ -8920,128 +8910,6 @@ async function saveCharacterSheet() {
   }
 }
 
-function buildHpPayload() {
-  const current = parseOptionalNumber(elements.sheetHpCurrent.value);
-  const max = parseOptionalNumber(elements.sheetHpMax.value);
-  if (current === null && max === null) {
-    return null;
-  }
-  return {
-    current,
-    max,
-  };
-}
-
-function buildAbilityScorePayload() {
-  return removeNullEntries({
-    STR: parseOptionalNumber(elements.sheetStr.value),
-    DEX: parseOptionalNumber(elements.sheetDex.value),
-    CON: parseOptionalNumber(elements.sheetCon.value),
-    INT: parseOptionalNumber(elements.sheetInt.value),
-    WIS: parseOptionalNumber(elements.sheetWis.value),
-    CHA: parseOptionalNumber(elements.sheetCha.value),
-  });
-}
-
-function normalizeHpForForm(hp) {
-  if (!hp) {
-    return {};
-  }
-  if (typeof hp === "number" || typeof hp === "string") {
-    return {
-      current: hp,
-      max: "",
-    };
-  }
-  return hp;
-}
-
-function characterAbilityScores(member) {
-  const source = member.abilityScores ?? member.ability_scores ?? member.stats?.abilityScores ?? member.stats?.ability_scores ?? member.stats?.abilities;
-  if (!source || Array.isArray(source) || typeof source !== "object") {
-    return {};
-  }
-
-  const aliases = {
-    STR: ["STR", "str", "strength"],
-    DEX: ["DEX", "dex", "dexterity"],
-    CON: ["CON", "con", "constitution"],
-    INT: ["INT", "int", "intelligence"],
-    WIS: ["WIS", "wis", "wisdom"],
-    CHA: ["CHA", "cha", "charisma"],
-  };
-
-  return Object.fromEntries(
-    Object.entries(aliases)
-      .map(([label, keys]) => {
-        const score = keys.map((key) => source[key]).find((value) => value !== undefined && value !== null);
-        return score !== undefined ? [label, score] : null;
-      })
-      .filter(Boolean),
-  );
-}
-
-function characterSkills(member) {
-  return uniqueTextList([
-    member.skills,
-    member.specialties,
-    member.proficiencies,
-    member.expertise,
-    member.stats?.skills,
-    member.stats?.proficiencies,
-  ]);
-}
-
-function characterAbilities(member) {
-  return uniqueTextList([
-    member.abilities,
-    member.features,
-    member.traits,
-  ]);
-}
-
-function uniqueTextList(values) {
-  const seen = new Set();
-  return values
-    .flatMap((value) => {
-      if (!value) {
-        return [];
-      }
-      if (Array.isArray(value)) {
-        return value;
-      }
-      if (typeof value === "object") {
-        return Object.entries(value).map(([key, entry]) => `${key}: ${entry}`);
-      }
-      return String(value).split(/[,;\n]+/);
-    })
-    .map((value) => {
-      if (value && typeof value === "object") {
-        return String(value.name || value.title || value.label || Object.entries(value).map(([key, entry]) => `${key}: ${entry}`).join(", "));
-      }
-      return String(value);
-    })
-    .map((value) => value.trim())
-    .filter((value) => {
-      if (!value || seen.has(value.toLowerCase())) {
-        return false;
-      }
-      seen.add(value.toLowerCase());
-      return true;
-    });
-}
-
-function splitMultiline(value) {
-  return String(value || "")
-    .split(/[,;\n]+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function mergeMultiline(existing, additions) {
-  return uniqueTextList([splitMultiline(existing), additions]).join("\n");
-}
-
 function parseOptionalNumber(value) {
   const text = String(value ?? "").trim();
   if (!text) {
@@ -9049,10 +8917,6 @@ function parseOptionalNumber(value) {
   }
   const number = Number(text);
   return Number.isFinite(number) ? number : text;
-}
-
-function removeNullEntries(object) {
-  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== null && value !== ""));
 }
 
 function renderPeople(campaign) {

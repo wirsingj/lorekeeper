@@ -13,6 +13,7 @@ import {
   buildQuestNotebookSection,
   buildThingsNotebookSection,
 } from "../app/campaign-notebook-controller.js";
+import { buildCharacterSheetPayload, buildCharacterSheetProjection, mergeSheetText } from "../app/character-sheet-controller.js";
 import {
   buildChoiceSelectionFromText,
   buildChoiceSelectionMeta,
@@ -3903,6 +3904,76 @@ function testCharacterSeedRules() {
   assert.equal(frostDruid.resources.uses.wildShape.max, 2);
 }
 
+function testCharacterSheetController() {
+  const member = {
+    id: "party-ilyra",
+    name: "Ilyra",
+    ancestryClass: "Elf Ranger",
+    playerRole: "Host",
+    hp: 11,
+    ac: 14,
+    prof: 2,
+    background: "Watches the tree line.",
+    ability_scores: { strength: 9, dexterity: 16, constitution: 12, intelligence: 11, wisdom: 14, charisma: 10 },
+    skills: ["Stealth", "Perception"],
+    stats: {
+      skills: ["Stealth", "Survival"],
+      spells: [{ name: "Hunter's Mark" }],
+      resources: { spellSlots: { 1: { current: 2, max: 2 } } },
+    },
+    abilities: ["Favored Enemy"],
+    features: ["Natural Explorer"],
+    notes: ["Keeps watch."],
+    attacks: [{ name: "Longbow" }],
+  };
+
+  const projection = buildCharacterSheetProjection(member);
+  assert.equal(projection.title, "Ilyra");
+  assert.equal(projection.subtitle, "Elf Ranger / Host");
+  assert.equal(projection.fields.hpCurrent, 11);
+  assert.equal(projection.fields.hpMax, "");
+  assert.equal(projection.fields.dex, 16);
+  assert.equal(projection.fields.skills, "Stealth\nPerception\nSurvival");
+  assert.equal(projection.fields.spells, "Hunter's Mark");
+
+  assert.equal(mergeSheetText("Stealth\nPerception", ["Stealth", "Arcana"]), "Stealth\nPerception\nArcana");
+
+  const payload = buildCharacterSheetPayload({
+    member,
+    autoSheet: { speedFt: 35, abilities: ["Ignored here"] },
+    values: {
+      name: " Ilyra ",
+      ancestryClass: "Elf Ranger",
+      role: "Host",
+      level: "3",
+      xp: "900",
+      hpCurrent: "10",
+      hpMax: "18",
+      armorClass: "15",
+      proficiencyBonus: "2",
+      background: "Keeps the road safe.",
+      str: "9",
+      dex: "16",
+      con: "12",
+      int: "",
+      wis: "14",
+      cha: "10",
+      skills: "Stealth\nSurvival",
+      abilities: "Favored Enemy\nNatural Explorer",
+      spells: "Hunter's Mark, Cure Wounds",
+      notes: "Keeps watch.\nTrusts Mira.",
+    },
+  });
+  assert.equal(payload.name, "Ilyra");
+  assert.equal(payload.level, 3);
+  assert.deepEqual(payload.stats.hp, { current: 10, max: 18 });
+  assert.deepEqual(payload.stats.abilityScores, { STR: 9, DEX: 16, CON: 12, WIS: 14, CHA: 10 });
+  assert.deepEqual(payload.spells, ["Hunter's Mark", "Cure Wounds"]);
+  assert.equal(payload.speedFt, 35);
+  assert.equal(payload.resources, member.stats.resources);
+  assert.equal(payload.attacks, member.attacks);
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -4194,6 +4265,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const turnSubmitController = await readFile(path.join("app", "turn-submit-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const campaignNotebookController = await readFile(path.join("app", "campaign-notebook-controller.js"), "utf8");
+  const characterSheetController = await readFile(path.join("app", "character-sheet-controller.js"), "utf8");
   const sceneNotebookController = await readFile(path.join("app", "scene-notebook-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
@@ -4394,6 +4466,11 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /buildPeopleNotebookSection/, "world notebook rendering should consume section projections");
   assert.match(campaignNotebookController, /isHiddenStoryThread\(quest\)/, "quest notebook projection should keep DM-only story arcs out of player notes");
   assert.doesNotMatch(appJs, /isHiddenStoryThread\(quest\)/, "renderer should not own quest visibility policy");
+  assert.match(appJs, /buildCharacterSheetProjection/, "character sheet rendering should consume a projection");
+  assert.match(appJs, /buildCharacterSheetPayload/, "character sheet saves should consume a payload builder");
+  assert.match(characterSheetController, /characterAbilityScores\(member\)/, "character sheet controller should own ability-score aliases");
+  assert.doesNotMatch(appJs, /function characterAbilityScores/, "renderer should not own character sheet ability aliases");
+  assert.doesNotMatch(appJs, /function buildHpPayload/, "renderer should not own character sheet save payload rules");
   assert.match(styles, /\.scene-notes-section/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
@@ -4581,6 +4658,7 @@ testProviderChatProjection();
 testTableTalkProjection();
 testCharacterAutocompleteProjection();
 testCharacterSeedRules();
+testCharacterSheetController();
 testCampaignStateStore();
 testInputComposerProjection();
 testJoinPreviewProjection();
