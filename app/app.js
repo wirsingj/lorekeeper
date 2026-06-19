@@ -4458,7 +4458,7 @@ function createGuestShellCampaign() {
         body: guestWaitingRoomMode
           ? "Choose an open table, ask for a seat, and wait for your friend to bring you in."
           : "Join a hosted LoreKeeper table and play as an assigned party member.",
-        meta: "No local AI setup is needed here.",
+        meta: "No local DM Voice setup is needed here.",
           source: "lorekeeper_join",
           createdAt: new Date().toISOString(),
           data: {},
@@ -5801,7 +5801,7 @@ async function saveProviderSettingsFromControls() {
 async function refreshProviderStatus({ quiet = false } = {}) {
   try {
     if (!quiet) {
-      setProviderActivity("Checking local AI...", "working");
+      setProviderActivity("Checking local DM Voice...", "working");
     }
     const response = await fetch(apiProviderStatusUrl);
     if (!response.ok) {
@@ -6140,10 +6140,10 @@ function providerStatusLabel(ollama) {
 
 function providerSetupHint(ollama, selectedModel) {
   if (ollama.state === "ollama_not_installed") {
-    return "Install Ollama from ollama.com, then reopen setup and refresh local AI.";
+    return "Install Ollama from ollama.com, then reopen DM Voice and refresh.";
   }
   if (ollama.state === "ollama_not_running") {
-    return "Start Ollama, then refresh local AI.";
+    return "Start Ollama, then refresh DM Voice.";
   }
   return `${modelDisplayName(selectedModel)} is missing. Use Download to pull it locally.`;
 }
@@ -6511,7 +6511,7 @@ function render() {
   renderSceneNotebook(campaign);
   const providerSettings = currentProviderSettings();
   elements.providerStatus.textContent = providerSettings.preferredProvider === "ollama"
-    ? `DM voice: Local AI ${providerSettings.selectedModel}`
+    ? `DM voice: Local DM ${providerSettings.selectedModel}`
     : "DM voice: ChatGPT DM";
   if (providerSettings.preferredProvider === "bridge" && state.bridge.mode === "extension") {
     elements.providerStatus.textContent = state.bridge.ready
@@ -6681,7 +6681,7 @@ async function returnToMainMenu() {
   renderHomePanel();
   renderJoinClientPanel();
   setProviderActivity(
-    wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Host, Join, or AI Setup.",
+    wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Continue, New Adventure, Join, or DM Voice.",
     "idle",
   );
 }
@@ -7014,7 +7014,7 @@ function openDeleteCampaignDialog(target = activeCampaignDeleteTarget()) {
   state.pendingDeleteCampaign = target;
   elements.deleteCampaignTitle.textContent = `Delete ${target.title}`;
   elements.deleteCampaignMessage.textContent =
-    `This will remove "${target.title}" from LoreKeeper and move its SQLite files into the local deleted-campaigns folder for manual recovery.`;
+    `This will remove "${target.title}" from LoreKeeper and keep a local backup in case you need to recover it later.`;
   elements.confirmDeleteCampaign.disabled = false;
   elements.deleteCampaignDialog.showModal();
   elements.confirmDeleteCampaign.focus();
