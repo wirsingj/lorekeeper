@@ -13,6 +13,15 @@ import {
   buildQuestNotebookSection,
   buildThingsNotebookSection,
 } from "../app/campaign-notebook-controller.js";
+import {
+  buildOpeningSceneSummary,
+  normalizeWizardCharacter,
+  normalizeWizardControllerKind,
+  normalizeWizardJoiner,
+  normalizeWizardJoiners,
+  wizardControllerSheetFields,
+  wizardPlayerRoleForController,
+} from "../app/campaign-wizard-controller.js";
 import { buildCharacterSheetPayload, buildCharacterSheetProjection, mergeSheetText } from "../app/character-sheet-controller.js";
 import {
   buildChoiceSelectionFromText,
@@ -3872,6 +3881,60 @@ function testCharacterAutocompleteProjection() {
   assert.equal(new Set(manyCrew.map((member) => member.name)).size, manyCrew.length, "exhausted name pools should still produce unique fallback names");
 }
 
+function testCampaignWizardController() {
+  assert.equal(normalizeWizardControllerKind("you"), "host");
+  assert.equal(normalizeWizardControllerKind("friend"), "remote_invite");
+  assert.equal(normalizeWizardControllerKind("unassigned"), "unassigned");
+  assert.equal(normalizeWizardControllerKind(""), "ai_companion");
+
+  const primary = normalizeWizardCharacter({
+    name: " Rowan ",
+    ancestry: "Half-elf",
+    characterClass: "Bard",
+    level: "3",
+    concept: "Knows too many songs.",
+    controllerKind: "you",
+  });
+  assert.equal(primary.name, "Rowan");
+  assert.equal(primary.level, 3);
+  assert.equal(primary.controllerKind, "host");
+
+  assert.equal(normalizeWizardJoiner({}), null);
+  const remote = normalizeWizardJoiner({
+    name: "Mira",
+    characterClass: "soldier",
+    controllerKind: "friend",
+    integrationPrompt: "Old squadmate.",
+    hostIntegrationPrompt: "Arrives with the caravan.",
+  });
+  assert.equal(remote.controllerKind, "remote_invite");
+  assert.equal(remote.playerRole, "Remote invite seat");
+  assert.match(remote.integrationPrompt, /Old squadmate/);
+
+  const joiners = normalizeWizardJoiners([remote, {}, { name: "Bran", controllerKind: "ai_companion" }]);
+  assert.equal(joiners.length, 2);
+  assert.equal(joiners[1].playerRole, "AI party companion");
+
+  const summary = buildOpeningSceneSummary({
+    premise: "Escort the miners.",
+    startingLocation: "old shrine road",
+    character: primary,
+    startingPartyMembers: joiners,
+  });
+  assert.match(summary, /The table is set at old shrine road/);
+  assert.match(summary, /Rowan, Mira, Bran are at the table/);
+  assert.match(summary, /Start Adventure/);
+
+  assert.deepEqual(wizardControllerSheetFields("host", { primary: true }), {
+    playerRole: "Host player character",
+    controllerKind: "host",
+    controllerId: "host",
+    fallbackControllerKind: "host",
+  });
+  assert.equal(wizardControllerSheetFields("remote_invite").inviteIntent, "remote_player");
+  assert.equal(wizardPlayerRoleForController("remote_invite"), "Remote invite seat");
+}
+
 function testCharacterSeedRules() {
   assert.equal(clampLevel("bad"), 1);
   assert.equal(clampLevel(99), 20);
@@ -4265,6 +4328,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const turnSubmitController = await readFile(path.join("app", "turn-submit-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const campaignNotebookController = await readFile(path.join("app", "campaign-notebook-controller.js"), "utf8");
+  const campaignWizardController = await readFile(path.join("app", "campaign-wizard-controller.js"), "utf8");
   const characterSheetController = await readFile(path.join("app", "character-sheet-controller.js"), "utf8");
   const sceneNotebookController = await readFile(path.join("app", "scene-notebook-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
@@ -4481,7 +4545,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /collectWizardAdditionalCharacters/);
   assert.match(appJs, /addPartyTemplateCharactersToWizard/);
   assert.match(appJs, /buildPartyTemplateCharacters/);
-  assert.match(appJs, /normalizeWizardJoiner/);
+  assert.match(appJs, /normalizeWizardJoiners/);
+  assert.match(campaignWizardController, /function normalizeWizardJoiner/, "wizard joiner policy should live outside the renderer");
+  assert.doesNotMatch(appJs, /function normalizeWizardJoiner/, "renderer should not own wizard joiner completion policy");
+  assert.doesNotMatch(appJs, /function wizardControllerSheetFields/, "renderer should not own wizard controller sheet defaults");
   assert.match(appJs, /openRemoteInviteLobbyForNewCampaign/);
   assert.match(appJs, /apiPreTableLobbySeatUrl/);
   assert.match(appJs, /seatPreTableWaitingGuest/);
@@ -4508,7 +4575,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /function buildAdventureOpeningPrompt/, "app.js should not own the opening DM prompt policy");
   assert.doesNotMatch(appJs, /elements\.cancelGeneration\.hidden\s*=\s*(?:true|false)/, "app.js should not manually hide/show cancel generation");
   assert.doesNotMatch(appJs, /elements\.cancelGeneration\.disabled\s*=\s*(?:true|false)/, "app.js should not manually enable/disable cancel generation");
-  assert.match(appJs, /Start Adventure for the opening narration/);
+  assert.match(campaignWizardController, /Start Adventure for the opening narration/);
   assert.doesNotMatch(appJs, /Next: click Nudge to ask the DM for the opening moment/);
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Start Adventure must remain host-controlled");
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");
@@ -4519,7 +4586,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /activeAfterCommit[\s\S]*activeAfterCommit !== current\.id/, "enemy auto-turns should only be marked handled after initiative leaves that enemy");
   assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);
   assert.match(appJs, /wizardControllerSheetFields/);
-  assert.match(appJs, /inviteIntent:\s*"remote_player"/);
+  assert.match(campaignWizardController, /function wizardControllerSheetFields/, "wizard controller sheet defaults should live outside renderer");
+  assert.match(campaignWizardController, /inviteIntent:\s*"remote_player"/);
   assert.match(appJs, /campaign-wizard-mode/);
   assert.match(appJs, /campaignWizardReturnHome/);
   assert.match(appJs, /campaignWizardCreating/);
@@ -4657,6 +4725,7 @@ testHomeCampaignController();
 testProviderChatProjection();
 testTableTalkProjection();
 testCharacterAutocompleteProjection();
+testCampaignWizardController();
 testCharacterSeedRules();
 testCharacterSheetController();
 testCampaignStateStore();

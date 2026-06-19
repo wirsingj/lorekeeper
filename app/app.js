@@ -20,6 +20,14 @@ import {
   buildQuestNotebookSection,
   buildThingsNotebookSection,
 } from "./campaign-notebook-controller.js";
+import {
+  buildOpeningSceneSummary,
+  normalizeWizardCharacter,
+  normalizeWizardControllerKind,
+  normalizeWizardJoiners,
+  wizardControllerSheetFields,
+  wizardPlayerRoleForController,
+} from "./campaign-wizard-controller.js";
 import { buildCharacterSheetPayload, buildCharacterSheetProjection, mergeSheetText } from "./character-sheet-controller.js";
 import {
   choiceLabelForIndex,
@@ -2527,13 +2535,6 @@ function setWizardControllerKind(card, value) {
   }
 }
 
-function normalizeWizardControllerKind(value) {
-  const normalized = String(value || "").trim();
-  return ["host", "ai_companion", "remote_invite", "unassigned"].includes(normalized)
-    ? normalized
-    : "ai_companion";
-}
-
 function setIfBlank(input, value) {
   if (!input || String(input.value ?? "").trim() || value === undefined || value === null) {
     return;
@@ -4411,95 +4412,6 @@ function clearWaitingRoomSession() {
   localStorage.removeItem(guestWaitingRoomStorageKey);
 }
 
-function normalizeWizardCharacter(input = {}) {
-  const name = String(input.name ?? "").trim();
-  const ancestry = String(input.ancestry ?? "").trim();
-  const characterClass = String(input.characterClass ?? "").trim();
-  const concept = String(input.concept ?? "").trim();
-  const level = clampLevel(parseOptionalNumber(input.level) ?? 1);
-
-  return {
-    name,
-    ancestry,
-    characterClass,
-    level,
-    concept,
-    autoSheet: input.autoSheet !== false,
-    controllerKind: input.controllerKind ? normalizeWizardControllerKind(input.controllerKind) : "",
-  };
-}
-
-function normalizeWizardJoiner(input = {}) {
-  const seed = normalizeWizardCharacter(input);
-  const integrationPrompt = String(input.integrationPrompt ?? "").trim();
-  const hostIntegrationPrompt = String(input.hostIntegrationPrompt ?? "").trim();
-  const hasAnyValue = [
-    seed.name,
-    seed.ancestry,
-    seed.characterClass,
-    seed.concept,
-    integrationPrompt,
-    hostIntegrationPrompt,
-  ].some(Boolean);
-  if (!hasAnyValue) {
-    return null;
-  }
-  const completed = completeCharacterSeed({
-    ...seed,
-    integrationPrompt,
-    hostIntegrationPrompt,
-  });
-  const controllerKind = normalizeWizardControllerKind(input.controllerKind || seed.controllerKind || "ai_companion");
-
-  return {
-    ...seed,
-    ...completed,
-    controllerKind,
-    playerRole: wizardPlayerRoleForController(controllerKind),
-    integrationPrompt: completed.integrationPrompt,
-    hostIntegrationPrompt: completed.hostIntegrationPrompt,
-  };
-}
-
-function normalizeWizardJoiners(inputs = []) {
-  return normalizeList(inputs)
-    .map((input) => normalizeWizardJoiner(input))
-    .filter(Boolean);
-}
-
-function buildOpeningSceneSummary({ premise, startingLocation, character, startingPartyMembers = [] }) {
-  const joiners = normalizeList(startingPartyMembers);
-  const partyNames = [
-    character?.name,
-    ...joiners.map((member) => member.name),
-  ].filter(Boolean);
-  const placeLine = startingLocation
-    ? `The table is set at ${startingLocation}.`
-    : "The table is set for the first scene.";
-  const details = [
-    placeLine,
-    partyNames.length
-      ? `${partyNames.join(", ")} ${partyNames.length === 1 ? "is" : "are"} at the table.`
-      : "",
-    premise
-      ? `Premise: ${premise}`
-      : "",
-    "Next: invite anyone else you want at the table, then press Start Adventure for the opening narration.",
-  ].filter(Boolean);
-
-  return details.join("\n\n");
-}
-
-function formatCharacterBasics(character) {
-  const identity = [
-    character.name,
-    character.ancestry,
-    character.characterClass,
-    character.level ? `level ${character.level}` : "",
-  ].filter(Boolean).join(", ");
-  return [identity || "Unnamed player character", character.concept].filter(Boolean).join(" - ");
-}
-
 async function seedWizardPlayerCharacter(character) {
   const baseSheet = character.autoSheet
     ? buildFiveELiteCharacterSeed(character)
@@ -4576,44 +4488,6 @@ async function seedWizardStartingPartyMember(character) {
 
   const result = await response.json();
   setCampaignFromPayload(result, "new_campaign_starting_party_member");
-}
-
-function wizardControllerSheetFields(controllerKind, { primary = false } = {}) {
-  const normalized = normalizeWizardControllerKind(controllerKind || (primary ? "host" : "ai_companion"));
-  if (normalized === "host") {
-    return {
-      playerRole: primary ? "Host player character" : "Host-controlled party member",
-      controllerKind: "host",
-      controllerId: "host",
-      fallbackControllerKind: "host",
-    };
-  }
-  if (normalized === "remote_invite") {
-    return {
-      playerRole: "Remote invite seat",
-      controllerKind: "unassigned",
-      controllerId: null,
-      fallbackControllerKind: "ai_companion",
-      inviteIntent: "remote_player",
-    };
-  }
-  return {
-    playerRole: primary ? "AI party companion" : "AI party companion",
-    controllerKind: "ai_companion",
-    controllerId: null,
-    fallbackControllerKind: "ai_companion",
-  };
-}
-
-function wizardPlayerRoleForController(controllerKind) {
-  const normalized = normalizeWizardControllerKind(controllerKind);
-  if (normalized === "host") {
-    return "Host-controlled party member";
-  }
-  if (normalized === "remote_invite") {
-    return "Remote invite seat";
-  }
-  return "AI party companion";
 }
 
 let pendingConfirmResolve = null;
