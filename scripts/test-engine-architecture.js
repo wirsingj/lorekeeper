@@ -58,6 +58,7 @@ import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecover
 import { buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "../app/table-action-controller.js";
 import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "../app/table-background-polling-controller.js";
 import { buildTableFocusProjection } from "../app/table-focus-controller.js";
+import { currentTableTalkMessages, freshestTableTalkMessages } from "../app/table-talk-controller.js";
 import { buildAdventureOpeningPrompt, buildStartAdventureOpeningProjection, isCampaignReadyForOpening } from "../app/table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "../app/table-status.js";
 import { buildTurnContentGate, buildTurnSubmitGate } from "../app/turn-submit-controller.js";
@@ -3177,6 +3178,44 @@ function testProviderChatProjection() {
   assert.doesNotMatch(progress[2].bridgeStatus, /fallback/i);
 }
 
+function testTableTalkProjection() {
+  const olderCampaignTalk = [
+    { id: "c1", text: "old host note", createdAt: "2026-06-18T10:00:00.000Z" },
+    { id: "c2", text: "older host note", createdAt: "2026-06-18T10:01:00.000Z" },
+  ];
+  const fresherSnapshotTalk = [
+    { id: "s1", text: "guest lands now", createdAt: "2026-06-18T10:02:00.000Z" },
+  ];
+  assert.equal(
+    freshestTableTalkMessages(fresherSnapshotTalk, olderCampaignTalk),
+    fresherSnapshotTalk,
+    "route-side table talk with a newer timestamp should win even if the local campaign snapshot has more old rows",
+  );
+
+  const longerCampaignTalk = [
+    { id: "c1", text: "same latest one", createdAt: "2026-06-18T10:02:00.000Z" },
+    { id: "c2", text: "same latest two", createdAt: "2026-06-18T10:02:00.000Z" },
+  ];
+  assert.equal(
+    freshestTableTalkMessages(fresherSnapshotTalk, longerCampaignTalk),
+    longerCampaignTalk,
+    "when latest timestamps match, the fuller table-talk history should win",
+  );
+
+  assert.equal(
+    currentTableTalkMessages({
+      guestSnapshot: {
+        tableState: { tableTalk: [{ id: "guest-table-state", createdAt: "2026-06-18T10:03:00.000Z" }] },
+        tableTalk: [{ id: "legacy-guest-field", createdAt: "2026-06-18T10:04:00.000Z" }],
+      },
+    })[0].id,
+    "guest-table-state",
+    "guest snapshots should prefer the public tableState table-talk feed",
+  );
+
+  assert.deepEqual(currentTableTalkMessages({ campaign: { multiplayer: { tableTalk: "bad data" } } }), []);
+}
+
 function testCharacterAutocompleteProjection() {
   assert.deepEqual(splitAncestryClass("Dwarf Soldier"), { ancestry: "Dwarf", characterClass: "Soldier" });
 
@@ -3807,7 +3846,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");
   assert.match(appJs, /const multiplayerPollIntervalMs = 1000/, "host guest-request polling should feel live");
   assert.match(appJs, /hasActiveGeneration\(\)[\s\S]*refreshMultiplayerSnapshot\(\{ quiet: true \}\)[\s\S]*renderTableTalk\(\)[\s\S]*renderTableActions\(\)/, "waiting guest cues and table talk should refresh even while the DM is generating");
-  assert.match(appJs, /snapshotTalk\.length > campaignTalk\.length/, "table talk rendering should prefer fresher multiplayer snapshots over stale campaign chat while generation is active");
+  assert.match(appJs, /projectCurrentTableTalkMessages/, "table talk rendering should use the tested freshness projection");
+  assert.doesNotMatch(appJs, /snapshotTalk\.length > campaignTalk\.length/, "table talk source freshness should not live as inline renderer branching");
   assert.match(appJs, /activeAfterCommit[\s\S]*activeAfterCommit !== current\.id/, "enemy auto-turns should only be marked handled after initiative leaves that enemy");
   assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);
   assert.match(appJs, /wizardControllerSheetFields/);
@@ -3937,6 +3977,7 @@ testStagedInputRecoveryController();
 testHostResponseReviewProjection();
 testProviderImportOutcomeProjection();
 testProviderChatProjection();
+testTableTalkProjection();
 testCharacterAutocompleteProjection();
 testCampaignStateStore();
 testInputComposerProjection();

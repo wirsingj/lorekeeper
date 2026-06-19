@@ -344,6 +344,8 @@ Risks:
 206. Guest table previews now filter starter scaffold ids/threads and strip host-only "Next:" setup instructions, so `/guest` sees table fiction, party, and useful seat context instead of backend placeholder records.
 207. Combat active-turn labels now render host-controlled party turns as "Your turn" in the host app while preserving "Host turn" for observer contexts and separate friend/companion/DM/table turn labels.
 208. The stale renderer-local provider speaker-splitting helper is removed; provider response speaker parsing now has one owner in `app/provider-import-controller.js`, and architecture tests guard against `app.js` growing that import policy back.
+209. Table Talk source freshness now lives in `app/table-talk-controller.js` with direct tests for guest snapshots, stale local campaign chat, route-side snapshot updates during generation, and bad data fallback instead of inline renderer branching.
+210. Successful imported player turns now clear the renderer's stale `currentTurn` pointer, so diagnostics and subsequent Send Turn attempts do not keep reasoning about the previous completed action; the exact remote chaos seed that exposed this now passes.
 
 ### Still Risky
 

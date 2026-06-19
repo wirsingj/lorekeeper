@@ -74,6 +74,7 @@ import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecover
 import { applyTableActionProjection, buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
 import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "./table-background-polling-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
+import { currentTableTalkMessages as projectCurrentTableTalkMessages } from "./table-talk-controller.js";
 import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { buildTurnContentGate, buildTurnSubmitGate } from "./turn-submit-controller.js";
@@ -1627,6 +1628,9 @@ async function submitPlayerTurnFromInput(originalInput, options = {}) {
     approvedPartyInputs,
     stagedRemoteInputs,
   }), runResult);
+  if (runResult?.imported) {
+    state.currentTurn = null;
+  }
   if (runResult?.providerReceived && !options.preserveInput) {
     elements.playerInput.value = "";
   } else if (!runResult?.providerReceived && !options.preserveInput && !elements.playerInput.value.trim()) {
@@ -10180,17 +10184,11 @@ function clearTableTalkUnread() {
 }
 
 function currentTableTalkMessages() {
-  if (state.guestSnapshot) {
-    return state.guestSnapshot.tableState?.tableTalk ?? state.guestSnapshot.tableTalk ?? [];
-  }
-  const snapshotTalk = state.multiplayerSnapshot?.tableTalk ?? [];
-  const campaignTalk = state.campaign?.multiplayer?.tableTalk ?? [];
-  if (!campaignTalk.length || snapshotTalk.length > campaignTalk.length) {
-    return snapshotTalk;
-  }
-  const snapshotLatest = snapshotTalk.at(-1)?.createdAt ?? "";
-  const campaignLatest = campaignTalk.at(-1)?.createdAt ?? "";
-  return snapshotLatest > campaignLatest ? snapshotTalk : campaignTalk;
+  return projectCurrentTableTalkMessages({
+    guestSnapshot: state.guestSnapshot,
+    multiplayerSnapshot: state.multiplayerSnapshot,
+    campaign: state.campaign,
+  });
 }
 
 function renderContextPack(contextPack) {
