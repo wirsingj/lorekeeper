@@ -23,6 +23,18 @@ The user should not feel like they are debugging a model, managing queue machine
 
 Every table surface should answer the same practical questions a real table answers without explanation: where are we, whose attention is needed, who controls this character, what just happened, what can I do now, and what is remembered as true.
 
+## Project Read
+
+LoreKeeper's goal is unusually strong because it is not "chat with a fantasy bot." It is a digital table: host, guests, party members, DM Voice, rules, memory, authority, recovery, and table flow all have separate jobs. That distinction is the project's best product insight and should stay protected.
+
+The project has made real progress from prototype/tooling shape toward table-sim shape. Earlier debt came from building around provider/import/debug mechanics first; recent work has been correctly moving authority into app-owned state, combat, multiplayer, recovery, and phase projections while pushing raw machinery behind table language and hidden harnesses.
+
+The codebase is healthier than its size suggests. The important direction is right: pure controllers and engine modules are being extracted, tests increasingly cover behavior instead of snapshots, and Playwright now exercises real host plus `/guest` flows. The main architectural risk is still concentration of orchestration in `app/app.js` and route glue in `scripts/serve.js`; every new gate should become a tested controller or engine invariant, not another renderer-only condition.
+
+Product management has been unusually effective because playtest frustration is being translated into principles, not just one-off fixes: "host is not DM," "Start Adventure is the first table beat," "nothing should be possible too early," and "the table must feel trustworthy" are durable product rules. The best next guidance pattern is the same one: identify moments that make a player ask "why did that happen?" and convert them into state invariants plus harness coverage.
+
+The current state is promising but not yet release-calm. Core mechanics, storage, multiplayer authority, combat rails, recovery, and harnesses are now credible. The remaining work is making the experience feel inevitable: fewer visible controls, clearer phase-specific actions, more polished combat decisions, recovery that feels like a table ruling, and real two-machine soak. The project feels past "can this work?" and into "can this feel smooth enough that players trust it for a whole session?"
+
 ## Steam-Ready UX Direction
 
 LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
