@@ -17,6 +17,19 @@ import { buildTableSessionProjection } from "../src/engine/table-session-engine.
 import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "./campaign-adoption-controller.js";
+import {
+  choiceLabelForIndex,
+  choiceOptionId,
+  choicePanelKey,
+  choiceSelectionActivityText,
+  choiceVoteCounts,
+  choiceVoteState,
+  choiceVoteSummaryText,
+  currentChoiceVotesForBlock,
+  currentGuestVoteForChoice as projectedGuestVoteForChoice,
+  isPartyVoteChoiceBlock,
+  leadingChoiceVoteEntry as projectedLeadingChoiceVoteEntry,
+} from "./choice-vote-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "./combat-prompt-repair-controller.js";
 import { buildCombatTrackerView, combatActorType, normalizedCombatTurnOrder } from "./combat-tracker-view.js";
 import { combatResolutionMessage, engineCombatResolutionChange, resolveEnemyCombatTurn } from "./combat-resolution-controller.js";
@@ -1450,106 +1463,25 @@ function choiceTokenToIndex(token) {
   return -1;
 }
 
-function choiceLabelForIndex(index) {
-  return String.fromCharCode(65 + index);
-}
-
-function choiceOptionId(block, index) {
-  return String(block.options?.[index]?.id || choiceLabelForIndex(index));
-}
-
-function choicePanelKey(block = {}) {
-  return compactCompareText([
-    block.prompt || "",
-    block.scope || "",
-    block.forActorId || "",
-    (block.options ?? []).map((option, index) => `${choiceOptionId(block, index)}:${option?.text || block.items?.[index] || ""}`).join("|"),
-  ].join("::")).slice(0, 500);
-}
-
-function isPartyVoteChoiceBlock(block = {}) {
-  const scope = String(block.scope || "").trim();
-  return block.allowVote === true || scope === "party" || scope === "vote";
-}
-
 function currentChoiceVotes(block = {}) {
-  const key = choicePanelKey(block);
-  if (!key) {
-    return [];
-  }
-  return (state.campaign?.multiplayer?.choiceVotes ?? [])
-    .filter((vote) => vote.choiceKey === key);
-}
-
-function choiceVoteCounts(block = {}) {
-  const counts = new Map();
-  for (const vote of currentChoiceVotes(block)) {
-    const id = String(vote.optionId || "");
-    counts.set(id, (counts.get(id) || 0) + 1);
-  }
-  return counts;
-}
-
-function choiceVoteSummaryText(block = {}) {
-  if (!isPartyVoteChoiceBlock(block)) {
-    return "";
-  }
-  const voteState = choiceVoteState(block);
-  if (!voteState.entries.length) {
-    return "";
-  }
-  const votesText = voteState.entries.map((entry) => `${entry.label}: ${entry.count}`).join(", ");
-  if (voteState.tied) {
-    return `Tie at the table - ${votesText}. Host breaks the tie by choosing any option.`;
-  }
-  return `Table leaning - ${votesText}. Leading: ${voteState.leader.label}.`;
-}
-
-function choiceVoteState(block = {}) {
-  const entries = choiceVoteEntries(block).filter((entry) => entry.count > 0);
-  if (!entries.length) {
-    return { entries, leaders: [], leader: null, tied: false };
-  }
-  const maxCount = Math.max(...entries.map((entry) => entry.count));
-  const leaders = entries.filter((entry) => entry.count === maxCount);
-  return {
-    entries,
-    leaders,
-    leader: leaders.length === 1 ? leaders[0] : null,
-    tied: leaders.length > 1,
-  };
-}
-
-function choiceVoteEntries(block = {}) {
-  const counts = choiceVoteCounts(block);
-  return (block.items ?? []).map((_, index) => {
-    const optionId = choiceOptionId(block, index);
-    return {
-      index,
-      optionId,
-      label: choiceLabelForIndex(index),
-      count: counts.get(optionId) || 0,
-    };
-  });
+  return currentChoiceVotesForBlock(block, state.campaign?.multiplayer?.choiceVotes ?? []);
 }
 
 function leadingChoiceVoteEntry(block = {}) {
-  if (!isPartyVoteChoiceBlock(block) || isRemoteTableClient()) {
-    return null;
-  }
-  return choiceVoteState(block).leader;
+  return projectedLeadingChoiceVoteEntry(block, {
+    choiceVotes: currentChoiceVotes(block),
+    isHost: !isRemoteTableClient(),
+  });
 }
 
 function currentGuestVoteForChoice(block = {}) {
   const playerId = state.guestSession?.playerId || state.guestSnapshot?.connection?.playerId || "";
   const characterId = state.guestSession?.partyMemberId || state.guestSnapshot?.connection?.partyMemberId || "";
-  if (!playerId && !characterId) {
-    return null;
-  }
-  return currentChoiceVotes(block).find((vote) =>
-    (playerId && vote.playerId === playerId) ||
-    (characterId && vote.characterId === characterId)
-  ) ?? null;
+  return projectedGuestVoteForChoice(block, {
+    choiceVotes: currentChoiceVotes(block),
+    playerId,
+    characterId,
+  });
 }
 
 function chooseVisibleOption(block, index) {
@@ -1578,9 +1510,8 @@ function chooseVisibleOption(block, index) {
   };
   elements.playerInput.value = `I choose ${label}: ${item}`;
   elements.playerInput.focus();
-  const voteCount = choiceVoteCounts(block).get(optionId) || 0;
-  const voteText = voteCount ? ` with ${voteCount} ${voteCount === 1 ? "vote" : "votes"}` : "";
-  setProviderActivity(`Selected choice ${label}${voteText}; edit or send`, "idle");
+  const voteCount = choiceVoteCounts(block, currentChoiceVotes(block)).get(optionId) || 0;
+  setProviderActivity(choiceSelectionActivityText(label, voteCount), "idle");
 }
 
 async function submitPlayerTurnFromInput(originalInput, options = {}) {
@@ -10509,7 +10440,8 @@ function messageBodyElements(text, role = "dm", data = {}) {
       }
 
       const list = document.createElement("ol");
-      const voteCounts = choiceVoteCounts(block);
+      const blockVotes = currentChoiceVotes(block);
+      const voteCounts = choiceVoteCounts(block, blockVotes);
       const guestVote = currentGuestVoteForChoice(block);
       block.items.forEach((itemText, index) => {
         const item = document.createElement("li");
@@ -10534,12 +10466,12 @@ function messageBodyElements(text, role = "dm", data = {}) {
       });
       panel.append(list);
 
-      const voteSummaryText = choiceVoteSummaryText(block);
+      const voteSummaryText = choiceVoteSummaryText(block, blockVotes);
       if (voteSummaryText) {
         const voteSummary = document.createElement("small");
         voteSummary.className = [
           "choice-vote-summary",
-          choiceVoteState(block).tied ? "choice-vote-tied" : "choice-vote-leading",
+          choiceVoteState(block, blockVotes).tied ? "choice-vote-tied" : "choice-vote-leading",
         ].join(" ");
         voteSummary.textContent = voteSummaryText;
         panel.append(voteSummary);

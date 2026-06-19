@@ -7,6 +7,16 @@ import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-ut
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "../app/campaign-adoption-controller.js";
 import {
+  choicePanelKey,
+  choiceSelectionActivityText,
+  choiceVoteCounts,
+  choiceVoteState,
+  choiceVoteSummaryText,
+  currentChoiceVotesForBlock,
+  currentGuestVoteForChoice,
+  leadingChoiceVoteEntry,
+} from "../app/choice-vote-controller.js";
+import {
   createImplicitCombatAdvanceChange,
   createImplicitCombatEnemySyncChange,
   createImplicitCombatStartChange,
@@ -2818,6 +2828,45 @@ function testPartySuggestionController() {
   });
 }
 
+function testChoiceVoteController() {
+  const block = {
+    type: "choices",
+    prompt: "Which road?",
+    scope: "vote",
+    items: ["Take the ridge", "Circle the ravine", "Wait for dawn"],
+    options: [
+      { id: "ridge", text: "Take the ridge" },
+      { id: "ravine", text: "Circle the ravine" },
+      { id: "dawn", text: "Wait for dawn" },
+    ],
+  };
+  const key = choicePanelKey(block);
+  const votes = [
+    { choiceKey: key, optionId: "ridge", playerId: "p1", characterId: "c1" },
+    { choiceKey: key, optionId: "ridge", playerId: "p2", characterId: "c2" },
+    { choiceKey: key, optionId: "ravine", playerId: "p3", characterId: "c3" },
+    { choiceKey: "old", optionId: "dawn", playerId: "p4" },
+  ];
+  assert.equal(currentChoiceVotesForBlock(block, votes).length, 3);
+  assert.equal(choiceVoteCounts(block, votes).get("ridge"), 2);
+  const state = choiceVoteState(block, votes);
+  assert.equal(state.leader.label, "A");
+  assert.equal(state.tied, false);
+  assert.match(choiceVoteSummaryText(block, votes), /Table leaning - A: 2, B: 1\. Leading: A\./);
+  assert.deepEqual(leadingChoiceVoteEntry(block, { choiceVotes: votes, isHost: true }), state.leader);
+  assert.equal(leadingChoiceVoteEntry(block, { choiceVotes: votes, isHost: false }), null);
+  assert.equal(currentGuestVoteForChoice(block, { choiceVotes: votes, playerId: "p3" })?.optionId, "ravine");
+  assert.equal(choiceSelectionActivityText("A", 2), "Selected choice A with 2 votes; edit or send");
+
+  const tiedVotes = [
+    { choiceKey: key, optionId: "ridge", playerId: "p1" },
+    { choiceKey: key, optionId: "ravine", playerId: "p2" },
+  ];
+  assert.equal(choiceVoteState(block, tiedVotes).tied, true);
+  assert.match(choiceVoteSummaryText(block, tiedVotes), /Tie at the table/);
+  assert.equal(leadingChoiceVoteEntry(block, { choiceVotes: tiedVotes, isHost: true }), null);
+}
+
 function testTurnRepairController() {
   const technicalRepair = {
     reason: "sceneStatus.awaitingPlayer must be boolean.",
@@ -3522,6 +3571,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
+  const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
@@ -3776,14 +3826,14 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /submitGuestChoiceVote/);
   assert.match(appJs, /notifyHostGuestLeaving/);
   assert.match(appJs, /choice-vote-count/);
-  assert.match(appJs, /choiceVoteSummaryText/);
-  assert.match(appJs, /choiceVoteState/);
-  assert.match(appJs, /leadingChoiceVoteEntry/);
+  assert.match(choiceVoteController, /function choiceVoteSummaryText/);
+  assert.match(choiceVoteController, /function choiceVoteState/);
+  assert.match(choiceVoteController, /function leadingChoiceVoteEntry/);
   assert.match(appJs, /choice-vote-summary/);
   assert.match(appJs, /choice-vote-tied/);
   assert.match(appJs, /choice-vote-action/);
   assert.match(appJs, /Draft leading choice \$\{leadingVote\.label\}/);
-  assert.match(appJs, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
+  assert.match(choiceVoteController, /Selected choice \$\{label\}\$\{voteText\}; edit or send/);
   assert.match(appJs, /buildProviderImportPlan\(\{[\s\S]*campaign: state\.campaign/, "renderer should pass explicit campaign context into provider import planning");
   assert.match(appJs, /seatWaitingGuestAtTable/);
   assert.match(appJs, /renderTableActions/);
@@ -3900,6 +3950,7 @@ testPlayLogProjectionBoundsLongSessions();
 testMessageLifecycleProjection();
 testPendingInputActionProjection();
 testPartySuggestionController();
+testChoiceVoteController();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 testSettingsSurfaceProjection();
