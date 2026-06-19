@@ -191,7 +191,7 @@ function phaseNextStep(phase, context) {
     case tablePhases.IDLE:
       return "Open or create a campaign to start the table.";
     case tablePhases.OPENING_READY:
-      return "Invite anyone else, then press Start Adventure for the opening DM narration.";
+      return "Invite anyone else, then press Start Adventure for the opening narration.";
     case tablePhases.RECOVERY:
       return context.repair
         ? "Host chooses Try Again, Details, or Use Anyway."

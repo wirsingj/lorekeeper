@@ -4705,7 +4705,7 @@ function buildOpeningSceneSummary({ premise, startingLocation, character, starti
     premise
       ? `Premise: ${premise}`
       : "",
-    "Next: invite anyone else you want at the table, then press Start Adventure for the opening DM narration.",
+    "Next: invite anyone else you want at the table, then press Start Adventure for the opening narration.",
   ].filter(Boolean);
 
   return details.join("\n\n");

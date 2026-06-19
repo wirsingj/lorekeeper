@@ -3799,7 +3799,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /function buildAdventureOpeningPrompt/, "app.js should not own the opening DM prompt policy");
   assert.doesNotMatch(appJs, /elements\.cancelGeneration\.hidden\s*=\s*(?:true|false)/, "app.js should not manually hide/show cancel generation");
   assert.doesNotMatch(appJs, /elements\.cancelGeneration\.disabled\s*=\s*(?:true|false)/, "app.js should not manually enable/disable cancel generation");
-  assert.match(appJs, /Start Adventure for the opening DM narration/);
+  assert.match(appJs, /Start Adventure for the opening narration/);
   assert.doesNotMatch(appJs, /Next: click Nudge to ask the DM for the opening moment/);
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Start Adventure must remain host-controlled");
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");

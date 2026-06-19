@@ -56,7 +56,7 @@ export function buildInputComposerProjection({
     return {
       inputDisabled: true,
       sendDisabled: true,
-      placeholder: "Press Start Adventure for the opening DM narration before sending table actions.",
+      placeholder: "Press Start Adventure for the opening narration before sending table actions.",
       buttonText: "Send Turn",
     };
   }
@@ -122,7 +122,7 @@ function hostComposerPhaseOverride(tableSession) {
     return { lock: true, placeholder: "DM is thinking. Wait for the response before sending another turn." };
   }
   if (phase === "opening_ready") {
-    return { lock: true, placeholder: "Press Start Adventure for the opening DM narration before sending table actions." };
+    return { lock: true, placeholder: "Press Start Adventure for the opening narration before sending table actions." };
   }
   if (phase === "recovery") {
     return { lock: true, placeholder: "Review the DM response before sending the next turn." };

@@ -24,7 +24,7 @@ export function buildStartAdventureOpeningProjection({
     disabled: !visible || Boolean(turnProjection.hasActiveGeneration),
     title: turnProjection.hasActiveGeneration
       ? "The DM is already starting the adventure"
-      : "Begin the opening DM narration",
+      : "Begin the opening narration",
   };
 }
 
