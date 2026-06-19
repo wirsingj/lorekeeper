@@ -2764,11 +2764,12 @@ function testStagedInputRecoveryController() {
 function testHostResponseReviewProjection() {
   const idle = buildHostResponseReviewProjection();
   assert.equal(idle.state, "idle");
-  assert.match(idle.nextStep, /Replacement DM Response/i);
+  assert.match(idle.nextStep, /Return to the table/i);
   assert.doesNotMatch(idle.nextStep, /paste box/i);
 
   const idleFallback = buildManualResponseFallbackProjection();
   assert.equal(idleFallback.state, "idle");
+  assert.equal(idleFallback.visible, false);
   assert.equal(idleFallback.open, false);
   assert.match(idleFallback.hint, /Rare fallback/i);
   assert.doesNotMatch(`${idleFallback.summary} ${idleFallback.hint}`, /JSON|contract|import|paste box/i);
@@ -2789,14 +2790,23 @@ function testHostResponseReviewProjection() {
     repair: { reason: "choices.options[0] must be string", responseText: "The scene continues." },
   });
   assert.equal(repairFallback.state, "repair");
+  assert.equal(repairFallback.visible, false);
   assert.equal(repairFallback.open, false);
   assert.match(repairFallback.hint, /Optional fallback/i);
   assert.doesNotMatch(repairFallback.hint, /JSON|contract|import|paste box/i);
+
+  const copiedRepairFallback = buildManualResponseFallbackProjection({
+    repair: { reason: "choices.options[0] must be string", responseText: "The scene continues." },
+    copiedResponseAvailable: true,
+  });
+  assert.equal(copiedRepairFallback.visible, true);
+  assert.equal(copiedRepairFallback.open, false);
 
   const draftFallback = buildManualResponseFallbackProjection({
     repair: { reason: "choices.options[0] must be string", responseText: "The scene continues." },
     hasDraftText: true,
   });
+  assert.equal(draftFallback.visible, true);
   assert.equal(draftFallback.open, true);
   assert.match(draftFallback.summary, /Ready/);
 
@@ -2821,6 +2831,7 @@ function testHostResponseReviewProjection() {
   assert.equal(changes.pendingChanges, 1);
   assert.match(changes.body, /1 proposed state change/);
   const changesFallback = buildManualResponseFallbackProjection({ reviewBatch: { proposedChanges: [{ status: "pending" }] } });
+  assert.equal(changesFallback.visible, false);
   assert.match(changesFallback.hint, /review the waiting table changes/i);
 }
 

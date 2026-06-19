@@ -294,7 +294,7 @@ Risks:
 156. Nudge DM and Start Adventure command gates now live beside the table action projection, so host/busy/opening-readiness checks are tested outside `app/app.js`.
 157. Table phase focus now reaches the permanent rails: party, combat, notebook, and Table Talk receive tested primary/supporting/quiet states from `TableSessionEngine` projection, and provider-status changes repaint the composer so the Now/Next cue and input placeholder do not disagree.
 158. Combat tracker now has an active-turn cue that names who controls the turn, what the table should do next, and the active actor's current legal actions from app-owned combat rules, making combat visually and functionally less like ordinary roleplay.
-159. The manual copied-response fallback is tucked behind a Replacement DM Response disclosure with controller-owned copy/state, so DM Recovery leads with the table-check summary instead of a visible paste box.
+159. The manual copied-response fallback is no longer a normal recovery row: it stays hidden unless bridge/manual handoff is active or copied text is already present, so DM Recovery leads with the table-check summary instead of a visible paste box or fallback disclosure.
 160. Inspecting a paused DM response now opens a focused DM Recovery settings surface instead of the broader Troubleshooting drawer, with `settings-surface-controller.js` owning the one-tab recovery mode and target panel filtering.
 161. Live playtest fixed two table-flow bugs: Table Talk now repaints from fresh multiplayer snapshots while the DM is thinking, and app-owned enemy turns only mark themselves handled after initiative actually leaves the enemy; enemy attack messages now read as short table narration instead of bare roll receipts.
 162. Join-client internals now use `join`/`host` runtime modes and `join-client` renderer names instead of the old `thin` naming, while legacy launch/package aliases remain as compatibility shims.
@@ -331,12 +331,13 @@ Risks:
 193. Host-controlled combat input now prompts the host to choose the active character's action, spell, movement, or tactic instead of saying "Act as..." a party member.
 194. Product docs now explicitly separate host and DM roles: the host is a party member plus software-side table owner for setup/invites/provider access/recovery, while the provider/DM Voice is the DM at the table inside app-owned rails.
 195. Settings surfaces are now single-purpose at runtime: Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery no longer expose cross-surface tabs to normal users, while the hidden UI harness can still open diagnostics directly for chaos/audit coverage.
+196. DM Recovery no longer invites users to open a replacement-response path when nothing is waiting, and the copied-response fallback is hidden unless it is actually relevant to a bridge/manual handoff or pasted draft.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
 2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, send-turn preflight including pre-opening locks, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, AI companion Nudge gates, and Nudge/table action visibility policy are now extracted. Watch remaining message-bubble actions, debug hooks, and public routes for phase/session bypasses whenever a new UI gate is added.
-3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, focused DM Recovery surface, host review summary, and replacement-response fallback disclosure, but the underlying manual review textarea still exists as a rare fallback.
+3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, focused DM Recovery surface, host review summary, and hidden copied-response fallback, but the underlying manual review textarea still exists as a rare bridge/manual fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language, combat nudges are active-turn-only suggestions, and app-owned enemy turns now guard against stuck initiative after resolution, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, and ties are visible. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
 6. Local multiplayer still needs longer two-machine soak testing.
@@ -395,7 +396,7 @@ Risks:
 
 6. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
 7. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-8. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists before a collapsed Replacement DM Response fallback, fallback copy/state lives in the host response review controller, and Inspect opens a focused DM Recovery surface instead of broad Troubleshooting.
+8. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists, the copied-response fallback stays hidden unless bridge/manual handoff or pasted draft text makes it relevant, fallback copy/state lives in the host response review controller, and Inspect opens a focused DM Recovery surface instead of broad Troubleshooting.
 9. Run the two-machine playtest checklist and log every friction point.
 10. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 11. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -692,6 +693,8 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Visual audit found Friends And Seats still rendering the DM Voice panel. Root cause: `applyHostModeChrome()` used an old broad setup-section unhide helper after scoped settings projection. Fix keeps host chrome from overriding panel visibility and adds a UI assertion for the Friends surface.
 - 2026-06-18: Combat command-deck copy now asks the host to choose the active character's action/spell/movement/tactic instead of "Act as" that character. Verification: `npm run test:engine`, `npm run build`, and focused `combat-player-and-enemy-turns` UI passed.
 - 2026-06-18: Product stance clarified: the host is not the DM. The host is a party member and the software-side table owner for campaign setup, invites, party management, provider/model access, recovery, and tie-breaking. The provider/DM Voice is the DM inside app-owned rails.
+- 2026-06-18: Settings entry points now behave like single-purpose surfaces instead of a visible tabbed preferences console. Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery no longer expose cross-surface tabs to normal users; diagnostics remain reachable through the hidden UI harness. Verification: `npm run test:engine`, `npm run build`, and focused `settings-navigation-and-diagnostics` UI passed.
+- 2026-06-18: DM Recovery now hides the copied-response fallback unless bridge/manual handoff is active or pasted draft text exists, and idle recovery no longer tells users to open the replacement-response path. Verification: `npm run test:engine`, `npm run build`, and focused `visual-audit-screenshots` UI passed.
 
 ## How To Use This Doc
 

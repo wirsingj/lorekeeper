@@ -10487,6 +10487,7 @@ function renderReviewBatch() {
     repair,
     reviewBatch: state.reviewBatch,
     hasDraftText: Boolean(elements.responseImport?.value.trim()),
+    copiedResponseAvailable: currentProviderSettings().preferredProvider === "bridge" && state.bridge?.mode === "manual",
   }));
   renderReviewPanel({
     elements,

@@ -32,19 +32,26 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
     state: "idle",
     title: "No DM Response Waiting",
     body: "When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.",
-    nextStep: "Open Replacement DM Response only when you intentionally copied a replacement response.",
+    nextStep: "Return to the table when everyone is ready.",
     tone: "idle",
     responseChars: 0,
     pendingChanges: 0,
   };
 }
 
-export function buildManualResponseFallbackProjection({ repair = null, reviewBatch = null, hasDraftText = false } = {}) {
+export function buildManualResponseFallbackProjection({
+  repair = null,
+  reviewBatch = null,
+  hasDraftText = false,
+  copiedResponseAvailable = false,
+} = {}) {
   const pendingChanges = (reviewBatch?.proposedChanges ?? reviewBatch?.proposals ?? [])
     .filter((change) => change?.status !== "committed");
+  const visible = Boolean(hasDraftText || copiedResponseAvailable);
   if (repair) {
     return {
       state: "repair",
+      visible,
       summary: hasDraftText ? "Replacement DM Response Ready" : "Replacement DM Response",
       hint: "Optional fallback: only use this when you intentionally copied a replacement DM response from another chat.",
       open: Boolean(hasDraftText),
@@ -55,6 +62,7 @@ export function buildManualResponseFallbackProjection({ repair = null, reviewBat
   if (pendingChanges.length) {
     return {
       state: "changes",
+      visible,
       summary: "Replacement DM Response",
       hint: "Usually you should review the waiting table changes above. Use copied text only for a deliberate replacement response.",
       open: Boolean(hasDraftText),
@@ -64,6 +72,7 @@ export function buildManualResponseFallbackProjection({ repair = null, reviewBat
   }
   return {
     state: "idle",
+    visible,
     summary: "Replacement DM Response",
     hint: "Rare fallback for a deliberately copied DM response. Most tables should use DM Voice or Read Latest instead.",
     open: Boolean(hasDraftText),
@@ -93,6 +102,7 @@ export function applyManualResponseFallbackProjection(elements, projection) {
     return;
   }
   elements.manualResponseFallback.dataset.state = projection.state || "idle";
+  elements.manualResponseFallback.hidden = !projection.visible;
   elements.manualResponseFallback.open = Boolean(projection.open);
   if (elements.manualResponseFallbackSummary) {
     elements.manualResponseFallbackSummary.textContent = projection.summary || "Replacement DM Response";

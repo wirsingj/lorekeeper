@@ -920,9 +920,9 @@ function SetupDialog() {
           <div id="host-response-review" className="host-response-review" aria-live="polite">
             <strong>No DM Response Waiting</strong>
             <p>When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.</p>
-            <p className="review-next-step">Open Replacement DM Response only when you intentionally copied a replacement response.</p>
+            <p className="review-next-step">Return to the table when everyone is ready.</p>
           </div>
-          <details id="manual-response-fallback" className="manual-response-fallback">
+          <details id="manual-response-fallback" className="manual-response-fallback" hidden>
             <summary id="manual-response-fallback-summary">Replacement DM Response</summary>
             <p id="manual-response-fallback-hint" className="manual-response-fallback-hint">
               Rare fallback for a deliberately copied DM response. Most tables should use DM Voice or Read Latest instead.
