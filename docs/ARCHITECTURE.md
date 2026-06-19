@@ -1,6 +1,6 @@
 # LoreKeeper Architecture
 
-Updated: 2026-06-16
+Updated: 2026-06-19
 
 This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers, and `docs/living-world.md` explains long-term continuity memory.
 
@@ -180,6 +180,7 @@ Provider text can enrich play, but provider text alone should not silently mutat
 UI projections:
 
 - `app/*controller.js` files should keep growing as small projection/policy modules.
+- `app/message-block-controller.js` owns DM/provider play-message block parsing: prose grouping, mechanics block extraction, parsed choice panels, structured choice override, and latest-choice lookup. `app/app.js` should render the returned blocks, not parse provider text.
 - Prefer extracting pure decisions into these modules with tests before adding more branches to `app/app.js`.
 
 ## Storage Model

@@ -47,6 +47,7 @@ import {
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildJoinPreviewProjection, compactJoinPreviewLine } from "../app/join-preview-controller.js";
+import { buildMessageBlocks, latestChoiceBlockFromMessages } from "../app/message-block-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import {
   buildPartyApprovalControlsProjection,
@@ -2968,6 +2969,53 @@ function testChoiceVoteController() {
   assert.deepEqual(structuredBlock.items, ["Vessa: Lead from the front"]);
 }
 
+function testMessageBlockController() {
+  const parsedChoices = buildMessageBlocks(
+    "The road narrows. What do you do?\n\nA) Take the ridge\nB) Circle the ravine",
+    "dm",
+  );
+  assert.equal(parsedChoices.at(-1).type, "choices");
+  assert.equal(parsedChoices.at(-1).prompt, "What do you do?");
+  assert.deepEqual(parsedChoices.at(-1).items, ["Take the ridge", "Circle the ravine"]);
+
+  const structuredChoices = buildMessageBlocks(
+    "Visible prose.\n\n1. stale parsed choice\n2. another stale parsed choice",
+    "dm",
+    {
+      choiceOwner: true,
+      choices: {
+        prompt: "How does Vessa press?",
+        scope: "combat_actor",
+        forActor: "Vessa",
+        options: [
+          { id: "strike", text: "Strike with the spear" },
+          { id: "guard", text: "Guard Mira" },
+        ],
+      },
+    },
+  );
+  assert.equal(structuredChoices.filter((block) => block.type === "choices").length, 1);
+  assert.equal(structuredChoices.at(-1).audienceLabel, "Combat turn: Vessa");
+  assert.deepEqual(structuredChoices.at(-1).items, ["Strike with the spear", "Guard Mira"]);
+  assert.deepEqual(structuredChoices.at(-1).options.map((option) => option.id), ["strike", "guard"]);
+
+  const mechanics = buildMessageBlocks(
+    "The beast lunges, but Vessa keeps her shield high.\n\nAttack Roll: d20+4 = 13 vs AC 16. Damage: 1d6+2 = 5 slashing.",
+    "dm",
+  );
+  assert.equal(mechanics.some((block) => block.type === "paragraph" && /shield high/.test(block.text)), true);
+  const mechanicsBlock = mechanics.find((block) => block.type === "mechanics");
+  assert.ok(mechanicsBlock, "mechanics rows should render as a table-facing roll panel");
+  assert.deepEqual(mechanicsBlock.rows.map((row) => row.label), ["Attack Roll", "Damage"]);
+
+  const latest = latestChoiceBlockFromMessages([
+    { role: "player", body: "I look around." },
+    { role: "dm", body: "The trail forks. What do you do?\n\n1. Follow the torchlight\n2. Stay hidden" },
+  ]);
+  assert.equal(latest.prompt, "What do you do?");
+  assert.deepEqual(latest.items, ["Follow the torchlight", "Stay hidden"]);
+}
+
 function testTurnRepairController() {
   const technicalRepair = {
     reason: "sceneStatus.awaitingPlayer must be boolean.",
@@ -3708,6 +3756,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
+  const messageBlockController = await readFile(path.join("app", "message-block-controller.js"), "utf8");
   const partySuggestionController = await readFile(path.join("app", "party-suggestion-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
@@ -3722,6 +3771,13 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /tableTimeline: state\.tableTimeline\.slice\(-80\)/, "renderer diagnostics should include the table-facing timeline");
   assert.match(appJs, /buildPlayLogProjection/, "play log rendering should use a bounded projection for long sessions");
   assert.match(appJs, /renderLoadEarlierMessages/, "older play log entries should remain reachable on demand");
+  assert.match(appJs, /buildMessageBlocks/, "play-message body parsing should be projected outside the renderer");
+  assert.match(appJs, /latestChoiceBlockFromMessages/, "latest choice lookup should be projected outside the renderer");
+  assert.match(messageBlockController, /function normalizeMessageBlocks/, "message block parsing should live in message-block-controller");
+  assert.match(messageBlockController, /structuredChoiceBlockFromMessageData/, "structured choices should merge outside app.js");
+  assert.doesNotMatch(appJs, /function normalizeMessageBlocks/, "renderer should not own play-message block parsing");
+  assert.doesNotMatch(appJs, /function extractChoicePanel/, "renderer should not own choice panel parsing");
+  assert.doesNotMatch(appJs, /function textBlockToRenderableBlock/, "renderer should not own message block type parsing");
   assert.match(appJs, /buildMessageLifecycleProjection/, "play bubbles should consume projected lifecycle state");
   assert.doesNotMatch(appJs, /function messageLifecycleForMessage/, "renderer should not own play-message lifecycle wording");
   assert.match(playLogController, /function buildMessageLifecycleProjection/, "play-message lifecycle wording should live in play-log-controller");
@@ -4214,6 +4270,7 @@ testMessageLifecycleProjection();
 testPendingInputActionProjection();
 testPartySuggestionController();
 testChoiceVoteController();
+testMessageBlockController();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 testSettingsSurfaceProjection();
