@@ -7,6 +7,13 @@ import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-ut
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "../app/campaign-adoption-controller.js";
 import {
+  buildCampaignNotebookProjection,
+  buildPeopleNotebookSection,
+  buildPlacesNotebookSection,
+  buildQuestNotebookSection,
+  buildThingsNotebookSection,
+} from "../app/campaign-notebook-controller.js";
+import {
   buildChoiceSelectionFromText,
   buildChoiceSelectionMeta,
   choiceAudienceLabel,
@@ -1293,6 +1300,59 @@ function testSceneNotebookProjection() {
   const empty = buildSceneNotebookProjection({ scene: {}, party: [], people: [], places: [], items: [], quests: [] });
   assert.equal(empty.count, 0);
   assert.deepEqual(empty.records, []);
+}
+
+function testCampaignNotebookProjection() {
+  const campaign = {
+    ...campaignFixture(),
+    people: [{
+      id: "barkeep",
+      name: "Barkeep",
+      role: "Innkeeper",
+      summary: "Keeps one eye on every table.",
+      locationId: "tavern",
+      relatedIds: ["thor"],
+    }],
+    places: [
+      { id: "crossroad", name: "Old Crossroad", type: "road" },
+      { id: "tavern", name: "Tavern", type: "inn", region: "North Ward", connectedPlaceIds: ["crossroad"] },
+    ],
+    items: [{ id: "amulet", name: "Silver Amulet", type: "clue", summary: "Cold to the touch.", notes: ["Moon mark."] }],
+    inventory: [{ id: "carried-key", itemId: "iron-key", name: "Iron Key", quantity: 2, carriedBy: "Thor", notes: "Fits the cellar." }],
+    assets: [{ id: "map", name: "Ancient Map", kind: "handout", path: "maps/old-road.png", notes: ["Torn corner."] }],
+    quests: [
+      { id: "quest-1", title: "Calm the brawl", status: "active", stakes: "Keep the tavern standing.", relatedIds: ["tavern"] },
+      { id: "quest-done", title: "Paid the tab", status: "completed" },
+      { id: "quest-secret", title: "The hidden hand", status: "active", visibility: "dm_only", type: "story_arc" },
+    ],
+    scene: {
+      ...campaignFixture().scene,
+      currentPlaceId: "tavern",
+    },
+  };
+
+  const projection = buildCampaignNotebookProjection(campaign);
+  assert.equal(projection.people.count, 1);
+  assert.equal(projection.people.records[0].subtitle, "Innkeeper");
+  assert.match(projection.people.records[0].body, /Location: Tavern/);
+  assert.match(projection.people.records[0].body, /Related: Thor/);
+
+  assert.deepEqual(projection.places.records.map((record) => record.title), ["Tavern", "Old Crossroad"]);
+  assert.equal(projection.places.records[0].subtitle, "inn / current");
+  assert.match(projection.places.records[0].body, /Connected: Old Crossroad/);
+
+  assert.equal(projection.things.count, 3);
+  assert.deepEqual(projection.things.records.map((record) => record.title), ["Ancient Map", "Iron Key", "Silver Amulet"]);
+  assert.equal(projection.things.records.find((record) => record.title === "Iron Key").subtitle, "2 carried by Thor");
+
+  assert.equal(projection.quests.count, 1);
+  assert.equal(projection.quests.records[0].title, "Calm the brawl");
+  assert.match(projection.quests.records[0].body, /Related: Tavern/);
+
+  assert.equal(buildPeopleNotebookSection({}).count, 0);
+  assert.equal(buildPlacesNotebookSection({}).emptyText, "Current and discovered locations will appear here.");
+  assert.equal(buildThingsNotebookSection({}).count, 0);
+  assert.equal(buildQuestNotebookSection({}).count, 0);
 }
 
 function testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds() {
@@ -4133,6 +4193,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
   const turnSubmitController = await readFile(path.join("app", "turn-submit-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
+  const campaignNotebookController = await readFile(path.join("app", "campaign-notebook-controller.js"), "utf8");
   const sceneNotebookController = await readFile(path.join("app", "scene-notebook-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
@@ -4330,6 +4391,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(sceneNotebookController, /buildSceneRetrieval\(campaign\)/, "scene notebook should use the same scene retrieval as DM context");
   assert.match(sceneNotebookController, /relevantRelationships\.slice\(0, 2\)/, "scene notebook should surface relationship context without flooding the rail");
   assert.doesNotMatch(appJs, /buildSceneRetrieval\(campaign\)/, "renderer should not own scene retrieval policy for the notebook rail");
+  assert.match(appJs, /buildPeopleNotebookSection/, "world notebook rendering should consume section projections");
+  assert.match(campaignNotebookController, /isHiddenStoryThread\(quest\)/, "quest notebook projection should keep DM-only story arcs out of player notes");
+  assert.doesNotMatch(appJs, /isHiddenStoryThread\(quest\)/, "renderer should not own quest visibility policy");
   assert.match(styles, /\.scene-notes-section/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
@@ -4495,6 +4559,7 @@ testCombatTrackerView();
 testSceneImportController();
 testSceneAndConsequenceEngines();
 testSceneNotebookProjection();
+testCampaignNotebookProjection();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
 testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise();

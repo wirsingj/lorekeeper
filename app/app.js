@@ -11,10 +11,15 @@ import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
-import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
 import { buildFiveELiteCharacterSeed, clampLevel } from "../src/rules/character-seed.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "./campaign-adoption-controller.js";
+import {
+  buildPeopleNotebookSection,
+  buildPlacesNotebookSection,
+  buildQuestNotebookSection,
+  buildThingsNotebookSection,
+} from "./campaign-notebook-controller.js";
 import {
   choiceLabelForIndex,
   choiceOptionId,
@@ -9051,112 +9056,49 @@ function removeNullEntries(object) {
 }
 
 function renderPeople(campaign) {
-  elements.peopleCount.textContent = String(campaign.people.length);
+  const section = buildPeopleNotebookSection(campaign);
+  elements.peopleCount.textContent = String(section.count);
   elements.peopleList.replaceChildren(
     ...emptyOrRecords(
-      campaign.people.map((person) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: person.name,
-          subtitle: person.role || person.type || "person",
-          body: detailLines([
-            person.summary,
-            ...(person.notes ?? []),
-            person.locationId ? `Location: ${labelById(campaign, person.locationId)}` : "",
-            person.relatedIds?.length ? `Related: ${person.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
-          ]),
-          onEdit: () => openRecordDialog("people", person),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "NPCs and contacts the table meets will appear here.",
+      section.emptyText,
     ),
   );
 }
 
 function renderPlaces(campaign) {
-  const currentPlaceId = campaign.scene.currentPlaceId;
-  const places = [...campaign.places].sort((a, b) => {
-    if (a.id === currentPlaceId) {
-      return -1;
-    }
-    if (b.id === currentPlaceId) {
-      return 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
-
-  elements.placeCount.textContent = String(places.length);
+  const section = buildPlacesNotebookSection(campaign);
+  elements.placeCount.textContent = String(section.count);
   elements.placeList.replaceChildren(
     ...emptyOrRecords(
-      places.map((place) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: place.name,
-          subtitle: place.id === currentPlaceId ? `${place.type || "place"} / current` : place.type || place.region || "place",
-          body: detailLines([
-            place.summary,
-            place.region ? `Region: ${place.region}` : "",
-            ...(place.notes ?? []),
-            place.connectedPlaceIds?.length
-              ? `Connected: ${place.connectedPlaceIds.map((id) => labelById(campaign, id)).join(", ")}`
-              : "",
-          ]),
-          onEdit: () => openRecordDialog("places", place),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "Current and discovered locations will appear here.",
+      section.emptyText,
     ),
   );
 }
 
 function renderThings(campaign) {
-  const things = [
-    ...campaign.items.map((item) => ({
-      id: item.id,
-      domain: "items",
-      record: item,
-      title: item.name,
-      subtitle: item.type || "item",
-      body: detailLines([item.summary, ...(item.notes ?? [])]),
-    })),
-    ...campaign.inventory.map((entry) => {
-      const item = findById(campaign.items, entry.itemId);
-      return {
-        id: entry.id || entry.itemId,
-        domain: "items",
-        record: {
-          ...(item ?? {}),
-          id: item?.id ?? entry.itemId,
-          name: entry.name || item?.name || entry.itemId,
-          type: item?.type || "inventory",
-          summary: detailLines([entry.notes, item?.summary]),
-          notes: item?.notes ?? [],
-        },
-        title: entry.name || item?.name || entry.itemId,
-        subtitle: `${entry.quantity ?? 1} carried by ${entry.carriedBy || entry.holderId || "party"}`,
-        body: detailLines([entry.notes, item?.summary, ...(item?.notes ?? [])]),
-      };
-    }),
-    ...campaign.assets.map((asset) => ({
-      id: asset.id,
-      domain: "assets",
-      record: asset,
-      title: asset.name,
-      subtitle: asset.kind || "asset",
-      body: detailLines([asset.path, ...(asset.notes ?? [])]),
-    })),
-  ].sort((a, b) => a.title.localeCompare(b.title));
-
-  elements.thingCount.textContent = String(things.length);
+  const section = buildThingsNotebookSection(campaign);
+  elements.thingCount.textContent = String(section.count);
   elements.thingList.replaceChildren(
     ...emptyOrRecords(
-      things.map((thing) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: thing.title,
-          subtitle: thing.subtitle,
-          body: thing.body,
-          onEdit: () => openRecordDialog(thing.domain, thing.record),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "Items, clues, handouts, and assets will appear here.",
+      section.emptyText,
     ),
   );
 }
@@ -9178,26 +9120,17 @@ function formatHp(hp) {
 }
 
 function renderQuests(campaign) {
-  const active = campaign.quests
-    .filter((quest) => quest.status !== "completed")
-    .filter((quest) => !isHiddenStoryThread(quest))
-    .slice(0, 8);
-  elements.questCount.textContent = String(active.length);
+  const section = buildQuestNotebookSection(campaign);
+  elements.questCount.textContent = String(section.count);
   elements.questList.replaceChildren(
     ...emptyOrRecords(
-      active.map((quest) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: quest.title,
-          subtitle: quest.status || "thread",
-          body: detailLines([
-            quest.stakes,
-            ...(quest.openQuestions ?? []).map((question) => `Open: ${question}`),
-            quest.relatedIds?.length ? `Related: ${quest.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
-          ]),
-          onEdit: () => openRecordDialog("quests", quest),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "Open quests and unresolved story threads will appear here.",
+      section.emptyText,
     ),
   );
 }
