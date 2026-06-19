@@ -39,6 +39,7 @@ Renderer:
 Domain engine:
 
 - `src/engine/*` owns deterministic tabletop rules, turn state, combat state, scene retrieval, consequences, agency checks, and provider orchestration.
+- `src/rules/*` owns deterministic tabletop rule helpers that are not renderer-specific, including 5E-lite character sheet seed/profile/equipment/spell policy.
 - `src/campaign-state/*` owns campaign shape, normalization, direct record mutations, review logs, and canonical change application.
 - `src/storage/*` owns campaign file persistence, SQLite import/export, migrations, and review commits.
 - `src/model-contract/*` owns provider response validation, rendering, fixtures, and agency guard rails.

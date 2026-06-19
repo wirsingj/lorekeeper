@@ -93,6 +93,7 @@ import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
+import { buildFiveELiteCharacterSeed, classifyCharacterProfile, clampLevel } from "../src/rules/character-seed.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
 import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startCombat } from "../src/engine/combat-engine.js";
 import { createCampaignStateStore } from "../src/engine/campaign-state-store.js";
@@ -3523,6 +3524,38 @@ function testCharacterAutocompleteProjection() {
   assert.equal(new Set(manyCrew.map((member) => member.name)).size, manyCrew.length, "exhausted name pools should still produce unique fallback names");
 }
 
+function testCharacterSeedRules() {
+  assert.equal(clampLevel("bad"), 1);
+  assert.equal(clampLevel(99), 20);
+  assert.equal(classifyCharacterProfile("frost druid with a wolf companion").key, "druid");
+
+  const ranger = buildFiveELiteCharacterSeed({
+    name: "Renn",
+    ancestry: "Human",
+    characterClass: "Ranger",
+    concept: "A scout who reads the ridge line.",
+    level: 3,
+  });
+  assert.equal(ranger.id, "party-renn");
+  assert.equal(ranger.level, 3);
+  assert.equal(ranger.proficiencyBonus, 2);
+  assert.equal(ranger.stats.abilityScores.DEX, 15);
+  assert.equal(ranger.attacks.some((attack) => attack.name === "Longbow"), true);
+  assert.equal(ranger.equipment.inventory.includes("Quiver of arrows"), true);
+  assert.equal(ranger.resources.spellSlots[1].max, 3);
+
+  const frostDruid = buildFiveELiteCharacterSeed({
+    name: "Ilyra",
+    ancestry: "Elf",
+    characterClass: "Druid",
+    concept: "A frost-touched wanderer with wolf signs.",
+    level: 2,
+  });
+  assert.equal(frostDruid.spells.some((spell) => spell.name === "Frostbite"), true);
+  assert.equal(frostDruid.abilities.includes("Wolf companion bond"), true);
+  assert.equal(frostDruid.resources.uses.wildShape.max, 2);
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -3788,6 +3821,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
+  const characterSeedRules = await readFile(path.join("src", "rules", "character-seed.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
@@ -4000,9 +4034,12 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /function saveGuestSession\(session\) \{\s*state\.guestSession = session/s);
   assert.match(appJs, /tableId:\s*status\.localTable\?\.tableId/);
   assert.match(appJs, /sessionId:\s*status\.localTable\?\.sessionId/);
-  assert.match(appJs, /equipmentForProfile/);
-  assert.match(appJs, /inventory:\s*equipment\.inventory/);
-  assert.match(appJs, /function spell\(name, level/);
+  assert.match(appJs, /buildFiveELiteCharacterSeed/);
+  assert.doesNotMatch(appJs, /function equipmentForProfile/, "5E-lite equipment policy should live outside app.js");
+  assert.doesNotMatch(appJs, /function spell\(name, level/, "5E-lite spell seed policy should live outside app.js");
+  assert.match(characterSeedRules, /function equipmentForProfile/);
+  assert.match(characterSeedRules, /inventory:\s*equipment\.inventory/);
+  assert.match(characterSeedRules, /function spell\(name, level/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /startingPartyMembers:\s*joinerSeeds/);
   assert.match(appJs, /startAdventureOpening/);
@@ -4158,6 +4195,7 @@ testProviderResultController();
 testProviderChatProjection();
 testTableTalkProjection();
 testCharacterAutocompleteProjection();
+testCharacterSeedRules();
 testCampaignStateStore();
 testInputComposerProjection();
 testJoinPreviewProjection();

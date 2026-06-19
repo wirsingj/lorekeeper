@@ -416,6 +416,7 @@ Risks:
 215. Rejected remote guest actions, passes, and choice votes now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
 216. Start Adventure duplicate-click coverage now proves a rapid second click cannot create a second provider call or duplicate opening narration.
 217. Recovery Retry/Use Anyway action gating now lives in `app/turn-repair-controller.js`; handlers block busy/no-repair/no-reviewed-response/hard-blocked states even if a hidden recovery button or debug path is invoked directly.
+218. The 5E-lite character sheet seed/profile/equipment/spell policy moved out of `app/app.js` into `src/rules/character-seed.js`, with direct tests and architecture guards preventing renderer ownership from creeping back.
 
 ### Still Risky
 
@@ -799,6 +800,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-19: Trust route probes now cover pre-opening guest action, pass, and choice-vote attempts with the same no-mutation host snapshot invariant. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-route-smoke`, 2 runs) passed.
 - 2026-06-19: Start Adventure duplicate-click trust coverage now fires two clicks on the opening control and asserts only one provider generation plus one visible opening narration. Verification: `node --check scripts/test-ui-flow.js` and focused `create-campaign-and-hide-start-adventure-after-use` UI passed.
 - 2026-06-19: Recovery action handlers now use a tested repair-action gate so Retry/Use Anyway cannot run from hidden/debug entry points during active generation, without an active repair, without reviewed text, or after a hard agency block. Verification: `npm run test:engine`, node syntax checks, and visual-audit UI passed.
+- 2026-06-19: `v0.5.0-work` branch began the larger `app/app.js` teardown. First extraction moved 5E-lite character seed/profile/equipment/spell rules into `src/rules/character-seed.js`, deleting roughly 340 renderer lines and adding direct module/architecture tests. Verification: `npm run test:engine`, `npm run build`, focused wizard party UI, and focused Start Adventure UI passed.
 
 ## How To Use This Doc
 
