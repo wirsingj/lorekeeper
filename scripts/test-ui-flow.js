@@ -540,6 +540,82 @@ const scenarios = [
     },
   },
   {
+    name: "long-session-scroll-soak",
+    run: async (harness) => {
+      await harness.gotoHome();
+      await createCampaignFromWizard(harness, {
+        title: "Harness Long Scroll",
+        premise: "A long night at the table crosses roads, ruins, and quiet campfire choices.",
+        startingLocation: "Old watch road",
+        tone: "slow-burn travel fantasy",
+        primary: {
+          name: "Vessa",
+          ancestry: "Human",
+          characterClass: "Fighter",
+          concept: "A steady road captain who keeps the marching order honest.",
+        },
+      });
+      await harness.page.evaluate(() => {
+        window.__lorekeeperDebug?.setPlayLogVisibleLimit?.(20);
+        return window.__lorekeeperDebug?.seedPlayLogMessages?.(
+          Array.from({ length: 36 }, (_, index) => ({
+            id: `scroll-soak-${index + 1}`,
+            role: index % 2 === 0 ? "player" : "dm",
+            title: index % 2 === 0 ? "Vessa" : "DM",
+            body: `Long session beat ${index + 1}: the table keeps moving without losing its place.`,
+            createdAt: new Date(Date.UTC(2026, 5, 18, 20, index)).toISOString(),
+          })),
+        );
+      });
+      await harness.page.waitForFunction(() => document.querySelectorAll("#play-log .play-message").length === 20, null, { timeout: 10000 });
+      await expectVisibleText(harness.page, "Show 16 earlier messages");
+      await expectVisibleText(harness.page, "Long session beat 36");
+      assert.equal(await harness.page.locator("#play-log .play-message").count(), 20);
+
+      await harness.page.locator(".play-log-load-earlier button").click();
+      await expectVisibleText(harness.page, "Long session beat 1");
+      assert.equal(await harness.page.locator("#play-log .play-message").count(), 36);
+
+      await harness.page.evaluate(() => {
+        window.__lorekeeperDebug?.setPlayLogVisibleLimit?.(20);
+        const log = document.querySelector("#play-log");
+        if (log) {
+          log.scrollTop = 0;
+        }
+        window.__lorekeeperDebug?.appendPlayLogMessages?.([{
+          id: "scroll-soak-reader-preserve",
+          role: "dm",
+          title: "DM",
+          body: "Long session beat 37: this arrives while the reader is checking older text.",
+        }]);
+      });
+      const readerPosition = await harness.page.evaluate(() => {
+        const log = document.querySelector("#play-log");
+        return log ? log.scrollHeight - log.scrollTop - log.clientHeight : 0;
+      });
+      assert.ok(readerPosition >= 96, "play log should not jump to bottom while reading older text");
+
+      await harness.page.evaluate(() => {
+        const log = document.querySelector("#play-log");
+        if (log) {
+          log.scrollTop = log.scrollHeight;
+        }
+        window.__lorekeeperDebug?.appendPlayLogMessages?.([{
+          id: "scroll-soak-auto-follow",
+          role: "dm",
+          title: "DM",
+          body: "Long session beat 38: this newest beat stays in view at the table edge.",
+        }]);
+      });
+      await expectVisibleText(harness.page, "Long session beat 38");
+      const bottomPosition = await harness.page.evaluate(() => {
+        const log = document.querySelector("#play-log");
+        return log ? log.scrollHeight - log.scrollTop - log.clientHeight : 0;
+      });
+      assert.ok(bottomPosition < 96, "play log should follow new messages when already at the bottom");
+    },
+  },
+  {
     name: "remote-guest-prelobby-joins-and-plays",
     run: async (harness) => {
       await harness.gotoHome();

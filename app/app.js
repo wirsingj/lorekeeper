@@ -7874,6 +7874,40 @@ function installInternalDebugHarness() {
     },
     recentEvents: (limit = 80) => state.diagnosticsEvents.slice(-Math.max(1, Math.min(Number(limit) || 80, 200))),
     recentTimeline: (limit = 80) => state.tableTimeline.slice(-Math.max(1, Math.min(Number(limit) || 80, 200))),
+    setPlayLogVisibleLimit: (limit = defaultPlayLogVisibleLimit) => {
+      state.playLogVisibleLimit = Math.max(1, Number(limit) || defaultPlayLogVisibleLimit);
+      renderPlayLog();
+      return state.playLogVisibleLimit;
+    },
+    seedPlayLogMessages: (messages = []) => {
+      state.playMessages = normalizeDebugPlayMessages(messages);
+      if (state.campaign) {
+        state.campaign = {
+          ...state.campaign,
+          sessionLog: {
+            ...(state.campaign.sessionLog ?? {}),
+            messages: state.playMessages,
+          },
+        };
+      }
+      state.forceScrollToBottom = true;
+      renderPlayLog();
+      return state.playMessages.length;
+    },
+    appendPlayLogMessages: (messages = []) => {
+      state.playMessages.push(...normalizeDebugPlayMessages(messages, state.playMessages.length));
+      if (state.campaign) {
+        state.campaign = {
+          ...state.campaign,
+          sessionLog: {
+            ...(state.campaign.sessionLog ?? {}),
+            messages: state.playMessages,
+          },
+        };
+      }
+      renderPlayLog();
+      return state.playMessages.length;
+    },
     stateSummary: () => ({
       campaignId: state.campaign?.id || "",
       campaignTitle: state.campaign?.title || "",
@@ -7906,6 +7940,23 @@ function installInternalDebugHarness() {
   Object.defineProperty(window, "__lorekeeperDebug", {
     value: harness,
     configurable: true,
+  });
+}
+
+function normalizeDebugPlayMessages(messages = [], offset = 0) {
+  return (Array.isArray(messages) ? messages : []).map((message, index) => {
+    const role = message.role || (index % 2 === 0 ? "player" : "dm");
+    return {
+      id: message.id || `debug-message-${offset + index + 1}`,
+      sessionId: message.sessionId || state.campaign?.activeSessionId || "debug-session",
+      role,
+      title: message.title || (role === "player" ? "Harness Player" : "DM"),
+      body: message.body || `Harness table message ${offset + index + 1}.`,
+      meta: cleanMessageMeta(message.meta || ""),
+      source: message.source || "debug_harness",
+      data: message.data || {},
+      createdAt: message.createdAt || new Date(Date.now() + index).toISOString(),
+    };
   });
 }
 
