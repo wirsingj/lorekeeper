@@ -1,6 +1,6 @@
 # LoreKeeper State Of The Table
 
-Updated: 2026-06-18
+Updated: 2026-06-19
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
@@ -42,6 +42,40 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
 - AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
+
+## Trust Risks
+
+Trust rule: every action must be allowed, visible, outcome-clear, recoverable, and unable to silently fail or silently mutate table state.
+
+### Fixed Trust Violations
+
+- Fresh tables now have an explicit pre-opening phase. Start Adventure is the only first provider turn; DM Nudge, companion Nudge, Send Turn, debug submit, and pre-opening guest actions are gated until the opening starts.
+- Start Adventure now disappears after the host requests opening narration for the current local-table session, and can return only when a fresh re-hosted table is still pre-opening.
+- Guest actions, guest snapshots, guest choice votes, waiting-room registrations, and auto-resolve timers are pinned to campaign/table/session identity so stale joins and delayed work cannot mutate a new table.
+- Guest leave/rejoin and campaign-switch flows clear stale connection/controller state instead of silently reviving old approvals.
+- Table Talk refreshes while DM Voice is generating so side chat does not appear to vanish until the DM response posts.
+- Review commits now save through the active campaign update queue, preserving route-side Table Talk and remote guest state that land during provider import.
+- AI companion Nudge is gated by table phase, guest/client role, and combat active actor; disabled nudge buttons are tested to prove they cannot start generation or trigger recovery.
+- Common combat resolution owns active actor, initiative, legal options, action economy, and enemy-turn advancement enough to reject provider phrasing that would skip or resolve the wrong actor.
+- Campaign delete is visible from the front door and recycles local SQLite files instead of exposing undeletable backend placeholder campaigns.
+- The hidden Playwright harness uses temp campaign roots, host plus `/guest` tabs, deterministic provider mocks, remote chaos, and failure artifacts so trust bugs do not pollute real campaign files.
+
+### Remaining Trust Risks
+
+- `app/app.js` still owns broad orchestration around provider/import/recovery/combat/multiplayer. Any new visible gate must also have a route/controller invariant so an alternate entry point cannot bypass it.
+- Recovery is more table-shaped, but the manual replacement/use-anyway escape path still feels like a tool for fixing software rather than a table ruling.
+- Combat still needs deeper phase-specific action surfaces for spells, reactions, movement, concentration, richer conditions, and improvised actions so players do not wonder why a legal-looking action is unavailable.
+- Real two-machine LAN play remains the highest confidence gap for guest waiting-room presence, reconnects, firewall/device behavior, and perceived timing.
+- Provider failure, cancel, campaign switch, stale invite, and combat interruption paths have coverage, but chaos should keep adding explicit "nothing mutated" assertions after every rejected or interrupted action.
+- Host play still blends party-member input with software-owner controls. Host-only controls should keep moving into tucked-away table-owner surfaces so the shared table never looks like an admin panel.
+
+### Recurring Patterns
+
+- UI button gates are necessary but insufficient; debug hooks, public routes, delayed timers, and message-bubble actions need the same state invariant.
+- Delayed async work must carry campaign/table/session identity and stand down when that identity changes.
+- Rejected actions should prove a negative: no provider call, no play-log message, no staged input, no combat turn advance, no controller transfer, no recovery modal.
+- Harness provider queues can hide mistakes if a test only checks the happy-path text. Chaos tests should verify state before and after actions, not only the visible response.
+- Copy changes can create trust debt when labels drift from ownership reality. Host is the software-side owner and party member; DM Voice/provider is the DM.
 
 ## Product UX/UI Redesign Audit
 
@@ -350,6 +384,7 @@ Risks:
 212. The New Adventure wizard's first companion card now uses the same "Scene cue for DM Voice" wording as dynamically added party cards, removing the last visible "Host note for the DM" setup leak.
 213. Additional visible copy leaks now use table language: returning home points to Continue/New Adventure/Join/DM Voice, local model readiness says local DM Voice instead of local AI, and delete confirmation describes a local backup instead of SQLite/deleted-campaigns/manual recovery internals.
 214. Guest lobby previews now collapse fresh-table setup scaffolding down to table fiction/premise and the remote join helper asserts guests do not see "The table is set..." or host-only Next instructions.
+215. Rejected remote guest actions now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
 
 ### Still Risky
 
@@ -399,6 +434,7 @@ Risks:
 | Notes support table memory. | Improved | Campaign Notes and Player Notes are split, with a Scene section surfacing current situation/consequences/threads from retrieval. Player Notes are campaign-backed local scratch space, but not yet a full per-user shared/private notes model. |
 | Recovery after provider failure is understandable. | Improved | Player echoes, staged inputs, retry bubbles, table-facing labels, and session `Next:` guidance show lifecycle. Manual review still needs a less developer-shaped surface. |
 | Character creation is consistent. | Fixed | Shared compact auto-complete and controller defaults are in place; Auto-Complete preserves hard facts while refreshing generated character flavor. |
+| Forbidden actions fail safely. | Improved | Pre-opening host/companion/guest gates, stale session route tests, and the Playwright trust snapshot check prove key rejected actions do not silently mutate state. Expand this pattern to every interrupted/canceled action. |
 
 ## Priority Queue
 
@@ -601,6 +637,7 @@ Risks:
 - [x] Ollama context cache is campaign/model/mode scoped and non-canon.
 - [x] Diagnostics can show recent errors and session health.
 - [x] Add internal trace/debug harnesses for API/provider/renderer/UI investigation. Current state: server diagnostics include an auth-protected trace ring, provider generation emits prompt/response lifecycle events, `inspect:diagnostics` reads campaign SQLite diagnostics, and `test:ui` is an opt-in Playwright scenario harness with seeded desktop chaos mode, deterministic provider mocking, temp campaign roots, pre-opening DM/companion Nudge and Send Turn checks, and failure artifacts.
+- [x] Add trust-invariant assertions to the UI harness for rejected role/session actions. Current state: forbidden/stale guest action probes now capture host state before and after the route call and assert no provider generation, play-log, staged-input, turn, combat, recovery, phase, or waiting-room mutation.
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
 - [x] Add local asset and path traversal integration coverage for the server.
@@ -727,6 +764,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Long-session scroll soak is now automated through hidden UI harness play-log seeding/append hooks. Verification: `npm run build` and focused `long-session-scroll-soak` UI passed.
 - 2026-06-18: `/guest` waiting-room joins now expose the optional character draft card and carry those notes through pre-table and active waiting-room seating. Verification: `npm run test:multiplayer`, focused remote pre-lobby UI, and focused remote active leave/rejoin/new-game UI passed.
 - 2026-06-18: Provider result metadata and contract-issue selection moved into `app/provider-result-controller.js`, with architecture guards keeping that pure repair/import policy out of `app/app.js`. Verification: `npm run test:engine` and `npm run build` passed.
+- 2026-06-19: Trust pass started. SotT now tracks Trust Risks explicitly, and rejected guest-action probes compare host trust snapshots before/after to catch silent mutation, not just HTTP rejection. Verification: `node --check scripts/test-ui-flow.js`, focused remote leave/rejoin/new-game UI, and seeded chaos UI (`trust-invariant-smoke`, 2 runs) passed.
 
 ## How To Use This Doc
 

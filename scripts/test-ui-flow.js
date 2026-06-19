@@ -713,6 +713,7 @@ const scenarios = [
       await seatActiveWaitingGuest(harness, { playerName: "Remote Jess", seatName: "Renn" });
       const firstSession = await waitForGuestConnected(guestPage, { characterName: "Renn", campaignTitle: "Harness Remote Active A" });
       assert.equal(firstSession.assignedCharacter.name, "Renn");
+      await waitForHostPreOpeningSeatSettled(harness.page);
       await expectGuestActionRejected(
         harness,
         await guestDebugSession(guestPage),
@@ -739,6 +740,7 @@ const scenarios = [
       ]);
       await submitPlayerTurn(harness.page, "Ilyra keeps the camp quiet while Renn points out the tracks.");
       await expectVisibleText(guestPage, "second set of tracks");
+      await waitForHostResolvedTurnSettled(harness.page);
 
       const staleSession = await guestDebugSession(guestPage);
       await guestPage.click("#return-main-menu");
@@ -1357,10 +1359,115 @@ async function guestDebugSession(guestPage) {
   });
 }
 
+async function captureTrustSnapshot(page) {
+  return page.evaluate(() => {
+    const debug = window.__lorekeeperDebug;
+    const summary = debug?.stateSummary?.() ?? {};
+    const renderer = debug?.renderer?.() ?? {};
+    const snapshot = renderer?.debugSnapshot ?? {};
+    const multiplayer = snapshot.multiplayer ?? {};
+    const stagedGuestInputs = Array.isArray(multiplayer.stagedGuestInputs)
+      ? multiplayer.stagedGuestInputs
+      : [];
+    const diagnosticsEvents = Array.isArray(renderer.diagnosticsEvents)
+      ? renderer.diagnosticsEvents
+      : [];
+    const recentMessages = Array.isArray(renderer.recentPlayMessages)
+      ? renderer.recentPlayMessages
+      : [];
+    const combat = snapshot.combat ?? {};
+    const turn = snapshot.turn ?? {};
+
+    return {
+      campaignId: summary.campaignId || snapshot.identity?.campaignId || "",
+      campaignTitle: summary.campaignTitle || snapshot.identity?.campaignTitle || "",
+      tablePhase: summary.tablePhase || renderer.tableSession?.phase || "",
+      activeGeneration: Boolean(summary.activeGeneration),
+      repairActive: Boolean(summary.repair?.active || renderer.turnRepair?.active),
+      playMessages: Number(summary.playMessages ?? renderer.campaignCounts?.messages ?? 0),
+      recentPlayFingerprint: recentMessages
+        .map((message) => `${message.id || ""}:${message.role || ""}:${message.body || ""}`)
+        .join("|"),
+      stagedGuestInputCount: stagedGuestInputs.length,
+      stagedGuestInputFingerprint: stagedGuestInputs
+        .map((input) => `${input.id || ""}:${input.connectionId || ""}:${input.textPreview || ""}`)
+        .join("|"),
+      currentTurnMessage: renderer.currentTurn?.playerMessage || "",
+      currentTurnStatus: renderer.turnEngine?.status || "",
+      activeActorId: turn.activeActorId || "",
+      activeActorName: turn.activeActorName || "",
+      inCombat: Boolean(combat.inCombat),
+      combatCurrentTurnId: combat.currentTurnId || "",
+      generationStarts: diagnosticsEvents.filter((event) => event?.type === "ollama_generation_started").length,
+      providerActivityState: renderer.providerActivity?.state || "",
+      waitingGuests: Array.isArray(multiplayer.waitingGuests) ? multiplayer.waitingGuests.length : Number(multiplayer.waitingGuests || 0),
+    };
+  });
+}
+
+function assertTrustSnapshotUnchanged(before, after, label) {
+  const fields = [
+    "campaignId",
+    "campaignTitle",
+    "tablePhase",
+    "activeGeneration",
+    "repairActive",
+    "playMessages",
+    "recentPlayFingerprint",
+    "stagedGuestInputCount",
+    "stagedGuestInputFingerprint",
+    "currentTurnMessage",
+    "currentTurnStatus",
+    "activeActorId",
+    "activeActorName",
+    "inCombat",
+    "combatCurrentTurnId",
+    "generationStarts",
+    "providerActivityState",
+    "waitingGuests",
+  ];
+  for (const field of fields) {
+    assert.deepEqual(
+      after[field],
+      before[field],
+      `${label} unexpectedly changed ${field}: before=${JSON.stringify(before)} after=${JSON.stringify(after)}`,
+    );
+  }
+}
+
+async function waitForHostPreOpeningSeatSettled(page) {
+  return waitForAsync(async () => {
+    const snapshot = await captureTrustSnapshot(page);
+    return snapshot.tablePhase === "opening_ready" && snapshot.waitingGuests === 0
+      ? snapshot
+      : null;
+  }, {
+    timeoutMs: 12000,
+    description: "host pre-opening phase settled after seating guest",
+  });
+}
+
+async function waitForHostResolvedTurnSettled(page) {
+  return waitForAsync(async () => {
+    const snapshot = await captureTrustSnapshot(page);
+    return !snapshot.activeGeneration
+      && snapshot.providerActivityState !== "working"
+      && snapshot.tablePhase === "waiting_for_player"
+      && snapshot.stagedGuestInputCount === 0
+      && snapshot.currentTurnMessage === ""
+      ? snapshot
+      : null;
+  }, {
+    timeoutMs: 15000,
+    description: "host table settled after resolved turn",
+  });
+}
+
 async function expectGuestActionRejected(harness, session, text) {
   if (!session?.connectionId) {
     return;
   }
+  const before = await captureTrustSnapshot(harness.page);
   const response = await fetch(`${harness.baseUrl}/api/multiplayer/action`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -1377,6 +1484,9 @@ async function expectGuestActionRejected(harness, session, text) {
     }),
   });
   assert.equal(response.ok, false, "stale or disconnected guest credentials should not submit actions");
+  await harness.page.waitForTimeout(600);
+  const after = await captureTrustSnapshot(harness.page);
+  assertTrustSnapshotUnchanged(before, after, "rejected guest action");
 }
 
 async function assertNoDuplicateWizardCardNames(page) {
@@ -1797,6 +1907,7 @@ async function exerciseRemoteGuestPreOpeningChaos(harness, rng, runIndex, seatNa
     campaignTitle: `Chaos Table ${runIndex}`,
   });
   assert.equal(session.assignedCharacter.name, seatName);
+  await waitForHostPreOpeningSeatSettled(harness.page);
   await expectGuestActionRejected(
     harness,
     await guestDebugSession(guestPage),
