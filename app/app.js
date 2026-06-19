@@ -3847,10 +3847,9 @@ function renderJoinPreview(preview, container, options = {}) {
   const title = document.createElement("h3");
   title.textContent = preview.campaignTitle || "Hosted Table";
   const scene = preview.scene ?? {};
-  const summary = compactJoinPreviewLine([
-    preview.campaignSummary,
-    scene.immediateSituation,
-  ].filter(Boolean).join(" "));
+  const sceneSummary = compactJoinPreviewLine(scene.immediateSituation);
+  const campaignSummary = compactJoinPreviewLine(preview.campaignSummary);
+  const summary = sceneSummary || campaignSummary;
   const copy = document.createElement("p");
   copy.textContent = summary || "The host is sharing this local table.";
 
@@ -3905,12 +3904,13 @@ function joinPreviewPill(text) {
 }
 
 function compactJoinPreviewLine(text) {
-  return String(text ?? "")
+  const cleaned = String(text ?? "")
     .replace(/\s+Next:\s+.*$/i, "")
     .replace(/opening DM narration/gi, "opening narration")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 420);
+    .trim();
+  const setupPremise = cleaned.match(/^The table is set at\b.*?\bPremise:\s*(.+)$/i);
+  return (setupPremise?.[1]?.trim() || cleaned).slice(0, 420);
 }
 
 function looksLikeRecordId(value) {

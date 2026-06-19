@@ -1081,6 +1081,10 @@ async function requestGuestSeat(guestPage, { playerName, seatName }) {
     await guestPage.waitForFunction(() => Boolean(window.__lorekeeperDebug), null, { timeout: 10000 });
   }
   await guestPage.locator("#guest-waiting-room-panel").waitFor({ state: "visible", timeout: 10000 });
+  await guestPage.locator("#guest-table-preview").waitFor({ state: "visible", timeout: 10000 });
+  const previewText = await guestPage.locator("#guest-table-preview").innerText();
+  assert.doesNotMatch(previewText, /The table is set at/i, "guest preview should hide host setup scaffolding");
+  assert.doesNotMatch(previewText, /Next:\s*invite/i, "guest preview should hide host-only next-step instructions");
   await guestPage.waitForFunction((name) => {
     const buttons = [...document.querySelectorAll("[data-guest-seat-id]")];
     return buttons.some((button) => !name || button.textContent?.includes(name));

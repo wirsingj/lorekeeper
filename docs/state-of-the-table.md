@@ -349,6 +349,7 @@ Risks:
 211. The command deck Send action is now content-aware for host and guest composers: connected/ready state alone no longer enables an empty submit, while typed text, approved companion beats, or active staged remote inputs wake the button. The input composer repaints on typed and programmatic draft changes.
 212. The New Adventure wizard's first companion card now uses the same "Scene cue for DM Voice" wording as dynamically added party cards, removing the last visible "Host note for the DM" setup leak.
 213. Additional visible copy leaks now use table language: returning home points to Continue/New Adventure/Join/DM Voice, local model readiness says local DM Voice instead of local AI, and delete confirmation describes a local backup instead of SQLite/deleted-campaigns/manual recovery internals.
+214. Guest lobby previews now collapse fresh-table setup scaffolding down to table fiction/premise and the remote join helper asserts guests do not see "The table is set..." or host-only Next instructions.
 
 ### Still Risky
 
