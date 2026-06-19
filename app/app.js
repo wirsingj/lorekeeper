@@ -33,6 +33,13 @@ import {
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
+import {
+  buildPartyApprovalControlsProjection,
+  buildPartyApprovalProjection,
+  partySuggestionActivityForStatus,
+  partySuggestionInputFromMessage,
+  partySuggestionStatusMeta,
+} from "./party-suggestion-controller.js";
 import { buildMessageLifecycleProjection, buildPendingInputActionProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "./provider-chat-controller.js";
 import {
@@ -8996,7 +9003,10 @@ function renderPlayLog() {
         }
         bubble.append(actionRow);
       }
-      const partyApproval = partyApprovalStateForMessage(message);
+      const partyApproval = buildPartyApprovalProjection(message, {
+        providerAuthored: isProviderAuthoredPartyMessage(message),
+        hidden: shouldHideAutonomousHostMessage(message),
+      });
       if (partyApproval) {
         bubble.append(renderPartyApprovalActions(message, partyApproval));
       }
@@ -9063,17 +9073,6 @@ function dedupeProviderPartySuggestions(messages) {
   });
 }
 
-function partyApprovalStateForMessage(message) {
-  if (message.role !== "party" || !isProviderAuthoredPartyMessage(message) || shouldHideAutonomousHostMessage(message)) {
-    return null;
-  }
-  const status = message.data.status || "pending_party_approval";
-  if (!["pending_party_approval", "approved_party_input", "rejected_party_input", "submitted_party_input"].includes(status)) {
-    return null;
-  }
-  return { status };
-}
-
 function shouldHideAutonomousHostMessage(message) {
   if (message.role !== "party" || !isProviderAuthoredPartyMessage(message)) {
     return false;
@@ -9107,51 +9106,37 @@ function partyMemberForMessage(message) {
 function renderPartyApprovalActions(message, approval) {
   const actionRow = document.createElement("div");
   actionRow.className = "message-actions party-approval-actions";
+  const resolveGate = buildTurnSubmitGate({
+    turnProjection: turnProjection(),
+    repair: activeTurnRepair(),
+    readyForOpening: isCampaignReadyForOpening(),
+  });
+  const projection = buildPartyApprovalControlsProjection(approval, { resolveGate });
 
-  if (approval.status === "pending_party_approval") {
-    const approveButton = document.createElement("button");
-    approveButton.type = "button";
-    approveButton.className = "mini-action message-approve-action";
-    approveButton.textContent = "Stage For DM";
-    approveButton.title = "Stage this companion beat for the next Send Turn";
-    approveButton.addEventListener("click", () => setPartySuggestionStatus(message, "approved_party_input"));
-
-    const resolveButton = document.createElement("button");
-    resolveButton.type = "button";
-    resolveButton.className = "mini-action message-submit-action";
-    resolveButton.textContent = "Resolve Now";
-    const resolveGate = buildTurnSubmitGate({
-      turnProjection: turnProjection(),
-      repair: activeTurnRepair(),
-      readyForOpening: isCampaignReadyForOpening(),
-    });
-    resolveButton.disabled = resolveGate.blocked;
-    resolveButton.title = resolveGate.blocked
-      ? resolveGate.activityText
-      : "Send this companion beat to the DM now";
-    resolveButton.addEventListener("click", () => resolvePartySuggestionNow(message));
-
-    const rejectButton = document.createElement("button");
-    rejectButton.type = "button";
-    rejectButton.className = "mini-action secondary-action";
-    rejectButton.textContent = "Pass";
-    rejectButton.title = "Do not send this companion beat to the DM";
-    rejectButton.addEventListener("click", () => setPartySuggestionStatus(message, "rejected_party_input"));
-
-    actionRow.append(approveButton, resolveButton, rejectButton);
+  if (projection.actions.length) {
+    for (const action of projection.actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = action.className;
+      button.textContent = action.label;
+      button.title = action.title;
+      button.disabled = Boolean(action.disabled);
+      if (action.kind === "resolve") {
+        button.addEventListener("click", () => resolvePartySuggestionNow(message));
+      } else {
+        button.addEventListener("click", () => setPartySuggestionStatus(message, action.nextStatus));
+      }
+      actionRow.append(button);
+    }
     return actionRow;
   }
 
   const status = document.createElement("span");
   status.className = "message-action-status";
-  status.textContent = {
-    approved_party_input: "Staged for next Send Turn",
-    rejected_party_input: "Passed",
-    submitted_party_input: "Sent to DM",
-  }[approval.status] || approval.status;
+  status.textContent = projection.statusLabel;
   actionRow.append(status);
 
-  if (approval.status === "approved_party_input" || approval.status === "rejected_party_input") {
+  if (projection.canUndo) {
     const undoButton = document.createElement("button");
     undoButton.type = "button";
     undoButton.className = "mini-action secondary-action";
@@ -9164,12 +9149,7 @@ function renderPartyApprovalActions(message, approval) {
 }
 
 async function setPartySuggestionStatus(message, status) {
-  const meta = {
-    pending_party_approval: "Companion beat waiting for host",
-    approved_party_input: "Staged for next Send Turn",
-    rejected_party_input: "Passed by host",
-    submitted_party_input: "Sent to DM",
-  }[status] || "";
+  const meta = partySuggestionStatusMeta(status);
 
   await patchPlayMessage(message.id, {
     meta,
@@ -9178,10 +9158,8 @@ async function setPartySuggestionStatus(message, status) {
       decidedAt: new Date().toISOString(),
     },
   });
-  const activity = status === "approved_party_input"
-    ? "Companion beat staged; add host text or press Send Turn when ready."
-    : meta || "Companion beat updated";
-  setProviderActivity(activity, status === "approved_party_input" ? "waiting" : "idle");
+  const activity = partySuggestionActivityForStatus(status);
+  setProviderActivity(activity.text, activity.state);
 }
 
 async function resolvePartySuggestionNow(message) {
@@ -9215,17 +9193,6 @@ async function resolvePartySuggestionNow(message) {
   } else {
     await markApprovedPartyInputsStillStaged([input], runResult);
   }
-}
-
-function partySuggestionInputFromMessage(message) {
-  return {
-    type: "approved_party_contribution",
-    id: message.id,
-    characterId: message.data?.characterId || "",
-    characterName: message.data?.characterName || message.title || "",
-    text: message.body || "",
-    ready: true,
-  };
 }
 
 async function patchPlayMessage(messageId, patch = {}, options = {}) {

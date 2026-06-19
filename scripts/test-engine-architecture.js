@@ -23,6 +23,13 @@ import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "../ap
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
+import {
+  buildPartyApprovalControlsProjection,
+  buildPartyApprovalProjection,
+  partySuggestionActivityForStatus,
+  partySuggestionInputFromMessage,
+  partySuggestionStatusMeta,
+} from "../app/party-suggestion-controller.js";
 import { buildMessageLifecycleProjection, buildPendingInputActionProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "../app/provider-chat-controller.js";
 import {
@@ -2766,6 +2773,51 @@ function testPendingInputActionProjection() {
   }, pendingInputs), null);
 }
 
+function testPartySuggestionController() {
+  const message = {
+    id: "beat-1",
+    role: "party",
+    title: "Mira",
+    body: "Mira checks the ridge.",
+    data: { characterId: "mira", suggestedByProvider: true },
+  };
+  assert.deepEqual(
+    buildPartyApprovalProjection(message, { providerAuthored: true }),
+    { status: "pending_party_approval" },
+  );
+  assert.equal(buildPartyApprovalProjection(message, { providerAuthored: false }), null);
+  assert.equal(buildPartyApprovalProjection(message, { providerAuthored: true, hidden: true }), null);
+  assert.equal(
+    buildPartyApprovalProjection({ ...message, data: { status: "unknown_status" } }, { providerAuthored: true }),
+    null,
+  );
+
+  const pendingControls = buildPartyApprovalControlsProjection(
+    { status: "pending_party_approval" },
+    { resolveGate: { blocked: true, activityText: "Start Adventure first" } },
+  );
+  assert.deepEqual(pendingControls.actions.map((action) => action.label), ["Stage For DM", "Resolve Now", "Pass"]);
+  assert.equal(pendingControls.actions[1].disabled, true);
+  assert.equal(pendingControls.actions[1].title, "Start Adventure first");
+
+  const approvedControls = buildPartyApprovalControlsProjection({ status: "approved_party_input" });
+  assert.equal(approvedControls.statusLabel, "Staged for next Send Turn");
+  assert.equal(approvedControls.canUndo, true);
+  assert.equal(partySuggestionStatusMeta("rejected_party_input"), "Passed by host");
+  assert.deepEqual(partySuggestionActivityForStatus("approved_party_input"), {
+    text: "Companion beat staged; add host text or press Send Turn when ready.",
+    state: "waiting",
+  });
+  assert.deepEqual(partySuggestionInputFromMessage(message), {
+    type: "approved_party_contribution",
+    id: "beat-1",
+    characterId: "mira",
+    characterName: "Mira",
+    text: "Mira checks the ridge.",
+    ready: true,
+  });
+}
+
 function testTurnRepairController() {
   const technicalRepair = {
     reason: "sceneStatus.awaitingPlayer must be boolean.",
@@ -3366,6 +3418,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
+  const partySuggestionController = await readFile(path.join("app", "party-suggestion-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
@@ -3413,12 +3466,13 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     /label:\s*"Invite"[\s\S]*?label:\s*"Nudge"[\s\S]*?className:\s*"nudge-action"/,
     "AI companion card actions should place Nudge after Invite and use nudge styling",
   );
-  assert.match(appJs, /Stage For DM/, "AI companion approval should read like staging a table beat");
-  assert.match(appJs, /Resolve Now/, "AI companion approval should support immediate DM resolution");
+  assert.match(partySuggestionController, /Stage For DM/, "AI companion approval should read like staging a table beat");
+  assert.match(partySuggestionController, /Resolve Now/, "AI companion approval should support immediate DM resolution");
   assert.match(appJs, /resolvePartySuggestionNow/, "AI companion resolve-now flow should be explicit");
-  assert.match(appJs, /partySuggestionInputFromMessage/, "AI companion resolve-now should send a structured party input");
-  assert.match(appJs, /Pass/, "AI companion approval should allow the host to pass on the beat");
-  assert.match(appJs, /Companion beat staged; add host text or press Send Turn when ready\./);
+  assert.match(partySuggestionController, /partySuggestionInputFromMessage/, "AI companion resolve-now should send a structured party input");
+  assert.match(partySuggestionController, /Pass/, "AI companion approval should allow the host to pass on the beat");
+  assert.match(partySuggestionController, /Companion beat staged; add host text or press Send Turn when ready\./);
+  assert.doesNotMatch(appJs, /Stage this companion beat for the next Send Turn/, "AI companion approval wording should not live in app.js");
   assert.match(appJs, /markApprovedPartyInputsStillStaged/, "failed DM turns should keep approved party inputs visibly staged");
   assert.match(appJs, /markRemoteInputsStillStaged/, "failed DM turns should keep remote party inputs visibly staged");
   assert.match(playLogController, /dm_failed_still_staged[\s\S]*?label:\s*"Still staged"/, "failed staged inputs should use table-facing retry wording");
@@ -3845,6 +3899,7 @@ testDmNudgeController();
 testPlayLogProjectionBoundsLongSessions();
 testMessageLifecycleProjection();
 testPendingInputActionProjection();
+testPartySuggestionController();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 testSettingsSurfaceProjection();
