@@ -147,6 +147,33 @@ export function buildMessageLifecycleProjection(message = {}) {
   return labels[key] || null;
 }
 
+export function buildPendingInputActionProjection(message = {}, pendingTurnInputs = []) {
+  const pendingInputId = message.data?.pendingInputId;
+  if (!pendingInputId || message.data?.status !== "pending_model_submit") {
+    return null;
+  }
+  const input = (Array.isArray(pendingTurnInputs) ? pendingTurnInputs : [])
+    .find((entry) => entry.id === pendingInputId && entry.ready && !entry.passed && entry.text);
+  if (!input) {
+    return null;
+  }
+  if (message.data?.hostStaged) {
+    return {
+      id: input.id,
+      kind: "drop",
+      status: message.data?.holdForGroup ? "Holding for group turn" : "Queued for DM",
+      buttonLabel: "Drop",
+      title: "Remove this staged guest action without sending it to the DM",
+    };
+  }
+  return {
+    id: input.id,
+    kind: "stage",
+    buttonLabel: "Stage",
+    title: "Stage this character action for the next Send Turn",
+  };
+}
+
 function remotePendingInputLabel(message) {
   if (!message.data?.hostStaged) {
     return "Waiting for host";

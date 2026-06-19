@@ -23,7 +23,7 @@ import { buildGuestAutoResolvePlan, shouldScheduleGuestAutoResolve } from "../ap
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
-import { buildMessageLifecycleProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
+import { buildMessageLifecycleProjection, buildPendingInputActionProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "../app/play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "../app/provider-chat-controller.js";
 import {
   buildProviderImportOutcome,
@@ -2725,6 +2725,47 @@ function testMessageLifecycleProjection() {
   assert.equal(buildMessageLifecycleProjection({ role: "dm", data: { lifecycle: "turn_waiting_for_dm" } }), null);
 }
 
+function testPendingInputActionProjection() {
+  const pendingInputs = [
+    { id: "pending-1", ready: true, passed: false, text: "I check the door." },
+    { id: "passed-1", ready: true, passed: true, text: "I wait." },
+    { id: "empty-1", ready: true, passed: false, text: "" },
+  ];
+  assert.deepEqual(
+    buildPendingInputActionProjection({
+      role: "party",
+      data: { status: "pending_model_submit", pendingInputId: "pending-1" },
+    }, pendingInputs),
+    {
+      id: "pending-1",
+      kind: "stage",
+      buttonLabel: "Stage",
+      title: "Stage this character action for the next Send Turn",
+    },
+  );
+  assert.deepEqual(
+    buildPendingInputActionProjection({
+      role: "party",
+      data: { status: "pending_model_submit", pendingInputId: "pending-1", hostStaged: true, holdForGroup: true },
+    }, pendingInputs),
+    {
+      id: "pending-1",
+      kind: "drop",
+      status: "Holding for group turn",
+      buttonLabel: "Drop",
+      title: "Remove this staged guest action without sending it to the DM",
+    },
+  );
+  assert.equal(buildPendingInputActionProjection({
+    role: "party",
+    data: { status: "pending_model_submit", pendingInputId: "passed-1" },
+  }, pendingInputs), null);
+  assert.equal(buildPendingInputActionProjection({
+    role: "party",
+    data: { status: "submitted_to_model", pendingInputId: "pending-1" },
+  }, pendingInputs), null);
+}
+
 function testTurnRepairController() {
   const technicalRepair = {
     reason: "sceneStatus.awaitingPlayer must be boolean.",
@@ -3383,7 +3424,9 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(playLogController, /dm_failed_still_staged[\s\S]*?label:\s*"Still staged"/, "failed staged inputs should use table-facing retry wording");
   assert.match(appJs, /dropPendingRemoteInput/, "host should be able to drop a stale staged guest action");
   assert.match(playLogController, /label:\s*"Dropped"/, "dropped staged guest actions should not read as DM-resolved");
-  assert.match(appJs, /Remove this staged guest action without sending it to the DM/);
+  assert.match(playLogController, /Remove this staged guest action without sending it to the DM/);
+  assert.match(appJs, /buildPendingInputActionProjection/, "renderer should consume projected staged-input actions");
+  assert.doesNotMatch(appJs, /function pendingInputActionForMessage/, "renderer should not own staged-input action policy");
   assert.match(appJs, /buildStagedInputRecoveryPlan/, "staged input recovery policy should be outside the renderer turn body");
   assert.match(appJs, /applyStagedInputRecoveryPlan/, "renderer should execute the staged input recovery plan");
   assert.doesNotMatch(appJs, /function providerFailureReason/, "staged input failure wording should live outside app.js");
@@ -3801,6 +3844,7 @@ testTableActionProjection();
 testDmNudgeController();
 testPlayLogProjectionBoundsLongSessions();
 testMessageLifecycleProjection();
+testPendingInputActionProjection();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 testSettingsSurfaceProjection();

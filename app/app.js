@@ -33,7 +33,7 @@ import {
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
-import { buildMessageLifecycleProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
+import { buildMessageLifecycleProjection, buildPendingInputActionProjection, buildPlayLogProjection, defaultPlayLogVisibleLimit, playLogPageSize } from "./play-log-controller.js";
 import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaignChatFallbackReasons } from "./provider-chat-controller.js";
 import {
   buildProviderImportOutcome,
@@ -8964,21 +8964,24 @@ function renderPlayLog() {
         meta.textContent = `Meta: ${cleanedMeta}`;
         bubble.append(meta);
       }
-      const pendingAction = pendingInputActionForMessage(message);
+      const pendingAction = buildPendingInputActionProjection(
+        message,
+        state.campaign.multiplayer?.pendingTurnInputs ?? [],
+      );
       if (pendingAction) {
         const actionRow = document.createElement("div");
         actionRow.className = "message-actions";
-        if (message.data?.hostStaged) {
+        if (pendingAction.kind === "drop") {
           const status = document.createElement("span");
           status.className = "message-action-status";
-          status.textContent = message.data?.holdForGroup ? "Holding for group turn" : "Queued for DM";
+          status.textContent = pendingAction.status;
           actionRow.append(status);
           if (!clientMode) {
             const dropButton = document.createElement("button");
             dropButton.type = "button";
             dropButton.className = "mini-action secondary-action";
-            dropButton.textContent = "Drop";
-            dropButton.title = "Remove this staged guest action without sending it to the DM";
+            dropButton.textContent = pendingAction.buttonLabel;
+            dropButton.title = pendingAction.title;
             dropButton.addEventListener("click", () => dropPendingRemoteInput(pendingAction.id));
             actionRow.append(dropButton);
           }
@@ -8986,8 +8989,8 @@ function renderPlayLog() {
           const stageButton = document.createElement("button");
           stageButton.type = "button";
           stageButton.className = "mini-action message-submit-action";
-          stageButton.textContent = "Stage";
-          stageButton.title = "Stage this character action for the next Send Turn";
+          stageButton.textContent = pendingAction.buttonLabel;
+          stageButton.title = pendingAction.title;
           stageButton.addEventListener("click", () => resolvePendingInput(pendingAction.id));
           actionRow.append(stageButton);
         }
@@ -9281,15 +9284,6 @@ function patchPlayMessageLocal(messageId, patch = {}) {
       },
     };
   }
-}
-
-function pendingInputActionForMessage(message) {
-  const pendingInputId = message.data?.pendingInputId;
-  if (!pendingInputId || message.data?.status !== "pending_model_submit") {
-    return null;
-  }
-  return (state.campaign.multiplayer?.pendingTurnInputs ?? [])
-    .find((input) => input.id === pendingInputId && input.ready && !input.passed && input.text);
 }
 
 function isLocalControllerMessage(message) {
