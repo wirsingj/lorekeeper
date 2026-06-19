@@ -80,6 +80,7 @@ import {
   splitChoiceText,
   splitProviderTableMessages,
 } from "./provider-import-controller.js";
+import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
@@ -7475,12 +7476,6 @@ function handleProviderGenerationEvent(event) {
   }
 }
 
-function providerResultMeta(result) {
-  return result
-    ? `Ollama ${result.model}; ${Math.round((result.durationMs ?? 0) / 1000)}s; context ${result.contextSize ?? 0} chars`
-    : "";
-}
-
 function isChoiceLikeLine(line) {
   return /^\s*(?:[-*]\s*)?(?:[A-Ha-h]|\d{1,2})\s*[\).:-]\s+/.test(String(line ?? ""));
 }
@@ -7494,22 +7489,6 @@ function partyControllerKind(member) {
 
 function isHostControlledPartyRecord(member) {
   return partyControllerKind(member) === "host";
-}
-
-function contractIssueFromProviderResult(result) {
-  if (!result) {
-    return "missing provider result";
-  }
-  if (result.ok === true && !result.error && !result.parseError) {
-    return "";
-  }
-  if (result.parseError) {
-    return result.parseError;
-  }
-  if (Array.isArray(result.validationErrors) && result.validationErrors.length) {
-    return result.validationErrors[0];
-  }
-  return "";
 }
 
 function cancelActiveGeneration() {

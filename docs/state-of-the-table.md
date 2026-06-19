@@ -726,6 +726,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Choice selection parsing, structured choice normalization, audience labels, edited-choice preservation, pending clicked-choice matching, and provider choice meta copy moved into `app/choice-vote-controller.js`, with architecture guards keeping that grammar out of `app/app.js`. Verification: `npm run test:engine`, `npm run build`, focused remote party-vote UI, and focused RP import UI passed.
 - 2026-06-18: Long-session scroll soak is now automated through hidden UI harness play-log seeding/append hooks. Verification: `npm run build` and focused `long-session-scroll-soak` UI passed.
 - 2026-06-18: `/guest` waiting-room joins now expose the optional character draft card and carry those notes through pre-table and active waiting-room seating. Verification: `npm run test:multiplayer`, focused remote pre-lobby UI, and focused remote active leave/rejoin/new-game UI passed.
+- 2026-06-18: Provider result metadata and contract-issue selection moved into `app/provider-result-controller.js`, with architecture guards keeping that pure repair/import policy out of `app/app.js`. Verification: `npm run test:engine` and `npm run build` passed.
 
 ## How To Use This Doc
 

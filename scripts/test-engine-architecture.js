@@ -66,6 +66,7 @@ import {
   shouldAutoApproveProviderChange,
   splitProviderTableMessages,
 } from "../app/provider-import-controller.js";
+import { contractIssueFromProviderResult, providerResultMeta } from "../app/provider-result-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
@@ -3247,6 +3248,18 @@ sceneStatus: {"mode":"exploration"}`);
   assert.equal(prepareAutoCommitReviewBatch({ proposedChanges: [{ importance: "major" }] }), null);
 }
 
+function testProviderResultController() {
+  assert.equal(providerResultMeta(null), "");
+  assert.equal(
+    providerResultMeta({ model: "qwen3:14b", durationMs: 2450, contextSize: 12000 }),
+    "Ollama qwen3:14b; 2s; context 12000 chars",
+  );
+  assert.equal(contractIssueFromProviderResult(null), "missing provider result");
+  assert.equal(contractIssueFromProviderResult({ ok: true }), "");
+  assert.equal(contractIssueFromProviderResult({ parseError: "Bad JSON" }), "Bad JSON");
+  assert.equal(contractIssueFromProviderResult({ validationErrors: ["table[0].text required"] }), "table[0].text required");
+}
+
 function testJoinPreviewProjection() {
   const setupLine = "The table is set at Old South Road. Mira, Renn are at the table. Premise: A caravan road bends toward an old watchtower before sunset. Next: invite anyone else.";
   assert.equal(
@@ -3637,6 +3650,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
   const providerImportController = await readFile(path.join("app", "provider-import-controller.js"), "utf8");
+  const providerResultController = await readFile(path.join("app", "provider-result-controller.js"), "utf8");
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
@@ -3712,6 +3726,10 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
   assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
+  assert.match(appJs, /provider-result-controller\.js/, "provider result validation summary policy should live outside the renderer");
+  assert.match(providerResultController, /function contractIssueFromProviderResult/);
+  assert.doesNotMatch(appJs, /function contractIssueFromProviderResult/, "renderer should not own provider result contract issue selection");
+  assert.doesNotMatch(appJs, /function providerResultMeta/, "renderer should not own provider result metadata copy");
   assert.match(providerImportController, /function parseSpeakerLine/, "provider import speaker splitting should live in the provider import controller");
   assert.doesNotMatch(appJs, /function parseSpeakerLine/, "renderer should not keep stale provider speaker-splitting helpers");
   assert.match(appJs, /provider-chat-controller\.js/, "campaign chat fallback policy should live outside the main app renderer");
@@ -4115,6 +4133,7 @@ testTurnRepairController();
 testStagedInputRecoveryController();
 testHostResponseReviewProjection();
 testProviderImportOutcomeProjection();
+testProviderResultController();
 testProviderChatProjection();
 testTableTalkProjection();
 testCharacterAutocompleteProjection();
