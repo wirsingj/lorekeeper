@@ -8,12 +8,10 @@ import { fileURLToPath } from "node:url";
 const rootDir = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const preferredPort = Number(process.env.LOREKEEPER_PORT || 4173);
 let apiPort = preferredPort;
-const executableName = path.basename(process.execPath);
-const packagedJoinDefault = /(thinlorekeeper|lorekeeperjoin)/i.test(`${app.getName()} ${executableName}`);
 const initialJoinLink = findJoinLinkArg(process.argv);
-const clientMode = Boolean(initialJoinLink) || process.argv.includes("--client") || process.env.LOREKEEPER_CLIENT_MODE === "1" || packagedJoinDefault;
+const clientMode = Boolean(initialJoinLink) || process.argv.includes("--client") || process.env.LOREKEEPER_CLIENT_MODE === "1";
 const appName = "LoreKeeper";
-const appDisplayName = clientMode ? "LoreKeeper Join" : "LoreKeeper";
+const appDisplayName = "LoreKeeper";
 const appIconPath = path.join(rootDir, "assets", "brand", "lorekeeper-icon.ico");
 let apiProcess = null;
 let mainWindow = null;
@@ -166,17 +164,22 @@ async function startApiServer() {
   }
 
   apiPort = await findAvailablePort(preferredPort);
-  apiProcess = spawn(process.env.LOREKEEPER_NODE || "node", ["./scripts/serve.js", String(apiPort)], {
+  const nodeRuntime = process.env.LOREKEEPER_NODE || (app.isPackaged ? process.execPath : "node");
+  const serverEnv = {
+    ...process.env,
+    LOREKEEPER_PARENT_PID: String(process.pid),
+    LOREKEEPER_API_TOKEN: apiToken,
+    LOREKEEPER_BIND_HOST: "0.0.0.0",
+  };
+  if (!process.env.LOREKEEPER_NODE && app.isPackaged) {
+    serverEnv.ELECTRON_RUN_AS_NODE = "1";
+  }
+  apiProcess = spawn(nodeRuntime, ["./scripts/serve.js", String(apiPort)], {
     cwd: rootDir,
     stdio: ["ignore", "pipe", "pipe", "ipc"],
     shell: false,
     windowsHide: true,
-    env: {
-      ...process.env,
-      LOREKEEPER_PARENT_PID: String(process.pid),
-      LOREKEEPER_API_TOKEN: apiToken,
-      LOREKEEPER_BIND_HOST: "0.0.0.0",
-    },
+    env: serverEnv,
   });
 
   apiProcess.stdout?.on("data", (chunk) => {
@@ -203,7 +206,11 @@ async function waitForApi() {
   const deadline = Date.now() + 10000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`http://127.0.0.1:${apiPort}/api/runtime`);
+      const response = await fetch(`http://127.0.0.1:${apiPort}/api/runtime`, {
+        headers: {
+          "x-lorekeeper-api-token": apiToken,
+        },
+      });
       if (response.ok) {
         const runtime = await response.json();
         if (isOwnedApiRuntime(runtime)) {
@@ -288,7 +295,7 @@ ipcMain.handle("lorekeeper:clipboard-read-text", () => {
 });
 
 ipcMain.handle("lorekeeper:relaunch-mode", (_event, requestedMode) => {
-  const nextMode = requestedMode === "join" || requestedMode === "thin" ? "join" : "host";
+  const nextMode = requestedMode === "join" ? "join" : "host";
   if ((nextMode === "join") === clientMode) {
     return { ok: true, mode: nextMode, relaunched: false };
   }

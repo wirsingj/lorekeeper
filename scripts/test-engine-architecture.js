@@ -7,6 +7,23 @@ import { readTextWithFallback, writeTextWithFallback } from "../app/clipboard-ut
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "../app/character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "../app/campaign-adoption-controller.js";
 import {
+  buildCampaignNotebookProjection,
+  buildPeopleNotebookSection,
+  buildPlacesNotebookSection,
+  buildQuestNotebookSection,
+  buildThingsNotebookSection,
+} from "../app/campaign-notebook-controller.js";
+import {
+  buildOpeningSceneSummary,
+  normalizeWizardCharacter,
+  normalizeWizardControllerKind,
+  normalizeWizardJoiner,
+  normalizeWizardJoiners,
+  wizardControllerSheetFields,
+  wizardPlayerRoleForController,
+} from "../app/campaign-wizard-controller.js";
+import { buildCharacterSheetPayload, buildCharacterSheetProjection, mergeSheetText } from "../app/character-sheet-controller.js";
+import {
   buildChoiceSelectionFromText,
   buildChoiceSelectionMeta,
   choiceAudienceLabel,
@@ -45,8 +62,16 @@ import {
   shouldScheduleGuestAutoResolve,
 } from "../app/guest-auto-resolve-controller.js";
 import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
+import {
+  activeCampaignDeleteTarget,
+  buildHomeCampaignPickerProjection,
+  isBackendStarterCampaign,
+  selectedHomeCampaign,
+  visibleCampaigns,
+} from "../app/home-campaign-controller.js";
 import { buildInputComposerProjection } from "../app/input-composer-controller.js";
 import { buildJoinPreviewProjection, compactJoinPreviewLine } from "../app/join-preview-controller.js";
+import { buildMessageBlocks, latestChoiceBlockFromMessages } from "../app/message-block-controller.js";
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import {
   buildPartyApprovalControlsProjection,
@@ -66,9 +91,26 @@ import {
   shouldAutoApproveProviderChange,
   splitProviderTableMessages,
 } from "../app/provider-import-controller.js";
+import {
+  buildModelOptionsProjection,
+  campaignCreationProviderSettings,
+  providerSetupHint,
+  providerStatusLabel,
+  resolveProviderSettings,
+  selectedModelSummaryProjection,
+} from "../app/provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "../app/provider-result-controller.js";
+import {
+  buildRendererDiagnosticsSnapshot,
+  buildSessionHealthSummary as buildSessionHealthSummaryProjection,
+  buildTableTimelineSummaryProjection,
+  normalizeDebugPlayMessages,
+  summarizeTurnRepair,
+  turnFlowTimelineEventDetail,
+} from "../app/renderer-diagnostics-controller.js";
 import { buildReviewPanelProjection } from "../app/proposed-changes-panel.js";
 import { createImplicitSceneProgressChange } from "../app/scene-import-controller.js";
+import { buildSceneIntelligenceProjection, buildSceneNotebookProjection } from "../app/scene-notebook-controller.js";
 import { buildSettingsSurfaceProjection } from "../app/settings-surface-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "../app/staged-input-recovery-controller.js";
 import { buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "../app/table-action-controller.js";
@@ -93,6 +135,7 @@ import { applyCanonicalChanges } from "../src/campaign-state/apply-changes.js";
 import { addCampaignRecord } from "../src/campaign-state/direct-records.js";
 import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
+import { buildFiveELiteCharacterSeed, classifyCharacterProfile, clampLevel } from "../src/rules/character-seed.js";
 import { controllerForActor, canProviderActForActor, requiresHumanInput } from "../src/engine/agency-controller.js";
 import { getActiveCombatActor, legalActionsForActor, resolveCombatAction, startCombat } from "../src/engine/combat-engine.js";
 import { createCampaignStateStore } from "../src/engine/campaign-state-store.js";
@@ -1224,6 +1267,102 @@ function testSceneAndConsequenceEngines() {
   });
   assert.equal(resolved.consequences.find((item) => item.id === "consequence-barkeep-memory").state, "resolved");
   assert.equal(buildSceneRetrieval(resolved).activeConsequences.length, 0);
+}
+
+function testSceneNotebookProjection() {
+  let campaign = transitionScene(campaignFixture(), {
+    id: "scene-shrine",
+    title: "Shrine road watch",
+    type: "exploration",
+    locationId: "tavern",
+    presentPartyMemberIds: ["thor"],
+    activeQuestIds: ["quest-1"],
+    tensions: ["A hidden watcher tracks the party."],
+    unresolvedQuestions: ["Who left the fresh offering?"],
+    immediateSituation: "The party studies a half-buried shrine beside the road.",
+    whyHere: "The road omen points at the active thread.",
+  }, { now: "2026-01-01T00:00:00.000Z" });
+  campaign = addConsequence(campaign, {
+    id: "consequence-watcher",
+    title: "Watcher knows Thor's route",
+    description: "Someone unseen can report where the party went.",
+    sourceSceneId: "scene-shrine",
+    participantIds: ["thor"],
+    threadIds: ["quest-1"],
+    importance: "high",
+  }, { now: "2026-01-01T00:00:01.000Z" });
+
+  const intelligence = buildSceneIntelligenceProjection(campaign);
+  assert.equal(intelligence.visible, true);
+  assert.equal(intelligence.title, "Shrine road watch");
+  assert.match(intelligence.tensionText, /hidden watcher/);
+  assert.match(intelligence.consequenceText, /Watcher knows Thor/);
+
+  const notebook = buildSceneNotebookProjection(campaign);
+  assert.ok(notebook.count >= 3);
+  assert.equal(notebook.records[0].title, "Shrine road watch");
+  assert.match(notebook.records[0].body, /Why here: The road omen/);
+  assert.ok(notebook.records.some((record) => record.title === "Watcher knows Thor's route"));
+  assert.ok(notebook.records.some((record) => record.title === "Calm the brawl"));
+  assert.ok(notebook.records.some((record) => /Thor/.test(record.title) && /Barkeep/.test(record.title)));
+  assert.match(notebook.emptyText, /Scene focus/);
+
+  const empty = buildSceneNotebookProjection({ scene: {}, party: [], people: [], places: [], items: [], quests: [] });
+  assert.equal(empty.count, 0);
+  assert.deepEqual(empty.records, []);
+}
+
+function testCampaignNotebookProjection() {
+  const campaign = {
+    ...campaignFixture(),
+    people: [{
+      id: "barkeep",
+      name: "Barkeep",
+      role: "Innkeeper",
+      summary: "Keeps one eye on every table.",
+      locationId: "tavern",
+      relatedIds: ["thor"],
+    }],
+    places: [
+      { id: "crossroad", name: "Old Crossroad", type: "road" },
+      { id: "tavern", name: "Tavern", type: "inn", region: "North Ward", connectedPlaceIds: ["crossroad"] },
+    ],
+    items: [{ id: "amulet", name: "Silver Amulet", type: "clue", summary: "Cold to the touch.", notes: ["Moon mark."] }],
+    inventory: [{ id: "carried-key", itemId: "iron-key", name: "Iron Key", quantity: 2, carriedBy: "Thor", notes: "Fits the cellar." }],
+    assets: [{ id: "map", name: "Ancient Map", kind: "handout", path: "maps/old-road.png", notes: ["Torn corner."] }],
+    quests: [
+      { id: "quest-1", title: "Calm the brawl", status: "active", stakes: "Keep the tavern standing.", relatedIds: ["tavern"] },
+      { id: "quest-done", title: "Paid the tab", status: "completed" },
+      { id: "quest-secret", title: "The hidden hand", status: "active", visibility: "dm_only", type: "story_arc" },
+    ],
+    scene: {
+      ...campaignFixture().scene,
+      currentPlaceId: "tavern",
+    },
+  };
+
+  const projection = buildCampaignNotebookProjection(campaign);
+  assert.equal(projection.people.count, 1);
+  assert.equal(projection.people.records[0].subtitle, "Innkeeper");
+  assert.match(projection.people.records[0].body, /Location: Tavern/);
+  assert.match(projection.people.records[0].body, /Related: Thor/);
+
+  assert.deepEqual(projection.places.records.map((record) => record.title), ["Tavern", "Old Crossroad"]);
+  assert.equal(projection.places.records[0].subtitle, "inn / current");
+  assert.match(projection.places.records[0].body, /Connected: Old Crossroad/);
+
+  assert.equal(projection.things.count, 3);
+  assert.deepEqual(projection.things.records.map((record) => record.title), ["Ancient Map", "Iron Key", "Silver Amulet"]);
+  assert.equal(projection.things.records.find((record) => record.title === "Iron Key").subtitle, "2 carried by Thor");
+
+  assert.equal(projection.quests.count, 1);
+  assert.equal(projection.quests.records[0].title, "Calm the brawl");
+  assert.match(projection.quests.records[0].body, /Related: Tavern/);
+
+  assert.equal(buildPeopleNotebookSection({}).count, 0);
+  assert.equal(buildPlacesNotebookSection({}).emptyText, "Current and discovered locations will appear here.");
+  assert.equal(buildThingsNotebookSection({}).count, 0);
+  assert.equal(buildQuestNotebookSection({}).count, 0);
 }
 
 function testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds() {
@@ -2364,6 +2503,92 @@ function testTableStatusVocabulary() {
   assert.equal(event.at, "2026-01-01T00:00:00.000Z");
 }
 
+function testRendererDiagnosticsController() {
+  const debugMessages = normalizeDebugPlayMessages(
+    [{ meta: "  meta text  " }, { role: "party", body: "Mira checks the door." }],
+    {
+      offset: 4,
+      sessionId: "session-1",
+      nowMs: Date.parse("2026-01-01T00:00:00.000Z"),
+      cleanMeta: (value) => String(value).trim().toUpperCase(),
+    },
+  );
+  assert.equal(debugMessages[0].id, "debug-message-5");
+  assert.equal(debugMessages[0].sessionId, "session-1");
+  assert.equal(debugMessages[0].role, "player");
+  assert.equal(debugMessages[0].meta, "META TEXT");
+  assert.equal(debugMessages[1].title, "DM");
+  assert.equal(debugMessages[1].body, "Mira checks the door.");
+
+  const timeline = buildTableTimelineSummaryProjection([
+    { label: "Older", at: "2026-01-01T00:00:00.000Z" },
+    { message: "Newer", at: "2026-01-01T00:01:00.000Z" },
+  ], { formatTime: (value) => `time:${value}` });
+  assert.equal(timeline.empty, false);
+  assert.deepEqual(timeline.items.map((item) => item.label), ["Newer", "Older"]);
+  assert.equal(timeline.items[0].timeText, "time:2026-01-01T00:01:00.000Z");
+  assert.equal(buildTableTimelineSummaryProjection([]).emptyText, "No table timeline yet.");
+
+  const health = buildSessionHealthSummaryProjection({
+    headline: "Waiting",
+    tone: "waiting",
+    phase: "waiting_for_dm",
+    lines: [],
+  });
+  assert.equal(health.headline, "Waiting");
+  assert.deepEqual(health.lines, ["No blockers detected."]);
+
+  const turnEvent = turnFlowTimelineEventDetail({
+    type: "turn_flow_reset",
+    reason: "campaign_changed",
+    projection: { turnId: "turn-1", activeRequestId: "request-1" },
+  });
+  assert.equal(turnEvent.type, "turn_flow_reset");
+  assert.equal(turnEvent.detail.message, "Campaign switched; table state reset.");
+  assert.equal(turnEvent.detail.turnId, "turn-1");
+
+  const repair = summarizeTurnRepair({
+    reason: "bad response",
+    responseText: "response",
+    rawText: "raw",
+    providerResult: { model: "qwen3" },
+  });
+  assert.equal(repair.responseTextChars, 8);
+  assert.equal(repair.rawTextChars, 3);
+  assert.equal(repair.model, "qwen3");
+
+  const diagnostics = buildRendererDiagnosticsSnapshot({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    url: "http://127.0.0.1/table",
+    providerActivity: { text: "DM is thinking", state: "working" },
+    turnProjection: { state: "generating" },
+    currentTurn: {
+      playerMessage: "Open the door",
+      contextPack: { sections: [{ id: "scene", title: "Scene", entries: ["Door"] }] },
+      providerPrompt: "x".repeat(6100),
+    },
+    prompt: "y".repeat(6101),
+    repair: { reason: "repair", responseText: "abc" },
+    tableSession: { headline: "Roleplay", phase: "roleplay", lines: ["Ready"] },
+    playMessages: Array.from({ length: 40 }, (_, index) => ({ id: `m-${index}` })),
+    tableTimeline: Array.from({ length: 90 }, (_, index) => ({ id: `t-${index}` })),
+    diagnosticsEvents: Array.from({ length: 90 }, (_, index) => ({ id: `e-${index}` })),
+    campaign: { party: [1], people: [1, 2], places: [], items: [1], quests: [1], sessionLog: { messages: [1, 2, 3] } },
+  });
+  assert.equal(diagnostics.currentTurn.providerPromptChars, 6100);
+  assert.equal(diagnostics.promptTail.length, 6000);
+  assert.equal(diagnostics.recentPlayMessages.length, 30);
+  assert.equal(diagnostics.tableTimeline.length, 80);
+  assert.deepEqual(diagnostics.campaignCounts, {
+    party: 1,
+    people: 2,
+    places: 0,
+    items: 1,
+    threads: 1,
+    messages: 3,
+  });
+}
+
 function testTableSessionEnginePhases() {
   const campaign = campaignFixture();
   const roleplay = buildTableSessionProjection({ campaign });
@@ -2967,6 +3192,53 @@ function testChoiceVoteController() {
   assert.deepEqual(structuredBlock.items, ["Vessa: Lead from the front"]);
 }
 
+function testMessageBlockController() {
+  const parsedChoices = buildMessageBlocks(
+    "The road narrows. What do you do?\n\nA) Take the ridge\nB) Circle the ravine",
+    "dm",
+  );
+  assert.equal(parsedChoices.at(-1).type, "choices");
+  assert.equal(parsedChoices.at(-1).prompt, "What do you do?");
+  assert.deepEqual(parsedChoices.at(-1).items, ["Take the ridge", "Circle the ravine"]);
+
+  const structuredChoices = buildMessageBlocks(
+    "Visible prose.\n\n1. stale parsed choice\n2. another stale parsed choice",
+    "dm",
+    {
+      choiceOwner: true,
+      choices: {
+        prompt: "How does Vessa press?",
+        scope: "combat_actor",
+        forActor: "Vessa",
+        options: [
+          { id: "strike", text: "Strike with the spear" },
+          { id: "guard", text: "Guard Mira" },
+        ],
+      },
+    },
+  );
+  assert.equal(structuredChoices.filter((block) => block.type === "choices").length, 1);
+  assert.equal(structuredChoices.at(-1).audienceLabel, "Combat turn: Vessa");
+  assert.deepEqual(structuredChoices.at(-1).items, ["Strike with the spear", "Guard Mira"]);
+  assert.deepEqual(structuredChoices.at(-1).options.map((option) => option.id), ["strike", "guard"]);
+
+  const mechanics = buildMessageBlocks(
+    "The beast lunges, but Vessa keeps her shield high.\n\nAttack Roll: d20+4 = 13 vs AC 16. Damage: 1d6+2 = 5 slashing.",
+    "dm",
+  );
+  assert.equal(mechanics.some((block) => block.type === "paragraph" && /shield high/.test(block.text)), true);
+  const mechanicsBlock = mechanics.find((block) => block.type === "mechanics");
+  assert.ok(mechanicsBlock, "mechanics rows should render as a table-facing roll panel");
+  assert.deepEqual(mechanicsBlock.rows.map((row) => row.label), ["Attack Roll", "Damage"]);
+
+  const latest = latestChoiceBlockFromMessages([
+    { role: "player", body: "I look around." },
+    { role: "dm", body: "The trail forks. What do you do?\n\n1. Follow the torchlight\n2. Stay hidden" },
+  ]);
+  assert.equal(latest.prompt, "What do you do?");
+  assert.deepEqual(latest.items, ["Follow the torchlight", "Stay hidden"]);
+}
+
 function testTurnRepairController() {
   const technicalRepair = {
     reason: "sceneStatus.awaitingPlayer must be boolean.",
@@ -3086,7 +3358,7 @@ function testHostResponseReviewProjection() {
   assert.equal(repairFallback.state, "repair");
   assert.equal(repairFallback.visible, false);
   assert.equal(repairFallback.open, false);
-  assert.match(repairFallback.hint, /Optional fallback/i);
+  assert.match(repairFallback.hint, /copied a DM response/i);
   assert.doesNotMatch(repairFallback.hint, /JSON|contract|import|paste box/i);
 
   const copiedRepairFallback = buildManualResponseFallbackProjection({
@@ -3279,6 +3551,92 @@ function testProviderResultController() {
   assert.equal(contractIssueFromProviderResult({ ok: true }), "");
   assert.equal(contractIssueFromProviderResult({ parseError: "Bad JSON" }), "Bad JSON");
   assert.equal(contractIssueFromProviderResult({ validationErrors: ["table[0].text required"] }), "table[0].text required");
+}
+
+function testProviderSettingsController() {
+  assert.deepEqual(
+    resolveProviderSettings({ preferredProvider: "chatgpt", outputLimit: 120 }, { selectedModel: "qwen3:8b" }),
+    {
+      preferredProvider: "bridge",
+      selectedModel: "qwen3:8b",
+      generationTimeoutMs: 120000,
+      outputLimit: 1800,
+      fastMode: false,
+      ollamaBaseUrl: "http://127.0.0.1:11434",
+    },
+  );
+
+  const ollama = {
+    state: "selected_model_missing",
+    selectedModel: "qwen3:14b",
+    models: [{ name: "qwen3:4b" }, { model: "llama3.1:8b" }],
+    recommendedModels: [{ id: "qwen3:14b" }, { id: "qwen3:4b" }],
+  };
+  const options = buildModelOptionsProjection({ selectedModel: "qwen3:14b", ollama });
+  assert.equal(options[0].value, "qwen3:14b");
+  assert.equal(options[0].selected, true);
+  assert.match(options[0].label, /download needed/);
+  assert.ok(options.some((option) => option.value === "qwen3:4b" && /installed/.test(option.label)));
+
+  const missingSummary = selectedModelSummaryProjection({ selectedModel: "qwen3:14b", ollama });
+  assert.equal(missingSummary.installed, false);
+  assert.equal(missingSummary.pullHidden, false);
+  assert.equal(missingSummary.pullDisabled, false);
+  assert.ok(missingSummary.chips.includes("Not Downloaded"));
+
+  const installedSettings = campaignCreationProviderSettings(
+    { preferredProvider: "ollama", selectedModel: "qwen3:14b" },
+    { selectedControlModel: "qwen3:4b", installedModels: ["qwen3:4b"] },
+  );
+  assert.equal(installedSettings.selectedModel, "qwen3:4b");
+  assert.equal(
+    campaignCreationProviderSettings({ preferredProvider: "bridge", selectedModel: "qwen3:14b" }).selectedModel,
+    "qwen3:14b",
+  );
+
+  assert.equal(providerStatusLabel({ state: "ready", selectedModel: "qwen3:14b" }), "Ollama ready: Qwen3 14B");
+  assert.match(providerSetupHint({ state: "ollama_not_running" }, "qwen3:14b"), /Start Ollama/);
+}
+
+function testHomeCampaignController() {
+  const starter = {
+    title: "Untitled Campaign 42",
+    summary: "A new D&D 5e-lite campaign ready to grow through play.",
+    sqlitePath: "starter.sqlite",
+  };
+  const road = { title: "Road Ambush", sqlitePath: "road.sqlite" };
+  const shrine = { title: "Ruined Shrine", sqlitePath: "shrine.sqlite" };
+
+  assert.equal(isBackendStarterCampaign(starter), true);
+  assert.equal(isBackendStarterCampaign({ ...starter, summary: "Real table" }), false);
+  assert.deepEqual(visibleCampaigns([starter, road, shrine]).map((campaign) => campaign.title), ["Road Ambush", "Ruined Shrine"]);
+
+  const empty = buildHomeCampaignPickerProjection({ campaigns: [starter] });
+  assert.equal(empty.savedText, "No saved adventures yet");
+  assert.equal(empty.selectDisabled, true);
+  assert.equal(empty.hostDisabled, true);
+  assert.equal(empty.deleteDisabled, true);
+  assert.equal(empty.options[0].label, "No saved adventures yet");
+
+  const selected = buildHomeCampaignPickerProjection({
+    campaigns: [starter, road, shrine],
+    selectedSqlitePath: "shrine.sqlite",
+  });
+  assert.equal(selected.savedText, "2 saved adventures");
+  assert.equal(selected.hostDisabled, false);
+  assert.equal(selected.deleteTitle, "Delete the selected saved adventure.");
+  assert.deepEqual(selected.options.map((option) => [option.value, option.selected]), [
+    ["road.sqlite", false],
+    ["shrine.sqlite", true],
+  ]);
+  assert.equal(selected.selectedCampaign.title, "Ruined Shrine");
+  assert.equal(selectedHomeCampaign([starter, road], "starter.sqlite"), null);
+  assert.equal(selectedHomeCampaign([starter, road], "road.sqlite").title, "Road Ambush");
+  assert.deepEqual(activeCampaignDeleteTarget({ sqlitePath: "road.sqlite", campaign: road }), {
+    sqlitePath: "road.sqlite",
+    title: "Road Ambush",
+  });
+  assert.equal(activeCampaignDeleteTarget({ sqlitePath: "starter.sqlite", campaign: starter }), null);
 }
 
 function testJoinPreviewProjection() {
@@ -3523,6 +3881,162 @@ function testCharacterAutocompleteProjection() {
   assert.equal(new Set(manyCrew.map((member) => member.name)).size, manyCrew.length, "exhausted name pools should still produce unique fallback names");
 }
 
+function testCampaignWizardController() {
+  assert.equal(normalizeWizardControllerKind("you"), "host");
+  assert.equal(normalizeWizardControllerKind("friend"), "remote_invite");
+  assert.equal(normalizeWizardControllerKind("unassigned"), "unassigned");
+  assert.equal(normalizeWizardControllerKind(""), "ai_companion");
+
+  const primary = normalizeWizardCharacter({
+    name: " Rowan ",
+    ancestry: "Half-elf",
+    characterClass: "Bard",
+    level: "3",
+    concept: "Knows too many songs.",
+    controllerKind: "you",
+  });
+  assert.equal(primary.name, "Rowan");
+  assert.equal(primary.level, 3);
+  assert.equal(primary.controllerKind, "host");
+
+  assert.equal(normalizeWizardJoiner({}), null);
+  const remote = normalizeWizardJoiner({
+    name: "Mira",
+    characterClass: "soldier",
+    controllerKind: "friend",
+    integrationPrompt: "Old squadmate.",
+    hostIntegrationPrompt: "Arrives with the caravan.",
+  });
+  assert.equal(remote.controllerKind, "remote_invite");
+  assert.equal(remote.playerRole, "Remote invite seat");
+  assert.match(remote.integrationPrompt, /Old squadmate/);
+
+  const joiners = normalizeWizardJoiners([remote, {}, { name: "Bran", controllerKind: "ai_companion" }]);
+  assert.equal(joiners.length, 2);
+  assert.equal(joiners[1].playerRole, "AI party companion");
+
+  const summary = buildOpeningSceneSummary({
+    premise: "Escort the miners.",
+    startingLocation: "old shrine road",
+    character: primary,
+    startingPartyMembers: joiners,
+  });
+  assert.match(summary, /The table is set at old shrine road/);
+  assert.match(summary, /Rowan, Mira, Bran are at the table/);
+  assert.match(summary, /Start Adventure/);
+
+  assert.deepEqual(wizardControllerSheetFields("host", { primary: true }), {
+    playerRole: "Host player character",
+    controllerKind: "host",
+    controllerId: "host",
+    fallbackControllerKind: "host",
+  });
+  assert.equal(wizardControllerSheetFields("remote_invite").inviteIntent, "remote_player");
+  assert.equal(wizardPlayerRoleForController("remote_invite"), "Remote invite seat");
+}
+
+function testCharacterSeedRules() {
+  assert.equal(clampLevel("bad"), 1);
+  assert.equal(clampLevel(99), 20);
+  assert.equal(classifyCharacterProfile("frost druid with a wolf companion").key, "druid");
+
+  const ranger = buildFiveELiteCharacterSeed({
+    name: "Renn",
+    ancestry: "Human",
+    characterClass: "Ranger",
+    concept: "A scout who reads the ridge line.",
+    level: 3,
+  });
+  assert.equal(ranger.id, "party-renn");
+  assert.equal(ranger.level, 3);
+  assert.equal(ranger.proficiencyBonus, 2);
+  assert.equal(ranger.stats.abilityScores.DEX, 15);
+  assert.equal(ranger.attacks.some((attack) => attack.name === "Longbow"), true);
+  assert.equal(ranger.equipment.inventory.includes("Quiver of arrows"), true);
+  assert.equal(ranger.resources.spellSlots[1].max, 3);
+
+  const frostDruid = buildFiveELiteCharacterSeed({
+    name: "Ilyra",
+    ancestry: "Elf",
+    characterClass: "Druid",
+    concept: "A frost-touched wanderer with wolf signs.",
+    level: 2,
+  });
+  assert.equal(frostDruid.spells.some((spell) => spell.name === "Frostbite"), true);
+  assert.equal(frostDruid.abilities.includes("Wolf companion bond"), true);
+  assert.equal(frostDruid.resources.uses.wildShape.max, 2);
+}
+
+function testCharacterSheetController() {
+  const member = {
+    id: "party-ilyra",
+    name: "Ilyra",
+    ancestryClass: "Elf Ranger",
+    playerRole: "Host",
+    hp: 11,
+    ac: 14,
+    prof: 2,
+    background: "Watches the tree line.",
+    ability_scores: { strength: 9, dexterity: 16, constitution: 12, intelligence: 11, wisdom: 14, charisma: 10 },
+    skills: ["Stealth", "Perception"],
+    stats: {
+      skills: ["Stealth", "Survival"],
+      spells: [{ name: "Hunter's Mark" }],
+      resources: { spellSlots: { 1: { current: 2, max: 2 } } },
+    },
+    abilities: ["Favored Enemy"],
+    features: ["Natural Explorer"],
+    notes: ["Keeps watch."],
+    attacks: [{ name: "Longbow" }],
+  };
+
+  const projection = buildCharacterSheetProjection(member);
+  assert.equal(projection.title, "Ilyra");
+  assert.equal(projection.subtitle, "Elf Ranger / Host");
+  assert.equal(projection.fields.hpCurrent, 11);
+  assert.equal(projection.fields.hpMax, "");
+  assert.equal(projection.fields.dex, 16);
+  assert.equal(projection.fields.skills, "Stealth\nPerception\nSurvival");
+  assert.equal(projection.fields.spells, "Hunter's Mark");
+
+  assert.equal(mergeSheetText("Stealth\nPerception", ["Stealth", "Arcana"]), "Stealth\nPerception\nArcana");
+
+  const payload = buildCharacterSheetPayload({
+    member,
+    autoSheet: { speedFt: 35, abilities: ["Ignored here"] },
+    values: {
+      name: " Ilyra ",
+      ancestryClass: "Elf Ranger",
+      role: "Host",
+      level: "3",
+      xp: "900",
+      hpCurrent: "10",
+      hpMax: "18",
+      armorClass: "15",
+      proficiencyBonus: "2",
+      background: "Keeps the road safe.",
+      str: "9",
+      dex: "16",
+      con: "12",
+      int: "",
+      wis: "14",
+      cha: "10",
+      skills: "Stealth\nSurvival",
+      abilities: "Favored Enemy\nNatural Explorer",
+      spells: "Hunter's Mark, Cure Wounds",
+      notes: "Keeps watch.\nTrusts Mira.",
+    },
+  });
+  assert.equal(payload.name, "Ilyra");
+  assert.equal(payload.level, 3);
+  assert.deepEqual(payload.stats.hp, { current: 10, max: 18 });
+  assert.deepEqual(payload.stats.abilityScores, { STR: 9, DEX: 16, CON: 12, WIS: 14, CHA: 10 });
+  assert.deepEqual(payload.spells, ["Hunter's Mark", "Cure Wounds"]);
+  assert.equal(payload.speedFt, 35);
+  assert.equal(payload.resources, member.stats.resources);
+  assert.equal(payload.attacks, member.attacks);
+}
+
 function testMultiplayerSessionProjection() {
   const campaign = campaignFixture();
   campaign.multiplayer = {
@@ -3670,11 +4184,15 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
   const combatImportController = await readFile(path.join("app", "combat-import-controller.js"), "utf8");
   const combatPromptRepairController = await readFile(path.join("app", "combat-prompt-repair-controller.js"), "utf8");
+  const homeCampaignController = await readFile(path.join("app", "home-campaign-controller.js"), "utf8");
   const providerImportController = await readFile(path.join("app", "provider-import-controller.js"), "utf8");
+  const providerSettingsController = await readFile(path.join("app", "provider-settings-controller.js"), "utf8");
   const providerResultController = await readFile(path.join("app", "provider-result-controller.js"), "utf8");
   const sceneImportController = await readFile(path.join("app", "scene-import-controller.js"), "utf8");
   const tableFocusController = await readFile(path.join("app", "table-focus-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
+  const messageBlockController = await readFile(path.join("app", "message-block-controller.js"), "utf8");
+  const rendererDiagnosticsController = await readFile(path.join("app", "renderer-diagnostics-controller.js"), "utf8");
   const partySuggestionController = await readFile(path.join("app", "party-suggestion-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
@@ -3686,9 +4204,27 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     /!turn\?\.playerMessage\?\.trim\(\)\s*&&\s*!turn\?\.playerInputs\?\.length/,
     "local provider runner must accept remote-only structured player inputs",
   );
-  assert.match(appJs, /tableTimeline: state\.tableTimeline\.slice\(-80\)/, "renderer diagnostics should include the table-facing timeline");
+  assert.match(appJs, /buildRendererDiagnosticsSnapshot/, "renderer diagnostics should use a projected snapshot");
+  assert.match(appJs, /buildTableTimelineSummaryProjection/, "diagnostics timeline rendering should consume a projection");
+  assert.match(rendererDiagnosticsController, /function buildRendererDiagnosticsSnapshot/, "renderer diagnostics serialization should live in renderer-diagnostics-controller");
+  assert.match(rendererDiagnosticsController, /function turnFlowTimelineLabel/, "turn-flow timeline wording should live in renderer-diagnostics-controller");
+  assert.match(rendererDiagnosticsController, /tableTimeline: \(Array\.isArray\(tableTimeline\)/, "renderer diagnostics should include a bounded table-facing timeline");
+  assert.doesNotMatch(appJs, /function summarizeCurrentTurn/, "renderer should not own diagnostics turn serialization");
+  assert.doesNotMatch(appJs, /function tableLabelForTurnEvent/, "renderer should not own turn-flow timeline wording");
   assert.match(appJs, /buildPlayLogProjection/, "play log rendering should use a bounded projection for long sessions");
   assert.match(appJs, /renderLoadEarlierMessages/, "older play log entries should remain reachable on demand");
+  assert.match(appJs, /home-campaign-controller\.js/, "front-door campaign filtering should live outside the renderer");
+  assert.match(appJs, /buildHomeCampaignPickerProjection/, "front-door saved-adventure picker should consume a projection");
+  assert.match(homeCampaignController, /function isBackendStarterCampaign/, "backend starter campaign hiding should live in home-campaign-controller");
+  assert.match(homeCampaignController, /function buildHomeCampaignPickerProjection/, "saved-adventure picker policy should live in home-campaign-controller");
+  assert.doesNotMatch(appJs, /function isBackendStarterCampaign/, "renderer should not own backend starter campaign filtering");
+  assert.match(appJs, /buildMessageBlocks/, "play-message body parsing should be projected outside the renderer");
+  assert.match(appJs, /latestChoiceBlockFromMessages/, "latest choice lookup should be projected outside the renderer");
+  assert.match(messageBlockController, /function normalizeMessageBlocks/, "message block parsing should live in message-block-controller");
+  assert.match(messageBlockController, /structuredChoiceBlockFromMessageData/, "structured choices should merge outside app.js");
+  assert.doesNotMatch(appJs, /function normalizeMessageBlocks/, "renderer should not own play-message block parsing");
+  assert.doesNotMatch(appJs, /function extractChoicePanel/, "renderer should not own choice panel parsing");
+  assert.doesNotMatch(appJs, /function textBlockToRenderableBlock/, "renderer should not own message block type parsing");
   assert.match(appJs, /buildMessageLifecycleProjection/, "play bubbles should consume projected lifecycle state");
   assert.doesNotMatch(appJs, /function messageLifecycleForMessage/, "renderer should not own play-message lifecycle wording");
   assert.match(playLogController, /function buildMessageLifecycleProjection/, "play-message lifecycle wording should live in play-log-controller");
@@ -3705,8 +4241,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
     "Try Again should update the original player action after the retry result",
   );
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
-  assert.match(appJs, /buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
-  assert.match(appJs, /sessionHealth: buildSessionHealthSummary\(\)/, "renderer diagnostics should serialize session health");
+  assert.match(rendererDiagnosticsController, /function buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
+  assert.match(rendererDiagnosticsController, /sessionHealth: buildSessionHealthSummary/, "renderer diagnostics should serialize session health");
   assert.match(tableSessionEngine, /phaseNextStep/, "table session projection should name the next table action");
   assert.match(tableSessionEngine, /Host resolves the staged table input when ready/, "host should get a clear next step for queued guest input");
   assert.match(tableSessionEngine, /takes the active combat turn/, "combat waits should name the active turn");
@@ -3747,6 +4283,12 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
   assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
+  assert.match(appJs, /provider-settings-controller\.js/, "DM Voice settings projection should live outside the main app renderer");
+  assert.match(providerSettingsController, /function providerStatusLabel/, "DM Voice status labels should live in provider-settings-controller");
+  assert.match(providerSettingsController, /function buildModelOptionsProjection/, "DM Voice model option projection should live in provider-settings-controller");
+  assert.doesNotMatch(appJs, /function providerStatusLabel/, "renderer should not own DM Voice status labels");
+  assert.doesNotMatch(appJs, /function dedupeModelOptions/, "renderer should not own local model option policy");
+  assert.doesNotMatch(appJs, /recommendedOllamaModels/, "renderer should not import recommended model policy directly");
   assert.match(appJs, /provider-result-controller\.js/, "provider result validation summary policy should live outside the renderer");
   assert.match(providerResultController, /function contractIssueFromProviderResult/);
   assert.doesNotMatch(appJs, /function contractIssueFromProviderResult/, "renderer should not own provider result contract issue selection");
@@ -3785,15 +4327,29 @@ async function testNewCampaignPreTableJoinerWiring() {
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
   const turnSubmitController = await readFile(path.join("app", "turn-submit-controller.js"), "utf8");
   const settingsSurfaceController = await readFile(path.join("app", "settings-surface-controller.js"), "utf8");
+  const campaignNotebookController = await readFile(path.join("app", "campaign-notebook-controller.js"), "utf8");
+  const campaignWizardController = await readFile(path.join("app", "campaign-wizard-controller.js"), "utf8");
+  const characterSheetController = await readFile(path.join("app", "character-sheet-controller.js"), "utf8");
+  const sceneNotebookController = await readFile(path.join("app", "scene-notebook-controller.js"), "utf8");
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
+  const characterSeedRules = await readFile(path.join("src", "rules", "character-seed.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
   const localTable = await readFile(path.join("src", "multiplayer", "local-table.js"), "utf8");
   const server = await readFile(path.join("scripts", "serve.js"), "utf8");
-  assert.doesNotMatch(localTable, /ThinLoreKeeper/, "multiplayer-created character notes should use the unified LoreKeeper Join identity");
+  const packageJson = JSON.parse(await readFile(path.join("package.json"), "utf8"));
+  assert.match(packageJson.description, /host and browser guest play/i, "package metadata should describe LoreKeeper's current host/guest product shape");
+  assert.doesNotMatch(packageJson.description, /browser-extension|thinclient/i, "package metadata should not revive stale product identities");
+  assert.equal(packageJson.keywords.includes("browser-extension"), false, "package keywords should not describe LoreKeeper as a browser extension");
+  assert.equal(packageJson.scripts["package:portable"], "npm run package:host", "portable packaging should build the full LoreKeeper app");
+  assert.equal(packageJson.scripts["package:host"], "npm run build && node ./scripts/package-portable-host.js", "host packaging should create the full portable app");
+  assert.equal("package:guest" in packageJson.scripts, false, "guest packaging should not be a separate distro");
+  assert.equal("package:join" in packageJson.scripts, false, "join packaging should not be a separate distro");
+  assert.equal("package:thin" in packageJson.scripts, false, "thin packaging should not remain as a distro alias");
+  assert.doesNotMatch(localTable, /ThinLoreKeeper|LoreKeeper Join/, "multiplayer-created character notes should use the unified LoreKeeper identity");
   assert.match(appShell, /Party/);
   assert.match(appShell, /Add Crew/);
   assert.match(appShell, /add-party-template/);
@@ -3866,7 +4422,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="command-context-next"/);
   assert.match(appShell, /id="host-response-review"/, "DM recovery should lead with a host-facing response summary");
   assert.match(appShell, /id="manual-response-fallback"/, "manual copied-response controls should be a named fallback surface");
-  assert.match(appShell, /Replacement DM Response/);
+  assert.match(appShell, /Copied DM Response Fallback/);
   assert.doesNotMatch(appShell, /Use Pasted Response|paste box/i);
   assert.ok(
     appShell.indexOf('id="host-response-review"') < appShell.indexOf('id="manual-response-fallback"')
@@ -3976,9 +4532,18 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="show-debug-meta"/);
   assert.match(appShell, /id="scene-note-list"/, "notebook should include a current-scene section");
   assert.match(appShell, /id="scene-note-count"/);
-  assert.match(appJs, /function renderSceneNotebook/, "scene notebook projection should be explicit renderer behavior");
-  assert.match(appJs, /buildSceneRetrieval\(campaign\)/, "scene notebook should use the same scene retrieval as DM context");
-  assert.match(appJs, /relevantRelationships\.slice\(0, 2\)/, "scene notebook should surface relationship context without flooding the rail");
+  assert.match(appJs, /buildSceneNotebookProjection/, "scene notebook rendering should consume a projection");
+  assert.match(sceneNotebookController, /buildSceneRetrieval\(campaign\)/, "scene notebook should use the same scene retrieval as DM context");
+  assert.match(sceneNotebookController, /relevantRelationships\.slice\(0, 2\)/, "scene notebook should surface relationship context without flooding the rail");
+  assert.doesNotMatch(appJs, /buildSceneRetrieval\(campaign\)/, "renderer should not own scene retrieval policy for the notebook rail");
+  assert.match(appJs, /buildPeopleNotebookSection/, "world notebook rendering should consume section projections");
+  assert.match(campaignNotebookController, /isHiddenStoryThread\(quest\)/, "quest notebook projection should keep DM-only story arcs out of player notes");
+  assert.doesNotMatch(appJs, /isHiddenStoryThread\(quest\)/, "renderer should not own quest visibility policy");
+  assert.match(appJs, /buildCharacterSheetProjection/, "character sheet rendering should consume a projection");
+  assert.match(appJs, /buildCharacterSheetPayload/, "character sheet saves should consume a payload builder");
+  assert.match(characterSheetController, /characterAbilityScores\(member\)/, "character sheet controller should own ability-score aliases");
+  assert.doesNotMatch(appJs, /function characterAbilityScores/, "renderer should not own character sheet ability aliases");
+  assert.doesNotMatch(appJs, /function buildHpPayload/, "renderer should not own character sheet save payload rules");
   assert.match(styles, /\.scene-notes-section/);
   assert.match(appJs, /renderRightRailState/);
   assert.match(appJs, /playerNotesStoragePrefix/);
@@ -3989,7 +4554,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /collectWizardAdditionalCharacters/);
   assert.match(appJs, /addPartyTemplateCharactersToWizard/);
   assert.match(appJs, /buildPartyTemplateCharacters/);
-  assert.match(appJs, /normalizeWizardJoiner/);
+  assert.match(appJs, /normalizeWizardJoiners/);
+  assert.match(campaignWizardController, /function normalizeWizardJoiner/, "wizard joiner policy should live outside the renderer");
+  assert.doesNotMatch(appJs, /function normalizeWizardJoiner/, "renderer should not own wizard joiner completion policy");
+  assert.doesNotMatch(appJs, /function wizardControllerSheetFields/, "renderer should not own wizard controller sheet defaults");
   assert.match(appJs, /openRemoteInviteLobbyForNewCampaign/);
   assert.match(appJs, /apiPreTableLobbySeatUrl/);
   assert.match(appJs, /seatPreTableWaitingGuest/);
@@ -4000,9 +4568,12 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /function saveGuestSession\(session\) \{\s*state\.guestSession = session/s);
   assert.match(appJs, /tableId:\s*status\.localTable\?\.tableId/);
   assert.match(appJs, /sessionId:\s*status\.localTable\?\.sessionId/);
-  assert.match(appJs, /equipmentForProfile/);
-  assert.match(appJs, /inventory:\s*equipment\.inventory/);
-  assert.match(appJs, /function spell\(name, level/);
+  assert.match(appJs, /buildFiveELiteCharacterSeed/);
+  assert.doesNotMatch(appJs, /function equipmentForProfile/, "5E-lite equipment policy should live outside app.js");
+  assert.doesNotMatch(appJs, /function spell\(name, level/, "5E-lite spell seed policy should live outside app.js");
+  assert.match(characterSeedRules, /function equipmentForProfile/);
+  assert.match(characterSeedRules, /inventory:\s*equipment\.inventory/);
+  assert.match(characterSeedRules, /function spell\(name, level/);
   assert.match(appJs, /seedWizardStartingPartyMember/);
   assert.match(appJs, /startingPartyMembers:\s*joinerSeeds/);
   assert.match(appJs, /startAdventureOpening/);
@@ -4013,18 +4584,19 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /function buildAdventureOpeningPrompt/, "app.js should not own the opening DM prompt policy");
   assert.doesNotMatch(appJs, /elements\.cancelGeneration\.hidden\s*=\s*(?:true|false)/, "app.js should not manually hide/show cancel generation");
   assert.doesNotMatch(appJs, /elements\.cancelGeneration\.disabled\s*=\s*(?:true|false)/, "app.js should not manually enable/disable cancel generation");
-  assert.match(appJs, /Start Adventure for the opening narration/);
+  assert.match(campaignWizardController, /Start Adventure for the opening narration/);
   assert.doesNotMatch(appJs, /Next: click Nudge to ask the DM for the opening moment/);
   assert.doesNotMatch(appJs, /await startNewCampaignOpening/, "new tables should not auto-run the first DM turn; Start Adventure must remain host-controlled");
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");
   assert.match(appJs, /const multiplayerPollIntervalMs = 1000/, "host guest-request polling should feel live");
   assert.match(appJs, /hasActiveGeneration\(\)[\s\S]*refreshMultiplayerSnapshot\(\{ quiet: true \}\)[\s\S]*renderTableTalk\(\)[\s\S]*renderTableActions\(\)/, "waiting guest cues and table talk should refresh even while the DM is generating");
-  assert.match(appJs, /projectCurrentTableTalkMessages/, "table talk rendering should use the tested freshness projection");
+  assert.match(appJs, /buildTableTalkProjection/, "table talk rendering should use the tested freshness projection");
   assert.doesNotMatch(appJs, /snapshotTalk\.length > campaignTalk\.length/, "table talk source freshness should not live as inline renderer branching");
   assert.match(appJs, /activeAfterCommit[\s\S]*activeAfterCommit !== current\.id/, "enemy auto-turns should only be marked handled after initiative leaves that enemy");
   assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);
   assert.match(appJs, /wizardControllerSheetFields/);
-  assert.match(appJs, /inviteIntent:\s*"remote_player"/);
+  assert.match(campaignWizardController, /function wizardControllerSheetFields/, "wizard controller sheet defaults should live outside renderer");
+  assert.match(campaignWizardController, /inviteIntent:\s*"remote_player"/);
   assert.match(appJs, /campaign-wizard-mode/);
   assert.match(appJs, /campaignWizardReturnHome/);
   assert.match(appJs, /campaignWizardCreating/);
@@ -4140,6 +4712,8 @@ testCombatImportController();
 testCombatTrackerView();
 testSceneImportController();
 testSceneAndConsequenceEngines();
+testSceneNotebookProjection();
+testCampaignNotebookProjection();
 testSceneRetrievalFindsParticipantConsequencesWithoutProjectionIds();
 testSceneRetrievalRanksFocusUnderLongCampaignNoise();
 testLivingWorldMemoryAndGoalHorizonsSurviveLongCampaignNoise();
@@ -4155,9 +4729,14 @@ testStagedInputRecoveryController();
 testHostResponseReviewProjection();
 testProviderImportOutcomeProjection();
 testProviderResultController();
+testProviderSettingsController();
+testHomeCampaignController();
 testProviderChatProjection();
 testTableTalkProjection();
 testCharacterAutocompleteProjection();
+testCampaignWizardController();
+testCharacterSeedRules();
+testCharacterSheetController();
 testCampaignStateStore();
 testInputComposerProjection();
 testJoinPreviewProjection();
@@ -4166,6 +4745,7 @@ testCampaignAdoptionController();
 testMultiplayerPollingController();
 testTurnSubmitGates();
 testTableStatusVocabulary();
+testRendererDiagnosticsController();
 testTableSessionEnginePhases();
 testTableFocusProjection();
 testTableOpeningController();
@@ -4176,6 +4756,7 @@ testMessageLifecycleProjection();
 testPendingInputActionProjection();
 testPartySuggestionController();
 testChoiceVoteController();
+testMessageBlockController();
 testMultiplayerSessionProjection();
 testReviewPanelProjection();
 testSettingsSurfaceProjection();

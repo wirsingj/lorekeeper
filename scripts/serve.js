@@ -109,6 +109,20 @@ const corsHeaders = {
   "access-control-allow-headers": "content-type,x-lorekeeper-api-token,x-lorekeeper-campaign-id,x-lorekeeper-sqlite-path",
 };
 
+const guestSafeRemoteApiRoutes = new Set([
+  routeKey("POST", "/api/multiplayer/join"),
+  routeKey("GET", "/api/multiplayer/join-preview"),
+  routeKey("POST", "/api/multiplayer/waiting-room/register"),
+  routeKey("GET", "/api/multiplayer/waiting-room/status"),
+  routeKey("GET", "/api/multiplayer/guest-snapshot"),
+  routeKey("POST", "/api/multiplayer/action"),
+  routeKey("POST", "/api/multiplayer/choice-vote"),
+  routeKey("POST", "/api/multiplayer/pass"),
+  routeKey("POST", "/api/multiplayer/disconnect"),
+  routeKey("POST", "/api/multiplayer/combat/join"),
+  routeKey("POST", "/api/multiplayer/table-talk"),
+]);
+
 const server = createServer(async (request, response) => {
   const requestStartedAt = Date.now();
   let url;
@@ -1284,11 +1298,6 @@ async function buildDiagnosticsBundle({ full = false } = {}) {
   const logFiles = [
     "launcher.log",
     "electron.log",
-    "launcher-join.log",
-    "electron-join.log",
-    // Legacy names from the pre-LoreKeeper Join client builds.
-    "launcher-thin.log",
-    "electron-thin.log",
   ];
 
   return {
@@ -1857,26 +1866,42 @@ export function isProtectedApiPath(pathname, method) {
   if (!pathname.startsWith("/api/")) {
     return false;
   }
-  if (pathname === "/api/runtime") {
-    return false;
-  }
-  if (pathname === "/api/multiplayer/join"
-    || pathname === "/api/multiplayer/join-preview"
-    || pathname === "/api/multiplayer/waiting-room/register"
-    || pathname === "/api/multiplayer/waiting-room/status"
-    || pathname === "/api/multiplayer/guest-snapshot"
-    || pathname === "/api/multiplayer/action"
-    || pathname === "/api/multiplayer/choice-vote"
-    || pathname === "/api/multiplayer/pass"
-    || pathname === "/api/multiplayer/disconnect"
-    || pathname === "/api/multiplayer/combat/join"
-    || pathname === "/api/multiplayer/table-talk") {
+  if (isGuestSafeRemotePath(pathname, method)) {
     return false;
   }
   if (method === "OPTIONS") {
     return false;
   }
   return true;
+}
+
+export function isGuestSafeRemotePath(pathname, method = "GET") {
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  const normalizedPathname = String(pathname || "");
+  if (normalizedMethod === "GET" && normalizedPathname === "/guest") {
+    return true;
+  }
+  if (normalizedMethod === "GET" && isGuestSafeBuiltAssetPath(normalizedPathname)) {
+    return true;
+  }
+  return guestSafeRemoteApiRoutes.has(routeKey(normalizedMethod, normalizedPathname));
+}
+
+function routeKey(method, pathname) {
+  return `${String(method || "GET").toUpperCase()} ${String(pathname || "")}`;
+}
+
+function isGuestSafeBuiltAssetPath(pathname) {
+  let decoded = "";
+  try {
+    decoded = decodeURIComponent(String(pathname || ""));
+  } catch {
+    return false;
+  }
+  if (decoded.includes("..") || decoded.includes("\\") || decoded.endsWith("/")) {
+    return false;
+  }
+  return decoded.startsWith("/assets/") || decoded.startsWith("/icons/");
 }
 
 async function validateCampaignPin(request, url) {

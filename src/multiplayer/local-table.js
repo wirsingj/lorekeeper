@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { touchCampaign } from "../campaign-state/schema.js";
 import { isAllowedInviteHost } from "./invite-security.js";
+import { buildShareTableSession, guestSafeShareRouteBoundary } from "./share-table-session.js";
+export { buildShareTableSession, guestSafeShareRouteBoundary };
 import { buildAggregatedPlayerTurn as buildAggregatedPlayerTurnPure } from "./turn-inputs.js";
 import { addMissingCombatantsToTurnOrder } from "../rules/combat-turns.js";
 import { choiceLabelForIndex, choicePanelKey } from "../engine/choice-vote-identity.js";
@@ -1173,6 +1175,10 @@ export function createHostSnapshot(campaign) {
       ...normalized.multiplayer.localTable,
       campaignId: normalized.id,
     },
+    shareSession: buildShareTableSession({
+      table: normalized.multiplayer.localTable,
+      campaignId: normalized.id,
+    }),
     settings: normalized.multiplayer.settings,
     hostTurnState: normalized.multiplayer.hostTurnState,
     party: normalized.party.map((member) => ({
@@ -2306,7 +2312,7 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "", options =
       armorClass: 12,
     },
     notes: [
-      "Created from a LoreKeeper Join character request.",
+      "Created from a LoreKeeper character request.",
       character.roleIntent ? `Table role: ${character.roleIntent}` : "",
       character.appearance ? `Look/vibe: ${character.appearance}` : "",
       character.backstory ? `Backstory: ${character.backstory}` : "",

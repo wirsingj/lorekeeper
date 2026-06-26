@@ -2,21 +2,34 @@ import { buildContextPack } from "../src/context-packs/build-context-pack.js";
 import { findById } from "../src/campaign-state/formatters.js";
 import { normalizeCampaign } from "../src/campaign-state/schema.js";
 import { createSampleCampaign } from "../src/campaign-state/sample-campaign.js";
-import { createStarterCampaign } from "../src/campaign-state/starter-campaign.js";
 import { getActiveProviderConversation } from "../src/campaign-state/provider-conversations.js";
 import { createReviewBatch } from "../src/canon-review/proposals.js";
 import { extractLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
-import { normalizeOllamaModelId, recommendedOllamaModels } from "../src/ai/provider-settings.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
+import { buildShareTableSession } from "../src/multiplayer/share-table-session.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
-import { buildSceneRetrieval } from "../src/engine/scene-engine.js";
 import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
-import { isHiddenStoryThread } from "../src/context-packs/story-threads.js";
+import { buildFiveELiteCharacterSeed, clampLevel } from "../src/rules/character-seed.js";
 import { buildPartyTemplateCharacters, completeCharacterSeed, splitAncestryClass } from "./character-autocomplete-controller.js";
 import { buildCampaignAdoptionPlan } from "./campaign-adoption-controller.js";
+import {
+  buildPeopleNotebookSection,
+  buildPlacesNotebookSection,
+  buildQuestNotebookSection,
+  buildThingsNotebookSection,
+} from "./campaign-notebook-controller.js";
+import {
+  buildOpeningSceneSummary,
+  normalizeWizardCharacter,
+  normalizeWizardControllerKind,
+  normalizeWizardJoiners,
+  wizardControllerSheetFields,
+  wizardPlayerRoleForController,
+} from "./campaign-wizard-controller.js";
+import { buildCharacterSheetPayload, buildCharacterSheetProjection, mergeSheetText } from "./character-sheet-controller.js";
 import {
   choiceLabelForIndex,
   choiceOptionId,
@@ -34,7 +47,6 @@ import {
   isPartyVoteChoiceBlock,
   leadingChoiceVoteEntry as projectedLeadingChoiceVoteEntry,
   pendingSelectionMatchesText,
-  structuredChoiceBlockFromMessageData,
   structuredChoicesForMessage,
 } from "./choice-vote-controller.js";
 import { createImplicitCombatActorPromptChange, latestDmNarration } from "./combat-prompt-repair-controller.js";
@@ -54,9 +66,16 @@ import {
   buildManualResponseFallbackProjection,
   renderHostResponseReview,
 } from "./host-response-review-controller.js";
+import {
+  activeCampaignDeleteTarget as projectedActiveCampaignDeleteTarget,
+  buildHomeCampaignPickerProjection,
+  isBackendStarterCampaign,
+  selectedHomeCampaign as projectedSelectedHomeCampaign,
+  visibleCampaigns as projectVisibleCampaigns,
+} from "./home-campaign-controller.js";
 import { buildInputComposerProjection, applyInputComposerProjection } from "./input-composer-controller.js";
 import { buildJoinPreviewProjection } from "./join-preview-controller.js";
-import { dedupeMechanicsRows, splitMechanicsFromBlock } from "./mechanics-formatting.js";
+import { buildMessageBlocks, latestChoiceBlockFromMessages } from "./message-block-controller.js";
 import { buildMultiplayerSessionProjection, renderMultiplayerSessionPanel } from "./multiplayer-session-panel.js";
 import {
   buildPartyApprovalControlsProjection,
@@ -70,24 +89,40 @@ import { buildCampaignChatFallbackPlan, buildCampaignChatProgressSteps, campaign
 import {
   buildProviderImportOutcome,
   buildProviderImportPlan,
-  cleanChoiceText,
   cleanProviderResponseForPlay,
   decideLatestProviderImport,
-  extractChoicePrompt,
-  extractInlineNumberedChoicePanel,
-  normalizeProviderChoiceFormattingForPlay,
   prepareAutoCommitReviewBatch,
-  splitChoiceText,
   splitProviderTableMessages,
 } from "./provider-import-controller.js";
+import {
+  buildModelOptionsProjection,
+  campaignCreationProviderSettings,
+  installedOllamaModelIds,
+  modelDisplayName,
+  providerSetupHint,
+  providerStatusLabel,
+  resolveProviderSettings,
+  selectedModelSummaryProjection,
+} from "./provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
+import { recordDialogConfig, recordLabel, recordNotesValue, recordRoleValue } from "./record-dialog-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
+import {
+  buildRendererDiagnosticsSnapshot,
+  buildSessionHealthSummary as buildSessionHealthProjection,
+  buildTableTimelineSummaryProjection,
+  normalizeDebugPlayMessages as normalizeDebugPlayMessagesProjection,
+  summarizeTurnRepair,
+  turnFlowTimelineEventDetail,
+} from "./renderer-diagnostics-controller.js";
 import { applySettingsSurfaceProjection, buildSettingsSurfaceProjection, settingsModeForTab } from "./settings-surface-controller.js";
+import { buildSceneIntelligenceProjection, buildSceneNotebookProjection } from "./scene-notebook-controller.js";
 import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecoveryActions } from "./staged-input-recovery-controller.js";
 import { applyTableActionProjection, buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
 import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "./table-background-polling-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
-import { currentTableTalkMessages as projectCurrentTableTalkMessages } from "./table-talk-controller.js";
+import { compactSceneSituation } from "./table-text-controller.js";
+import { buildTableTalkProjection } from "./table-talk-controller.js";
 import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { buildTurnContentGate, buildTurnSubmitGate } from "./turn-submit-controller.js";
@@ -465,6 +500,7 @@ const elements = {
   localTableState: document.querySelector("#local-table-state"),
   localTableAddress: document.querySelector("#local-table-address"),
   localTableGuidance: document.querySelector("#local-table-guidance"),
+  localTableShareSafety: document.querySelector("#local-table-share-safety"),
   localTableGuestLink: document.querySelector("#local-table-guest-link"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
@@ -1234,22 +1270,7 @@ function normalizeSubmittedPlayerMessage(originalInput, options = {}) {
 }
 
 function latestChoicePanelFromMessages() {
-  for (const message of [...state.playMessages].reverse()) {
-    if (message.role !== "dm" && message.role !== "provider") {
-      continue;
-    }
-    const structured = structuredChoiceBlockFromMessageData(message.data);
-    if (structured?.items?.length) {
-      return structured;
-    }
-    const blocks = extractChoicePanel(normalizeMessageBlocks(message.body, message.role), message.role);
-    for (let index = blocks.length - 1; index >= 0; index -= 1) {
-      if (blocks[index]?.type === "choices") {
-        return blocks[index];
-      }
-    }
-  }
-  return null;
+  return latestChoiceBlockFromMessages(state.playMessages);
 }
 
 function currentChoiceVotes(block = {}) {
@@ -1719,7 +1740,7 @@ async function boot() {
 }
 
 async function bootClientMode() {
-  document.title = "LoreKeeper Join";
+  document.title = "LoreKeeper";
   const loadedInvite = applyLaunchInviteLink();
   state.sourceMode = "guest";
   state.campaigns = [];
@@ -1738,7 +1759,7 @@ async function bootClientMode() {
         ? "Invite link loaded. Enter your name, then join the hosted table."
         : guestWaitingRoomMode
         ? "Guest waiting room ready. Ask the host for a seat."
-        : "LoreKeeper Join ready. Paste a host invite link to join.",
+        : "LoreKeeper ready. Paste a host invite link to join.",
       loadedInvite ? "waiting" : "idle",
     );
   }
@@ -2398,7 +2419,7 @@ function addWizardPartyMemberCard(input = {}) {
       <label><input type="radio" name="wizard-character-controller-${index}" value="remote_invite" data-character-field="controllerKind" /><span>Invite Friend</span></label>
     </div>
     <div class="campaign-wizard-grid">
-      <label><span>Name</span><input data-character-field="name" autocomplete="off" placeholder="Oskar, Ingrid, Bren..." /></label>
+      <label><span>Name</span><input data-character-field="name" autocomplete="off" placeholder="Character name" /></label>
       <label><span>Ancestry</span><input data-character-field="ancestry" autocomplete="off" placeholder="Dwarf, elf, human..." /></label>
       <label><span>Class / role</span><input data-character-field="class" autocomplete="off" placeholder="Soldier, scout, cleric..." /></label>
       <label><span>Level</span><input data-character-field="level" inputmode="numeric" value="1" /></label>
@@ -2516,13 +2537,6 @@ function setWizardControllerKind(card, value) {
   if (target) {
     target.checked = true;
   }
-}
-
-function normalizeWizardControllerKind(value) {
-  const normalized = String(value || "").trim();
-  return ["host", "ai_companion", "remote_invite", "unassigned"].includes(normalized)
-    ? normalized
-    : "ai_companion";
 }
 
 function setIfBlank(input, value) {
@@ -2707,25 +2721,10 @@ async function adoptPreTableLobbyIntoActiveCampaign() {
 }
 
 function providerSettingsForNewCampaign() {
-  const settings = currentProviderSettings();
-  if (settings.preferredProvider !== "ollama") {
-    return settings;
-  }
-
-  const installed = installedOllamaModelIds();
-  if (isOllamaModelInstalled(settings.selectedModel, installed)) {
-    return settings;
-  }
-
-  const selectedControlModel = elements.ollamaModel?.value;
-  const fallbackModel = [selectedControlModel, ...installed]
-    .filter(Boolean)
-    .find((model) => isOllamaModelInstalled(model, installed));
-
-  return {
-    ...settings,
-    selectedModel: fallbackModel || settings.selectedModel,
-  };
+  return campaignCreationProviderSettings(currentProviderSettings(), {
+    selectedControlModel: elements.ollamaModel?.value,
+    installedModels: installedOllamaModelIds(state.providerStatus?.providers?.ollama),
+  });
 }
 
 function openCampaignDialog({ returnToMainMenu = false } = {}) {
@@ -3136,26 +3135,28 @@ async function copyGuestLinkFromUi() {
     showGuestLink(link);
     const copied = await writeClipboardText(link);
     if (copied) {
-      setProviderActivity("Guest link copied", "idle");
+      setProviderActivity("Share Table link copied", "idle");
       return true;
     }
     revealGuestLink();
-    setProviderActivity("Guest page ready; copy it from Table Options.", "waiting");
+    setProviderActivity("Share Table link ready; copy it from Friends And Seats.", "waiting");
     return false;
   } catch (error) {
-    setProviderActivity(error instanceof Error ? `Guest link failed: ${error.message}` : "Guest link failed", "error");
+    setProviderActivity(error instanceof Error ? `Share Table failed: ${error.message}` : "Share Table failed", "error");
     return false;
   }
 }
 
 function currentLocalGuestLink() {
   const table = state.campaign?.multiplayer?.localTable ?? state.multiplayerSnapshot?.localTable ?? {};
-  if (!table.running) {
-    return "";
-  }
-  const host = table.lanAddress || window.location.hostname || "127.0.0.1";
-  const port = table.port || window.location.port;
-  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
+  return buildShareTableSession({
+    table: {
+      ...table,
+      lanAddress: table.lanAddress || window.location.hostname || "127.0.0.1",
+    },
+    campaignId: state.campaign?.id || state.multiplayerSnapshot?.campaignId || "",
+    locationPort: window.location.port,
+  }).guestLink;
 }
 
 function localTableAuthorityPayload(overrides = {}) {
@@ -4188,7 +4189,7 @@ async function stagePendingRemoteInput(inputId) {
 function createGuestShellCampaign() {
   return normalizeCampaign({
     id: "lorekeeper-join",
-    title: "LoreKeeper Join",
+    title: "LoreKeeper",
     summary: "Waiting for a hosted local table.",
     scene: {
       status: "waiting",
@@ -4214,7 +4215,7 @@ function createGuestShellCampaign() {
       sessions: [
         {
           id: "lorekeeper-join-session",
-          title: "LoreKeeper Join",
+          title: "LoreKeeper",
           startedAt: new Date().toISOString(),
           endedAt: null,
           recap: "",
@@ -4417,95 +4418,6 @@ function clearWaitingRoomSession() {
   localStorage.removeItem(guestWaitingRoomStorageKey);
 }
 
-function normalizeWizardCharacter(input = {}) {
-  const name = String(input.name ?? "").trim();
-  const ancestry = String(input.ancestry ?? "").trim();
-  const characterClass = String(input.characterClass ?? "").trim();
-  const concept = String(input.concept ?? "").trim();
-  const level = clampLevel(parseOptionalNumber(input.level) ?? 1);
-
-  return {
-    name,
-    ancestry,
-    characterClass,
-    level,
-    concept,
-    autoSheet: input.autoSheet !== false,
-    controllerKind: input.controllerKind ? normalizeWizardControllerKind(input.controllerKind) : "",
-  };
-}
-
-function normalizeWizardJoiner(input = {}) {
-  const seed = normalizeWizardCharacter(input);
-  const integrationPrompt = String(input.integrationPrompt ?? "").trim();
-  const hostIntegrationPrompt = String(input.hostIntegrationPrompt ?? "").trim();
-  const hasAnyValue = [
-    seed.name,
-    seed.ancestry,
-    seed.characterClass,
-    seed.concept,
-    integrationPrompt,
-    hostIntegrationPrompt,
-  ].some(Boolean);
-  if (!hasAnyValue) {
-    return null;
-  }
-  const completed = completeCharacterSeed({
-    ...seed,
-    integrationPrompt,
-    hostIntegrationPrompt,
-  });
-  const controllerKind = normalizeWizardControllerKind(input.controllerKind || seed.controllerKind || "ai_companion");
-
-  return {
-    ...seed,
-    ...completed,
-    controllerKind,
-    playerRole: wizardPlayerRoleForController(controllerKind),
-    integrationPrompt: completed.integrationPrompt,
-    hostIntegrationPrompt: completed.hostIntegrationPrompt,
-  };
-}
-
-function normalizeWizardJoiners(inputs = []) {
-  return normalizeList(inputs)
-    .map((input) => normalizeWizardJoiner(input))
-    .filter(Boolean);
-}
-
-function buildOpeningSceneSummary({ premise, startingLocation, character, startingPartyMembers = [] }) {
-  const joiners = normalizeList(startingPartyMembers);
-  const partyNames = [
-    character?.name,
-    ...joiners.map((member) => member.name),
-  ].filter(Boolean);
-  const placeLine = startingLocation
-    ? `The table is set at ${startingLocation}.`
-    : "The table is set for the first scene.";
-  const details = [
-    placeLine,
-    partyNames.length
-      ? `${partyNames.join(", ")} ${partyNames.length === 1 ? "is" : "are"} at the table.`
-      : "",
-    premise
-      ? `Premise: ${premise}`
-      : "",
-    "Next: invite anyone else you want at the table, then press Start Adventure for the opening narration.",
-  ].filter(Boolean);
-
-  return details.join("\n\n");
-}
-
-function formatCharacterBasics(character) {
-  const identity = [
-    character.name,
-    character.ancestry,
-    character.characterClass,
-    character.level ? `level ${character.level}` : "",
-  ].filter(Boolean).join(", ");
-  return [identity || "Unnamed player character", character.concept].filter(Boolean).join(" - ");
-}
-
 async function seedWizardPlayerCharacter(character) {
   const baseSheet = character.autoSheet
     ? buildFiveELiteCharacterSeed(character)
@@ -4582,389 +4494,6 @@ async function seedWizardStartingPartyMember(character) {
 
   const result = await response.json();
   setCampaignFromPayload(result, "new_campaign_starting_party_member");
-}
-
-function wizardControllerSheetFields(controllerKind, { primary = false } = {}) {
-  const normalized = normalizeWizardControllerKind(controllerKind || (primary ? "host" : "ai_companion"));
-  if (normalized === "host") {
-    return {
-      playerRole: primary ? "Host player character" : "Host-controlled party member",
-      controllerKind: "host",
-      controllerId: "host",
-      fallbackControllerKind: "host",
-    };
-  }
-  if (normalized === "remote_invite") {
-    return {
-      playerRole: "Remote invite seat",
-      controllerKind: "unassigned",
-      controllerId: null,
-      fallbackControllerKind: "ai_companion",
-      inviteIntent: "remote_player",
-    };
-  }
-  return {
-    playerRole: primary ? "AI party companion" : "AI party companion",
-    controllerKind: "ai_companion",
-    controllerId: null,
-    fallbackControllerKind: "ai_companion",
-  };
-}
-
-function wizardPlayerRoleForController(controllerKind) {
-  const normalized = normalizeWizardControllerKind(controllerKind);
-  if (normalized === "host") {
-    return "Host-controlled party member";
-  }
-  if (normalized === "remote_invite") {
-    return "Remote invite seat";
-  }
-  return "AI party companion";
-}
-
-function buildFiveELiteCharacterSeed(character) {
-  const level = clampLevel(character.level || 1);
-  const profile = classifyCharacterProfile(`${character.characterClass} ${character.concept}`);
-  const abilityScores = standardScoresForProfile(profile);
-  const conMod = abilityModifier(abilityScores.CON);
-  const dexMod = abilityModifier(abilityScores.DEX);
-  const maxHp = Math.max(1, hitDieForProfile(profile) + conMod + Math.max(0, level - 1) * Math.max(1, Math.ceil(hitDieForProfile(profile) / 2) + conMod));
-  const armorClass = Math.max(10, 10 + dexMod + armorBonusForProfile(profile));
-  const ancestryClass = [character.ancestry, character.characterClass].filter(Boolean).join(" ") || profile.label;
-  const proficiencyBonus = proficiencyBonusForLevel(level);
-  const spells = spellsForProfile(profile, character);
-  const resources = {
-    spellSlots: spellSlotsForProfile(profile, level),
-    uses: usesForProfile(profile, level),
-  };
-  const attacks = attacksForProfile(profile, abilityScores, proficiencyBonus);
-  const equipment = equipmentForProfile(profile, character);
-
-  return {
-    id: `party-${slugify(character.name)}`,
-    name: character.name,
-    type: "player_character",
-    playerRole: "Player character",
-    ancestryClass,
-    level,
-    experience: 0,
-    proficiencyBonus,
-    background: character.concept || `${character.name} is a ${ancestryClass} beginning the campaign.`,
-    stats: {
-      hp: {
-        current: maxHp,
-        max: maxHp,
-      },
-      armorClass,
-      abilityScores,
-      spells,
-      spellSlots: resources.spellSlots,
-    },
-    speedFt: 30,
-    resources,
-    attacks,
-    conditions: [],
-    skills: skillsForProfile(profile, character),
-    abilities: abilitiesForProfile(profile, character),
-    spells,
-    inventory: equipment.inventory,
-    equipment,
-    notes: ["Created from the new campaign wizard with a 5E-lite standard array."],
-  };
-}
-
-function classifyCharacterProfile(text) {
-  const value = String(text ?? "").toLowerCase();
-  const profiles = [
-    { key: "druid", label: "druid", match: /\b(druid|wild shape|nature|frost|wolf)\b/ },
-    { key: "rogue", label: "rogue", match: /\b(rogue|thief|burglar|assassin|heist|lock|sneak)\b/ },
-    { key: "ranger", label: "ranger", match: /\b(ranger|scout|archer|bow|tracker|hunter)\b/ },
-    { key: "fighter", label: "fighter", match: /\b(fighter|warrior|soldier|guard|knight|sword)\b/ },
-    { key: "wizard", label: "wizard", match: /\b(wizard|mage|arcane|spellbook|sorcerer)\b/ },
-    { key: "cleric", label: "cleric", match: /\b(cleric|priest|paladin|divine|faith|healer)\b/ },
-    { key: "bard", label: "bard", match: /\b(bard|performer|charmer|silver tongue|song)\b/ },
-  ];
-  return profiles.find((profile) => profile.match.test(value)) ?? { key: "balanced", label: "adventurer" };
-}
-
-function standardScoresForProfile(profile) {
-  const maps = {
-    druid: { STR: 8, DEX: 13, CON: 14, INT: 12, WIS: 15, CHA: 10 },
-    rogue: { STR: 8, DEX: 15, CON: 13, INT: 12, WIS: 10, CHA: 14 },
-    ranger: { STR: 10, DEX: 15, CON: 13, INT: 8, WIS: 14, CHA: 12 },
-    fighter: { STR: 15, DEX: 12, CON: 14, INT: 8, WIS: 13, CHA: 10 },
-    wizard: { STR: 8, DEX: 14, CON: 13, INT: 15, WIS: 12, CHA: 10 },
-    cleric: { STR: 12, DEX: 10, CON: 14, INT: 8, WIS: 15, CHA: 13 },
-    bard: { STR: 8, DEX: 14, CON: 13, INT: 10, WIS: 12, CHA: 15 },
-    balanced: { STR: 12, DEX: 14, CON: 13, INT: 10, WIS: 15, CHA: 8 },
-  };
-
-  return maps[profile.key] ?? maps.balanced;
-}
-
-function hitDieForProfile(profile) {
-  if (profile.key === "fighter") {
-    return 10;
-  }
-  if (profile.key === "wizard") {
-    return 6;
-  }
-  return 8;
-}
-
-function armorBonusForProfile(profile) {
-  if (profile.key === "fighter" || profile.key === "cleric") {
-    return 3;
-  }
-  if (profile.key === "ranger" || profile.key === "rogue") {
-    return 2;
-  }
-  return 0;
-}
-
-function skillsForProfile(profile, character) {
-  const skills = {
-    druid: ["Nature", "Survival", "Animal Handling", "Perception"],
-    rogue: ["Stealth", "Sleight of Hand", "Deception", "Thieves' Tools"],
-    ranger: ["Perception", "Survival", "Stealth", "Athletics"],
-    fighter: ["Athletics", "Intimidation", "Perception", "Survival"],
-    wizard: ["Arcana", "Investigation", "History", "Insight"],
-    cleric: ["Medicine", "Insight", "Religion", "Persuasion"],
-    bard: ["Performance", "Persuasion", "Deception", "Insight"],
-    balanced: ["Perception", "Survival", "Insight", "Athletics"],
-  };
-  const extras = /frost/i.test(`${character.characterClass} ${character.concept}`) ? ["Frost magic control"] : [];
-  return [...(skills[profile.key] ?? skills.balanced), ...extras];
-}
-
-function abilitiesForProfile(profile, character) {
-  const abilities = {
-    druid: ["Wild Shape", "Druidcraft", "Primal spellcasting"],
-    rogue: ["Sneak Attack", "Cunning Action", "Thieves' Tools"],
-    ranger: ["Favored terrain instincts", "Archery training", "Tracking"],
-    fighter: ["Second Wind", "Weapon training", "Tactical footing"],
-    wizard: ["Arcane Recovery", "Ritual casting", "Spellbook"],
-    cleric: ["Channel Divinity", "Divine spellcasting", "Healing word"],
-    bard: ["Bardic Inspiration", "Jack of All Trades", "Silver tongue"],
-    balanced: ["Adventurer's instincts", "Fieldcraft", "Quick thinking"],
-  };
-  const extras = /wolf/i.test(`${character.characterClass} ${character.concept}`) ? ["Wolf companion bond"] : [];
-  return [...(abilities[profile.key] ?? abilities.balanced), ...extras];
-}
-
-function spellsForProfile(profile, character) {
-  const value = `${character.characterClass} ${character.concept}`;
-  if (profile.key === "druid") {
-    return /frost/i.test(value)
-      ? [
-        spell("Frostbite", 0, { castingTime: "action", roll: { save: { ability: "CON" }, damage: "1d6" }, effect: "Cold cantrip that can sap a target's next weapon attack." }),
-        spell("Druidcraft", 0, { castingTime: "action", effect: "Small primal omen, sensory, or nature effect." }),
-        spell("Entangle", 1, { castingTime: "action", roll: { save: { ability: "STR" }, conditionOnFail: "restrained" }, effect: "Plants restrain creatures in a small area on a failed save." }),
-        spell("Goodberry", 1, { castingTime: "action", effect: "Creates simple magical food and minor healing." }),
-      ]
-      : [
-        spell("Druidcraft", 0, { castingTime: "action", effect: "Small primal omen, sensory, or nature effect." }),
-        spell("Entangle", 1, { castingTime: "action", roll: { save: { ability: "STR" }, conditionOnFail: "restrained" }, effect: "Plants restrain creatures in a small area on a failed save." }),
-        spell("Goodberry", 1, { castingTime: "action", effect: "Creates simple magical food and minor healing." }),
-      ];
-  }
-  if (profile.key === "wizard") {
-    return [
-      spell("Mage Hand", 0, { castingTime: "action", effect: "Spectral hand manipulates small objects at range." }),
-      spell("Detect Magic", 1, { castingTime: "action", effect: "Reveals nearby magical auras with concentration." }),
-      spell("Magic Missile", 1, { castingTime: "action", roll: { damage: "3d4+3" }, effect: "Automatic force darts against visible targets." }),
-    ];
-  }
-  if (profile.key === "cleric") {
-    return [
-      spell("Guidance", 0, { castingTime: "action", effect: "Brief divine help on an ability check." }),
-      spell("Bless", 1, { castingTime: "action", effect: "Allies add a small divine bonus to attacks and saves." }),
-      spell("Healing Word", 1, { castingTime: "bonus_action", roll: { healing: "1d4+3" }, effect: "Ranged minor healing as a bonus action." }),
-    ];
-  }
-  if (profile.key === "bard") {
-    return [
-      spell("Vicious Mockery", 0, { castingTime: "action", roll: { save: { ability: "WIS" }, damage: "1d4" }, effect: "Psychic insult that can hinder a target's next attack." }),
-      spell("Charm Person", 1, { castingTime: "action", roll: { save: { ability: "WIS" } }, effect: "Social magic that makes one humanoid friendly for a while." }),
-      spell("Healing Word", 1, { castingTime: "bonus_action", roll: { healing: "1d4+3" }, effect: "Ranged minor healing as a bonus action." }),
-    ];
-  }
-  return [];
-}
-
-function spell(name, level, details = {}) {
-  return {
-    name,
-    level,
-    castingTime: details.castingTime || "action",
-    roll: details.roll ?? null,
-    effect: details.effect || "",
-  };
-}
-
-function spellSlotsForProfile(profile, level) {
-  const fullCaster = {
-    1: { 1: { max: 2, used: 0 } },
-    2: { 1: { max: 3, used: 0 } },
-    3: { 1: { max: 4, used: 0 }, 2: { max: 2, used: 0 } },
-    4: { 1: { max: 4, used: 0 }, 2: { max: 3, used: 0 } },
-    5: { 1: { max: 4, used: 0 }, 2: { max: 3, used: 0 }, 3: { max: 2, used: 0 } },
-  };
-  const halfCaster = {
-    2: { 1: { max: 2, used: 0 } },
-    3: { 1: { max: 3, used: 0 } },
-    4: { 1: { max: 3, used: 0 } },
-    5: { 1: { max: 4, used: 0 }, 2: { max: 2, used: 0 } },
-  };
-  const table = ["druid", "wizard", "cleric", "bard"].includes(profile.key)
-    ? fullCaster
-    : profile.key === "ranger"
-      ? halfCaster
-      : null;
-  if (!table) {
-    return {};
-  }
-  const eligibleLevel = Math.max(...Object.keys(table).map(Number).filter((entry) => entry <= level));
-  return structuredClone(table[eligibleLevel] ?? {});
-}
-
-function usesForProfile(profile, level) {
-  const uses = {};
-  if (profile.key === "druid" && level >= 2) {
-    uses.wildShape = { max: 2, used: 0 };
-  }
-  if (profile.key === "fighter") {
-    uses.secondWind = { max: 1, used: 0 };
-  }
-  if (profile.key === "cleric" && level >= 2) {
-    uses.channelDivinity = { max: 1, used: 0 };
-  }
-  if (profile.key === "bard") {
-    uses.bardicInspiration = { max: Math.max(1, abilityModifier(15)), used: 0 };
-  }
-  return uses;
-}
-
-function attacksForProfile(profile, abilityScores, proficiencyBonus) {
-  const dexAttack = abilityModifier(abilityScores.DEX) + proficiencyBonus;
-  const strAttack = abilityModifier(abilityScores.STR) + proficiencyBonus;
-  const wisAttack = abilityModifier(abilityScores.WIS) + proficiencyBonus;
-  const intAttack = abilityModifier(abilityScores.INT) + proficiencyBonus;
-  const chaAttack = abilityModifier(abilityScores.CHA) + proficiencyBonus;
-  const damage = (dice, mod) => `${dice}${mod ? formatModifier(mod) : ""}`;
-
-  const attacks = {
-    druid: [
-      { name: "Quarterstaff", attackBonus: strAttack, damage: damage("1d6", abilityModifier(abilityScores.STR)), range: "5 ft", requirements: ["equipped weapon"] },
-      { name: "Primal cantrip", attackBonus: wisAttack, damage: "cantrip effect", range: "spell range", requirements: ["known cantrip"] },
-    ],
-    rogue: [
-      { name: "Shortsword", attackBonus: dexAttack, damage: damage("1d6", abilityModifier(abilityScores.DEX)), range: "5 ft", requirements: ["finesse weapon"] },
-      { name: "Shortbow", attackBonus: dexAttack, damage: damage("1d6", abilityModifier(abilityScores.DEX)), range: "80/320 ft", requirements: ["line of sight", "ammunition"] },
-    ],
-    ranger: [
-      { name: "Longbow", attackBonus: dexAttack, damage: damage("1d8", abilityModifier(abilityScores.DEX)), range: "150/600 ft", requirements: ["line of sight", "ammunition"] },
-      { name: "Shortsword", attackBonus: dexAttack, damage: damage("1d6", abilityModifier(abilityScores.DEX)), range: "5 ft", requirements: ["equipped weapon"] },
-    ],
-    fighter: [
-      { name: "Longsword", attackBonus: strAttack, damage: damage("1d8", abilityModifier(abilityScores.STR)), range: "5 ft", requirements: ["equipped weapon"] },
-      { name: "Javelin", attackBonus: strAttack, damage: damage("1d6", abilityModifier(abilityScores.STR)), range: "30/120 ft", requirements: ["line of sight"] },
-    ],
-    wizard: [
-      { name: "Dagger", attackBonus: dexAttack, damage: damage("1d4", abilityModifier(abilityScores.DEX)), range: "20/60 ft", requirements: ["equipped weapon"] },
-      { name: "Arcane cantrip", attackBonus: intAttack, damage: "cantrip effect", range: "spell range", requirements: ["known cantrip"] },
-    ],
-    cleric: [
-      { name: "Mace", attackBonus: strAttack, damage: damage("1d6", abilityModifier(abilityScores.STR)), range: "5 ft", requirements: ["equipped weapon"] },
-      { name: "Divine cantrip", attackBonus: wisAttack, damage: "cantrip effect", range: "spell range", requirements: ["known cantrip"] },
-    ],
-    bard: [
-      { name: "Rapier", attackBonus: dexAttack, damage: damage("1d8", abilityModifier(abilityScores.DEX)), range: "5 ft", requirements: ["finesse weapon"] },
-      { name: "Bardic cantrip", attackBonus: chaAttack, damage: "cantrip effect", range: "spell range", requirements: ["known cantrip"] },
-    ],
-    balanced: [
-      { name: "Simple weapon", attackBonus: dexAttack, damage: damage("1d6", abilityModifier(abilityScores.DEX)), range: "weapon range", requirements: ["equipped weapon"] },
-    ],
-  };
-
-  return attacks[profile.key] ?? attacks.balanced;
-}
-
-function equipmentForProfile(profile, character = {}) {
-  const ancestryClass = `${character.ancestry || ""} ${character.characterClass || ""} ${character.concept || ""}`;
-  const common = ["Bedroll", "Rations", "Waterskin", "Tinderbox"];
-  const kits = {
-    druid: {
-      armor: "Leather armor",
-      weapons: ["Quarterstaff", "Sling"],
-      tools: ["Herbalism kit"],
-      inventory: ["Druidic focus", "Herbalism kit", ...common],
-    },
-    rogue: {
-      armor: "Leather armor",
-      weapons: ["Shortsword", "Shortbow", "Dagger"],
-      tools: ["Thieves' tools", "Disguise kit"],
-      inventory: ["Thieves' tools", "Disguise kit", "50 ft rope", ...common],
-    },
-    ranger: {
-      armor: "Leather armor",
-      weapons: ["Longbow", "Shortsword", "Dagger"],
-      tools: ["Hunting trap"],
-      inventory: ["Quiver of arrows", "Hunting trap", "50 ft rope", ...common],
-    },
-    fighter: {
-      armor: /dwarf|soldier|guard|knight/i.test(ancestryClass) ? "Chain mail" : "Scale mail",
-      weapons: ["Longsword", "Javelin", "Shield"],
-      tools: ["Gaming set or soldier's kit"],
-      inventory: ["Shield", "Javelins", "Whetstone", ...common],
-    },
-    wizard: {
-      armor: "No armor",
-      weapons: ["Dagger", "Quarterstaff"],
-      tools: ["Spellbook", "Arcane focus"],
-      inventory: ["Spellbook", "Arcane focus", "Ink and quill", ...common],
-    },
-    cleric: {
-      armor: "Scale mail",
-      weapons: ["Mace", "Light crossbow", "Shield"],
-      tools: ["Holy symbol", "Healer's kit"],
-      inventory: ["Holy symbol", "Healer's kit", "Shield", ...common],
-    },
-    bard: {
-      armor: "Leather armor",
-      weapons: ["Rapier", "Dagger", "Light crossbow"],
-      tools: ["Musical instrument"],
-      inventory: ["Musical instrument", "Diplomat's pack", ...common],
-    },
-    balanced: {
-      armor: "Traveling leathers",
-      weapons: ["Simple weapon", "Dagger"],
-      tools: ["Adventuring kit"],
-      inventory: ["Adventuring kit", ...common],
-    },
-  };
-  return kits[profile.key] ?? kits.balanced;
-}
-
-function formatModifier(value) {
-  const number = Number(value) || 0;
-  return number >= 0 ? `+${number}` : `${number}`;
-}
-
-function proficiencyBonusForLevel(level) {
-  return 2 + Math.floor((Math.max(1, level) - 1) / 4);
-}
-
-function abilityModifier(score) {
-  return Math.floor((Number(score) - 10) / 2);
-}
-
-function clampLevel(value) {
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    return 1;
-  }
-  return Math.min(20, Math.max(1, Math.round(number)));
 }
 
 let pendingConfirmResolve = null;
@@ -5440,19 +4969,7 @@ function resetTurnCarryover() {
 }
 
 function currentProviderSettings() {
-  const settings = state.campaign?.providerSettings ?? {};
-  const saved = loadLastProviderSettings();
-  const preferredProvider = settings.preferredProvider === "chatgpt"
-    ? "bridge"
-    : settings.preferredProvider || saved.preferredProvider || "ollama";
-  return {
-    preferredProvider,
-    selectedModel: settings.selectedModel || saved.selectedModel || "llama3.1:8b",
-    generationTimeoutMs: Number(settings.generationTimeoutMs || saved.generationTimeoutMs) || 120000,
-    outputLimit: Math.max(1800, Number(settings.outputLimit || saved.outputLimit) || 1800),
-    fastMode: settings.fastMode ?? saved.fastMode ?? false,
-    ollamaBaseUrl: settings.ollamaBaseUrl || saved.ollamaBaseUrl || "http://127.0.0.1:11434",
-  };
+  return resolveProviderSettings(state.campaign?.providerSettings ?? {}, loadLastProviderSettings());
 }
 
 function turnProjection() {
@@ -5477,7 +4994,7 @@ function currentAppMode() {
 }
 
 function normalizeAppMode(mode) {
-  return mode === "join" || mode === "thin" ? "join" : "host";
+  return mode === "join" ? "join" : "host";
 }
 
 async function switchAppMode(mode) {
@@ -5653,7 +5170,7 @@ function applyJoinClientChrome() {
   renderAppModeControls();
   document.body.classList.add("lorekeeper-join-mode");
   elements.deleteCampaign.hidden = true;
-  elements.providerStatus.textContent = "Mode: LoreKeeper Join";
+  elements.providerStatus.textContent = "Mode: LoreKeeper";
   hideSetupSection(elements.providerMode, true);
   hideSetupSection(elements.newCampaign, true);
   hideSetupSection(elements.responseImport, true);
@@ -5779,77 +5296,30 @@ function hideSetupSection(element, hidden) {
 
 function renderModelOptions(settings) {
   const ollama = state.providerStatus?.providers?.ollama;
-  const installed = installedOllamaModelIds();
-  const recommended = (ollama?.recommendedModels ?? []).map((model) => model.id);
-  const options = dedupeModelOptions([settings.selectedModel, ...installed, ...recommended].filter(Boolean), settings.selectedModel);
+  const options = buildModelOptionsProjection({
+    selectedModel: settings.selectedModel,
+    ollama,
+  });
 
   elements.ollamaModel.replaceChildren(
-    ...options.map((model) => {
+    ...options.map((modelOption) => {
       const option = document.createElement("option");
-      option.value = model;
-      option.textContent = formatModelOptionLabel(model, isOllamaModelInstalled(model, installed));
-      option.selected = normalizeOllamaModelId(model) === normalizeOllamaModelId(settings.selectedModel);
+      option.value = modelOption.value;
+      option.textContent = modelOption.label;
+      option.selected = modelOption.selected;
       return option;
     }),
   );
 }
 
-function installedOllamaModelIds() {
-  const ollama = state.providerStatus?.providers?.ollama;
-  return (ollama?.models ?? []).map((model) => model.name || model.model).filter(Boolean);
-}
-
-function dedupeModelOptions(modelIds, selectedModel) {
-  const byCanonicalId = new Map();
-  const selectedCanonicalId = normalizeOllamaModelId(selectedModel);
-  for (const modelId of modelIds) {
-    const canonicalId = normalizeOllamaModelId(modelId);
-    if (!canonicalId) {
-      continue;
-    }
-
-    const current = byCanonicalId.get(canonicalId);
-    const candidateIsSelected = canonicalId === selectedCanonicalId;
-    const currentIsSelected = normalizeOllamaModelId(current) === selectedCanonicalId;
-    if (!current || (candidateIsSelected && !currentIsSelected)) {
-      byCanonicalId.set(canonicalId, modelId);
-    }
-  }
-
-  return [...byCanonicalId.values()];
-}
-
-function isOllamaModelInstalled(modelId, installedModels) {
-  const canonicalId = normalizeOllamaModelId(modelId);
-  return installedModels.some((installed) => normalizeOllamaModelId(installed) === canonicalId);
-}
-
-function formatModelOptionLabel(modelId, isInstalled) {
-  const descriptor = getRecommendedModelDescriptor(modelId);
-  const label = descriptor?.label ?? modelId;
-  const badges = [
-    isInstalled ? "installed" : "download needed",
-    descriptor?.recommended ? "recommended" : null,
-    descriptor?.spec ? `${descriptor.spec} spec` : null,
-  ].filter(Boolean);
-  return `${label} - ${badges.join(" / ")}`;
-}
-
 function renderSelectedModelSummary(settings, ollama) {
-  const modelId = settings.selectedModel;
-  const installedModelNames = (ollama.models ?? []).map((model) => model.name || model.model).filter(Boolean);
-  const installed = isOllamaModelInstalled(modelId, installedModelNames);
-  const descriptor = getRecommendedModelDescriptor(modelId);
-  const chips = [
-    descriptor?.recommended ? "Recommended" : null,
-    descriptor?.spec ? `${descriptor.spec} Spec` : null,
-    descriptor?.speed ? `Speed: ${descriptor.speed}` : null,
-    descriptor?.quality ? `Quality: ${descriptor.quality}` : null,
-    installed ? "Installed" : "Not Downloaded",
-  ].filter(Boolean);
+  const summary = selectedModelSummaryProjection({
+    selectedModel: settings.selectedModel,
+    ollama,
+  });
 
   elements.ollamaModelSummary.replaceChildren(
-    ...chips.map((chip) => {
+    ...summary.chips.map((chip) => {
       const span = document.createElement("span");
       span.className = `model-chip ${chip === "Not Downloaded" ? "missing" : ""}`;
       span.textContent = chip;
@@ -5857,70 +5327,10 @@ function renderSelectedModelSummary(settings, ollama) {
     }),
   );
 
-  elements.pullOllamaModel.hidden = installed;
-  elements.pullOllamaModel.disabled = ollama.state === "ollama_not_installed" || ollama.state === "ollama_not_running";
-  elements.pullOllamaModel.textContent = "Download";
-  elements.pullOllamaModel.title = `Download ${modelId} with Ollama`;
-}
-
-function getRecommendedModelDescriptor(modelId) {
-  const canonicalId = normalizeOllamaModelId(modelId);
-  const model = recommendedOllamaModels.find((candidate) => normalizeOllamaModelId(candidate.id) === canonicalId);
-  if (!model) {
-    return {
-      label: modelId,
-      spec: "Custom",
-      speed: null,
-      quality: null,
-      recommended: false,
-    };
-  }
-
-  return {
-    ...model,
-    spec: model.spec ?? inferModelSpec(model.id),
-    recommended: Boolean(model.recommended),
-  };
-}
-
-function inferModelSpec(modelId) {
-  if (/14b|27b|70b/i.test(modelId)) {
-    return "High";
-  }
-  if (/nemo|12b/i.test(modelId)) {
-    return "Medium";
-  }
-  return "Low";
-}
-
-function providerStatusLabel(ollama) {
-  if (ollama.state === "ready") {
-    return `Ollama ready: ${modelDisplayName(ollama.selectedModel)}`;
-  }
-  if (ollama.state === "selected_model_missing") {
-    return `Ollama running; ${modelDisplayName(ollama.selectedModel)} is not downloaded`;
-  }
-  if (ollama.state === "ollama_not_running") {
-    return "Ollama installed but not running";
-  }
-  if (ollama.state === "ollama_not_installed") {
-    return "Ollama is not installed";
-  }
-  return ollama.runtimeMessage || "Ollama status unknown";
-}
-
-function providerSetupHint(ollama, selectedModel) {
-  if (ollama.state === "ollama_not_installed") {
-    return "Install Ollama from ollama.com, then reopen DM Voice and refresh.";
-  }
-  if (ollama.state === "ollama_not_running") {
-    return "Start Ollama, then refresh DM Voice.";
-  }
-  return `${modelDisplayName(selectedModel)} is missing. Use Download to pull it locally.`;
-}
-
-function modelDisplayName(modelId) {
-  return getRecommendedModelDescriptor(modelId)?.label ?? modelId;
+  elements.pullOllamaModel.hidden = summary.pullHidden;
+  elements.pullOllamaModel.disabled = summary.pullDisabled;
+  elements.pullOllamaModel.textContent = summary.pullLabel;
+  elements.pullOllamaModel.title = summary.pullTitle;
 }
 
 async function testOllamaModel() {
@@ -6130,112 +5540,6 @@ function openRecordDialog(domain, record = null) {
   elements.recordName.focus();
 }
 
-function recordDialogConfig(domain) {
-  const configs = {
-    party: {
-      title: "Add Party Member",
-      editTitle: "Edit Party Member",
-      nameLabel: "Character name",
-      roleLabel: "Ancestry / class",
-      namePlaceholder: "Evelynn",
-      rolePlaceholder: "Forest elf ranger",
-      notesPlaceholder: "Personality, goals, stats, familiar, important backstory...",
-    },
-    people: {
-      title: "Add Person",
-      editTitle: "Edit Person",
-      nameLabel: "Name",
-      roleLabel: "Role / type",
-      namePlaceholder: "Mira Vale",
-      rolePlaceholder: "Herbalist, rival, guard captain...",
-      notesPlaceholder: "What is canon about this person?",
-    },
-    places: {
-      title: "Add Place",
-      editTitle: "Edit Place",
-      nameLabel: "Place name",
-      roleLabel: "Place type",
-      namePlaceholder: "Brindle Hollow",
-      rolePlaceholder: "frontier town, ruin, forest road...",
-      notesPlaceholder: "Sights, factions, dangers, connections, known facts...",
-    },
-    quests: {
-      title: "Add Thread",
-      editTitle: "Edit Thread",
-      nameLabel: "Thread title",
-      roleLabel: "Status",
-      namePlaceholder: "Find the missing wolf companion",
-      rolePlaceholder: "active",
-      notesPlaceholder: "Stakes, clues, unresolved questions...",
-    },
-    lore: {
-      title: "Add Lore Note",
-      editTitle: "Edit Lore Note",
-      nameLabel: "Lore title",
-      roleLabel: "Tags",
-      namePlaceholder: "Moonlit wolf omen",
-      rolePlaceholder: "omen, forest, wolves",
-      notesPlaceholder: "Canon note text...",
-    },
-    assets: {
-      title: "Add Source Image",
-      editTitle: "Edit Source Image",
-      nameLabel: "Asset name",
-      roleLabel: "Kind",
-      namePlaceholder: "Brindle Hollow map",
-      rolePlaceholder: "image",
-      notesPlaceholder: "What should LoreKeeper remember about this source image?",
-    },
-    items: {
-      title: "Add Thing",
-      editTitle: "Edit Thing",
-      nameLabel: "Thing name",
-      roleLabel: "Kind / type",
-      namePlaceholder: "Silver lockpick",
-      rolePlaceholder: "tool, clue, artifact, weapon...",
-      notesPlaceholder: "What is known about it, who has it, and why it matters...",
-    },
-  };
-
-  return configs[domain] ?? configs.lore;
-}
-
-function recordRoleValue(domain, record) {
-  if (domain === "party") {
-    return record.ancestryClass || record.role || record.playerRole || "";
-  }
-
-  if (domain === "quests") {
-    return record.status || "";
-  }
-
-  if (domain === "lore") {
-    return (record.tags ?? []).join(", ");
-  }
-
-  return record.role || record.type || record.kind || record.region || "";
-}
-
-function recordNotesValue(domain, record) {
-  if (domain === "quests") {
-    return [record.stakes, ...(record.openQuestions ?? []).map((question) => `Open: ${question}`)].filter(Boolean).join("\n");
-  }
-
-  return [record.summary, record.description, ...(record.notes ?? [])].filter(Boolean).join("\n");
-}
-
-function recordLabel(domain) {
-  return {
-    party: "Party member",
-    people: "Person",
-    places: "Place",
-    quests: "Thread",
-    lore: "Lore note",
-    assets: "Asset",
-    items: "Thing",
-  }[domain] ?? "Record";
-}
-
 function seedPlayLog() {
   const campaign = state.campaign;
   const storedMessages = campaign.sessionLog?.messages ?? [];
@@ -6421,14 +5725,7 @@ function chooseHomeFlow(flow) {
 }
 
 function visibleCampaigns() {
-  return (state.campaigns ?? []).filter((campaign) => !isBackendStarterCampaign(campaign));
-}
-
-function isBackendStarterCampaign(campaign = {}) {
-  const title = String(campaign.title || "").trim();
-  const summary = String(campaign.summary || "").trim();
-  return /^Untitled Campaign(?: \d+)?$/i.test(title)
-    && summary === "A new D&D 5e-lite campaign ready to grow through play.";
+  return projectVisibleCampaigns(state.campaigns);
 }
 
 async function returnToMainMenu() {
@@ -6481,73 +5778,60 @@ function renderHomePanel() {
   elements.homePanel.hidden = !show;
   renderLobbyChrome({ homeVisible: show });
 
+  const projection = buildHomeCampaignPickerProjection({
+    campaigns: state.campaigns,
+    selectedSqlitePath: state.sqlitePath,
+  });
+
   if (elements.homeActiveCampaign) {
-    const campaignCount = visibleCampaigns().length;
-    elements.homeActiveCampaign.textContent = campaignCount
-      ? `${campaignCount} saved ${campaignCount === 1 ? "adventure" : "adventures"}`
-      : "No saved adventures yet";
+    elements.homeActiveCampaign.textContent = projection.savedText;
   }
 
   if (elements.homeCharacterCount) {
-    elements.homeCharacterCount.textContent = "Characters live with their campaigns";
+    elements.homeCharacterCount.textContent = projection.characterText;
   }
 
-  renderHomeCampaignPicker();
+  renderHomeCampaignPicker(projection);
 }
 
-function renderHomeCampaignPicker() {
+function renderHomeCampaignPicker(projection = buildHomeCampaignPickerProjection({
+  campaigns: state.campaigns,
+  selectedSqlitePath: state.sqlitePath,
+})) {
   if (!elements.homeCampaignSelect) {
     return;
   }
-  const campaigns = visibleCampaigns();
-  if (!campaigns.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No saved adventures yet";
-    option.selected = true;
-    elements.homeCampaignSelect.replaceChildren(option);
-    elements.homeCampaignSelect.disabled = true;
-    if (elements.homeHostFlow) {
-      elements.homeHostFlow.disabled = true;
-      elements.homeHostFlow.title = "Start a new adventure first.";
-    }
-    updateHomeDeleteButton();
-    return;
-  }
-  elements.homeCampaignSelect.disabled = false;
   elements.homeCampaignSelect.replaceChildren(
-    ...campaigns.map((campaign) => {
+    ...projection.options.map((campaign) => {
       const option = document.createElement("option");
-      option.value = campaign.sqlitePath;
-      option.textContent = campaign.title;
-      option.selected = campaign.sqlitePath === state.sqlitePath;
+      option.value = campaign.value;
+      option.textContent = campaign.label;
+      option.selected = campaign.selected;
       return option;
     }),
   );
+  elements.homeCampaignSelect.disabled = projection.selectDisabled;
   if (elements.homeHostFlow) {
-    elements.homeHostFlow.disabled = false;
-    elements.homeHostFlow.title = "Open the selected campaign as host.";
+    elements.homeHostFlow.disabled = projection.hostDisabled;
+    elements.homeHostFlow.title = projection.hostTitle;
   }
-  updateHomeDeleteButton();
+  updateHomeDeleteButton(projection);
 }
 
 function selectedHomeCampaign() {
-  const sqlitePath = String(elements.homeCampaignSelect?.value || "").trim();
-  if (!sqlitePath) {
-    return null;
-  }
-  return visibleCampaigns().find((campaign) => campaign.sqlitePath === sqlitePath) ?? null;
+  return projectedSelectedHomeCampaign(state.campaigns, elements.homeCampaignSelect?.value);
 }
 
-function updateHomeDeleteButton() {
+function updateHomeDeleteButton(projection = null) {
   if (!elements.homeDeleteCampaign) {
     return;
   }
-  const selected = selectedHomeCampaign();
-  elements.homeDeleteCampaign.disabled = !selected;
-  elements.homeDeleteCampaign.title = selected
-    ? "Delete the selected saved adventure."
-    : "No saved adventure to delete.";
+  const deleteProjection = projection ?? buildHomeCampaignPickerProjection({
+    campaigns: state.campaigns,
+    selectedSqlitePath: elements.homeCampaignSelect?.value,
+  });
+  elements.homeDeleteCampaign.disabled = deleteProjection.deleteDisabled;
+  elements.homeDeleteCampaign.title = deleteProjection.deleteTitle;
 }
 
 function renderLobbyChrome({ homeVisible = null, joinVisible = null } = {}) {
@@ -6572,27 +5856,18 @@ function renderSceneIntelligence(campaign) {
   if (!elements.sceneIntelligence) {
     return;
   }
-  const retrieval = buildSceneRetrieval(campaign);
-  const scene = retrieval.scene;
-  const tensions = scene?.tensions ?? campaign.scene?.tensions ?? [];
-  const consequences = retrieval.activeConsequences;
-  const hasFirstClassScene = Boolean(campaign.scene?.activeSceneId || (campaign.scenes ?? []).some((record) => record.status === "active"));
-  const hasDetails = Boolean(hasFirstClassScene || tensions.length || consequences.length);
-  elements.sceneIntelligence.hidden = !hasDetails;
+  const projection = buildSceneIntelligenceProjection(campaign);
+  elements.sceneIntelligence.hidden = !projection.visible;
   if (elements.sceneIntelligenceTitle) {
-    elements.sceneIntelligenceTitle.textContent = scene?.title || "Current scene";
+    elements.sceneIntelligenceTitle.textContent = projection.title;
   }
   if (elements.sceneIntelligenceTensions) {
-    elements.sceneIntelligenceTensions.textContent = tensions.length
-      ? `Tension: ${tensions.slice(0, 2).join("; ")}`
-      : "";
-    elements.sceneIntelligenceTensions.hidden = tensions.length === 0;
+    elements.sceneIntelligenceTensions.textContent = projection.tensionText;
+    elements.sceneIntelligenceTensions.hidden = !projection.tensionText;
   }
   if (elements.sceneIntelligenceConsequences) {
-    elements.sceneIntelligenceConsequences.textContent = consequences.length
-      ? `Consequence: ${consequences.slice(0, 2).map((consequence) => consequence.title).join("; ")}`
-      : "";
-    elements.sceneIntelligenceConsequences.hidden = consequences.length === 0;
+    elements.sceneIntelligenceConsequences.textContent = projection.consequenceText;
+    elements.sceneIntelligenceConsequences.hidden = !projection.consequenceText;
   }
 }
 
@@ -6600,56 +5875,11 @@ function renderSceneNotebook(campaign) {
   if (!elements.sceneNoteList || !elements.sceneNoteCount) {
     return;
   }
-  const retrieval = buildSceneRetrieval(campaign);
-  const scene = retrieval.scene;
-  const records = [];
-  if (scene) {
-    const location = scene.locationId ? labelById(campaign, scene.locationId) : "";
-    records.push(binderRecordElement({
-      title: scene.title || "Current scene",
-      subtitle: location || scene.type || "scene",
-      body: detailLines([
-        scene.immediateSituation,
-        scene.whyHere ? `Why here: ${scene.whyHere}` : "",
-        ...(scene.tensions ?? []).slice(0, 3).map((tension) => `Tension: ${tension}`),
-        ...(scene.unresolvedQuestions ?? []).slice(0, 3).map((question) => `Open: ${question}`),
-      ]),
-    }));
-  }
-
-  for (const consequence of retrieval.activeConsequences.slice(0, 3)) {
-    records.push(binderRecordElement({
-      title: consequence.title || "Consequence",
-      subtitle: consequence.scope || consequence.importance || "consequence",
-      body: detailLines([
-        consequence.description,
-        consequence.status ? `Status: ${consequence.status}` : "",
-      ]),
-    }));
-  }
-
-  for (const thread of retrieval.activeThreads.slice(0, 3)) {
-    records.push(binderRecordElement({
-      title: thread.title || "Open thread",
-      subtitle: thread.status || "thread",
-      body: detailLines([
-        thread.stakes,
-        ...(thread.openQuestions ?? []).slice(0, 2).map((question) => `Open: ${question}`),
-      ]),
-    }));
-  }
-
-  for (const relationship of retrieval.relevantRelationships.slice(0, 2)) {
-    records.push(binderRecordElement({
-      title: `${labelById(campaign, relationship.sourceId)} / ${labelById(campaign, relationship.targetId)}`,
-      subtitle: relationship.type || "relationship",
-      body: detailLines([relationship.summary, relationship.notes]),
-    }));
-  }
-
-  elements.sceneNoteCount.textContent = String(records.length);
+  const projection = buildSceneNotebookProjection(campaign);
+  const records = projection.records.map((record) => binderRecordElement(record));
+  elements.sceneNoteCount.textContent = String(projection.count);
   elements.sceneNoteList.replaceChildren(
-    ...emptyOrRecords(records, "Scene focus, consequences, and active threads will appear here as play creates them."),
+    ...emptyOrRecords(records, projection.emptyText),
   );
 }
 
@@ -6799,13 +6029,10 @@ function openDeleteCampaignDialog(target = activeCampaignDeleteTarget()) {
 }
 
 function activeCampaignDeleteTarget() {
-  if (!state.sqlitePath || !state.campaign?.title || isBackendStarterCampaign(state.campaign)) {
-    return null;
-  }
-  return {
+  return projectedActiveCampaignDeleteTarget({
     sqlitePath: state.sqlitePath,
-    title: state.campaign.title,
-  };
+    campaign: state.campaign,
+  });
 }
 
 async function deleteActiveCampaign() {
@@ -6942,20 +6169,6 @@ function schedulePostImportAutomation() {
 async function autoCommitReviewBatch(reviewBatch) {
   const safeBatch = prepareAutoCommitReviewBatch(reviewBatch);
   return safeBatch ? commitExtractedChanges(safeBatch) : null;
-}
-
-function compactSceneSituation(text = "") {
-  const cleaned = String(text)
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => line && !isChoiceLikeLine(line) && !/^what (?:does|do|would|will|should|can)\b/i.test(line))
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned) {
-    return "";
-  }
-  return cleaned.length > 520 ? `${cleaned.slice(0, 519).trimEnd()}...` : cleaned;
 }
 
 function escapeRegExp(value) {
@@ -7476,10 +6689,6 @@ function handleProviderGenerationEvent(event) {
   }
 }
 
-function isChoiceLikeLine(line) {
-  return /^\s*(?:[-*]\s*)?(?:[A-Ha-h]|\d{1,2})\s*[\).:-]\s+/.test(String(line ?? ""));
-}
-
 function partyControllerKind(member) {
   if (!member) {
     return "ai_companion";
@@ -7881,19 +7090,10 @@ function installInternalDebugHarness() {
 }
 
 function normalizeDebugPlayMessages(messages = [], offset = 0) {
-  return (Array.isArray(messages) ? messages : []).map((message, index) => {
-    const role = message.role || (index % 2 === 0 ? "player" : "dm");
-    return {
-      id: message.id || `debug-message-${offset + index + 1}`,
-      sessionId: message.sessionId || state.campaign?.activeSessionId || "debug-session",
-      role,
-      title: message.title || (role === "player" ? "Harness Player" : "DM"),
-      body: message.body || `Harness table message ${offset + index + 1}.`,
-      meta: cleanMessageMeta(message.meta || ""),
-      source: message.source || "debug_harness",
-      data: message.data || {},
-      createdAt: message.createdAt || new Date(Date.now() + index).toISOString(),
-    };
+  return normalizeDebugPlayMessagesProjection(messages, {
+    offset,
+    sessionId: state.campaign?.activeSessionId || "debug-session",
+    cleanMeta: cleanMessageMeta,
   });
 }
 
@@ -7901,24 +7101,24 @@ function renderTableTimelineSummary(timeline = []) {
   if (!elements.tableTimelineSummary) {
     return;
   }
-  const recent = Array.isArray(timeline) ? timeline.slice(-8).reverse() : [];
-  if (!recent.length) {
+  const projection = buildTableTimelineSummaryProjection(timeline, { formatTime: formatMessageTime });
+  if (projection.empty) {
     const empty = document.createElement("p");
-    empty.textContent = "No table timeline yet.";
+    empty.textContent = projection.emptyText;
     elements.tableTimelineSummary.replaceChildren(empty);
     return;
   }
 
   const list = document.createElement("ol");
   list.className = "table-timeline-list";
-  for (const event of recent) {
+  for (const event of projection.items) {
     const item = document.createElement("li");
     const label = document.createElement("span");
     label.className = "table-timeline-label";
-    label.textContent = event.label || event.message || event.type || "Table event";
+    label.textContent = event.label;
     const time = document.createElement("time");
-    time.dateTime = event.at || "";
-    time.textContent = formatMessageTime(event.at);
+    time.dateTime = event.dateTime;
+    time.textContent = event.timeText;
     item.append(label, time);
     list.append(item);
   }
@@ -7927,7 +7127,7 @@ function renderTableTimelineSummary(timeline = []) {
 
 function buildRendererDiagnostics() {
   const tableSession = state.tableSession ?? buildCurrentTableSessionProjection();
-  return {
+  return buildRendererDiagnosticsSnapshot({
     generatedAt: new Date().toISOString(),
     url: redactedRendererUrl(),
     clientMode,
@@ -7938,13 +7138,12 @@ function buildRendererDiagnostics() {
       state: elements.providerActivity?.dataset.state || "",
     },
     bridgeStatus: elements.bridgeStatus?.textContent || "",
-    turnEngine: state.turnFlow.getProjection(),
-    currentTurn: summarizeCurrentTurn(state.currentTurn),
-    promptChars: state.prompt?.length ?? 0,
-    promptTail: state.prompt ? state.prompt.slice(-6000) : "",
+    turnProjection: state.turnFlow.getProjection(),
+    currentTurn: state.currentTurn,
+    prompt: state.prompt,
     reviewBatch: state.reviewBatch,
     bridge: state.bridge,
-    turnRepair: summarizeTurnRepair(activeTurnRepair()),
+    repair: activeTurnRepair(),
     tableSession,
     debugSnapshot: buildTableDebugSnapshot({
       campaign: state.campaign,
@@ -7963,19 +7162,11 @@ function buildRendererDiagnostics() {
       guestSnapshot: state.guestSnapshot,
       recentErrors: state.diagnosticsEvents,
     }),
-    sessionHealth: buildSessionHealthSummary(),
-    recentPlayMessages: state.playMessages.slice(-30),
-    tableTimeline: state.tableTimeline.slice(-80),
-    diagnosticsEvents: state.diagnosticsEvents.slice(-80),
-    campaignCounts: state.campaign ? {
-      party: state.campaign.party?.length ?? 0,
-      people: state.campaign.people?.length ?? 0,
-      places: state.campaign.places?.length ?? 0,
-      items: state.campaign.items?.length ?? 0,
-      threads: state.campaign.quests?.length ?? 0,
-      messages: state.campaign.sessionLog?.messages?.length ?? 0,
-    } : {},
-  };
+    playMessages: state.playMessages,
+    tableTimeline: state.tableTimeline,
+    diagnosticsEvents: state.diagnosticsEvents,
+    campaign: state.campaign,
+  });
 }
 
 function renderSessionHealthSummary(summary = buildSessionHealthSummary()) {
@@ -8002,13 +7193,7 @@ function renderSessionHealthSummary(summary = buildSessionHealthSummary()) {
 
 function buildSessionHealthSummary() {
   const tableSession = state.tableSession ?? refreshTableSessionProjection();
-  return {
-    headline: tableSession.headline,
-    tone: tableSession.tone,
-    phase: tableSession.phase,
-    lines: tableSession.lines?.length ? tableSession.lines : ["No blockers detected."],
-    tableSession,
-  };
+  return buildSessionHealthProjection(tableSession);
 }
 
 function refreshTableSessionProjection() {
@@ -8057,39 +7242,6 @@ function redactedRendererUrl() {
   }
 }
 
-function summarizeCurrentTurn(turn) {
-  if (!turn) {
-    return null;
-  }
-
-  return {
-    playerMessage: turn.playerMessage,
-    playerInputs: turn.playerInputs ?? [],
-    parsedMessage: turn.parsedMessage,
-    contextSections: turn.contextPack?.sections?.map((section) => ({
-      id: section.id,
-      title: section.title,
-      entries: section.entries?.length ?? 0,
-    })) ?? [],
-    providerPromptChars: turn.providerPrompt?.length ?? 0,
-  };
-}
-
-function summarizeTurnRepair(repair) {
-  if (!repair) {
-    return null;
-  }
-  return {
-    reason: repair.reason,
-    validationErrors: repair.validationErrors,
-    parseError: repair.parseError,
-    responseTextChars: repair.responseText?.length ?? 0,
-    rawTextChars: repair.rawText?.length ?? 0,
-    model: repair.providerResult?.model,
-    createdAt: repair.createdAt,
-  };
-}
-
 function pushDiagnosticsEvent(type, detail = {}) {
   state.diagnosticsEvents.push({
     type,
@@ -8111,34 +7263,11 @@ function pushTableTimelineEvent(type, detail = {}) {
 }
 
 function handleTurnFlowVisibilityEvent(event = {}) {
-  const type = event.type || "turn_state_changed";
-  const label = tableLabelForTurnEvent(type, event);
-  if (!label) {
+  const timelineEvent = turnFlowTimelineEventDetail(event);
+  if (!timelineEvent) {
     return;
   }
-  pushTableTimelineEvent(type, {
-    message: label,
-    turnId: event.turnId || event.projection?.turnId || "",
-    requestId: event.requestId || event.projection?.activeRequestId || "",
-    reason: event.reason || event.error || "",
-  });
-}
-
-function tableLabelForTurnEvent(type, event = {}) {
-  if (type === "turn_locked") return "Turn submitted; DM is resolving it.";
-  if (type === "generation_started") return "DM started thinking.";
-  if (type === "generation_completed") return "DM response received.";
-  if (type === "generation_cancelled") return "DM response canceled.";
-  if (type === "generation_failed") return "DM response failed; retry is available.";
-  if (type === "turn_retrying") return "Retrying the DM response.";
-  if (type === "turn_repair_required") return "DM response needs review.";
-  if (type === "turn_repair_cleared") return "DM response review cleared.";
-  if (type === "turn_flow_reset") {
-    return event.reason === "campaign_changed"
-      ? "Campaign switched; table state reset."
-      : "Table turn state reset.";
-  }
-  return "";
+  pushTableTimelineEvent(timelineEvent.type, timelineEvent.detail);
 }
 
 function reportUiError(error) {
@@ -9397,36 +8526,29 @@ function openCharacterSheet(member) {
 }
 
 function renderCharacterSheet(member) {
-  elements.characterSheetTitle.textContent = member.name || "Unnamed party member";
-  elements.characterSheetSubtitle.textContent = [
-    member.ancestryClass,
-    member.playerRole,
-    member.role,
-    member.type,
-  ].filter(Boolean).join(" / ") || "Party member";
-  const hp = normalizeHpForForm(member.stats?.hp ?? member.hp ?? member.hitPoints);
-  const scores = characterAbilityScores(member);
-
-  elements.sheetName.value = member.name || "";
-  elements.sheetAncestryClass.value = member.ancestryClass || member.class || "";
-  elements.sheetRole.value = member.playerRole || member.role || "";
-  elements.sheetLevel.value = member.level ?? member.stats?.level ?? member.characterLevel ?? "";
-  elements.sheetXp.value = member.experience ?? member.xp ?? member.stats?.experience ?? member.stats?.xp ?? "";
-  elements.sheetHpCurrent.value = hp.current ?? "";
-  elements.sheetHpMax.value = hp.max ?? "";
-  elements.sheetAc.value = member.stats?.armorClass ?? member.armorClass ?? member.ac ?? "";
-  elements.sheetProf.value = member.proficiencyBonus ?? member.stats?.proficiencyBonus ?? member.prof ?? "";
-  elements.sheetBackground.value = member.background || member.backstory || member.summary || member.description || "";
-  elements.sheetStr.value = scores.STR ?? "";
-  elements.sheetDex.value = scores.DEX ?? "";
-  elements.sheetCon.value = scores.CON ?? "";
-  elements.sheetInt.value = scores.INT ?? "";
-  elements.sheetWis.value = scores.WIS ?? "";
-  elements.sheetCha.value = scores.CHA ?? "";
-  elements.sheetSkills.value = characterSkills(member).join("\n");
-  elements.sheetAbilities.value = characterAbilities(member).join("\n");
-  elements.sheetSpells.value = uniqueTextList([member.spells, member.stats?.spells]).join("\n");
-  elements.sheetNotes.value = (member.notes ?? []).join("\n");
+  const projection = buildCharacterSheetProjection(member);
+  elements.characterSheetTitle.textContent = projection.title;
+  elements.characterSheetSubtitle.textContent = projection.subtitle;
+  elements.sheetName.value = projection.fields.name;
+  elements.sheetAncestryClass.value = projection.fields.ancestryClass;
+  elements.sheetRole.value = projection.fields.role;
+  elements.sheetLevel.value = projection.fields.level;
+  elements.sheetXp.value = projection.fields.xp;
+  elements.sheetHpCurrent.value = projection.fields.hpCurrent;
+  elements.sheetHpMax.value = projection.fields.hpMax;
+  elements.sheetAc.value = projection.fields.armorClass;
+  elements.sheetProf.value = projection.fields.proficiencyBonus;
+  elements.sheetBackground.value = projection.fields.background;
+  elements.sheetStr.value = projection.fields.str;
+  elements.sheetDex.value = projection.fields.dex;
+  elements.sheetCon.value = projection.fields.con;
+  elements.sheetInt.value = projection.fields.int;
+  elements.sheetWis.value = projection.fields.wis;
+  elements.sheetCha.value = projection.fields.cha;
+  elements.sheetSkills.value = projection.fields.skills;
+  elements.sheetAbilities.value = projection.fields.abilities;
+  elements.sheetSpells.value = projection.fields.spells;
+  elements.sheetNotes.value = projection.fields.notes;
 }
 
 function autoFillOpenCharacterSheet() {
@@ -9460,12 +8582,37 @@ function autoFillOpenCharacterSheet() {
   elements.sheetInt.value = sheet.stats.abilityScores.INT ?? "";
   elements.sheetWis.value = sheet.stats.abilityScores.WIS ?? "";
   elements.sheetCha.value = sheet.stats.abilityScores.CHA ?? "";
-  elements.sheetSkills.value = mergeMultiline(elements.sheetSkills.value, sheet.skills);
-  elements.sheetAbilities.value = mergeMultiline(elements.sheetAbilities.value, sheet.abilities);
-  elements.sheetSpells.value = mergeMultiline(elements.sheetSpells.value, sheet.spells);
-  elements.sheetNotes.value = mergeMultiline(elements.sheetNotes.value, ["Auto-filled with a 5E-lite standard array."]);
+  elements.sheetSkills.value = mergeSheetText(elements.sheetSkills.value, sheet.skills);
+  elements.sheetAbilities.value = mergeSheetText(elements.sheetAbilities.value, sheet.abilities);
+  elements.sheetSpells.value = mergeSheetText(elements.sheetSpells.value, sheet.spells);
+  elements.sheetNotes.value = mergeSheetText(elements.sheetNotes.value, ["Auto-filled with a 5E-lite standard array."]);
   state.activeCharacterSheetAutofill = sheet;
   elements.bridgeStatus.textContent = `${sheet.name} sheet auto-filled; review and save when ready`;
+}
+
+function readCharacterSheetFormValues() {
+  return {
+    name: elements.sheetName.value,
+    ancestryClass: elements.sheetAncestryClass.value,
+    role: elements.sheetRole.value,
+    level: elements.sheetLevel.value,
+    xp: elements.sheetXp.value,
+    hpCurrent: elements.sheetHpCurrent.value,
+    hpMax: elements.sheetHpMax.value,
+    armorClass: elements.sheetAc.value,
+    proficiencyBonus: elements.sheetProf.value,
+    background: elements.sheetBackground.value,
+    str: elements.sheetStr.value,
+    dex: elements.sheetDex.value,
+    con: elements.sheetCon.value,
+    int: elements.sheetInt.value,
+    wis: elements.sheetWis.value,
+    cha: elements.sheetCha.value,
+    skills: elements.sheetSkills.value,
+    abilities: elements.sheetAbilities.value,
+    spells: elements.sheetSpells.value,
+    notes: elements.sheetNotes.value,
+  };
 }
 
 async function saveCharacterSheet() {
@@ -9475,40 +8622,11 @@ async function saveCharacterSheet() {
     return;
   }
 
-  const autoSheet = state.activeCharacterSheetAutofill;
-  const preservedResources = autoSheet?.resources ?? member.resources ?? member.stats?.resources ?? {};
-  const preservedAttacks = autoSheet?.attacks ?? member.attacks ?? member.weapons ?? member.equipment?.weapons ?? [];
-  const preservedConditions = member.conditions ?? member.stats?.conditions ?? autoSheet?.conditions ?? [];
-  const payload = {
-    domain: "party",
-    id: member.id,
-    name: elements.sheetName.value.trim(),
-    role: elements.sheetRole.value.trim(),
-    playerRole: elements.sheetRole.value.trim(),
-    ancestryClass: elements.sheetAncestryClass.value.trim(),
-    level: parseOptionalNumber(elements.sheetLevel.value),
-    experience: parseOptionalNumber(elements.sheetXp.value),
-    proficiencyBonus: parseOptionalNumber(elements.sheetProf.value),
-    background: elements.sheetBackground.value.trim(),
-    stats: {
-      hp: buildHpPayload(),
-      armorClass: parseOptionalNumber(elements.sheetAc.value),
-      abilityScores: buildAbilityScorePayload(),
-      spellSlots: preservedResources.spellSlots ?? member.stats?.spellSlots ?? null,
-      resources: preservedResources,
-      conditions: preservedConditions,
-      spells: splitMultiline(elements.sheetSpells.value),
-    },
-    speedFt: autoSheet?.speedFt ?? member.speedFt ?? member.speed ?? member.stats?.speedFt ?? member.stats?.speed ?? null,
-    resources: preservedResources,
-    attacks: preservedAttacks,
-    conditions: preservedConditions,
-    inventory: member.inventory ?? member.equipment ?? member.items ?? [],
-    skills: splitMultiline(elements.sheetSkills.value),
-    abilities: splitMultiline(elements.sheetAbilities.value),
-    spells: splitMultiline(elements.sheetSpells.value),
-    notes: splitMultiline(elements.sheetNotes.value),
-  };
+  const payload = buildCharacterSheetPayload({
+    member,
+    autoSheet: state.activeCharacterSheetAutofill,
+    values: readCharacterSheetFormValues(),
+  });
 
   if (!payload.name) {
     elements.bridgeStatus.textContent = "Character name is required";
@@ -9548,128 +8666,6 @@ async function saveCharacterSheet() {
   }
 }
 
-function buildHpPayload() {
-  const current = parseOptionalNumber(elements.sheetHpCurrent.value);
-  const max = parseOptionalNumber(elements.sheetHpMax.value);
-  if (current === null && max === null) {
-    return null;
-  }
-  return {
-    current,
-    max,
-  };
-}
-
-function buildAbilityScorePayload() {
-  return removeNullEntries({
-    STR: parseOptionalNumber(elements.sheetStr.value),
-    DEX: parseOptionalNumber(elements.sheetDex.value),
-    CON: parseOptionalNumber(elements.sheetCon.value),
-    INT: parseOptionalNumber(elements.sheetInt.value),
-    WIS: parseOptionalNumber(elements.sheetWis.value),
-    CHA: parseOptionalNumber(elements.sheetCha.value),
-  });
-}
-
-function normalizeHpForForm(hp) {
-  if (!hp) {
-    return {};
-  }
-  if (typeof hp === "number" || typeof hp === "string") {
-    return {
-      current: hp,
-      max: "",
-    };
-  }
-  return hp;
-}
-
-function characterAbilityScores(member) {
-  const source = member.abilityScores ?? member.ability_scores ?? member.stats?.abilityScores ?? member.stats?.ability_scores ?? member.stats?.abilities;
-  if (!source || Array.isArray(source) || typeof source !== "object") {
-    return {};
-  }
-
-  const aliases = {
-    STR: ["STR", "str", "strength"],
-    DEX: ["DEX", "dex", "dexterity"],
-    CON: ["CON", "con", "constitution"],
-    INT: ["INT", "int", "intelligence"],
-    WIS: ["WIS", "wis", "wisdom"],
-    CHA: ["CHA", "cha", "charisma"],
-  };
-
-  return Object.fromEntries(
-    Object.entries(aliases)
-      .map(([label, keys]) => {
-        const score = keys.map((key) => source[key]).find((value) => value !== undefined && value !== null);
-        return score !== undefined ? [label, score] : null;
-      })
-      .filter(Boolean),
-  );
-}
-
-function characterSkills(member) {
-  return uniqueTextList([
-    member.skills,
-    member.specialties,
-    member.proficiencies,
-    member.expertise,
-    member.stats?.skills,
-    member.stats?.proficiencies,
-  ]);
-}
-
-function characterAbilities(member) {
-  return uniqueTextList([
-    member.abilities,
-    member.features,
-    member.traits,
-  ]);
-}
-
-function uniqueTextList(values) {
-  const seen = new Set();
-  return values
-    .flatMap((value) => {
-      if (!value) {
-        return [];
-      }
-      if (Array.isArray(value)) {
-        return value;
-      }
-      if (typeof value === "object") {
-        return Object.entries(value).map(([key, entry]) => `${key}: ${entry}`);
-      }
-      return String(value).split(/[,;\n]+/);
-    })
-    .map((value) => {
-      if (value && typeof value === "object") {
-        return String(value.name || value.title || value.label || Object.entries(value).map(([key, entry]) => `${key}: ${entry}`).join(", "));
-      }
-      return String(value);
-    })
-    .map((value) => value.trim())
-    .filter((value) => {
-      if (!value || seen.has(value.toLowerCase())) {
-        return false;
-      }
-      seen.add(value.toLowerCase());
-      return true;
-    });
-}
-
-function splitMultiline(value) {
-  return String(value || "")
-    .split(/[,;\n]+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function mergeMultiline(existing, additions) {
-  return uniqueTextList([splitMultiline(existing), additions]).join("\n");
-}
-
 function parseOptionalNumber(value) {
   const text = String(value ?? "").trim();
   if (!text) {
@@ -9679,117 +8675,50 @@ function parseOptionalNumber(value) {
   return Number.isFinite(number) ? number : text;
 }
 
-function removeNullEntries(object) {
-  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== null && value !== ""));
-}
-
 function renderPeople(campaign) {
-  elements.peopleCount.textContent = String(campaign.people.length);
+  const section = buildPeopleNotebookSection(campaign);
+  elements.peopleCount.textContent = String(section.count);
   elements.peopleList.replaceChildren(
     ...emptyOrRecords(
-      campaign.people.map((person) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: person.name,
-          subtitle: person.role || person.type || "person",
-          body: detailLines([
-            person.summary,
-            ...(person.notes ?? []),
-            person.locationId ? `Location: ${labelById(campaign, person.locationId)}` : "",
-            person.relatedIds?.length ? `Related: ${person.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
-          ]),
-          onEdit: () => openRecordDialog("people", person),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "NPCs and contacts the table meets will appear here.",
+      section.emptyText,
     ),
   );
 }
 
 function renderPlaces(campaign) {
-  const currentPlaceId = campaign.scene.currentPlaceId;
-  const places = [...campaign.places].sort((a, b) => {
-    if (a.id === currentPlaceId) {
-      return -1;
-    }
-    if (b.id === currentPlaceId) {
-      return 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
-
-  elements.placeCount.textContent = String(places.length);
+  const section = buildPlacesNotebookSection(campaign);
+  elements.placeCount.textContent = String(section.count);
   elements.placeList.replaceChildren(
     ...emptyOrRecords(
-      places.map((place) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: place.name,
-          subtitle: place.id === currentPlaceId ? `${place.type || "place"} / current` : place.type || place.region || "place",
-          body: detailLines([
-            place.summary,
-            place.region ? `Region: ${place.region}` : "",
-            ...(place.notes ?? []),
-            place.connectedPlaceIds?.length
-              ? `Connected: ${place.connectedPlaceIds.map((id) => labelById(campaign, id)).join(", ")}`
-              : "",
-          ]),
-          onEdit: () => openRecordDialog("places", place),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "Current and discovered locations will appear here.",
+      section.emptyText,
     ),
   );
 }
 
 function renderThings(campaign) {
-  const things = [
-    ...campaign.items.map((item) => ({
-      id: item.id,
-      domain: "items",
-      record: item,
-      title: item.name,
-      subtitle: item.type || "item",
-      body: detailLines([item.summary, ...(item.notes ?? [])]),
-    })),
-    ...campaign.inventory.map((entry) => {
-      const item = findById(campaign.items, entry.itemId);
-      return {
-        id: entry.id || entry.itemId,
-        domain: "items",
-        record: {
-          ...(item ?? {}),
-          id: item?.id ?? entry.itemId,
-          name: entry.name || item?.name || entry.itemId,
-          type: item?.type || "inventory",
-          summary: detailLines([entry.notes, item?.summary]),
-          notes: item?.notes ?? [],
-        },
-        title: entry.name || item?.name || entry.itemId,
-        subtitle: `${entry.quantity ?? 1} carried by ${entry.carriedBy || entry.holderId || "party"}`,
-        body: detailLines([entry.notes, item?.summary, ...(item?.notes ?? [])]),
-      };
-    }),
-    ...campaign.assets.map((asset) => ({
-      id: asset.id,
-      domain: "assets",
-      record: asset,
-      title: asset.name,
-      subtitle: asset.kind || "asset",
-      body: detailLines([asset.path, ...(asset.notes ?? [])]),
-    })),
-  ].sort((a, b) => a.title.localeCompare(b.title));
-
-  elements.thingCount.textContent = String(things.length);
+  const section = buildThingsNotebookSection(campaign);
+  elements.thingCount.textContent = String(section.count);
   elements.thingList.replaceChildren(
     ...emptyOrRecords(
-      things.map((thing) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: thing.title,
-          subtitle: thing.subtitle,
-          body: thing.body,
-          onEdit: () => openRecordDialog(thing.domain, thing.record),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "Items, clues, handouts, and assets will appear here.",
+      section.emptyText,
     ),
   );
 }
@@ -9811,26 +8740,17 @@ function formatHp(hp) {
 }
 
 function renderQuests(campaign) {
-  const active = campaign.quests
-    .filter((quest) => quest.status !== "completed")
-    .filter((quest) => !isHiddenStoryThread(quest))
-    .slice(0, 8);
-  elements.questCount.textContent = String(active.length);
+  const section = buildQuestNotebookSection(campaign);
+  elements.questCount.textContent = String(section.count);
   elements.questList.replaceChildren(
     ...emptyOrRecords(
-      active.map((quest) =>
+      section.records.map((record) =>
         binderRecordElement({
-          title: quest.title,
-          subtitle: quest.status || "thread",
-          body: detailLines([
-            quest.stakes,
-            ...(quest.openQuestions ?? []).map((question) => `Open: ${question}`),
-            quest.relatedIds?.length ? `Related: ${quest.relatedIds.map((id) => labelById(campaign, id)).join(", ")}` : "",
-          ]),
-          onEdit: () => openRecordDialog("quests", quest),
+          ...record,
+          onEdit: () => openRecordDialog(record.domain, record.record),
         }),
       ),
-      "Open quests and unresolved story threads will appear here.",
+      section.emptyText,
     ),
   );
 }
@@ -9959,7 +8879,8 @@ function renderTableTalk() {
   if (!elements.tableTalkLog || !elements.tableTalkCount) {
     return;
   }
-  const messages = currentTableTalkMessages();
+  const projection = currentTableTalkProjection();
+  const messages = projection.messages;
   const previousCount = state.lastTableTalkCount;
   if (previousCount != null && messages.length > previousCount && document.activeElement !== elements.tableTalkInput) {
     state.unreadTableTalkCount += messages.length - previousCount;
@@ -9982,7 +8903,7 @@ function renderTableTalk() {
     elements.tableTalkLog.replaceChildren(empty);
   } else {
     elements.tableTalkLog.replaceChildren(
-      ...messages.slice(-80).map((message) => {
+      ...projection.visibleMessages.map((message) => {
         const wrapper = document.createElement("article");
         wrapper.className = "table-talk-message";
 
@@ -10019,15 +8940,15 @@ function renderTableTalk() {
 
 function clearTableTalkUnread() {
   state.unreadTableTalkCount = 0;
-  state.lastTableTalkCount = currentTableTalkMessages().length;
+  state.lastTableTalkCount = currentTableTalkProjection().totalCount;
   elements.tableTalkLog?.closest(".table-talk-section")?.classList.remove("has-new-table-talk");
   if (elements.tableTalkCount) {
     elements.tableTalkCount.textContent = String(state.lastTableTalkCount);
   }
 }
 
-function currentTableTalkMessages() {
-  return projectCurrentTableTalkMessages({
+function currentTableTalkProjection() {
+  return buildTableTalkProjection({
     guestSnapshot: state.guestSnapshot,
     multiplayerSnapshot: state.multiplayerSnapshot,
     campaign: state.campaign,
@@ -10244,11 +9165,7 @@ function recordElement({ title, body, badge, actions = [], onEdit }) {
 }
 
 function messageBodyElements(text, role = "dm", data = {}) {
-  const structuredChoiceBlock = structuredChoiceBlockFromMessageData(data);
-  const blocks = mergeStructuredChoiceBlock(
-    extractChoicePanel(normalizeMessageBlocks(text, role), role),
-    structuredChoiceBlock,
-  );
+  const blocks = buildMessageBlocks(text, role, data);
 
   if (!blocks.length) {
     const paragraph = document.createElement("p");
@@ -10376,297 +9293,3 @@ function messageBodyElements(text, role = "dm", data = {}) {
   });
 }
 
-function normalizeMessageBlocks(text, role) {
-  const normalizedText = role === "dm" || role === "provider"
-    ? normalizeProviderChoiceFormattingForPlay(text)
-    : String(text ?? "");
-  const rawBlocks = normalizedText
-    .trim()
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-
-  if (!rawBlocks.length) {
-    return [];
-  }
-
-  if (role !== "dm" && role !== "provider") {
-    return rawBlocks.map(textBlockToRenderableBlock);
-  }
-
-  const trailingChoices = extractTrailingChoiceBlocks(rawBlocks);
-  if (trailingChoices) {
-    return [
-      ...normalizeDmProseBlocks(rawBlocks.slice(0, trailingChoices.promptIndex)),
-      {
-        type: "choices",
-        prompt: trailingChoices.prompt,
-        items: trailingChoices.items,
-      },
-    ];
-  }
-
-  return normalizeDmProseBlocks(rawBlocks);
-}
-
-function normalizeDmProseBlocks(rawBlocks) {
-  const normalized = [];
-  let proseGroup = [];
-  const seenMechanics = new Set();
-
-  rawBlocks.forEach((block, index) => {
-    for (const part of splitMechanicsFromBlock(block)) {
-      const renderable = part.type === "mechanics"
-        ? { type: "mechanics", rows: dedupeMechanicsRows(part.rows, seenMechanics) }
-        : textBlockToRenderableBlock(part.text);
-      if (renderable.type === "mechanics" && !renderable.rows.length) {
-        continue;
-      }
-      if (renderable.type === "list" || renderable.type === "choices" || renderable.type === "combat" || renderable.type === "mechanics") {
-        flushProseGroup();
-        if (renderable.type === "choices" && renderable.beforeText) {
-          normalized.push({
-            type: "paragraph",
-            text: renderable.beforeText,
-          });
-        }
-        normalized.push(renderable);
-        continue;
-      }
-
-      if (shouldKeepDmBlockSeparate(renderable.text, index, rawBlocks.length)) {
-        flushProseGroup();
-        normalized.push(renderable);
-        continue;
-      }
-
-      proseGroup.push(renderable.text);
-      const joinedLength = proseGroup.join(" ").length;
-      if (proseGroup.length >= 4 || joinedLength >= 480) {
-        flushProseGroup();
-      }
-    }
-  });
-
-  flushProseGroup();
-  return normalized;
-
-  function flushProseGroup() {
-    if (!proseGroup.length) {
-      return;
-    }
-
-    normalized.push({
-      type: "paragraph",
-      text: proseGroup.join(" "),
-    });
-    proseGroup = [];
-  }
-}
-
-function extractTrailingChoiceBlocks(rawBlocks) {
-  for (let index = rawBlocks.length - 2; index >= 0; index -= 1) {
-    const prompt = extractChoicePrompt(rawBlocks[index]);
-    if (!prompt) {
-      continue;
-    }
-
-    const choices = rawBlocks.slice(index + 1)
-      .map(cleanChoiceText)
-      .filter(Boolean);
-    if (choices.length >= 2 && choices.every(isLikelyChoiceText)) {
-      return {
-        promptIndex: index,
-        prompt,
-        items: choices,
-      };
-    }
-  }
-
-  return null;
-}
-
-function mergeStructuredChoiceBlock(blocks, structuredChoiceBlock) {
-  if (!structuredChoiceBlock?.items?.length) {
-    return blocks;
-  }
-  const withoutParsedChoices = blocks.filter((block) => block.type !== "choices");
-  return [...withoutParsedChoices, structuredChoiceBlock];
-}
-
-function isLikelyChoiceText(text) {
-  return text.length <= 220 && !/^["“].+["”]$/.test(text);
-}
-
-function textBlockToRenderableBlock(block) {
-  const lines = block.split(/\n/).map((line) => line.trim()).filter(Boolean);
-  const isList = lines.length > 1 && lines.every((line) => /^[-*]\s+/.test(line));
-  const numberedChoices = extractNumberedChoiceLines(lines);
-  const isCombatBlock = lines.some((line) => /^Options:$/i.test(line)) &&
-    lines.some((line) => /^(Chosen|Damage|Narration):/i.test(line));
-
-  if (numberedChoices) {
-    return numberedChoices;
-  }
-
-  if (isList) {
-    return {
-      type: "list",
-      items: lines.map((line) => line.replace(/^[-*]\s+/, "")),
-    };
-  }
-
-  if (isCombatBlock) {
-    return {
-      type: "combat",
-      lines,
-    };
-  }
-
-  return {
-    type: "paragraph",
-    text: lines.join(" "),
-  };
-}
-
-function extractChoicePanel(blocks, role) {
-  if (role !== "dm" && role !== "provider") {
-    return blocks;
-  }
-
-  if (blocks.length < 1) {
-    return blocks;
-  }
-
-  const last = blocks.at(-1);
-  const inlinePanel = extractInlineChoicePanel(last);
-  if (inlinePanel) {
-    const nextBlocks = blocks.slice(0, -1);
-    if (inlinePanel.beforeText) {
-      nextBlocks.push({
-        ...last,
-        text: inlinePanel.beforeText,
-      });
-    }
-    nextBlocks.push({
-      type: "choices",
-      prompt: inlinePanel.prompt,
-      items: inlinePanel.items,
-    });
-    return nextBlocks;
-  }
-
-  if (blocks.length < 2) {
-    return blocks;
-  }
-
-  const previous = blocks.at(-2);
-  if (last?.type !== "paragraph" || previous?.type !== "paragraph") {
-    return blocks;
-  }
-
-  const prompt = extractChoicePrompt(previous.text);
-  if (!prompt) {
-    return blocks;
-  }
-
-  const choices = splitChoiceText(last.text);
-  if (choices.length < 2) {
-    return blocks;
-  }
-
-  const previousText = previous.text.slice(0, previous.text.length - prompt.length).trim();
-  const nextBlocks = blocks.slice(0, -2);
-  if (previousText) {
-    nextBlocks.push({
-      ...previous,
-      text: previousText,
-    });
-  }
-
-  nextBlocks.push({
-    type: "choices",
-    prompt,
-    items: choices,
-  });
-  return nextBlocks;
-}
-
-function extractInlineChoicePanel(block) {
-  if (block?.type !== "paragraph") {
-    return null;
-  }
-
-  const text = block.text.trim();
-  const numberedPanel = extractInlineNumberedChoicePanel(text);
-  if (numberedPanel) {
-    return numberedPanel;
-  }
-
-  const optionMarker = text.search(/\b(?:Options?|Choices?)\s*:/i);
-  if (optionMarker === -1) {
-    return null;
-  }
-
-  const beforeMarker = text.slice(0, optionMarker).trim();
-  const optionText = text.slice(optionMarker).replace(/^\s*(?:Options?|Choices?)\s*:\s*/i, "").trim();
-  const prompt = extractChoicePrompt(beforeMarker) || extractChoicePrompt(text) || "What do you do?";
-  const promptStart = beforeMarker.lastIndexOf(prompt);
-  const beforeText = promptStart >= 0 ? beforeMarker.slice(0, promptStart).trim() : beforeMarker;
-  const choices = splitChoiceText(optionText);
-  if (choices.length < 2) {
-    return null;
-  }
-
-  return {
-    beforeText,
-    prompt,
-    items: choices,
-  };
-}
-
-function extractNumberedChoiceLines(lines) {
-  if (lines.length < 2) {
-    return null;
-  }
-
-  const promptLineIndex = lines.findIndex((line) => extractChoicePrompt(line));
-  const firstChoiceIndex = lines.findIndex((line) => /^(?:\d+|[A-Ha-h])[.)]\s+/.test(line));
-  if (firstChoiceIndex === -1) {
-    return null;
-  }
-
-  const prompt = promptLineIndex >= 0 && promptLineIndex < firstChoiceIndex
-    ? extractChoicePrompt(lines[promptLineIndex])
-    : "What do you do?";
-  const beforeText = promptLineIndex > 0 ? lines.slice(0, promptLineIndex).join(" ") : "";
-  const choiceLines = lines.slice(firstChoiceIndex);
-  const items = splitChoiceText(choiceLines.join(" "));
-
-  if (items.length < 2) {
-    return null;
-  }
-
-  return {
-    type: "choices",
-    prompt,
-    beforeText,
-    items,
-  };
-}
-
-function shouldKeepDmBlockSeparate(text, index, totalBlocks) {
-  if (text.length > 260) {
-    return true;
-  }
-
-  if (index === totalBlocks - 1 && /\?\s*$/.test(text) && text.length <= 120) {
-    return true;
-  }
-
-  if (/^(what do you do|what now|your move|choose|options?)\b/i.test(text)) {
-    return true;
-  }
-
-  return false;
-}

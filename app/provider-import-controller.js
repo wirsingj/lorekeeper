@@ -1,5 +1,6 @@
 import { createReviewBatch } from "../src/canon-review/proposals.js";
 import { stripLorekeeperUpdates } from "../src/canon-review/extract-updates.js";
+import { normalizeChangeDomain } from "./change-domain-controller.js";
 import {
   createImplicitCombatAdvanceChange,
   createImplicitCombatEnemySyncChange,
@@ -7,6 +8,7 @@ import {
 } from "./combat-import-controller.js";
 import { createImplicitCombatActorPromptChange } from "./combat-prompt-repair-controller.js";
 import { createImplicitSceneProgressChange } from "./scene-import-controller.js";
+import { isChoiceLikeLine } from "./table-text-controller.js";
 
 // Provider import policy projections. Keep table-facing wording, import
 // planning, and auto-commit decisions here so app.js can execute the policy
@@ -605,10 +607,6 @@ function normalizeChoiceItems(items) {
   return normalized;
 }
 
-function isChoiceLikeLine(line) {
-  return /^\s*(?:[-*]\s*)?(?:[A-Ha-h]|\d{1,2})\s*[\).:-]\s+/.test(String(line ?? ""));
-}
-
 function isHiddenStoryChange(change = {}) {
   return (
     normalizeChangeDomain(change.domain) === "quests" &&
@@ -622,11 +620,4 @@ function isHiddenStoryChange(change = {}) {
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function normalizeChangeDomain(domain) {
-  if (domain === "party_member" || domain === "player_character") {
-    return "party";
-  }
-  return domain;
 }

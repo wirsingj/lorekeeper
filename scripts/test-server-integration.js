@@ -23,7 +23,12 @@ try {
   const port = await waitForServerPort(child);
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  const runtime = await fetchJson(`${baseUrl}/api/runtime`);
+  const runtimeUnauthorized = await fetch(`${baseUrl}/api/runtime`);
+  assert.equal(runtimeUnauthorized.status, 401);
+
+  const runtime = await fetchJson(`${baseUrl}/api/runtime`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
   assert.equal(path.resolve(runtime.projectRoot), path.resolve(tempDir));
   assert.equal(runtime.authRequired, true);
   assert.equal(runtime.port, port);

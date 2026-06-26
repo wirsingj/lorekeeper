@@ -1,3 +1,5 @@
+export const tableTalkVisibleLimit = 80;
+
 export function currentTableTalkMessages({
   guestSnapshot = null,
   multiplayerSnapshot = null,
@@ -13,6 +15,24 @@ export function currentTableTalkMessages({
     safeMessages(multiplayerSnapshot?.tableTalk),
     safeMessages(campaign?.multiplayer?.tableTalk),
   );
+}
+
+export function buildTableTalkProjection({
+  guestSnapshot = null,
+  multiplayerSnapshot = null,
+  campaign = null,
+  visibleLimit = tableTalkVisibleLimit,
+} = {}) {
+  const messages = currentTableTalkMessages({ guestSnapshot, multiplayerSnapshot, campaign });
+  const limit = Math.max(1, Number(visibleLimit) || tableTalkVisibleLimit);
+  const hiddenCount = Math.max(0, messages.length - limit);
+  return {
+    messages,
+    visibleMessages: hiddenCount > 0 ? messages.slice(hiddenCount) : messages,
+    totalCount: messages.length,
+    visibleLimit: limit,
+    hiddenCount,
+  };
 }
 
 export function freshestTableTalkMessages(snapshotTalk = [], campaignTalk = []) {

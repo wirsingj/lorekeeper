@@ -114,6 +114,7 @@ export function normalizedCombatTurnOrder(campaign) {
       initiativeScore: entry.initiativeScore ?? entry.initiative ?? null,
       hp: combatActorHp(campaign, entry.id || entry.actorId, entry),
       conditions: combatActorConditions(campaign, entry.id || entry.actorId, entry),
+      resources: combatActorResources(campaign, entry.id || entry.actorId, entry),
       turnEconomy: combat.turnEconomy?.[entry.id || entry.actorId] ?? entry.turnEconomy ?? {},
       defeated: combatActorDefeated(campaign, entry.id || entry.actorId, entry),
     })).filter((entry) => entry.id);
@@ -133,6 +134,7 @@ export function normalizedCombatTurnOrder(campaign) {
     initiativeScore: null,
     hp: combatActorHp(campaign, id),
     conditions: combatActorConditions(campaign, id),
+    resources: combatActorResources(campaign, id),
     turnEconomy: combat.turnEconomy?.[id] ?? {},
     defeated: combatActorDefeated(campaign, id),
   }));
@@ -170,9 +172,16 @@ function combatOrderMeta(entry, controlledActorId) {
   if (isSpent(economy.action)) {
     tags.push("Action spent");
   }
+  if (isSpent(economy.bonusAction)) {
+    tags.push("Bonus spent");
+  }
+  if (isSpent(economy.reaction)) {
+    tags.push("Reaction spent");
+  }
   if (Number.isFinite(Number(economy.movementRemainingFt))) {
     tags.push(`${Number(economy.movementRemainingFt)} ft`);
   }
+  tags.push(...combatResourceTags(entry.resources).slice(0, 2));
 
   return tags.join(" / ");
 }
@@ -192,7 +201,17 @@ function labelById(campaign, id) {
 function combatActorHp(campaign, id, fallback = {}) {
   const partyMember = (campaign.party ?? []).find((member) => member.id === id);
   if (partyMember) {
-    return normalizeHpValue(partyMember.stats?.hp ?? partyMember.hp ?? partyMember.hitPoints ?? fallback.hp);
+    const hp = normalizeHpValue(partyMember.stats?.hp ?? partyMember.hp ?? partyMember.hitPoints ?? fallback.hp);
+    const temporary = numberOrNull(
+      partyMember.stats?.temporaryHitPoints ??
+      partyMember.stats?.tempHp ??
+      partyMember.temporaryHitPoints ??
+      partyMember.tempHp
+    );
+    if (hp && temporary !== null) {
+      return { ...hp, temporary };
+    }
+    return hp ?? (temporary > 0 ? { current: null, max: null, temporary } : null);
   }
 
   const enemy = (campaign.combat?.enemies ?? []).find((item) => item.id === id);
@@ -217,6 +236,18 @@ function combatActorConditions(campaign, id, fallback = {}) {
   return normalizeList(fallback.conditions);
 }
 
+function combatActorResources(campaign, id, fallback = {}) {
+  const partyMember = (campaign.party ?? []).find((member) => member.id === id);
+  if (partyMember) {
+    return normalizeResources(partyMember.resources ?? partyMember.stats?.resources ?? {
+      spellSlots: partyMember.stats?.spellSlots,
+      uses: partyMember.stats?.uses ?? partyMember.uses,
+    });
+  }
+
+  return normalizeResources(fallback.resources);
+}
+
 function combatActorDefeated(campaign, id, fallback = {}) {
   const hp = combatActorHp(campaign, id, fallback);
   if (hp?.current !== null && hp?.current <= 0) {
@@ -238,6 +269,59 @@ function titleCaseToken(value) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
+function combatResourceTags(resources = {}) {
+  const tags = [];
+  for (const [level, slot] of Object.entries(resources.spellSlots ?? {}).sort(([a], [b]) => Number(a) - Number(b))) {
+    const value = resourceFraction(slot);
+    if (value) {
+      tags.push(`L${level} slots ${value}`);
+    }
+  }
+  for (const [name, use] of Object.entries(resources.uses ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    const value = resourceFraction(use);
+    if (value) {
+      tags.push(`${readableResourceName(name)} ${value}`);
+    }
+  }
+  return tags;
+}
+
+function resourceFraction(value) {
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    return "";
+  }
+  const max = numberOrNull(value.max ?? value.maximum ?? value.total);
+  const current = numberOrNull(value.current ?? value.remaining ?? value.available);
+  const used = numberOrNull(value.used ?? value.spent);
+  if (current !== null && max !== null) {
+    return `${current}/${max}`;
+  }
+  if (used !== null && max !== null) {
+    return `${Math.max(0, max - used)}/${max}`;
+  }
+  if (current !== null) {
+    return String(current);
+  }
+  if (max !== null) {
+    return `?/${max}`;
+  }
+  return "";
+}
+
+function readableResourceName(value) {
+  const text = String(value ?? "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  return titleCaseToken(text);
+}
+
 function readableActionLabel(action = {}) {
   const label = String(action.label ?? "").trim();
   if (label && !/\[object Object\]/i.test(label)) {
@@ -256,6 +340,10 @@ function normalizeList(value) {
   return (Array.isArray(value) ? value : [value])
     .map((item) => String(item ?? "").trim())
     .filter(Boolean);
+}
+
+function normalizeResources(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
 function normalizeHpValue(value) {
@@ -289,16 +377,17 @@ function combatHpLabel(hp, options = {}) {
   if (options.hidden) {
     return "HP ?";
   }
+  const tempLabel = Number(hp.temporary) > 0 ? ` +${Number(hp.temporary)} temp` : "";
   if (hp.current !== null && hp.max !== null) {
-    return `${hp.current}/${hp.max}`;
+    return `${hp.current}/${hp.max}${tempLabel}`;
   }
   if (hp.current !== null) {
-    return String(hp.current);
+    return `${hp.current}${tempLabel}`;
   }
   if (hp.max !== null) {
-    return `?/${hp.max}`;
+    return `?/${hp.max}${tempLabel}`;
   }
-  return "";
+  return tempLabel.trim();
 }
 
 function numberOrNull(value) {

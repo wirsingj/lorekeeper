@@ -2,7 +2,7 @@
   "name": "lorekeeper",
   "version": "0.0.0",
   "private": true,
-  "description": "Local-first tabletop RPG campaign memory engine and AI desktop app.",
+  "description": "Local-first tabletop RPG app with host and browser guest play.",
   "type": "module",
   "main": "electron/main.js",
   "engines": {
@@ -30,16 +30,17 @@
     "build": "vite build",
     "desktop": "npm run build && electron .",
     "client": "node ./scripts/launch-desktop.js --client",
-    "package:join": "npm run build && node ./scripts/package-join-client.js",
-    "package:thin": "npm run package:join",
+    "package:portable": "npm run package:host",
+    "package:host": "npm run build && node ./scripts/package-portable-host.js",
     "cleanup": "node ./scripts/cleanup-processes.js",
     "shortcut": "cscript //nologo \"Create LoreKeeper Desktop Shortcut.vbs\""
   },
   "keywords": [
     "campaign",
     "rpg",
-    "browser-extension",
-    "local-first"
+    "local-first",
+    "multiplayer",
+    "tabletop"
   ],
   "license": "UNLICENSED",
   "dependencies": {

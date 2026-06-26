@@ -1,6 +1,8 @@
 // Combat prompt repair policy.
 // The renderer may execute the repair, but the decision about whether a DM
 // response handed initiative to the wrong visible party actor belongs here.
+import { normalizeChangeDomain } from "./change-domain-controller.js";
+
 export function createImplicitCombatActorPromptChange({
   campaign = null,
   tableMessages = [],
@@ -184,13 +186,6 @@ function labelById(campaign, id) {
     (campaign?.combat?.enemies ?? []).find((item) => item.id === id)?.name ||
     id
   );
-}
-
-function normalizeChangeDomain(domain) {
-  if (domain === "party_member" || domain === "player_character") {
-    return "party";
-  }
-  return domain;
 }
 
 function normalizeNameKey(value) {
