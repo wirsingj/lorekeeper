@@ -3358,7 +3358,7 @@ function testHostResponseReviewProjection() {
   assert.equal(repairFallback.state, "repair");
   assert.equal(repairFallback.visible, false);
   assert.equal(repairFallback.open, false);
-  assert.match(repairFallback.hint, /Optional fallback/i);
+  assert.match(repairFallback.hint, /copied a DM response/i);
   assert.doesNotMatch(repairFallback.hint, /JSON|contract|import|paste box/i);
 
   const copiedRepairFallback = buildManualResponseFallbackProjection({
@@ -4340,7 +4340,16 @@ async function testNewCampaignPreTableJoinerWiring() {
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
   const localTable = await readFile(path.join("src", "multiplayer", "local-table.js"), "utf8");
   const server = await readFile(path.join("scripts", "serve.js"), "utf8");
-  assert.doesNotMatch(localTable, /ThinLoreKeeper/, "multiplayer-created character notes should use the unified LoreKeeper Join identity");
+  const packageJson = JSON.parse(await readFile(path.join("package.json"), "utf8"));
+  assert.match(packageJson.description, /host and browser guest play/i, "package metadata should describe LoreKeeper's current host/guest product shape");
+  assert.doesNotMatch(packageJson.description, /browser-extension|thinclient/i, "package metadata should not revive stale product identities");
+  assert.equal(packageJson.keywords.includes("browser-extension"), false, "package keywords should not describe LoreKeeper as a browser extension");
+  assert.equal(packageJson.scripts["package:portable"], "npm run package:host", "portable packaging should build the full LoreKeeper app");
+  assert.equal(packageJson.scripts["package:host"], "npm run build && node ./scripts/package-portable-host.js", "host packaging should create the full portable app");
+  assert.equal("package:guest" in packageJson.scripts, false, "guest packaging should not be a separate distro");
+  assert.equal("package:join" in packageJson.scripts, false, "join packaging should not be a separate distro");
+  assert.equal("package:thin" in packageJson.scripts, false, "thin packaging should not remain as a distro alias");
+  assert.doesNotMatch(localTable, /ThinLoreKeeper|LoreKeeper Join/, "multiplayer-created character notes should use the unified LoreKeeper identity");
   assert.match(appShell, /Party/);
   assert.match(appShell, /Add Crew/);
   assert.match(appShell, /add-party-template/);
@@ -4413,7 +4422,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /id="command-context-next"/);
   assert.match(appShell, /id="host-response-review"/, "DM recovery should lead with a host-facing response summary");
   assert.match(appShell, /id="manual-response-fallback"/, "manual copied-response controls should be a named fallback surface");
-  assert.match(appShell, /Replacement DM Response/);
+  assert.match(appShell, /Copied DM Response Fallback/);
   assert.doesNotMatch(appShell, /Use Pasted Response|paste box/i);
   assert.ok(
     appShell.indexOf('id="host-response-review"') < appShell.indexOf('id="manual-response-fallback"')
@@ -4581,7 +4590,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appJs, /function buildCampaignOpeningPrompt/, "opening prompt construction should not leave a dead auto-DM-start path");
   assert.match(appJs, /const multiplayerPollIntervalMs = 1000/, "host guest-request polling should feel live");
   assert.match(appJs, /hasActiveGeneration\(\)[\s\S]*refreshMultiplayerSnapshot\(\{ quiet: true \}\)[\s\S]*renderTableTalk\(\)[\s\S]*renderTableActions\(\)/, "waiting guest cues and table talk should refresh even while the DM is generating");
-  assert.match(appJs, /projectCurrentTableTalkMessages/, "table talk rendering should use the tested freshness projection");
+  assert.match(appJs, /buildTableTalkProjection/, "table talk rendering should use the tested freshness projection");
   assert.doesNotMatch(appJs, /snapshotTalk\.length > campaignTalk\.length/, "table talk source freshness should not live as inline renderer branching");
   assert.match(appJs, /activeAfterCommit[\s\S]*activeAfterCommit !== current\.id/, "enemy auto-turns should only be marked handled after initiative leaves that enemy");
   assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);

@@ -12,6 +12,16 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
       nextStep: hardBlocked
         ? "Try Again so the DM can answer without taking over a controlled character, or open Details to inspect what happened."
         : "Try Again for a cleaner response, open Details to inspect what happened, or Use Anyway only if the visible table text is right.",
+      decisionGuide: hardBlocked
+        ? [
+          "Try Again keeps player agency protected.",
+          "Details shows the exact table check.",
+        ]
+        : [
+          "Try Again asks the DM for a cleaner response.",
+          "Use Anyway only if the visible table text is right.",
+          "Details shows what LoreKeeper blocked.",
+        ],
       tone: "review",
       responseChars: repair.responseText?.length ?? repair.rawText?.length ?? 0,
       pendingChanges: pendingChanges.length,
@@ -23,6 +33,10 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
       title: "Proposed Table Changes Waiting",
       body: `${pendingChanges.length} proposed state ${pendingChanges.length === 1 ? "change needs" : "changes need"} host review before becoming campaign memory.`,
       nextStep: "Review and save the changes that should become canon.",
+      decisionGuide: [
+        "Save only the changes that should become campaign memory.",
+        "Leave uncertain changes uncommitted until the table is clear.",
+      ],
       tone: "waiting",
       responseChars: 0,
       pendingChanges: pendingChanges.length,
@@ -33,6 +47,7 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
     title: "No DM Response Waiting",
     body: "When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.",
     nextStep: "Return to the table when everyone is ready.",
+    decisionGuide: [],
     tone: "idle",
     responseChars: 0,
     pendingChanges: 0,
@@ -52,32 +67,32 @@ export function buildManualResponseFallbackProjection({
     return {
       state: "repair",
       visible,
-      summary: hasDraftText ? "Replacement DM Response Ready" : "Replacement DM Response",
-      hint: "Optional fallback: only use this when you intentionally copied a replacement DM response from another chat.",
+      summary: hasDraftText ? "Copied DM Response Ready" : "Copied DM Response Fallback",
+      hint: "Only use this when you intentionally copied a DM response from another chat and want LoreKeeper to review it.",
       open: Boolean(hasDraftText),
-      pasteLabel: "Paste Response",
-      useLabel: "Use Response",
+      pasteLabel: "Paste Copied Response",
+      useLabel: "Review Copied Response",
     };
   }
   if (pendingChanges.length) {
     return {
       state: "changes",
       visible,
-      summary: "Replacement DM Response",
-      hint: "Usually you should review the waiting table changes above. Use copied text only for a deliberate replacement response.",
+      summary: "Copied DM Response Fallback",
+      hint: "Usually you should review the waiting table changes above. Use copied text only for a deliberate alternate DM response.",
       open: Boolean(hasDraftText),
-      pasteLabel: "Paste Response",
-      useLabel: "Use Response",
+      pasteLabel: "Paste Copied Response",
+      useLabel: "Review Copied Response",
     };
   }
   return {
     state: "idle",
     visible,
-    summary: "Replacement DM Response",
+    summary: "Copied DM Response Fallback",
     hint: "Rare fallback for a deliberately copied DM response. Most tables should use DM Voice or Read Latest instead.",
     open: Boolean(hasDraftText),
-    pasteLabel: "Paste Response",
-    useLabel: "Use Response",
+    pasteLabel: "Paste Copied Response",
+    useLabel: "Review Copied Response",
   };
 }
 
@@ -94,7 +109,18 @@ export function renderHostResponseReview(container, projection) {
   const next = document.createElement("p");
   next.className = "review-next-step";
   next.textContent = view.nextStep;
-  container.replaceChildren(title, body, next);
+  const children = [title, body, next];
+  if (view.decisionGuide?.length) {
+    const guide = document.createElement("ul");
+    guide.className = "review-decision-guide";
+    for (const item of view.decisionGuide) {
+      const entry = document.createElement("li");
+      entry.textContent = item;
+      guide.append(entry);
+    }
+    children.push(guide);
+  }
+  container.replaceChildren(...children);
 }
 
 export function applyManualResponseFallbackProjection(elements, projection) {
@@ -105,7 +131,7 @@ export function applyManualResponseFallbackProjection(elements, projection) {
   elements.manualResponseFallback.hidden = !projection.visible;
   elements.manualResponseFallback.open = Boolean(projection.open);
   if (elements.manualResponseFallbackSummary) {
-    elements.manualResponseFallbackSummary.textContent = projection.summary || "Replacement DM Response";
+    elements.manualResponseFallbackSummary.textContent = projection.summary || "Copied DM Response Fallback";
   }
   if (elements.manualResponseFallbackHint) {
     elements.manualResponseFallbackHint.textContent = projection.hint || "";

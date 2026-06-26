@@ -2,11 +2,13 @@
 
 Updated: 2026-06-19
 
-This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers, and `docs/living-world.md` explains long-term continuity memory.
+This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers, `docs/REMOTE_TABLE_ACCESS_PLAN.md` is the host/guest remote-access doctrine, and `docs/living-world.md` explains long-term continuity memory.
 
 ## Product Shape
 
-LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a local AI provider, or serve a same-network guest page for remote players.
+LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a local AI provider or provider-backed DM Voice, serve a same-network browser guest page, and eventually support remote browser guests through a tunnel or relay that exposes only guest-safe routes.
+
+LoreKeeper is one app with multiple access surfaces: local host app, provider-backed host app, table-joining flow inside the app, browser guest mode, future relay-assisted remote guest links, and portable/packaged distribution. The retired Thinclient and standalone join-client concepts should not return as separate products or brands; use LoreKeeper app, Guest mode, Table session, Invite link, Relay, Provider, Local model, and Campaign canon instead.
 
 The north-star table model is:
 
@@ -146,6 +148,13 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Captures campaign/table/session identity, table phase, active turn/actor/controller, provider state, combat state, staged guest inputs, review/recovery state, and recent errors.
 - This should stay pure and redaction-friendly so it remains safe to copy during a stuck session.
 
+`ShareTableSession`
+
+- Lives in `src/multiplayer/share-table-session.js`.
+- Produces the browser-safe LAN `/guest` share projection used by Friends And Seats: campaign id, table id, session id, guest link, and guest-safe route categories.
+- Re-exporting it from `src/multiplayer/local-table.js` is acceptable for server/domain tests, but renderer code should import the browser-safe module directly so Node-only multiplayer authority code does not enter the client bundle.
+- This is not relay/tunnel implementation; it is the local session contract future remote transport should consume.
+
 `ObservabilityTrace`
 
 - Lives in `src/observability/trace-log.js`.
@@ -188,6 +197,9 @@ UI projections:
 - `app/home-campaign-controller.js` owns front-door saved-adventure projection: backend starter-campaign hiding, saved-adventure count copy, Continue/Delete enablement, selected campaign lookup, and safe delete-target projection.
 - `app/campaign-notebook-controller.js` owns player notebook sections for people, places, things, and quests, including current-place ordering, inventory/assets, related-entity labels, and DM-only story-thread filtering.
 - `app/scene-notebook-controller.js` owns scene intelligence and notebook projections using the same scene retrieval as DM context, while hiding generated fallback scene shells until player-visible scene details exist.
+- `app/record-dialog-controller.js` owns binder record dialog copy, placeholders, save labels, and edit value formatting for party, people, places, threads, lore, assets, and things.
+- `app/table-talk-controller.js` owns Table Talk source freshness and bounded visible-message projection so the renderer does not hard-code side-chat list limits.
+- `app/change-domain-controller.js` and `app/table-text-controller.js` own tiny shared import/recovery helpers that prevent alias normalization and scene-text compaction from being duplicated across provider, scene, and combat import paths.
 - Prefer extracting pure decisions into these modules with tests before adding more branches to `app/app.js`.
 
 ## Storage Model
@@ -244,7 +256,17 @@ Security rules:
 - public guest routes validate campaign/table/session identity and guest secrets,
 - host routes require host authorization,
 - stale `campaignId`, `tableId`, or `sessionId` must reject instead of applying to the active table,
-- guest leave should release the remote controller back to host control and make the seat requestable again.
+- guest leave should release the remote controller back to host control and make the seat requestable again,
+- remote sharing must expose only guest-safe routes; provider settings, Ollama/local model endpoints, filesystem/debug routes, campaign management, raw database access, and host/admin controls stay host-only.
+
+See `docs/REMOTE_TABLE_ACCESS_PLAN.md` before adding relay, tunnel, Steam, WebRTC, or other remote table transport work.
+
+## Portable Distribution
+
+- `scripts/package-portable-host.js` builds the Windows portable `dist/portable/LoreKeeper.zip`.
+- The portable package is the full LoreKeeper app. It can host a table, join another host from the app, or expose browser guest mode on the LAN.
+- The package bundles Electron/Node runtime files, built renderer assets, local API/server code, and runtime dependency `sql.js`.
+- The package intentionally excludes local campaign files, runtime logs, git metadata, old split-client portable artifacts, Ollama, and model files.
 
 ## UI Model
 
@@ -279,9 +301,10 @@ Start here when making changes:
 - Stale combat prompt repair: `app/combat-prompt-repair-controller.js`
 - Provider-import combat fallback guardrails: `app/combat-import-controller.js`
 - Provider-import scene fallback guardrails: `app/scene-import-controller.js`
-- Play log rendering: `app/play-log-controller.js` plus render functions in `app/app.js`
+- Play log and side-chat rendering: `app/play-log-controller.js`, `app/table-talk-controller.js`, plus render functions in `app/app.js`
 - Character creation/autocomplete: `app/character-autocomplete-controller.js`
-- Local multiplayer: `src/multiplayer/local-table.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`
+- Binder record dialogs: `app/record-dialog-controller.js`
+- Local multiplayer: `src/multiplayer/local-table.js`, `src/multiplayer/share-table-session.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`
 - Renderer campaign adoption/background polling policy: `app/campaign-adoption-controller.js`, `app/table-background-polling-controller.js`
 - Combat: `src/engine/combat-engine.js`, `src/rules/combat-turns.js`, `app/combat-resolution-controller.js`
 - Provider contract/agency: `src/model-contract/turn-json-contract.js`

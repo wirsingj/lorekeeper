@@ -8,6 +8,7 @@ import { extractLorekeeperUpdates } from "../src/canon-review/extract-updates.js
 import { createPlayerTurn } from "../src/play-loop/session-turn.js";
 import { renderTurnResponseForImport } from "../src/model-contract/turn-json-contract.js";
 import { isAllowedInviteHost } from "../src/multiplayer/invite-security.js";
+import { buildShareTableSession } from "../src/multiplayer/share-table-session.js";
 import { createProviderOrchestrator } from "../src/engine/provider-orchestrator.js";
 import { buildTableDebugSnapshot } from "../src/engine/table-debug-snapshot.js";
 import { buildTableSessionProjection } from "../src/engine/table-session-engine.js";
@@ -104,6 +105,7 @@ import {
   selectedModelSummaryProjection,
 } from "./provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
+import { recordDialogConfig, recordLabel, recordNotesValue, recordRoleValue } from "./record-dialog-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import {
   buildRendererDiagnosticsSnapshot,
@@ -119,7 +121,8 @@ import { buildStagedInputRecoveryPlan, providerFailureReason, stagedInputRecover
 import { applyTableActionProjection, buildAiCompanionNudgeGate, buildNudgeDmCommandGate, buildStartAdventureCommandGate, buildTableActionProjection } from "./table-action-controller.js";
 import { buildMultiplayerPollingPlan, multiplayerPollingActions } from "./table-background-polling-controller.js";
 import { applyTableFocusProjection, buildTableFocusProjection } from "./table-focus-controller.js";
-import { currentTableTalkMessages as projectCurrentTableTalkMessages } from "./table-talk-controller.js";
+import { compactSceneSituation } from "./table-text-controller.js";
+import { buildTableTalkProjection } from "./table-talk-controller.js";
 import { buildAdventureOpeningPrompt, isCampaignReadyForOpening as isOpeningReady } from "./table-opening-controller.js";
 import { tableStatusForActivity, tableTimelineEvent } from "./table-status.js";
 import { buildTurnContentGate, buildTurnSubmitGate } from "./turn-submit-controller.js";
@@ -497,6 +500,7 @@ const elements = {
   localTableState: document.querySelector("#local-table-state"),
   localTableAddress: document.querySelector("#local-table-address"),
   localTableGuidance: document.querySelector("#local-table-guidance"),
+  localTableShareSafety: document.querySelector("#local-table-share-safety"),
   localTableGuestLink: document.querySelector("#local-table-guest-link"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
@@ -1736,7 +1740,7 @@ async function boot() {
 }
 
 async function bootClientMode() {
-  document.title = "LoreKeeper Join";
+  document.title = "LoreKeeper";
   const loadedInvite = applyLaunchInviteLink();
   state.sourceMode = "guest";
   state.campaigns = [];
@@ -1755,7 +1759,7 @@ async function bootClientMode() {
         ? "Invite link loaded. Enter your name, then join the hosted table."
         : guestWaitingRoomMode
         ? "Guest waiting room ready. Ask the host for a seat."
-        : "LoreKeeper Join ready. Paste a host invite link to join.",
+        : "LoreKeeper ready. Paste a host invite link to join.",
       loadedInvite ? "waiting" : "idle",
     );
   }
@@ -2415,7 +2419,7 @@ function addWizardPartyMemberCard(input = {}) {
       <label><input type="radio" name="wizard-character-controller-${index}" value="remote_invite" data-character-field="controllerKind" /><span>Invite Friend</span></label>
     </div>
     <div class="campaign-wizard-grid">
-      <label><span>Name</span><input data-character-field="name" autocomplete="off" placeholder="Oskar, Ingrid, Bren..." /></label>
+      <label><span>Name</span><input data-character-field="name" autocomplete="off" placeholder="Character name" /></label>
       <label><span>Ancestry</span><input data-character-field="ancestry" autocomplete="off" placeholder="Dwarf, elf, human..." /></label>
       <label><span>Class / role</span><input data-character-field="class" autocomplete="off" placeholder="Soldier, scout, cleric..." /></label>
       <label><span>Level</span><input data-character-field="level" inputmode="numeric" value="1" /></label>
@@ -3131,26 +3135,28 @@ async function copyGuestLinkFromUi() {
     showGuestLink(link);
     const copied = await writeClipboardText(link);
     if (copied) {
-      setProviderActivity("Guest link copied", "idle");
+      setProviderActivity("Share Table link copied", "idle");
       return true;
     }
     revealGuestLink();
-    setProviderActivity("Guest page ready; copy it from Table Options.", "waiting");
+    setProviderActivity("Share Table link ready; copy it from Friends And Seats.", "waiting");
     return false;
   } catch (error) {
-    setProviderActivity(error instanceof Error ? `Guest link failed: ${error.message}` : "Guest link failed", "error");
+    setProviderActivity(error instanceof Error ? `Share Table failed: ${error.message}` : "Share Table failed", "error");
     return false;
   }
 }
 
 function currentLocalGuestLink() {
   const table = state.campaign?.multiplayer?.localTable ?? state.multiplayerSnapshot?.localTable ?? {};
-  if (!table.running) {
-    return "";
-  }
-  const host = table.lanAddress || window.location.hostname || "127.0.0.1";
-  const port = table.port || window.location.port;
-  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
+  return buildShareTableSession({
+    table: {
+      ...table,
+      lanAddress: table.lanAddress || window.location.hostname || "127.0.0.1",
+    },
+    campaignId: state.campaign?.id || state.multiplayerSnapshot?.campaignId || "",
+    locationPort: window.location.port,
+  }).guestLink;
 }
 
 function localTableAuthorityPayload(overrides = {}) {
@@ -4183,7 +4189,7 @@ async function stagePendingRemoteInput(inputId) {
 function createGuestShellCampaign() {
   return normalizeCampaign({
     id: "lorekeeper-join",
-    title: "LoreKeeper Join",
+    title: "LoreKeeper",
     summary: "Waiting for a hosted local table.",
     scene: {
       status: "waiting",
@@ -4209,7 +4215,7 @@ function createGuestShellCampaign() {
       sessions: [
         {
           id: "lorekeeper-join-session",
-          title: "LoreKeeper Join",
+          title: "LoreKeeper",
           startedAt: new Date().toISOString(),
           endedAt: null,
           recap: "",
@@ -4988,7 +4994,7 @@ function currentAppMode() {
 }
 
 function normalizeAppMode(mode) {
-  return mode === "join" || mode === "thin" ? "join" : "host";
+  return mode === "join" ? "join" : "host";
 }
 
 async function switchAppMode(mode) {
@@ -5164,7 +5170,7 @@ function applyJoinClientChrome() {
   renderAppModeControls();
   document.body.classList.add("lorekeeper-join-mode");
   elements.deleteCampaign.hidden = true;
-  elements.providerStatus.textContent = "Mode: LoreKeeper Join";
+  elements.providerStatus.textContent = "Mode: LoreKeeper";
   hideSetupSection(elements.providerMode, true);
   hideSetupSection(elements.newCampaign, true);
   hideSetupSection(elements.responseImport, true);
@@ -5532,112 +5538,6 @@ function openRecordDialog(domain, record = null) {
   }
   elements.recordDialog.showModal();
   elements.recordName.focus();
-}
-
-function recordDialogConfig(domain) {
-  const configs = {
-    party: {
-      title: "Add Party Member",
-      editTitle: "Edit Party Member",
-      nameLabel: "Character name",
-      roleLabel: "Ancestry / class",
-      namePlaceholder: "Evelynn",
-      rolePlaceholder: "Forest elf ranger",
-      notesPlaceholder: "Personality, goals, stats, familiar, important backstory...",
-    },
-    people: {
-      title: "Add Person",
-      editTitle: "Edit Person",
-      nameLabel: "Name",
-      roleLabel: "Role / type",
-      namePlaceholder: "Mira Vale",
-      rolePlaceholder: "Herbalist, rival, guard captain...",
-      notesPlaceholder: "What is canon about this person?",
-    },
-    places: {
-      title: "Add Place",
-      editTitle: "Edit Place",
-      nameLabel: "Place name",
-      roleLabel: "Place type",
-      namePlaceholder: "Brindle Hollow",
-      rolePlaceholder: "frontier town, ruin, forest road...",
-      notesPlaceholder: "Sights, factions, dangers, connections, known facts...",
-    },
-    quests: {
-      title: "Add Thread",
-      editTitle: "Edit Thread",
-      nameLabel: "Thread title",
-      roleLabel: "Status",
-      namePlaceholder: "Find the missing wolf companion",
-      rolePlaceholder: "active",
-      notesPlaceholder: "Stakes, clues, unresolved questions...",
-    },
-    lore: {
-      title: "Add Lore Note",
-      editTitle: "Edit Lore Note",
-      nameLabel: "Lore title",
-      roleLabel: "Tags",
-      namePlaceholder: "Moonlit wolf omen",
-      rolePlaceholder: "omen, forest, wolves",
-      notesPlaceholder: "Canon note text...",
-    },
-    assets: {
-      title: "Add Source Image",
-      editTitle: "Edit Source Image",
-      nameLabel: "Asset name",
-      roleLabel: "Kind",
-      namePlaceholder: "Brindle Hollow map",
-      rolePlaceholder: "image",
-      notesPlaceholder: "What should LoreKeeper remember about this source image?",
-    },
-    items: {
-      title: "Add Thing",
-      editTitle: "Edit Thing",
-      nameLabel: "Thing name",
-      roleLabel: "Kind / type",
-      namePlaceholder: "Silver lockpick",
-      rolePlaceholder: "tool, clue, artifact, weapon...",
-      notesPlaceholder: "What is known about it, who has it, and why it matters...",
-    },
-  };
-
-  return configs[domain] ?? configs.lore;
-}
-
-function recordRoleValue(domain, record) {
-  if (domain === "party") {
-    return record.ancestryClass || record.role || record.playerRole || "";
-  }
-
-  if (domain === "quests") {
-    return record.status || "";
-  }
-
-  if (domain === "lore") {
-    return (record.tags ?? []).join(", ");
-  }
-
-  return record.role || record.type || record.kind || record.region || "";
-}
-
-function recordNotesValue(domain, record) {
-  if (domain === "quests") {
-    return [record.stakes, ...(record.openQuestions ?? []).map((question) => `Open: ${question}`)].filter(Boolean).join("\n");
-  }
-
-  return [record.summary, record.description, ...(record.notes ?? [])].filter(Boolean).join("\n");
-}
-
-function recordLabel(domain) {
-  return {
-    party: "Party member",
-    people: "Person",
-    places: "Place",
-    quests: "Thread",
-    lore: "Lore note",
-    assets: "Asset",
-    items: "Thing",
-  }[domain] ?? "Record";
 }
 
 function seedPlayLog() {
@@ -6271,20 +6171,6 @@ async function autoCommitReviewBatch(reviewBatch) {
   return safeBatch ? commitExtractedChanges(safeBatch) : null;
 }
 
-function compactSceneSituation(text = "") {
-  const cleaned = String(text)
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter((line) => line && !isChoiceLikeLine(line) && !/^what (?:does|do|would|will|should|can)\b/i.test(line))
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!cleaned) {
-    return "";
-  }
-  return cleaned.length > 520 ? `${cleaned.slice(0, 519).trimEnd()}...` : cleaned;
-}
-
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -6801,10 +6687,6 @@ function handleProviderGenerationEvent(event) {
       responseChars: event.response?.responseText?.length ?? 0,
     });
   }
-}
-
-function isChoiceLikeLine(line) {
-  return /^\s*(?:[-*]\s*)?(?:[A-Ha-h]|\d{1,2})\s*[\).:-]\s+/.test(String(line ?? ""));
 }
 
 function partyControllerKind(member) {
@@ -8997,7 +8879,8 @@ function renderTableTalk() {
   if (!elements.tableTalkLog || !elements.tableTalkCount) {
     return;
   }
-  const messages = currentTableTalkMessages();
+  const projection = currentTableTalkProjection();
+  const messages = projection.messages;
   const previousCount = state.lastTableTalkCount;
   if (previousCount != null && messages.length > previousCount && document.activeElement !== elements.tableTalkInput) {
     state.unreadTableTalkCount += messages.length - previousCount;
@@ -9020,7 +8903,7 @@ function renderTableTalk() {
     elements.tableTalkLog.replaceChildren(empty);
   } else {
     elements.tableTalkLog.replaceChildren(
-      ...messages.slice(-80).map((message) => {
+      ...projection.visibleMessages.map((message) => {
         const wrapper = document.createElement("article");
         wrapper.className = "table-talk-message";
 
@@ -9057,15 +8940,15 @@ function renderTableTalk() {
 
 function clearTableTalkUnread() {
   state.unreadTableTalkCount = 0;
-  state.lastTableTalkCount = currentTableTalkMessages().length;
+  state.lastTableTalkCount = currentTableTalkProjection().totalCount;
   elements.tableTalkLog?.closest(".table-talk-section")?.classList.remove("has-new-table-talk");
   if (elements.tableTalkCount) {
     elements.tableTalkCount.textContent = String(state.lastTableTalkCount);
   }
 }
 
-function currentTableTalkMessages() {
-  return projectCurrentTableTalkMessages({
+function currentTableTalkProjection() {
+  return buildTableTalkProjection({
     guestSnapshot: state.guestSnapshot,
     multiplayerSnapshot: state.multiplayerSnapshot,
     campaign: state.campaign,

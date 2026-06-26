@@ -175,7 +175,7 @@ export function LorekeeperShell() {
             <div className="join-client-card">
               <div className="join-panel-header">
                 <div>
-                  <p className="eyebrow">LoreKeeper Join</p>
+                  <p className="eyebrow">LoreKeeper</p>
                   <h2 id="join-client-title">Join A Table</h2>
                 </div>
                 <button id="join-back-home" className="secondary-action back-home-action" type="button" title="Back to main menu">
@@ -225,7 +225,7 @@ export function LorekeeperShell() {
                 </button>
                 <label>
                   <span>Character name</span>
-                  <input id="join-client-character-name" autoComplete="off" placeholder="Mira" />
+                  <input id="join-client-character-name" autoComplete="off" placeholder="Character name" />
                 </label>
                 <div className="join-client-two">
                   <label>
@@ -600,7 +600,7 @@ function CampaignDialog() {
             <div className="campaign-wizard-grid">
               <label>
                 <span>Name</span>
-                <input id="new-character-name" autoComplete="off" placeholder="Evelynn, Jarin, Rowan..." />
+              <input id="new-character-name" autoComplete="off" placeholder="Character name" />
               </label>
               <label>
                 <span>Ancestry</span>
@@ -663,7 +663,7 @@ function CampaignDialog() {
                 <div className="campaign-wizard-grid">
                   <label>
                     <span>Name</span>
-                    <input id="new-joiner-name" autoComplete="off" placeholder="Eve, Mira, Tilli..." />
+                    <input id="new-joiner-name" autoComplete="off" placeholder="Character name" />
                   </label>
                   <label>
                     <span>Ancestry</span>
@@ -835,17 +835,20 @@ function SetupDialog() {
           <div className="friend-share-card">
             <p id="local-table-address" className="setup-note">Open the guest lobby when friends are joining from another device.</p>
             <label className="field-stack local-table-share">
-              <span>Guest Link</span>
+              <span>Share Table Link</span>
               <input
                 id="local-table-guest-link"
                 readOnly
                 spellCheck="false"
-                placeholder="Open the guest lobby to get a share link."
+                placeholder="Open the guest lobby to get a Share Table link."
               />
             </label>
+            <p id="local-table-share-safety" className="setup-note local-table-share-safety">
+              Shares browser guest mode only. Host settings and DM Voice stay on this machine.
+            </p>
             <div className="button-stack two-up">
               <button id="start-local-table" type="button">Open Guest Lobby</button>
-              <button id="copy-guest-link" type="button">Copy Guest Link</button>
+              <button id="copy-guest-link" type="button">Share Table</button>
               <button id="stop-local-table" type="button">Close Guest Lobby</button>
             </div>
           </div>
@@ -923,7 +926,7 @@ function SetupDialog() {
             <p className="review-next-step">Return to the table when everyone is ready.</p>
           </div>
           <details id="manual-response-fallback" className="manual-response-fallback" hidden>
-            <summary id="manual-response-fallback-summary">Replacement DM Response</summary>
+            <summary id="manual-response-fallback-summary">Copied DM Response Fallback</summary>
             <p id="manual-response-fallback-hint" className="manual-response-fallback-hint">
               Rare fallback for a deliberately copied DM response. Most tables should use DM Voice or Read Latest instead.
             </p>
@@ -934,8 +937,8 @@ function SetupDialog() {
               placeholder="Paste intentionally copied DM text here."
             ></textarea>
             <div className="button-stack two-up">
-              <button id="paste-response" type="button">Paste Response</button>
-              <button id="import-response" type="button">Use Response</button>
+              <button id="paste-response" type="button">Paste Copied Response</button>
+              <button id="import-response" type="button">Review Copied Response</button>
             </div>
           </details>
           <div id="review-list" className="review-stack"></div>
@@ -1134,7 +1137,7 @@ function JoinCampaignDialog() {
           </button>
           <label>
             <span>Character name</span>
-            <input id="join-character-name" autoComplete="off" placeholder="Mira" />
+            <input id="join-character-name" autoComplete="off" placeholder="Character name" />
           </label>
           <div className="join-two">
             <label>

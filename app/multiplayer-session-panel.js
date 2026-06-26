@@ -1,3 +1,5 @@
+import { buildShareTableSession } from "../src/multiplayer/share-table-session.js";
+
 export function buildMultiplayerSessionProjection({
   campaign,
   clientMode = false,
@@ -39,12 +41,14 @@ export function buildMultiplayerSessionProjection({
     requireGuestActionApproval: Boolean(multiplayer.settings?.requireGuestActionApproval),
     holdGuestActionsForGroupInput: Boolean(multiplayer.settings?.holdGuestActionsForGroupInput),
   };
-  const guestLink = localGuestLink(table, locationPort, { campaignId: multiplayer.campaignId || campaign?.id || "" });
+  const campaignId = multiplayer.campaignId || campaign?.id || "";
+  const shareSession = multiplayer.shareSession ?? buildShareTableSession({ table, campaignId, locationPort });
+  const guestLink = shareSession.guestLink;
   return {
     mode: "host",
     localTableState: table.running ? "On" : "Off",
     localTableAddress: table.running
-      ? `LAN: ${table.lanAddress || "127.0.0.1"}:${table.port || locationPort}`
+      ? shareSession.summary
       : "Open the guest page when a friend is joining.",
     canStartLocalTable: true,
     canStopLocalTable: Boolean(table.running),
@@ -56,6 +60,8 @@ export function buildMultiplayerSessionProjection({
     resolvePartyInputsLabel: resolvePartyInputsLabel({ readyInputs, settings }),
     requireGuestActionApproval: settings.requireGuestActionApproval,
     holdGuestActionsForGroupInput: settings.holdGuestActionsForGroupInput,
+    shareSession,
+    shareSafety: shareSession.safety,
     party: campaign?.party ?? [],
     connectedGuests: multiplayer.connections ?? [],
     waitingGuests: multiplayer.waitingGuests ?? [],
@@ -76,11 +82,14 @@ export function renderMultiplayerSessionPanel({
   if (elements.localTableGuidance) {
     elements.localTableGuidance.textContent = projection.flowSummary;
   }
+  if (elements.localTableShareSafety) {
+    elements.localTableShareSafety.textContent = projection.shareSafety || "";
+  }
   if (elements.localTableGuestLink) {
     elements.localTableGuestLink.value = projection.guestLink || "";
     elements.localTableGuestLink.placeholder = projection.guestLink
       ? ""
-      : "Open the guest page to get a share link.";
+      : "Open the guest lobby to get a Share Table link.";
   }
   elements.startLocalTable.disabled = !projection.canStartLocalTable;
   elements.stopLocalTable.disabled = !projection.canStopLocalTable;
@@ -103,15 +112,6 @@ export function renderMultiplayerSessionPanel({
   renderWaitingGuests(elements.waitingGuests, projection.waitingGuests, { party: projection.party ?? [], seatWaitingGuest });
   renderConnectedGuests(elements.connectedGuests, projection.connectedGuests, { labelById, approveGuest, denyGuest });
   renderPendingInputs(elements.pendingInputs, projection.pendingInputs);
-}
-
-function localGuestLink(table = {}, locationPort = "", { campaignId = "" } = {}) {
-  if (!table.running) {
-    return "";
-  }
-  const host = table.lanAddress || "127.0.0.1";
-  const port = table.port || locationPort;
-  return port ? `http://${host}:${port}/guest` : `http://${host}/guest`;
 }
 
 function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWaitingGuest } = {}) {

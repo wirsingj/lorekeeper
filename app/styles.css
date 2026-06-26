@@ -1307,6 +1307,11 @@ h3 {
   font-size: 0.72rem;
 }
 
+.local-table-share-safety {
+  color: #b8c7ce;
+  line-height: 1.35;
+}
+
 .setup-note {
   margin: 0;
   color: #aebbc2;
@@ -3026,6 +3031,16 @@ textarea::placeholder {
 
 .host-response-review .review-next-step {
   color: #aebbc2;
+}
+
+.review-decision-guide {
+  display: grid;
+  gap: 5px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: #c6d2d7;
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .manual-response-fallback {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   approveJoinRequest,
   buildAggregatedPlayerTurn,
+  buildShareTableSession,
   clearPendingTurnInputs,
   controllerKinds,
   createCharacterRequestInvite,
@@ -12,6 +13,7 @@ import {
   createWaitingGuestSnapshot,
   disconnectGuest,
   heartbeatWaitingGuest,
+  guestSafeShareRouteBoundary,
   joinableGuestSeats,
   parseInviteLink,
   passGuestAction,
@@ -30,6 +32,14 @@ import {
 import { buildMultiplayerSessionProjection } from "../app/multiplayer-session-panel.js";
 import { choicePanelKey } from "../src/engine/choice-vote-identity.js";
 
+const base64UrlTokenPattern = /^[A-Za-z0-9_-]+$/;
+
+function assertTokenShape(label, token, minLength) {
+  assert.equal(typeof token, "string", `${label} should be a string`);
+  assert.ok(token.length >= minLength, `${label} should be at least ${minLength} characters`);
+  assert.match(token, base64UrlTokenPattern, `${label} should be URL-safe`);
+}
+
 let campaign = testCampaign();
 campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
 assert.equal(campaign.multiplayer.localTable.running, true);
@@ -37,6 +47,17 @@ assert.ok(campaign.multiplayer.localTable.tableId);
 assert.ok(campaign.multiplayer.localTable.sessionId);
 assert.equal(campaign.multiplayer.settings.requireGuestActionApproval, false);
 assert.equal(campaign.multiplayer.settings.holdGuestActionsForGroupInput, false);
+const shareSession = buildShareTableSession({
+  table: campaign.multiplayer.localTable,
+  campaignId: campaign.id,
+});
+assert.equal(shareSession.campaignId, campaign.id);
+assert.equal(shareSession.tableId, campaign.multiplayer.localTable.tableId);
+assert.equal(shareSession.sessionId, campaign.multiplayer.localTable.sessionId);
+assert.equal(shareSession.guestLink, "http://192.168.1.24:7347/guest");
+assert.deepEqual(shareSession.routeBoundary, [...guestSafeShareRouteBoundary]);
+assert.match(shareSession.safety, /Host settings, DM Voice, Ollama, files, and diagnostics stay on this machine/);
+assert.match(shareSession.safety, /leave\/rejoin, combat participation/);
 
 let waitingResult = registerWaitingGuest(campaign, {
   playerName: "Nora",
@@ -52,7 +73,12 @@ let waitingResult = registerWaitingGuest(campaign, {
 });
 campaign = waitingResult.campaign;
 assert.ok(waitingResult.waitingSecret);
+assertTokenShape("waiting-room secret", waitingResult.waitingSecret, 32);
 let waitingHostSnapshot = createHostSnapshot(campaign);
+assert.equal(waitingHostSnapshot.shareSession.campaignId, campaign.id);
+assert.equal(waitingHostSnapshot.shareSession.tableId, campaign.multiplayer.localTable.tableId);
+assert.equal(waitingHostSnapshot.shareSession.sessionId, campaign.multiplayer.localTable.sessionId);
+assert.equal(waitingHostSnapshot.shareSession.guestLink, "http://192.168.1.24:7347/guest");
 assert.equal(waitingHostSnapshot.waitingGuests.length, 1);
 assert.equal(waitingHostSnapshot.waitingGuests[0].displayName, "Nora");
 assert.equal(waitingHostSnapshot.waitingGuests[0].preferredPartyMemberId, "lysa");
@@ -208,6 +234,8 @@ const inviteResult = createInviteForPartyMember(campaign, {
 campaign = inviteResult.campaign;
 const parsedInvite = parseInviteLink(inviteResult.inviteLink);
 assert.equal(parsedInvite.valid, true);
+assertTokenShape("fixed-seat invite token", inviteResult.invite.token, 24);
+assert.equal(parsedInvite.token, inviteResult.invite.token);
 assert.equal(parsedInvite.seat, "kevric");
 assert.equal(parsedInvite.port, 7347);
 assert.equal(parsedInvite.campaign, campaign.id);
@@ -240,6 +268,7 @@ const joinResult = requestJoin(campaign, {
 campaign = joinResult.campaign;
 assert.equal(joinResult.approved, false);
 assert.ok(joinResult.connectionSecret);
+assertTokenShape("guest connection secret", joinResult.connectionSecret, 32);
 assert.equal(campaign.multiplayer.connections.find((connection) => connection.id === joinResult.connection.id).status, "pending");
 const duplicateJoinResult = requestJoin(campaign, {
   inviteLink: inviteResult.inviteLink,
@@ -823,6 +852,8 @@ const characterInviteResult = createCharacterRequestInvite(joinAsCampaign, { hos
 joinAsCampaign = characterInviteResult.campaign;
 const characterInvite = parseInviteLink(characterInviteResult.inviteLink);
 assert.equal(characterInvite.valid, true);
+assertTokenShape("character-request invite token", characterInviteResult.invite.token, 24);
+assert.equal(characterInvite.token, characterInviteResult.invite.token);
 assert.equal(characterInvite.seat, "new-character");
 const characterJoinResult = requestJoin(joinAsCampaign, {
   inviteLink: characterInviteResult.inviteLink,

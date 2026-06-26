@@ -4,7 +4,7 @@ Updated: 2026-06-19
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
-This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The long-lived companion docs are `docs/ARCHITECTURE.md` for ownership boundaries, `docs/MAINTAINER_GUIDE.md` for commands/debugging/failure playbooks, and `docs/living-world.md` for continuity memory.
+This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The long-lived companion docs are `docs/ARCHITECTURE.md` for ownership boundaries, `docs/MAINTAINER_GUIDE.md` for commands/debugging/failure playbooks, `docs/REMOTE_TABLE_ACCESS_PLAN.md` for host/guest remote-access doctrine, and `docs/living-world.md` for continuity memory.
 
 Status legend:
 
@@ -46,11 +46,13 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 - Settings should become two calmer surfaces: app preferences before play, and table settings while hosting.
 - Every screen should show the next likely action and hide controls that are not relevant to the current phase.
 - Guest flow should prefer one plain LAN link with a table list and seat requests; direct deep links can remain optional power-user shortcuts.
+- Remote guest flow should eventually be one Discord/browser link through a guest-safe tunnel or relay. The host may suffer through setup; guests should not install LoreKeeper, Ollama, provider tools, VPN software, or model runtimes.
 
 ### Current Product Decisions
 
 - Side rails may stay open by default. The center story log should dominate, but the table does not need every inch of horizontal space; Party, Notebook, and Table Talk can remain visible when they are calm, useful, and resizable.
 - Guest `/guest` flow should require host approval for requested seats for now. Future trust can remember a returning person/account/IP for a prior seat, but the near-term product should be explicit and safe.
+- LoreKeeper is one app with host and guest access surfaces. Thinclient is retired as a separate product concept; do not revive it as user-facing product or brand language.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
 - AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
@@ -206,7 +208,7 @@ Risks:
 5. Party/character/vote/combat-actor choice targeting exists in the model contract and play log UI.
 6. Normal play hides raw provider meta while diagnostics remain available.
 7. Table status language has shifted toward table-facing wording: DM thinking, waiting for actor, recovery, staged input.
-8. Character creation is standardized across campaign creation, post-start host creation, guest join, and LoreKeeper Join.
+8. Character creation is standardized across campaign creation, post-start host creation, browser guest join, and in-app Join A Table.
 9. Additional host-created characters default to AI companions, while the first campaign character is host-controlled.
 10. Grouped enemies can expand into separate combatants and initiative rows.
 11. Guest inputs can drive provider turns through structured `user.playerInputs[]`.
@@ -311,7 +313,7 @@ Risks:
 110. Senior-dev/security/UX/DM review pass checked the main app shell, server routes, Electron boundary, engine ownership, multiplayer authority, provider authority, and table-flow docs against the current architecture.
 111. Host-style combat join mutations on the guest-public combat route now require local app authorization when no guest connection id is supplied.
 112. Server integration coverage now proves arbitrary local asset reads require authorization, stay inside allowed asset roots, and do not allow built-asset path traversal.
-113. Remaining visible ThinLoreKeeper join wording in multiplayer-created character notes now uses the unified LoreKeeper Join identity.
+113. Remaining visible split-client join wording in multiplayer-created character notes now uses the unified LoreKeeper identity.
 114. Guest table refresh copy now avoids "sync/resync" wording on ordinary table-facing controls and status messages.
 115. Pre-action DM nudges with living-world object memory no longer crash provider request construction when compacting NPC/faction/place memory.
 116. Host New Remote Invite seats now persist as unassigned remote-player seats, stay joinable after campaign creation, and automatically open/copy the Guest Link when the campaign starts.
@@ -360,7 +362,7 @@ Risks:
 159. The manual copied-response fallback is no longer a normal recovery row: it stays hidden unless bridge/manual handoff is active or copied text is already present, so DM Recovery leads with the table-check summary instead of a visible paste box or fallback disclosure.
 160. Inspecting a paused DM response now opens a focused DM Recovery settings surface instead of the broader Troubleshooting drawer, with `settings-surface-controller.js` owning the one-tab recovery mode and target panel filtering.
 161. Live playtest fixed two table-flow bugs: Table Talk now repaints from fresh multiplayer snapshots while the DM is thinking, and app-owned enemy turns only mark themselves handled after initiative actually leaves the enemy; enemy attack messages now read as short table narration instead of bare roll receipts.
-162. Join-client internals now use `join`/`host` runtime modes and `join-client` renderer names instead of the old `thin` naming, while legacy launch/package aliases remain as compatibility shims.
+162. Legacy guest-access internals now use `join`/`host` runtime modes instead of the old `thin` naming, but packaging is back to one app: the Windows portable distro is `LoreKeeper.zip`, and guests can join from LoreKeeper or a browser URL rather than a separate split-client package.
 163. The New Adventure seed helper is now product-named as adventure seed presets instead of `dev-jump-start`, and its visible action reads as a creative table aid instead of a developer shortcut.
 164. Campaign Chat fallback/progress copy now lives in `app/provider-chat-controller.js` with direct tests, so app.js executes provider-chat recovery plans instead of owning another cluster of fallback strings.
 165. Campaign Notes now start with a Scene notebook section fed by scene retrieval, surfacing current situation, tensions, consequences, threads, and relevant relationships without making them permanent center-stage chrome.
@@ -407,24 +409,30 @@ Risks:
 206. Guest table previews now filter starter scaffold ids/threads and strip host-only "Next:" setup instructions, so `/guest` sees table fiction, party, and useful seat context instead of backend placeholder records.
 207. Combat active-turn labels now render host-controlled party turns as "Your turn" in the host app while preserving "Host turn" for observer contexts and separate friend/companion/DM/table turn labels.
 208. The stale renderer-local provider speaker-splitting helper is removed; provider response speaker parsing now has one owner in `app/provider-import-controller.js`, and architecture tests guard against `app.js` growing that import policy back.
-209. Table Talk source freshness now lives in `app/table-talk-controller.js` with direct tests for guest snapshots, stale local campaign chat, route-side snapshot updates during generation, and bad data fallback instead of inline renderer branching.
-210. Successful imported player turns now clear the renderer's stale `currentTurn` pointer, so diagnostics and subsequent Send Turn attempts do not keep reasoning about the previous completed action; the exact remote chaos seed that exposed this now passes.
-211. The command deck Send action is now content-aware for host and guest composers: connected/ready state alone no longer enables an empty submit, while typed text, approved companion beats, or active staged remote inputs wake the button. The input composer repaints on typed and programmatic draft changes.
-212. The New Adventure wizard's first companion card now uses the same "Scene cue for DM Voice" wording as dynamically added party cards, removing the last visible "Host note for the DM" setup leak.
-213. Additional visible copy leaks now use table language: returning home points to Continue/New Adventure/Join/DM Voice, local model readiness says local DM Voice instead of local AI, and delete confirmation describes a local backup instead of SQLite/deleted-campaigns/manual recovery internals.
-214. Guest lobby previews now collapse fresh-table setup scaffolding down to table fiction/premise and the remote join helper asserts guests do not see "The table is set..." or host-only Next instructions.
-215. Rejected remote guest actions, passes, and choice votes now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
-216. Start Adventure duplicate-click coverage now proves a rapid second click cannot create a second provider call or duplicate opening narration.
-217. Recovery Retry/Use Anyway action gating now lives in `app/turn-repair-controller.js`; handlers block busy/no-repair/no-reviewed-response/hard-blocked states even if a hidden recovery button or debug path is invoked directly.
-218. The 5E-lite character sheet seed/profile/equipment/spell policy moved out of `app/app.js` into `src/rules/character-seed.js`, with direct tests and architecture guards preventing renderer ownership from creeping back.
-219. Play-message block parsing now lives in `app/message-block-controller.js`: DM/provider prose grouping, mechanics rows, parsed choice panels, structured choice override, and latest-choice lookup are tested outside `app/app.js`.
-220. DM Voice settings/model projection now lives in `app/provider-settings-controller.js`: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and selected-model chips are tested outside `app/app.js`.
-221. Renderer diagnostics/session-health/table-timeline projection now lives in `app/renderer-diagnostics-controller.js`, including debug play-log message normalization, diagnostics snapshot serialization, bounded timeline/event slices, and turn-flow timeline wording.
-222. Front-door saved-adventure projection now lives in `app/home-campaign-controller.js`: backend starter-campaign hiding, saved-adventure count copy, Continue/Delete enablement, selected campaign lookup, and safe delete-target projection are tested outside `app/app.js`.
-223. Scene intelligence and notebook projections now live in `app/scene-notebook-controller.js`: the table rail uses DM-context scene retrieval without letting generated fallback scene shells appear as player-visible notebook records.
-224. People/place/thing/quest notebook sections now live in `app/campaign-notebook-controller.js`, including current-place ordering, carried inventory, assets, related-entity labels, and DM-only story-thread filtering outside the renderer.
-225. Character sheet form projection and save-payload policy now live in `app/character-sheet-controller.js`: HP normalization, ability aliases, merged skill/ability/spell text, preserved resources/attacks, and parsed sheet fields are tested outside `app/app.js`.
-226. New Adventure wizard policy now lives in `app/campaign-wizard-controller.js`: primary/joiner normalization, host/remote/AI controller defaults, opening setup copy, and remote invite sheet fields are tested outside `app/app.js`.
+209. Combat tracker rows now summarize compact party resources, including spell slots and named uses, and show temporary HP from existing character shapes so combat visibility covers more than base HP and turn economy without opening a full sheet.
+210. Scene situation compaction now has one shared owner in `app/table-text-controller.js`, so renderer directives plus scene/combat import fallbacks strip choice prompts with the same tested policy instead of keeping duplicate helpers in `app.js`.
+211. Change-domain alias normalization now has one shared owner in `app/change-domain-controller.js`, so provider import, scene import, combat import, and combat prompt repair all treat `party_member`/`player_character` as `party` through the same tested helper.
+212. Table Talk visible-message bounding now lives in `app/table-talk-controller.js`, keeping side-chat render limits and source freshness in one tested projection instead of hard-coding the last 80 messages in `app.js`.
+213. Record-dialog placeholders now use campaign-neutral copy for party members, people, places, threads, lore, assets, and things instead of carrying specific example names from prior campaigns.
+214. Record-dialog copy, labels, save-success labels, and edit value formatting now live in `app/record-dialog-controller.js`, keeping another table-facing policy cluster out of `app/app.js`.
+215. Table Talk source freshness now lives in `app/table-talk-controller.js` with direct tests for guest snapshots, stale local campaign chat, route-side snapshot updates during generation, and bad data fallback instead of inline renderer branching.
+216. Successful imported player turns now clear the renderer's stale `currentTurn` pointer, so diagnostics and subsequent Send Turn attempts do not keep reasoning about the previous completed action; the exact remote chaos seed that exposed this now passes.
+217. The command deck Send action is now content-aware for host and guest composers: connected/ready state alone no longer enables an empty submit, while typed text, approved companion beats, or active staged remote inputs wake the button. The input composer repaints on typed and programmatic draft changes.
+218. The New Adventure wizard's first companion card now uses the same "Scene cue for DM Voice" wording as dynamically added party cards, removing the last visible "Host note for the DM" setup leak.
+219. Additional visible copy leaks now use table language: returning home points to Continue/New Adventure/Join/DM Voice, local model readiness says local DM Voice instead of local AI, and delete confirmation describes a local backup instead of SQLite/deleted-campaigns/manual recovery internals.
+220. Guest lobby previews now collapse fresh-table setup scaffolding down to table fiction/premise and the remote join helper asserts guests do not see "The table is set..." or host-only Next instructions.
+221. Rejected remote guest actions, passes, and choice votes now capture a host trust snapshot before and after the route call, proving stale/forbidden guest submissions do not change table phase, provider generation, recovery, play-log messages, staged inputs, active turn, combat turn, or waiting-room state.
+222. Start Adventure duplicate-click coverage now proves a rapid second click cannot create a second provider call or duplicate opening narration.
+223. Recovery Retry/Use Anyway action gating now lives in `app/turn-repair-controller.js`; handlers block busy/no-repair/no-reviewed-response/hard-blocked states even if a hidden recovery button or debug path is invoked directly.
+224. The 5E-lite character sheet seed/profile/equipment/spell policy moved out of `app/app.js` into `src/rules/character-seed.js`, with direct tests and architecture guards preventing renderer ownership from creeping back.
+225. Play-message block parsing now lives in `app/message-block-controller.js`: DM/provider prose grouping, mechanics rows, parsed choice panels, structured choice override, and latest-choice lookup are tested outside `app/app.js`.
+226. DM Voice settings/model projection now lives in `app/provider-settings-controller.js`: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and selected-model chips are tested outside `app/app.js`.
+227. Renderer diagnostics/session-health/table-timeline projection now lives in `app/renderer-diagnostics-controller.js`, including debug play-log message normalization, diagnostics snapshot serialization, bounded timeline/event slices, and turn-flow timeline wording.
+228. Front-door saved-adventure projection now lives in `app/home-campaign-controller.js`: backend starter-campaign hiding, saved-adventure count copy, Continue/Delete enablement, selected campaign lookup, and safe delete-target projection are tested outside `app/app.js`.
+229. Scene intelligence and notebook projections now live in `app/scene-notebook-controller.js`: the table rail uses DM-context scene retrieval without letting generated fallback scene shells appear as player-visible notebook records.
+230. People/place/thing/quest notebook sections now live in `app/campaign-notebook-controller.js`, including current-place ordering, carried inventory, assets, related-entity labels, and DM-only story-thread filtering outside the renderer.
+231. Character sheet form projection and save-payload policy now live in `app/character-sheet-controller.js`: HP normalization, ability aliases, merged skill/ability/spell text, preserved resources/attacks, and parsed sheet fields are tested outside `app/app.js`.
+232. New Adventure wizard policy now lives in `app/campaign-wizard-controller.js`: primary/joiner normalization, host/remote/AI controller defaults, opening setup copy, and remote invite sheet fields are tested outside `app/app.js`.
 
 ### Still Risky
 
@@ -456,6 +464,7 @@ Risks:
 26. Automated UI coverage is now much stronger, including host plus `/guest` browser-tab flows, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
 27. The Playwright harness now has a stable visual-audit screenshot mode for core host, guest, combat, and recovery states, but it remains a local browser harness. Visual QA still needs occasional Electron-host and real LAN guest review to catch shell/window/device details.
 28. Host play still blends party-member table play with software-owner controls in one shell. That is functional for authority, but the UX needs a clearer stance: host-only controls should feel like a tucked-away table-owner surface, while the center surface feels shared with the players and the provider remains the DM voice.
+29. Remote table access has a doctrine doc but not a built-in relay yet. Current `/guest` is LAN-first; future tunnel/relay work must begin from an explicit guest-safe route allowlist and keep provider keys, Ollama/local model endpoints, filesystem/debug routes, and host/admin controls private to the host.
 
 ## Live Acceptance Matrix
 
@@ -490,7 +499,7 @@ Risks:
 
 6. Continue validating party-vote host resolution in live play: guest voting, table leaning, ties, and host draft/send flow are implemented, but still need two-machine feel testing.
 7. Playtest AI companion combat approval flow for wording, speed, and whether Stage/Resolve/Pass feels natural mid-combat.
-8. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance exists, the copied-response fallback stays hidden unless bridge/manual handoff or pasted draft text makes it relevant, fallback copy/state lives in the host response review controller, and Inspect opens a focused DM Recovery surface instead of broad Troubleshooting.
+8. Replace the remaining manual review textarea escape hatch with a fuller guided host review flow. Current state: repair summary guidance now includes a tested decision guide for Try Again, Details, and Use Anyway; the copied-response fallback stays hidden unless bridge/manual handoff or pasted draft text makes it relevant, uses explicit copied-response fallback wording, fallback copy/state lives in the host response review controller, and Inspect opens a focused DM Recovery surface instead of broad Troubleshooting.
 9. Run the two-machine playtest checklist and log every friction point.
 10. Soak-test guest-side "sent / host received / resolving / resolved" state on two machines.
 11. Soak-test host-side "guest is waiting on you" affordance on two machines.
@@ -499,6 +508,7 @@ Risks:
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
 15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door DM Voice readiness is now secondary, settings entry points are single-purpose instead of visibly tabbed, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
 16. Keep the host-surface stance explicit: the host is a party member and software-side table owner, not the DM. Host-only controls should collect setup, invites, provider/model access, party ownership, recovery, and tie-breaking without making the main table feel like a DM console.
+17. Add a local table session/invite model and Share Table panel for LAN guest links first, with host approval and explicit guest-safe route boundaries, before any relay implementation. Current state: LAN guest links already use host approval and session-stamped guest requests; multiplayer authority now owns a tested share-session projection with campaign/table/session identity, the LAN `/guest` link, and guest-safe route categories; host snapshots carry that share session, and Friends And Seats renders the boundary for the host. Remaining gap: promote this into a fuller first-class table invite/session lifecycle beyond the current host snapshot/UI contract.
 
 ### Medium
 
@@ -512,7 +522,7 @@ Risks:
 
 ### Low
 
-24. Replace remaining overly specific placeholder text with neutral table examples. Current state: the main command deck fallback is now campaign-neutral; secondary placeholders still need occasional review as screens evolve.
+24. Replace remaining overly specific placeholder text with neutral table examples. Current state: the main command deck fallback, primary character-name placeholders, and record-dialog placeholders for party/people/place/thread/lore/asset/item records are now campaign-neutral; secondary placeholders still need occasional review as screens evolve.
 25. Add pre-table guest lobby: read-only campaign/party setup for guests, editable own character only, clear ready state.
 26. Continue improving campaign-aware character auto-complete quality; current behavior preserves supplied hard facts while letting the button regenerate derived pitch/integration text from party theme, premise, and existing characters.
 27. Add explicit party-template flow for "four dwarf soldiers" or "heist crew."
@@ -549,7 +559,7 @@ Risks:
 - [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
 - [x] Make fresh ready tables a first-class opening phase: Start Adventure is the only first provider turn, while DM Nudge, companion Nudge, Send Turn, and debug submit are blocked until the opening starts.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, play-log lifecycle/action wording, play-message block parsing, DM Voice settings/model projection, New Adventure wizard policy, character sheet projection/payload policy, renderer diagnostics/session-health/table-timeline projection, front-door saved-adventure projection, campaign/scene notebook projection, AI companion approval projection, party-vote choice math, send-turn preflight including pre-opening submit locks, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, provider response import planning, provider response cleanup/table-message splitting, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import side-effect orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, play-log lifecycle/action wording, play-message block parsing, DM Voice settings/model projection, New Adventure wizard policy, character sheet projection/payload policy, renderer diagnostics/session-health/table-timeline projection, front-door saved-adventure projection, campaign/scene notebook projection, record-dialog copy/value policy, AI companion approval projection, party-vote choice math, send-turn preflight including pre-opening submit locks, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, provider response import planning, provider response cleanup/table-message splitting, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, shared scene-situation text compaction, shared change-domain alias normalization, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import side-effect orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
@@ -593,10 +603,10 @@ Risks:
 - [ ] Tune agency validation against real play logs so it catches overreach without blocking neutral presence/staging narration. Current state: neutral presence, hostile focus, host-name-as-object, remote-PC body-language overreach, "doesn't back down" resolve-overreach fixtures, and friendlier opening/recovery copy are covered.
 - [x] Let host choose host/AI/unassigned during additional character creation.
 
-### Multiplayer And LoreKeeper Join
+### Multiplayer And LoreKeeper Access
 
 - [x] Host owns software-side campaign files, provider access/model calls, canon review, guest approvals, and persistence; the provider remains the DM voice.
-- [x] Guest/join clients do not need Ollama or provider controls.
+- [x] Browser guest access does not need Ollama or provider controls; the full LoreKeeper app can also join another host.
 - [x] Join-as flow supports richer character proposal and host integration note.
 - [x] Guest inputs are visible table messages and can become structured `user.playerInputs[]`.
 - [x] Party-scoped DM choices are host-submitted decisions; remote guests vote on options instead of drafting locked action text.
@@ -604,11 +614,12 @@ Risks:
 - [x] Remote-to-AI/host controller transfer clears stale guest links.
 - [x] Desktop protocol invite links preload the Join screen and clear stale saved sessions for different invites.
 - [x] Fixed-seat invite joins require a table-visible guest name.
-- [x] LoreKeeper has a single visible Host/Join front door; the old ThinLoreKeeper desktop identity is removed.
+- [x] LoreKeeper has a single visible Host/Join front door; old split-client desktop distro identities are removed.
 - [x] DM Voice setup is reachable as a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
 - [x] Browser `/guest` previews the active host table and lets guests request an available non-host character seat.
 - [x] Host can copy a same-network Guest Link from Local Table.
+- [x] Multiplayer authority owns a tested Share Table session projection with campaign/table/session identity, the LAN `/guest` link, and explicit host-side safety copy carried in host snapshots and rendered in Friends And Seats.
 - [x] Waiting-room guests are visible to the host without digging through diagnostics, including requested character seat.
 - [x] Stale waiting-room guests expire instead of lingering as broken seat buttons.
 - [x] Guest Leave notifies the host, releases the remote controller to Host, and makes the vacated seat requestable again.
@@ -626,6 +637,20 @@ Risks:
 - [x] Add disconnect/reconnect/campaign-switch soak tests. Current state: deterministic local regression coverage exists; real two-machine soak remains tracked separately.
 - [ ] Consider WebSocket/broadcast later after polling semantics are solid.
 
+### Remote Table Safety Audit
+
+- [x] Guest routes are distinct from host/admin routes through the explicit `isGuestSafeRemotePath` allowlist, `scripts/serve.js` route classification, and `scripts/test-server-security.js`.
+- [x] Guest mode cannot reach provider settings without host authorization.
+- [x] Guest mode cannot reach Ollama/local model endpoints without host authorization.
+- [x] Guest mode cannot reach filesystem/debug routes without host authorization; `/api/runtime` is host-protected because it includes local runtime details.
+- [x] Existing fixed-seat and character-request invite links use generated URL-safe tokens with explicit multiplayer test coverage; future remote invite links must use unguessable tokens too.
+- [x] Host approval exists for waiting-room seat requests and fixed-seat invite joins.
+- [x] Guest actions are requests/staged inputs, not direct canon mutations.
+- [x] Host remains authoritative for table state, provider calls, approvals, review, persistence, and controller transfers.
+- [x] Provider keys and local model access stay on the host side.
+- [x] Remote sharing exposes only guest-safe routes by policy. Current state: an explicit allowlist exists for `/guest`, static guest app assets, and public guest table APIs; Share Table route categories include waiting-room, fixed invite, action/pass/vote, disconnect/rejoin, combat participation, and Table Talk routes, and are cross-checked against server route security tests; no tunnel or relay consumes it yet.
+- [x] The host-facing share panel names the guest-safe boundary: preview, seat request, approved character actions, votes, pass, and Table Talk only; host settings, DM Voice, Ollama, files, and diagnostics stay host-side.
+
 ### Character Creation
 
 - [x] Campaign creation requires one host character.
@@ -635,7 +660,7 @@ Risks:
 - [x] Remote Invite seat intent survives campaign record creation and appears as a joinable guest seat after Create And Start.
 - [x] Host New has an explicit Back action and no stale table rails while setup is open.
 - [x] Post-start host-created character flow uses same compact creator.
-- [x] Guest join and LoreKeeper Join use aligned compact fields.
+- [x] Browser guest join and in-app Join A Table use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
 - [x] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character. Current state: `/guest` shows the table preview, open character seats, and an optional character draft card; waiting-room registrations carry the draft through pre-table and active-table seating so the host can see what the guest is bringing.
 - [x] Let Host New Remote Invite slots appear on `/guest` before campaign start and preserve waiting guest requests after Create And Start.
@@ -658,9 +683,10 @@ Risks:
 - [x] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog component remains, but the runtime surfaces are single-purpose App Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery views with cross-surface tabs hidden from normal entry points.
 - [x] Rename first-pass technical UI language so normal users see Host/Join/DM Voice/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
 - [x] Reduce visible Preferences controls to App, DM Voice, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
-- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, fresh-table Start Adventure, Seat Guest, and DM recovery actions live beside that cue, `app/table-action-controller.js` owns the main table CTA visibility policy, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; the party, combat, notebook, and Table Talk rails now receive tested primary/supporting/quiet focus states, provider-status updates repaint the composer to keep phase copy aligned, Start Adventure hides after the host requests the opening for the current table session, pre-opening DM/AI companion nudges and Send Turn are disabled until that opening has begun, backend starter seed campaigns are hidden from the front door, combat has an active-turn cue with controller responsibility plus legal actions, and Inspect opens a focused recovery settings surface. Deeper combat action workflows and broader settings split work still need phase-specific behavior.
+- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, fresh-table Start Adventure, Seat Guest, and DM recovery actions live beside that cue, `app/table-action-controller.js` owns the main table CTA visibility policy, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; the party, combat, notebook, and Table Talk rails now receive tested primary/supporting/quiet states, provider-status updates repaint the composer to keep phase copy aligned, Start Adventure hides after the host requests the opening for the current table session, pre-opening DM/AI companion nudges and Send Turn are disabled until that opening has begun, backend starter seed campaigns are hidden from the front door, combat has an active-turn cue with controller responsibility plus legal actions, combat rows now show action/bonus/reaction/movement/concentration/resource state, and Inspect opens a focused recovery settings surface. Deeper combat action workflows and broader settings split work still need phase-specific behavior.
 - [x] Make the front door feel closer to a game launcher: recent campaign, new table, join table, DM Voice readiness, and no hidden last-table background. Current state: the primary grid now presents Continue Adventure, New Adventure, and Join A Table as first-class choices, with DM Voice and Preferences in the lower utility strip.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
+- [x] Keep side-chat rendering bounded. Current state: `app/table-talk-controller.js` owns the Table Talk freshness and visible-message projection, capped to the latest 80 side-chat messages for rendering while preserving the full count for unread/status copy.
 - [x] Soak-test scroll behavior during long sessions. Current state: hidden UI harness helpers can seed/append synthetic play-log messages, and `long-session-scroll-soak` proves bounded rendering, Show Earlier, reader-position preservation, and bottom auto-follow without requiring hundreds of real provider turns.
 - [x] Keep debug/repair tools tucked away unless action is required.
 - [x] Add a context-sensitive Scene section to Campaign Notes. Current state: full note tabs can wait for playtest, but current scene/retrieval context is now visible in the notebook shelf.
@@ -680,6 +706,7 @@ Risks:
 - [x] Add trust-invariant assertions to the UI harness for rejected role/session actions. Current state: forbidden/stale guest action, pass, and choice-vote probes now capture host state before and after the route call and assert no provider generation, play-log, staged-input, turn, combat, recovery, phase, or waiting-room mutation.
 - [x] Add route-level tests for private/guest API split.
 - [x] Add route-level integration tests with API token enabled and stale campaign/table/session payloads.
+- [x] Keep Electron host startup aligned with protected runtime routes. Current state: the desktop launcher passes the per-process API token into the host app URL, and architecture tests assert the Electron startup probe uses that token when checking `/api/runtime`.
 - [x] Add local asset and path traversal integration coverage for the server.
 - [x] Gate host-style combat join mutations behind local app authorization when they share a guest-public route.
 - [x] Add migration modules before public release. Current state: versioned runner exists and unsupported schema/user_version combinations fail loudly; future schema changes still need explicit migration entries.
@@ -817,6 +844,19 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-19: Campaign notebook sections moved out of `app/app.js` into `app/campaign-notebook-controller.js`, covering people, places, things, quests, current-place ordering, carried inventory, assets, related labels, and DM-only story-thread filtering. Verification: node syntax checks, `npm run test:engine`, `npm run build`, focused visual-audit UI, and `npm run test:all` passed.
 - 2026-06-19: Character sheet projection/save-payload policy moved out of `app/app.js` into `app/character-sheet-controller.js`, covering HP normalization, ability aliases, text merging, resources/attacks preservation, and parsed 5E-lite form fields. Verification: node syntax checks, `npm run test:engine`, `npm run build`, `npm run test:all`, and focused Start Adventure UI passed.
 - 2026-06-19: New Adventure wizard policy moved out of `app/app.js` into `app/campaign-wizard-controller.js`, covering character/joiner normalization, controller-kind defaults, opening setup copy, and host/remote/AI sheet fields. Verification: node syntax checks, `npm run test:engine`, `npm run build`, `npm run test:all`, and focused Start Adventure UI passed.
+- 2026-06-19: Remote table route doctrine now has an executable boundary: `isGuestSafeRemotePath` allowlists `/guest`, static guest app assets, and public guest table APIs while keeping runtime diagnostics, provider settings, Ollama/local model endpoints, local assets, and host/admin routes out of future remote sharing. `/api/runtime` is now host-token protected when auth is configured. Verification: `npm run test:security`, `npm run test:multiplayer`, `npm run test:all`, and `npm run build` passed.
+- 2026-06-19: Desktop host startup was re-aligned with protected runtime diagnostics after `/api/runtime` became host-token protected; Electron now authenticates its readiness probe, and the architecture test locks that behavior so the desktop shortcut path does not silently regress. Verification: `npm run test:engine` and `npm run build` passed.
+- 2026-06-19: Multiplayer authority gained a tested Share Table session projection for the LAN `/guest` path. The projection carries campaign/table/session identity, the guest link, and the guest-safe route boundary, while Friends And Seats reminds hosts that DM Voice, Ollama, files, diagnostics, and settings stay on the host. Verification: `npm run test:multiplayer`, `npm run test:engine`, and `npm run build` passed.
+- 2026-06-19: DM Recovery review gained a tested decision guide so hosts see when to Try Again, open Details, or Use Anyway before they ever reach raw copied-response controls. The fallback is now labeled as a copied DM response path, not the normal recovery action. Verification: `npm run test:engine` and `npm run build` passed.
+- 2026-06-19: Combat tracker rows now expose more of the app-owned turn economy in the rail: action, bonus action, reaction, movement remaining, and concentration/condition state are covered by projection tests. Verification: `npm run test:engine` passed.
+- 2026-06-21: Combat tracker rows now also expose compact party resource state, including spell slots and named uses, and show temporary HP from existing character resource shapes. Verification: `npm run test:engine` passed.
+- 2026-06-21: Scene situation text compaction moved into `app/table-text-controller.js`, removing duplicate renderer, scene-import, and combat-import helpers while preserving choice-prompt stripping. Verification: `npm run test:engine` passed.
+- 2026-06-21: Change-domain alias normalization moved into `app/change-domain-controller.js`, removing duplicate `party_member`/`player_character` alias helpers from provider import, scene import, combat import, and combat prompt repair policy. Verification: `npm run test:engine` passed.
+- 2026-06-21: Table Talk rendering now uses a bounded projection from `app/table-talk-controller.js`, so source freshness and the latest-80 visible side-chat cap are tested outside `app.js`. Verification: `npm run test:engine` passed.
+- 2026-06-21: Record-dialog placeholders were neutralized across party, people, places, threads, lore, assets, and things, with architecture coverage preventing the old campaign-specific examples from returning. Verification: `npm run test:engine` passed.
+- 2026-06-21: Record-dialog copy/value policy moved into `app/record-dialog-controller.js`, covering labels, placeholders, role/notes formatting, and save-success labels outside the renderer. Verification: `npm run test:engine` passed.
+- 2026-06-21: The SotT recent-progress list was renumbered after the Share Table and controller-extraction notes were appended out of sequence, keeping the working roadmap readable without changing product state. Verification: docs-only cleanup.
+- 2026-06-21: Multiplayer invite-token doctrine now has direct regression coverage: fixed-seat invites, character-request invites, waiting-room secrets, and guest connection secrets are asserted as URL-safe generated tokens/secrets instead of only checked for presence. Verification: `npm run test:multiplayer` passed.
 
 ## How To Use This Doc
 

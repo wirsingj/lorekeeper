@@ -6,6 +6,7 @@ Start with:
 
 - `docs/state-of-the-table.md`: current product state, priorities, and checklist.
 - `docs/ARCHITECTURE.md`: durable ownership boundaries and important files.
+- `docs/REMOTE_TABLE_ACCESS_PLAN.md`: remote table access product/security doctrine.
 - `docs/living-world.md`: world-memory and goal-horizon model.
 
 This guide is the practical "what do I run and where do I look?" map.
@@ -53,6 +54,14 @@ Desktop:
 npm run desktop
 ```
 
+Windows portable package:
+
+```powershell
+npm run package:portable
+```
+
+This creates `dist/portable/LoreKeeper.zip`, the one-app portable distribution. It bundles the Electron/Node runtime, built renderer, local API server code, and runtime dependency `sql.js`, but it does not bundle Ollama or model files. The package script creates a clean `data/` folder and removes stale split-client portable artifacts so the distributable remains a single LoreKeeper app.
+
 Local server only:
 
 ```powershell
@@ -85,7 +94,9 @@ npm run cleanup
 - Campaign adoption/polling policy: `app/campaign-adoption-controller.js`, `app/table-background-polling-controller.js`
 - SQLite/repository: `src/storage/sqlite-store.js`, `src/storage/campaign-repository.js`, `src/storage/sqlite-migrations.js`
 - Recovery/import projections: `app/provider-import-controller.js`, `app/turn-repair-controller.js`, `app/staged-input-recovery-controller.js`
-- Play log projection: `app/play-log-controller.js`
+- Shared import/recovery helpers: `app/change-domain-controller.js`, `app/table-text-controller.js`
+- Play log and side-chat projections: `app/play-log-controller.js`, `app/table-talk-controller.js`
+- Record dialog copy/value policy: `app/record-dialog-controller.js`
 
 ## Do Not Grow These Files
 
@@ -147,6 +158,8 @@ npm run test:ui -- --scenario create-campaign-and-hide-start-adventure-after-use
 The Playwright harness starts its own temporary server and campaign directory. It can open multiple pages in one browser context, so host and `/guest` tabs share the same local server while preserving separate renderer/session state. It mocks provider generation inside scenarios that need deterministic DM output with a persistent page route, and keeps one real Ollama provider-contract scenario to catch parser drift against an installed quick model. Use `--keep-temp` only when intentionally preserving a failed temp campaign root for inspection.
 
 Real multiplayer QA should model the intended release shape: one software-side host authority, often the Electron desktop app with Ollama/provider configured, plus guests using `http://<host-ip>:4173/guest` in a browser or another desktop install. "Host" means lobby/table owner and provider access point, not the DM and not necessarily the only machine running the app.
+
+Remote table work must follow `docs/REMOTE_TABLE_ACCESS_PLAN.md`: the host may configure models, providers, tunnels, or relays, but guests should only need a browser link. Do not expose provider settings, Ollama/local model endpoints, filesystem/debug routes, raw database access, or host/admin controls through any remote sharing path.
 
 ## Debugging Owners
 
@@ -223,6 +236,41 @@ Common fix direction:
 - Preserve staged guest input on failure.
 - Keep timeout/retry wording in recovery controllers, not scattered UI branches.
 
+### Desktop Shortcut Does Not Open
+
+Symptoms:
+
+- `LoreKeeper.lnk` appears to do nothing.
+- The browser `/guest` shortcut cannot connect because the host app is not running.
+- `data/electron.log` reports `LoreKeeper API did not start in time`.
+
+Likely owner:
+
+- `Launch LoreKeeper Hidden.vbs`
+- `scripts/launch-desktop.js`
+- `electron/main.js`
+- `scripts/serve.js`
+
+Inspect:
+
+- Shortcut target should be `wscript.exe` with `Launch LoreKeeper Hidden.vbs` as the argument.
+- `data/launcher.log` for launcher mode/build/Electron spawn status.
+- `data/launcher-child.log` for child process build/Electron stdout and stderr.
+- `data/electron.log` for Electron startup and local API readiness errors.
+
+Run:
+
+```powershell
+npm run build
+npm run test:engine
+npm run test:security
+```
+
+Common fix direction:
+
+- If a host-protected readiness route changed, ensure Electron sends the per-process API token when probing it.
+- If the browser guest shortcut is the only failing entry, confirm the desktop host is running before testing `http://<host-ip>:4173/guest`.
+
 ### Provider Output Rejected
 
 Symptoms:
@@ -267,6 +315,7 @@ Symptoms:
 Likely owner:
 
 - `src/multiplayer/local-table.js`
+- `src/multiplayer/share-table-session.js`
 - `scripts/serve.js` multiplayer routes
 - `app/multiplayer-session-panel.js`
 
@@ -287,6 +336,7 @@ npm run test:regression
 Common fix direction:
 
 - Validate explicit campaign/table/session identity.
+- Keep Share Table projection browser-safe; renderer code should not import Node-backed multiplayer authority.
 - Prefer `/guest` waiting room over fixed join-as links for normal flow.
 - Do not let stale sessions silently attach to the active campaign.
 

@@ -1,6 +1,6 @@
 Option Explicit
 
-Dim shell, filesystem, repo, launcher, dataFolder, logFile, nodePath, command
+Dim shell, filesystem, repo, launcher, dataFolder, logFile, childLogFile, nodePath, command
 
 Set shell = CreateObject("WScript.Shell")
 Set filesystem = CreateObject("Scripting.FileSystemObject")
@@ -9,6 +9,7 @@ repo = filesystem.GetParentFolderName(WScript.ScriptFullName)
 launcher = repo & "\scripts\launch-desktop.js"
 dataFolder = repo & "\data"
 logFile = repo & "\data\launcher.log"
+childLogFile = repo & "\data\launcher-child.log"
 nodePath = FindNode()
 
 If Not filesystem.FolderExists(dataFolder) Then
@@ -17,7 +18,7 @@ End If
 
 shell.CurrentDirectory = repo
 AppendLog logFile, "VBS host launch using node: " & nodePath
-command = "cmd.exe /d /s /c " & Chr(34) & Chr(34) & nodePath & Chr(34) & " " & Chr(34) & launcher & Chr(34) & " >> " & Chr(34) & logFile & Chr(34) & " 2>&1" & Chr(34)
+command = "cmd.exe /d /s /c " & Chr(34) & Chr(34) & nodePath & Chr(34) & " " & Chr(34) & launcher & Chr(34) & " >> " & Chr(34) & childLogFile & Chr(34) & " 2>&1" & Chr(34)
 shell.Run command, 0, False
 
 Function FindNode()

@@ -2,6 +2,8 @@
 
 LoreKeeper is a local-first tabletop RPG desktop app for running a D&D-style campaign with a real table flow. The app owns campaign state, combat, continuity, recovery, multiplayer authority, and the shape of play. The AI provider owns narration, NPC behavior, atmosphere, and dialogue inside those app-owned rails.
 
+LoreKeeper is one app that can be experienced as a local host app, provider-backed host app, browser guest mode, and eventual remote guest link through a tunnel or relay. The current same-network `/guest` flow is the proof point: the host owns campaign state and DM Voice access, while guests join from a browser and do not need LoreKeeper, Ollama, provider tools, VPN software, or model runtimes.
+
 The default rules profile is D&D 5e-lite: HP, AC, ability scores, checks, saves, initiative, conditions, abilities, spells, inventory, and combat turns are tracked where the app has enough information. LoreKeeper is not trying to become a full virtual tabletop; it is trying to make a campaign feel durable, coherent, and easy to resume.
 
 ## Product Shape
@@ -46,6 +48,7 @@ Provider output is treated as a DM contribution, not as authority over campaign 
 
 - `docs/ARCHITECTURE.md`: current architecture, ownership boundaries, and code landmarks.
 - `docs/state-of-the-table.md`: working product state, priorities, checklist, and playtest notes.
+- `docs/REMOTE_TABLE_ACCESS_PLAN.md`: remote table access strategy, product doctrine, and route safety rules.
 - `docs/MAINTAINER_GUIDE.md`: practical commands, debug map, and failure playbooks.
 - `docs/living-world.md`: consequence, memory, relationship, faction, location, and goal-horizon continuity model.
 - `electron/`: desktop window, local server launch, and desktop protocol handling.
@@ -86,6 +89,14 @@ Run the full test suite and production build:
 npm run test:all
 npm run build
 ```
+
+Build the Windows portable app:
+
+```bash
+npm run package:portable
+```
+
+The portable zip is the full LoreKeeper app. It can host a local table or join another host from the same app. It bundles the Electron/Node runtime used by LoreKeeper, but Ollama and model files remain external installs.
 
 ## Local Persistence
 
