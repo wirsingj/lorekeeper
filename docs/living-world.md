@@ -1,3 +1,16 @@
+---
+yaiml: 0.2
+role: supporting
+title: LoreKeeper Living World
+purpose: Durable model for world memory, consequences, relationships, factions, locations, and goal horizons.
+belongs-here: continuity memory concepts, retrieval priorities, living-world engines, provider proposal expectations, long-campaign memory rules.
+not-here: general product priorities, command reference, remote table doctrine, complete campaign lore.
+durability: durable; update when the continuity memory model or ownership boundaries change.
+read-with: LoreKeeper State Of The Table; LoreKeeper Architecture.
+update-when: living-world storage, retrieval, proposal, or review semantics change.
+agent-guidance: Preserve the distinction between app-owned canon and provider expression. Do not treat provider memory as canon.
+---
+
 # LoreKeeper Living World
 
 Updated: 2026-06-16

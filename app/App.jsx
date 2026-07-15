@@ -67,7 +67,7 @@ export function LorekeeperShell() {
             <p id="scene-intelligence-tensions"></p>
             <p id="scene-intelligence-consequences"></p>
           </div>
-          <span id="provider-status" className="visually-hidden">DM voice: ChatGPT DM</span>
+          <span id="provider-status" className="visually-hidden">Model source: ChatGPT</span>
         </section>
 
         <section id="party-rail-section" className="rail-section party-rail-section">
@@ -109,18 +109,18 @@ export function LorekeeperShell() {
             <div className="home-menu">
               <div className="home-menu-heading">
                 <p className="eyebrow">LoreKeeper</p>
-                <h2>Start Playing</h2>
-                <p>Choose the table you want to sit at: continue a story, begin a new adventure, or join friends already gathering.</p>
+                <h2>Choose Table</h2>
+                <p>Continue your table, create a new one, or join friends already gathering.</p>
               </div>
               <div className="home-flow-grid">
                 <article className="home-flow-card home-flow-card-primary">
                   <div>
-                    <p className="eyebrow">Your Table</p>
-                    <h3>Continue Adventure</h3>
-                    <p>Return to a saved campaign and gather everyone before the next scene.</p>
+                    <p className="eyebrow">Saved</p>
+                    <h3>Continue Table</h3>
+                    <p>Return to a saved table and gather everyone before the next scene.</p>
                   </div>
                   <label className="home-campaign-picker">
-                    <span>Saved adventure</span>
+                    <span>Saved table</span>
                     <select id="home-campaign-select" aria-label="Existing campaign">
                       <option>Loading campaigns...</option>
                     </select>
@@ -132,30 +132,34 @@ export function LorekeeperShell() {
                 </article>
                 <article className="home-flow-card home-flow-card-compact home-flow-card-new">
                   <div>
-                    <p className="eyebrow">New Story</p>
-                    <h3>New Adventure</h3>
+                    <p className="eyebrow">New</p>
+                    <h3>Create New Table</h3>
                     <p>Set the opening situation, create your character, and invite companions before the first narration.</p>
                   </div>
                   <div className="home-flow-actions">
-                    <button id="home-new-campaign" type="button">Set Up Table</button>
+                    <button id="home-new-campaign" type="button">Create</button>
                   </div>
                 </article>
                 <article className="home-flow-card home-flow-card-compact">
                   <div>
                     <p className="eyebrow">Friends</p>
-                    <h3>Join A Table</h3>
+                    <h3>Join Table</h3>
                     <p>Find the host's table, ask for a seat, and play from this device.</p>
                   </div>
                   <div className="home-flow-actions">
-                    <button id="home-join-flow" type="button">Find Table</button>
+                    <button id="home-join-flow" type="button">Join</button>
                   </div>
                 </article>
               </div>
               <div className="home-library-strip" aria-label="Local library summary">
                 <span id="home-active-campaign">Campaigns loading...</span>
                 <span id="home-character-count">Characters stay with their adventures</span>
-                <button id="home-provider-setup" className="secondary-action" type="button">DM Voice</button>
-                <button id="home-settings" className="secondary-action" type="button">Preferences</button>
+                <button id="home-settings" className="icon-action home-settings-action" type="button" title="Settings" aria-label="Settings">
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8Z"></path>
+                    <path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.6 6.6l1.4 1.4M16 16l1.4 1.4M17.4 6.6L16 8M8 16l-1.4 1.4"></path>
+                  </svg>
+                </button>
               </div>
             </div>
           </section>
@@ -176,7 +180,7 @@ export function LorekeeperShell() {
               <div className="join-panel-header">
                 <div>
                   <p className="eyebrow">LoreKeeper</p>
-                  <h2 id="join-client-title">Join A Table</h2>
+                  <h2 id="join-client-title">Join Table</h2>
                 </div>
                 <button id="join-back-home" className="secondary-action back-home-action" type="button" title="Back to main menu">
                   <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -519,7 +523,7 @@ function CampaignDialog() {
         <header className="dialog-header">
           <div>
             <p className="eyebrow">Adventure</p>
-            <h2>New Adventure</h2>
+            <h2>Create New Table</h2>
           </div>
           <button id="close-campaign-dialog" className="secondary-action back-home-action" type="button" title="Back to previous screen">
             <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -737,7 +741,7 @@ function SetupDialog() {
 
         <nav id="settings-tabs" className="settings-tabs" aria-label="Preferences sections" role="tablist" data-visible-tabs="4">
           <button className="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="app">App</button>
-          <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="ai">DM</button>
+          <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="ai">Models</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="friends">Friends</button>
           <button className="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="troubleshooting">Troubleshooting</button>
         </nav>
@@ -758,13 +762,13 @@ function SetupDialog() {
 
         <section id="provider-setup-section" className="setup-section provider-setup-section" data-settings-panel="ai" hidden>
           <div className="section-title">
-            <h3>DM Voice</h3>
+            <h3>Model Setup</h3>
           </div>
           <label>
-            <span>DM Source</span>
+            <span>Generation Source</span>
             <select id="provider-mode">
-              <option value="ollama">Local DM</option>
-              <option value="bridge">ChatGPT DM</option>
+              <option value="ollama">Ollama on this computer</option>
+              <option value="bridge">ChatGPT manual handoff</option>
             </select>
           </label>
           <div className="local-ai-card">
@@ -774,7 +778,7 @@ function SetupDialog() {
             </div>
             <div className="model-picker-row">
               <label>
-                <span>Local DM Model</span>
+                <span>Ollama Model</span>
                 <select id="ollama-model">
                   <option value="llama3.1:8b">Llama 3.1 8B</option>
                   <option value="mistral-nemo">Mistral Nemo</option>
@@ -783,8 +787,12 @@ function SetupDialog() {
               </label>
               <button id="pull-ollama-model" type="button">Download</button>
             </div>
+            <p id="ollama-install-note" className="setup-note ollama-install-note">
+              Need Ollama? <a href="https://ollama.com/download" target="_blank" rel="noreferrer">Click here to install Ollama</a>.
+            </p>
             <div id="ollama-model-summary" className="model-summary" aria-live="polite"></div>
-            <p id="ollama-benchmark" className="setup-note">Local DM status will appear here.</p>
+            <ol id="ollama-readiness-list" className="ollama-readiness-list" aria-label="Local model setup steps"></ol>
+            <p id="ollama-benchmark" className="setup-note">Local model status will appear here.</p>
             <details className="advanced-provider-settings">
               <summary>Advanced</summary>
               <div className="settings-grid">
@@ -802,25 +810,25 @@ function SetupDialog() {
                 </label>
               </div>
               <div className="button-stack two-up">
-                <button id="refresh-ollama" type="button">Refresh Voice</button>
-                <button id="test-ollama" type="button">Test Voice</button>
+                <button id="refresh-ollama" type="button">Refresh Status</button>
+                <button id="test-ollama" type="button">Test Model</button>
               </div>
             </details>
           </div>
           <div id="bridge-card" className="bridge-card">
             <div className="status-line">
               <span className="status-dot"></span>
-              <span id="bridge-status">ChatGPT DM ready</span>
+              <span id="bridge-status">ChatGPT handoff ready</span>
             </div>
             <div className="button-stack">
-              <button id="check-sidecar" type="button">Open ChatGPT DM</button>
-              <button id="copy-provider-prompt" type="button">Copy DM Instructions</button>
-              <button id="new-provider-chat" type="button">New DM Chat</button>
+              <button id="check-sidecar" type="button">Open ChatGPT</button>
+              <button id="copy-provider-prompt" type="button">Copy Instructions</button>
+              <button id="new-provider-chat" type="button">New Chat</button>
             </div>
           </div>
           <details id="prompt-drawer" className="prompt-drawer">
             <summary>
-              <span>DM Instructions</span>
+              <span>Model Instructions</span>
               <span id="prompt-size">0 chars</span>
             </summary>
             <textarea id="prompt-output" spellCheck="false"></textarea>
@@ -844,7 +852,7 @@ function SetupDialog() {
               />
             </label>
             <p id="local-table-share-safety" className="setup-note local-table-share-safety">
-              Shares browser guest mode only. Host settings and DM Voice stay on this machine.
+              Shares browser guest mode only. Host settings and model setup stay on this machine.
             </p>
             <div className="button-stack two-up">
               <button id="start-local-table" type="button">Open Guest Lobby</button>

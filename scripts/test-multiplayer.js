@@ -56,7 +56,7 @@ assert.equal(shareSession.tableId, campaign.multiplayer.localTable.tableId);
 assert.equal(shareSession.sessionId, campaign.multiplayer.localTable.sessionId);
 assert.equal(shareSession.guestLink, "http://192.168.1.24:7347/guest");
 assert.deepEqual(shareSession.routeBoundary, [...guestSafeShareRouteBoundary]);
-assert.match(shareSession.safety, /Host settings, DM Voice, Ollama, files, and diagnostics stay on this machine/);
+assert.match(shareSession.safety, /Host settings, model setup, Ollama, files, and diagnostics stay on this machine/);
 assert.match(shareSession.safety, /leave\/rejoin, combat participation/);
 
 let waitingResult = registerWaitingGuest(campaign, {

@@ -1,3 +1,16 @@
+---
+yaiml: 0.2
+role: maintainer
+title: LoreKeeper Maintainer Guide
+purpose: Current commands, diagnostics, package/release procedures, important files, danger files, and failure playbooks.
+belongs-here: setup, verified commands, focused checks, dev server/desktop/package flows, diagnostics, release guardrails, operational troubleshooting.
+not-here: product direction, durable architecture rationale, complete history, speculative procedures.
+durability: current-only; remove dead commands and obsolete paths.
+read-with: LoreKeeper State Of The Table; LoreKeeper Architecture.
+update-when: commands, scripts, diagnostics, packaging, release checks, local setup, or failure playbooks change.
+agent-guidance: Verify command claims when practical. Mark environment-dependent procedures. Keep this useful for a fresh maintainer under time pressure.
+---
+
 # LoreKeeper Maintainer Guide
 
 Updated: 2026-06-18
@@ -10,6 +23,14 @@ Start with:
 - `docs/living-world.md`: world-memory and goal-horizon model.
 
 This guide is the practical "what do I run and where do I look?" map.
+
+## YAIML Maintenance
+
+LoreKeeper uses YAIML as plain-file project memory. Start with `yaiml.yml`, then read the stable headers and core documents it declares.
+
+Phrases such as "update YAIML", "updated YAIML", "check new YAIML", "refresh YAIML", or "run a YAIML update" mean to compare this repository's local YAIML scaffolding against a human-provided, workspace-provided, or team-approved YAIML reference. Refresh compatible convention scaffolding only: prompts/templates if this repo keeps local copies, `yaiml.yml` discovery hints, agent-instruction pointers, stable-header guidance, and this maintenance note.
+
+Do not rewrite LoreKeeper-specific memory during a YAIML convention refresh. Preserve the current SoT, architecture facts, maintainer commands, project-specific risks, human decisions, local naming choices, and supporting documents that contain real LoreKeeper knowledge. Use the separate "update project memory" flow only after meaningful LoreKeeper work changes current state, risks, commands, or architecture.
 
 ## Daily Commands
 
@@ -58,9 +79,15 @@ Windows portable package:
 
 ```powershell
 npm run package:portable
+npm run release:check
+npm run smoke:portable
+npm run hooks:install
+npm run release:tag -- v0.1.0 "LoreKeeper v0.1.0"
 ```
 
 This creates `dist/portable/LoreKeeper.zip`, the one-app portable distribution. It bundles the Electron/Node runtime, built renderer, local API server code, and runtime dependency `sql.js`, but it does not bundle Ollama or model files. The package script creates a clean `data/` folder and removes stale split-client portable artifacts so the distributable remains a single LoreKeeper app.
+
+`release:check` verifies the local portable folder and zip exist, do not contain stale split-client outputs, and are newer than packaged source files. `smoke:portable` copies the portable folder to a temp directory, starts the packaged executable as the bundled Node runtime, and verifies `/api/runtime` plus `/guest` without mutating the distributable. `hooks:install` points local git hooks at `.githooks`; the pre-commit hook runs the freshness check without rebuilding the distro, and the pre-push hook runs freshness plus smoke when pushing tags. Use `release:tag` for release tags so freshness plus smoke run before the tag is created.
 
 Local server only:
 
@@ -247,6 +274,7 @@ Symptoms:
 Likely owner:
 
 - `Launch LoreKeeper Hidden.vbs`
+- `Launch LoreKeeper.cmd`
 - `scripts/launch-desktop.js`
 - `electron/main.js`
 - `scripts/serve.js`
@@ -254,6 +282,8 @@ Likely owner:
 Inspect:
 
 - Shortcut target should be `wscript.exe` with `Launch LoreKeeper Hidden.vbs` as the argument.
+- The repo desktop shortcut is a developer launcher and uses local Node through `scripts/launch-desktop.js`.
+- The shareable distro is separate: unzip `dist/portable/LoreKeeper.zip`, then start `LoreKeeper.exe` or `Open LoreKeeper.cmd`.
 - `data/launcher.log` for launcher mode/build/Electron spawn status.
 - `data/launcher-child.log` for child process build/Electron stdout and stderr.
 - `data/electron.log` for Electron startup and local API readiness errors.
@@ -268,6 +298,8 @@ npm run test:security
 
 Common fix direction:
 
+- For your local developer shortcut, fix Node/Electron/dev build issues.
+- For a friend-facing portable package, rebuild `npm run package:portable` and test `dist/portable/LoreKeeper/LoreKeeper.exe`.
 - If a host-protected readiness route changed, ensure Electron sends the per-process API token when probing it.
 - If the browser guest shortcut is the only failing entry, confirm the desktop host is running before testing `http://<host-ip>:4173/guest`.
 

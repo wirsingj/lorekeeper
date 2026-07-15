@@ -1,3 +1,16 @@
+---
+yaiml: 0.2
+role: supporting
+title: LoreKeeper Remote Table Access Plan
+purpose: Host/guest remote-access doctrine, guest-safe route boundaries, and future tunnel/relay direction.
+belongs-here: host/guest product principles, remote/LAN guest access strategy, guest-safe route audit, invite/session safety doctrine, relay constraints.
+not-here: implementation of a relay, provider/model setup details, generic architecture inventory, ordinary maintainer command reference.
+durability: durable product/security doctrine; update when host/guest access strategy or route boundaries change.
+read-with: LoreKeeper State Of The Table; LoreKeeper Architecture; LoreKeeper Maintainer Guide.
+update-when: LAN guest model, remote sharing doctrine, guest-safe route policy, invite/session authority, or relay plans change.
+agent-guidance: Preserve "the host can suffer; the guest cannot." Do not add relay/tunnel/VPN/provider code merely because this plan exists.
+---
+
 # LoreKeeper Remote Table Access Plan
 
 ## Purpose

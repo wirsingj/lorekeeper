@@ -1,0 +1,26 @@
+yaiml: "0.2"
+
+project:
+  id: lorekeeper
+  name: LoreKeeper
+
+documents:
+  sot:
+    path: docs/state-of-the-table.md
+    title: LoreKeeper State Of The Table
+  architecture:
+    path: docs/ARCHITECTURE.md
+    title: LoreKeeper Architecture
+  maintainer:
+    path: docs/MAINTAINER_GUIDE.md
+    title: LoreKeeper Maintainer Guide
+
+supporting:
+  - path: docs/REMOTE_TABLE_ACCESS_PLAN.md
+    role: remote-table-access-doctrine
+  - path: docs/living-world.md
+    role: living-world-memory-model
+
+reference:
+  yaiml:
+    note: Provide a local or team-approved YAIML reference at run time for manual convention refreshes; do not commit machine-specific paths.

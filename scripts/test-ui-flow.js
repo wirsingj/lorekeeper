@@ -34,8 +34,10 @@ const scenarios = [
     name: "home-baseline",
     run: async (harness) => {
       await harness.gotoHome();
-      await expectVisibleText(harness.page, "Start Playing");
-      await expectVisibleText(harness.page, "New Adventure");
+      await expectVisibleText(harness.page, "Choose Table");
+      await expectVisibleText(harness.page, "Continue Table");
+      await expectVisibleText(harness.page, "Create New Table");
+      await expectVisibleText(harness.page, "Join Table");
       await expectHomeLibraryText(harness.page, "No saved adventures yet");
       await assertNoVisibleText(harness.page, "Untitled Campaign");
       assert.equal(await harness.page.locator("#home-host-flow").isDisabled(), true);
@@ -171,12 +173,13 @@ const scenarios = [
       await harness.page.click("#home-settings");
       await harness.page.locator("#setup-dialog").waitFor({ state: "visible", timeout: 10000 });
       await harness.page.locator("[data-settings-panel='app']").first().waitFor({ state: "visible", timeout: 10000 });
-      assert.equal(await harness.page.locator("#settings-tabs").isHidden(), true, "App Preferences should open as its own surface");
-      await harness.page.click("#close-setup");
-      await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
-      await harness.page.click("#home-provider-setup");
+      assert.equal(await harness.page.locator("#settings-tabs").isHidden(), false, "Settings should expose App and Models tabs");
+      await harness.page.click("[data-settings-tab='ai']");
       await harness.page.locator("[data-settings-panel='ai']").first().waitFor({ state: "visible", timeout: 10000 });
-      assert.equal(await harness.page.locator("#settings-tabs").isHidden(), true, "DM Voice should open as its own surface");
+      await expectVisibleText(harness.page, "Model Setup");
+      await harness.page.locator("#ollama-readiness-list").getByText("Install Ollama").waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.locator("#ollama-readiness-list").getByText("Start Ollama").waitFor({ state: "visible", timeout: 10000 });
+      await harness.page.locator("#ollama-readiness-list").getByText("Download Llama 3.1 8B").waitFor({ state: "visible", timeout: 10000 });
       await harness.page.click("#close-setup");
       await harness.page.waitForFunction(() => document.querySelector("#setup-dialog")?.open !== true, null, { timeout: 10000 });
 
@@ -199,7 +202,7 @@ const scenarios = [
       assert.equal(
         await harness.page.locator("#provider-setup-section").isHidden(),
         true,
-        "DM Voice panel should stay hidden inside Friends And Seats",
+        "Model Setup panel should stay hidden inside Friends And Seats",
       );
       assert.equal(
         await harness.page.locator("[data-settings-panel='troubleshooting']").first().isHidden(),
@@ -336,7 +339,7 @@ const scenarios = [
     },
   },
   {
-    name: "pre-opening-ai-companion-nudge-disabled",
+    name: "pre-opening-nudge-safely-blocked",
     run: async (harness) => {
       await harness.gotoHome();
       await createCampaignFromWizard(harness, {
@@ -358,8 +361,8 @@ const scenarios = [
           controllerKind: "ai_companion",
         }],
       });
-      await assertPreOpeningDmNudgeDisabled(harness);
-      await assertPreOpeningAiCompanionNudgeDisabled(harness, "Mira");
+      await assertPreOpeningDmNudgeSafelyBlocked(harness);
+      await assertPreOpeningAiCompanionNudgeSafelyBlocked(harness, "Mira");
     },
   },
   {
@@ -1620,8 +1623,8 @@ async function runChaosTableFlow(harness, { runIndex, seed }) {
     return window.__lorekeeperDebug?.stateSummary?.().campaignTitle === title;
   }, `Chaos Table ${runIndex}`, { timeout: 10000 });
   await assertHealthyUi(harness, `chaos ${runIndex}: campaign created`);
-  await assertPreOpeningDmNudgeDisabled(harness);
-  await assertFirstPreOpeningAiCompanionNudgeDisabled(harness);
+  await assertPreOpeningDmNudgeSafelyBlocked(harness);
+  await assertFirstPreOpeningAiCompanionNudgeSafelyBlocked(harness);
   const remoteGuest = await exerciseRemoteGuestPreOpeningChaos(harness, rng, runIndex, `Remote Seat ${runIndex}`);
   await startAdventureOpeningForHarness(
     harness,
@@ -2012,20 +2015,20 @@ async function assertHealthyUi(harness, label) {
   }
 }
 
-async function assertFirstPreOpeningAiCompanionNudgeDisabled(harness) {
+async function assertFirstPreOpeningAiCompanionNudgeSafelyBlocked(harness) {
   const campaign = await harness.fetchJson("/api/campaign");
   const companion = campaign?.campaign?.party?.find((member) => member.controllerKind === "ai_companion");
   if (!companion?.name) {
     return;
   }
-  await assertPreOpeningAiCompanionNudgeDisabled(harness, companion.name);
+  await assertPreOpeningAiCompanionNudgeSafelyBlocked(harness, companion.name);
 }
 
-async function assertPreOpeningDmNudgeDisabled(harness) {
+async function assertPreOpeningDmNudgeSafelyBlocked(harness) {
   const page = harness.page;
   const button = page.locator("#nudge-dm");
   await button.waitFor({ state: "visible", timeout: 10000 });
-  assert.equal(await button.isDisabled(), true, "DM Nudge should be disabled before Start Adventure");
+  assert.equal(await button.isDisabled(), false, "DM Nudge should stay clickable before Start Adventure so it can explain the block");
   assert.match(await button.getAttribute("title") ?? "", /Start Adventure/i);
   const input = page.locator("#player-input");
   const send = page.locator("#build-turn");
@@ -2039,15 +2042,16 @@ async function assertPreOpeningDmNudgeDisabled(harness) {
     renderer: window.__lorekeeperDebug?.renderer?.(),
     stateSummary: window.__lorekeeperDebug?.stateSummary?.(),
   }));
-  assert.equal(snapshot.stateSummary?.activeGeneration, false, "disabled pre-opening DM nudge should not start generation");
-  assert.notEqual(snapshot.stateSummary?.tablePhase, "recovery", "disabled pre-opening DM nudge should not trigger recovery");
+  assert.equal(snapshot.stateSummary?.activeGeneration, false, "blocked pre-opening DM nudge should not start generation");
+  assert.notEqual(snapshot.stateSummary?.tablePhase, "recovery", "blocked pre-opening DM nudge should not trigger recovery");
   assert.doesNotMatch(snapshot.renderer?.providerActivity?.text ?? "", /generating|response review|table check/i);
+  assert.match(snapshot.renderer?.providerActivity?.text ?? "", /Start Adventure/i);
   const debugSubmit = await page.evaluate(() => window.__lorekeeperDebug?.submitPlayerTurn?.({ text: "I test the pre-opening gate." }));
   assert.equal(debugSubmit?.providerReceived, false, "debug submit should respect the pre-opening gate");
   assert.equal(debugSubmit?.reason, "opening_not_started");
 }
 
-async function assertPreOpeningAiCompanionNudgeDisabled(harness, companionName) {
+async function assertPreOpeningAiCompanionNudgeSafelyBlocked(harness, companionName) {
   const page = harness.page;
   const button = page
     .locator(".record")
@@ -2055,7 +2059,7 @@ async function assertPreOpeningAiCompanionNudgeDisabled(harness, companionName) 
     .locator("button", { hasText: "Nudge" })
     .first();
   await button.waitFor({ state: "visible", timeout: 10000 });
-  assert.equal(await button.isDisabled(), true, `${companionName} Nudge should be disabled before Start Adventure`);
+  assert.equal(await button.isDisabled(), false, `${companionName} Nudge should stay clickable before Start Adventure so it can explain the block`);
   assert.match(await button.getAttribute("title") ?? "", /Start Adventure/i);
   await button.evaluate((element) => element.click());
   await page.waitForTimeout(500);
@@ -2063,9 +2067,10 @@ async function assertPreOpeningAiCompanionNudgeDisabled(harness, companionName) 
     renderer: window.__lorekeeperDebug?.renderer?.(),
     stateSummary: window.__lorekeeperDebug?.stateSummary?.(),
   }));
-  assert.equal(snapshot.stateSummary?.activeGeneration, false, "disabled pre-opening companion nudge should not start generation");
-  assert.notEqual(snapshot.stateSummary?.tablePhase, "recovery", "disabled pre-opening companion nudge should not trigger recovery");
+  assert.equal(snapshot.stateSummary?.activeGeneration, false, "blocked pre-opening companion nudge should not start generation");
+  assert.notEqual(snapshot.stateSummary?.tablePhase, "recovery", "blocked pre-opening companion nudge should not trigger recovery");
   assert.doesNotMatch(snapshot.renderer?.providerActivity?.text ?? "", /spoke or acted|response review|table check/i);
+  assert.match(snapshot.renderer?.providerActivity?.text ?? "", /Start Adventure/i);
 }
 
 async function startAdventureOpeningForHarness(harness, openingText) {

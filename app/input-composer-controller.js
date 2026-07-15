@@ -25,19 +25,19 @@ export function buildInputComposerProjection({
     const activeCombatTurn = campaign?.combat?.inCombat ? campaign.combat.currentTurnId : null;
     const isGuestCombatTurn = !activeCombatTurn || activeCombatTurn === effectiveGuestSession.partyMemberId;
     const guestPhaseOverride = connected ? guestComposerPhaseOverride(tableSession, guestSnapshot) : null;
-    if (connected && readyForOpening) {
-      return {
-        inputDisabled: true,
-        sendDisabled: true,
-        placeholder: "Waiting for the host to begin the opening scene.",
-        buttonText: "Send To Host",
-      };
-    }
     if (guestPhaseOverride) {
       return {
         inputDisabled: true,
         sendDisabled: true,
         placeholder: guestPhaseOverride,
+        buttonText: "Send To Host",
+      };
+    }
+    if (connected && readyForOpening) {
+      return {
+        inputDisabled: true,
+        sendDisabled: true,
+        placeholder: "Waiting for the host to begin the opening scene.",
         buttonText: "Send To Host",
       };
     }
@@ -54,15 +54,6 @@ export function buildInputComposerProjection({
   }
 
   const readyForOpening = isCampaignReadyForOpening(campaign, { isHost: true });
-  if (readyForOpening) {
-    return {
-      inputDisabled: true,
-      sendDisabled: true,
-      placeholder: "Press Start Adventure for the opening narration before sending table actions.",
-      buttonText: "Send Turn",
-    };
-  }
-
   const combatGate = buildHostCombatGate({
     campaign,
     collectStagedRemoteInputs,
@@ -72,6 +63,14 @@ export function buildInputComposerProjection({
   });
   const phaseOverride = hostComposerPhaseOverride(tableSession);
   const phaseLocksComposer = Boolean(phaseOverride?.lock);
+  if (readyForOpening && !phaseOverride) {
+    return {
+      inputDisabled: true,
+      sendDisabled: true,
+      placeholder: "Press Start Adventure for the opening narration before sending table actions.",
+      buttonText: "Send Turn",
+    };
+  }
   return {
     inputDisabled: phaseLocksComposer || combatGate.inputDisabled,
     sendDisabled: phaseLocksComposer || !turnProjection.canSubmit || combatGate.sendDisabled || !hasSubmitContent,

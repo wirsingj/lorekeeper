@@ -32,7 +32,7 @@ export function buildShareTableSession({ table = {}, campaignId = "", locationPo
       ? `LAN session: ${host}${port ? `:${port}` : ""} / table ${shortId(tableId)} / session ${shortId(sessionId)}`
       : "Guest lobby closed.",
     safety: running
-      ? "Shares browser guest mode only: preview, seat request, fixed invite join, approved character actions, votes, pass, leave/rejoin, combat participation, and Table Talk. Host settings, DM Voice, Ollama, files, and diagnostics stay on this machine."
+      ? "Shares browser guest mode only: preview, seat request, fixed invite join, approved character actions, votes, pass, leave/rejoin, combat participation, and Table Talk. Host settings, model setup, Ollama, files, and diagnostics stay on this machine."
       : "Open Guest Lobby when a friend is ready to join. Guests ask for seats; the host stays authoritative.",
   };
 }

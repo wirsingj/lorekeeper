@@ -12,8 +12,8 @@ export function buildTableActionProjection({
 } = {}) {
   const hasTable = Boolean(campaign);
   const activeRepair = Boolean(turnProjection.hasRepair || repair);
+  const activeRecovery = activeRepair || Boolean(turnProjection.canRetry);
   const hasActiveGeneration = Boolean(turnProjection.hasActiveGeneration);
-  const canNudge = Boolean(turnProjection.canNudge);
   const guestCount = Array.isArray(waitingGuests) ? waitingGuests.length : 0;
   const firstGuest = guestCount ? waitingGuests[0] : null;
   const readyForOpening = isCampaignReadyForOpening(campaign, { isHost });
@@ -27,9 +27,9 @@ export function buildTableActionProjection({
   return {
     nudgeDm: {
       visible: true,
-      disabled: !isHost || !hasTable || readyForOpening || !canNudge,
-      title: activeRepair
-        ? "Review the DM response first"
+      disabled: !isHost || !hasTable || hasActiveGeneration,
+      title: activeRecovery
+        ? "Resolve the DM recovery before nudging"
         : !isHost
           ? "Only the host can nudge the DM"
           : readyForOpening
@@ -55,12 +55,18 @@ export function buildTableActionProjection({
         : `${guestCount} guests are waiting for character seats`,
     },
     repairRetry: {
-      visible: activeRepair,
+      visible: activeRecovery,
       disabled: hasActiveGeneration,
+      title: activeRepair
+        ? "Ask the DM to try the response again"
+        : "Retry the failed DM response",
     },
     repairInspect: {
-      visible: activeRepair,
+      visible: activeRecovery,
       disabled: false,
+      title: activeRepair
+        ? "Open details and timeline for what happened"
+        : "Open diagnostics for the failed DM response",
     },
     repairUseAnyway: {
       visible: activeRepair,
@@ -107,19 +113,35 @@ export function buildNudgeDmCommandGate({
       activityState: "waiting",
     };
   }
-  if (readyForOpening) {
-    return {
-      blocked: true,
-      reason: "opening_not_started",
-      activityText: "Start Adventure before nudging the DM.",
-      activityState: "waiting",
-    };
-  }
   if (turnProjection.hasActiveGeneration) {
     return {
       blocked: true,
       reason: "busy",
       activityText: "DM is already generating",
+      activityState: "waiting",
+    };
+  }
+  if (turnProjection.hasRepair) {
+    return {
+      blocked: true,
+      reason: "repair_required",
+      activityText: "Review the DM response first. Use Try Again, Details, or Use Anyway.",
+      activityState: "error",
+    };
+  }
+  if (turnProjection.canRetry) {
+    return {
+      blocked: true,
+      reason: "failed_turn_retry_available",
+      activityText: "The last DM response failed. Use Try Again or open Details before nudging.",
+      activityState: "error",
+    };
+  }
+  if (readyForOpening) {
+    return {
+      blocked: true,
+      reason: "opening_not_started",
+      activityText: "Start Adventure before nudging the DM.",
       activityState: "waiting",
     };
   }
@@ -129,6 +151,7 @@ export function buildNudgeDmCommandGate({
 export function buildAiCompanionNudgeGate({
   isHost = true,
   readyForOpening = false,
+  turnProjection = {},
   inCombat = false,
   isActiveCombatTurn = false,
   companionName = "This companion",
@@ -140,6 +163,33 @@ export function buildAiCompanionNudgeGate({
       activityText: "Only the host can nudge AI companions",
       activityState: "waiting",
       title: "Only the host can nudge AI companions",
+    };
+  }
+  if (turnProjection.hasActiveGeneration) {
+    return {
+      blocked: true,
+      reason: "busy",
+      activityText: "DM is already generating",
+      activityState: "waiting",
+      title: "DM is already generating",
+    };
+  }
+  if (turnProjection.hasRepair) {
+    return {
+      blocked: true,
+      reason: "repair_required",
+      activityText: "Review the DM response first. Use Try Again, Details, or Use Anyway.",
+      activityState: "error",
+      title: "Resolve the DM response review before nudging AI companions",
+    };
+  }
+  if (turnProjection.canRetry) {
+    return {
+      blocked: true,
+      reason: "failed_turn_retry_available",
+      activityText: "The last DM response failed. Use Try Again or open Details before nudging AI companions.",
+      activityState: "error",
+      title: "Resolve the failed DM response before nudging AI companions",
     };
   }
   if (readyForOpening) {

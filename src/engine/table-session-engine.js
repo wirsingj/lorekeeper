@@ -195,7 +195,7 @@ function phaseNextStep(phase, context) {
     case tablePhases.RECOVERY:
       return context.repair
         ? "Host chooses Try Again, Details, or Use Anyway."
-        : "Host reviews the DM status and chooses the next recovery action.";
+        : "Host chooses Try Again or opens Details for the failed DM response.";
     case tablePhases.HOST_REVIEW:
       return `Host reviews or saves ${context.reviewCount} proposed table ${context.reviewCount === 1 ? "change" : "changes"}.`;
     case tablePhases.WAITING_FOR_DM:

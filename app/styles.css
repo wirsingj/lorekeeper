@@ -1175,11 +1175,73 @@ h3 {
   min-width: 104px;
 }
 
+.ollama-install-note {
+  margin: -4px 0 0;
+}
+
+.ollama-install-note a {
+  color: #9eddd5;
+  font-weight: 900;
+}
+
+.local-ai-card[data-ollama-state="ollama_not_installed"] .ollama-install-note {
+  padding: 8px 10px;
+  border: 1px solid rgba(217, 154, 112, 0.32);
+  border-radius: 8px;
+  background: rgba(217, 154, 112, 0.1);
+}
+
 .model-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   min-height: 24px;
+}
+
+.ollama-readiness-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ollama-readiness-list li {
+  display: grid;
+  grid-template-columns: minmax(106px, max-content) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #a8b4b8;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.ollama-readiness-list strong {
+  color: #dfe8ec;
+}
+
+.ollama-readiness-list li[data-state="done"] {
+  border-color: rgba(125, 213, 201, 0.18);
+  color: #9fb2b5;
+}
+
+.ollama-readiness-list li[data-state="done"] strong::before {
+  content: "Done ";
+  color: #7dd5c9;
+}
+
+.ollama-readiness-list li[data-state="current"] {
+  border-color: rgba(217, 154, 112, 0.38);
+  background: rgba(217, 154, 112, 0.1);
+  color: #ead2bd;
+}
+
+.ollama-readiness-list li[data-state="blocked"] {
+  opacity: 0.7;
 }
 
 .model-chip {
@@ -1631,6 +1693,19 @@ button:disabled {
 
 .home-library-strip button:first-of-type {
   margin-left: auto;
+}
+
+.home-library-strip .home-settings-action {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
+}
+
+.home-library-strip .home-settings-action svg {
+  width: 19px;
+  height: 19px;
 }
 
 .join-client-panel {
@@ -3012,6 +3087,10 @@ textarea::placeholder {
   border-color: rgba(206, 118, 105, 0.42);
 }
 
+.host-response-review[data-state="failed"] {
+  border-color: rgba(206, 118, 105, 0.42);
+}
+
 .host-response-review[data-state="changes"] {
   border-color: rgba(222, 188, 120, 0.34);
 }
@@ -3041,6 +3120,13 @@ textarea::placeholder {
   color: #c6d2d7;
   font-size: 0.76rem;
   line-height: 1.35;
+}
+
+.review-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .manual-response-fallback {
@@ -3365,6 +3451,10 @@ textarea::placeholder {
 
   .additional-characters-section {
     grid-column: auto;
+  }
+
+  .ollama-readiness-list li {
+    grid-template-columns: 1fr;
   }
 
   .campaign-wizard-grid,

@@ -1,6 +1,6 @@
 import { isHardBlockedTurnRepair, tableRepairReason } from "./turn-repair-controller.js";
 
-export function buildHostResponseReviewProjection({ repair = null, reviewBatch = null } = {}) {
+export function buildHostResponseReviewProjection({ repair = null, reviewBatch = null, turnProjection = {} } = {}) {
   const pendingChanges = (reviewBatch?.proposedChanges ?? reviewBatch?.proposals ?? [])
     .filter((change) => change?.status !== "committed");
   if (repair) {
@@ -27,6 +27,30 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
       pendingChanges: pendingChanges.length,
     };
   }
+  if (turnProjection?.canRetry) {
+    return {
+      state: "failed",
+      title: "DM Could Not Answer",
+      body: "LoreKeeper did not receive table text from the DM model.",
+      nextStep: "Use Try Again from the table. If it keeps failing, check Model Setup and confirm the selected local model is installed and running.",
+      decisionGuide: [
+        "Try Again reruns the same table prompt.",
+        "Check Model Setup if the local model is missing, stopped, or returning errors.",
+        "No table state was imported from the failed response.",
+      ],
+      actions: [
+        {
+          id: "open_model_setup",
+          label: "Open Model Setup",
+          title: "Check Ollama, model download, and provider settings",
+          kind: "secondary",
+        },
+      ],
+      tone: "error",
+      responseChars: 0,
+      pendingChanges: pendingChanges.length,
+    };
+  }
   if (pendingChanges.length) {
     return {
       state: "changes",
@@ -48,6 +72,7 @@ export function buildHostResponseReviewProjection({ repair = null, reviewBatch =
     body: "When a response needs attention, LoreKeeper will summarize what happened here before showing raw details.",
     nextStep: "Return to the table when everyone is ready.",
     decisionGuide: [],
+    actions: [],
     tone: "idle",
     responseChars: 0,
     pendingChanges: 0,
@@ -120,7 +145,41 @@ export function renderHostResponseReview(container, projection) {
     }
     children.push(guide);
   }
+  if (view.actions?.length) {
+    const actions = document.createElement("div");
+    actions.className = "review-action-row";
+    for (const action of view.actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = [
+        "mini-action",
+        action.kind === "danger" ? "danger-button" : "secondary-action",
+      ].join(" ");
+      button.dataset.reviewAction = action.id;
+      button.textContent = action.label;
+      button.title = action.title || action.label;
+      actions.append(button);
+    }
+    children.push(actions);
+  }
   container.replaceChildren(...children);
+}
+
+export function buildHostResponseReviewActionPlan(actionId = "") {
+  if (actionId === "open_model_setup") {
+    return {
+      action: "open_settings",
+      tab: "ai",
+      mode: "app",
+      activityText: "Model Setup is open",
+      activityState: "waiting",
+    };
+  }
+  return {
+    action: "none",
+    activityText: "",
+    activityState: "idle",
+  };
 }
 
 export function applyManualResponseFallbackProjection(elements, projection) {

@@ -1,6 +1,19 @@
+---
+yaiml: 0.2
+role: sot
+title: LoreKeeper State Of The Table
+purpose: Current product state, engineering direction, priorities, risks, and useful recent lessons for LoreKeeper.
+belongs-here: current product direction, verified capabilities, active trust risks, UX priorities, working checklist, playtest lessons, near-term context.
+not-here: durable architecture boundaries, command reference, exhaustive history, implementation details that no longer affect current work.
+durability: volatile; synthesize and prune aggressively.
+read-with: LoreKeeper Architecture; LoreKeeper Maintainer Guide.
+update-when: direction, verified behavior, risks, priorities, acceptance criteria, or material lessons change.
+agent-guidance: Preserve human product decisions. Verify implementation claims. Mark uncertainty. Remove resolved active risks instead of appending a diary.
+---
+
 # LoreKeeper State Of The Table
 
-Updated: 2026-06-19
+Updated: 2026-07-04
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
@@ -17,7 +30,7 @@ Status legend:
 
 LoreKeeper should feel like sitting at a natural D&D 5E table.
 
-The party members are the people around the table. The host is one of those party members, plus the software-side table owner for setup, invites, provider access, and recovery decisions. The DM at the table is the provider/DM Voice operating inside app-owned rails. The app owns continuity, state, rules, recovery, and table flow; the provider supplies narration, NPC behavior, atmosphere, suggested checks, and structured proposals.
+The party members are the people around the table. The host is one of those party members, plus the software-side table owner for setup, invites, provider access, and recovery decisions. The DM at the table is the configured DM model/provider operating inside app-owned rails. The app owns continuity, state, rules, recovery, and table flow; the provider supplies narration, NPC behavior, atmosphere, suggested checks, and structured proposals.
 
 The user should not feel like they are debugging a model, managing queue machinery, or translating software concepts while trying to play.
 
@@ -25,7 +38,7 @@ Every table surface should answer the same practical questions a real table answ
 
 ## Project Read
 
-LoreKeeper's goal is unusually strong because it is not "chat with a fantasy bot." It is a digital table: host, guests, party members, DM Voice, rules, memory, authority, recovery, and table flow all have separate jobs. That distinction is the project's best product insight and should stay protected.
+LoreKeeper's goal is unusually strong because it is not "chat with a fantasy bot." It is a digital table: host, guests, party members, DM model, rules, memory, authority, recovery, and table flow all have separate jobs. That distinction is the project's best product insight and should stay protected.
 
 The project has made real progress from prototype/tooling shape toward table-sim shape. Earlier debt came from building around provider/import/debug mechanics first; recent work has been correctly moving authority into app-owned state, combat, multiplayer, recovery, and phase projections while pushing raw machinery behind table language and hidden harnesses.
 
@@ -40,7 +53,7 @@ The current state is promising but not yet release-calm. Core mechanics, storage
 LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 
 - The front door should answer only three questions: continue hosting, start a new table, or join someone else's table.
-- Provider/model setup should feel like DM Voice readiness, not a core gameplay mode.
+- Provider/model setup belongs in Settings as app-level configuration, with Ollama install guidance and model choice under Models rather than as a front-door play mode.
 - Normal play surfaces should use table language: Host, Join, Guests, DM, Table, Seat, Continue, Troubleshooting.
 - Technical language such as SQLite, provider import, raw payloads, bridge/manual sync, and diagnostics belongs behind troubleshooting or developer details.
 - Settings should become two calmer surfaces: app preferences before play, and table settings while hosting.
@@ -69,10 +82,10 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Start Adventure now disappears after the host requests opening narration for the current local-table session, duplicate clicks are ignored, and the action can return only when a fresh re-hosted table is still pre-opening.
 - Guest actions, guest snapshots, guest choice votes, waiting-room registrations, and auto-resolve timers are pinned to campaign/table/session identity so stale joins and delayed work cannot mutate a new table.
 - Guest leave/rejoin and campaign-switch flows clear stale connection/controller state instead of silently reviving old approvals.
-- Table Talk refreshes while DM Voice is generating so side chat does not appear to vanish until the DM response posts.
+- Table Talk refreshes while the DM model is generating so side chat does not appear to vanish until the DM response posts.
 - Review commits now save through the active campaign update queue, preserving route-side Table Talk and remote guest state that land during provider import.
 - Recovery Retry and Use Anyway now share a pure action gate so hidden/debug clicks cannot run recovery actions while another DM response is generating or when no reviewed response is active.
-- AI companion Nudge is gated by table phase, guest/client role, and combat active actor; disabled nudge buttons are tested to prove they cannot start generation or trigger recovery.
+- DM and AI companion Nudge are gated by table phase, guest/client role, recovery state, and combat active actor; host-visible Nudge buttons stay clickable in safe blocked states so they can explain what is needed without starting generation or triggering recovery.
 - Common combat resolution owns active actor, initiative, legal options, action economy, and enemy-turn advancement enough to reject provider phrasing that would skip or resolve the wrong actor.
 - Campaign delete is visible from the front door and recycles local SQLite files instead of exposing undeletable backend placeholder campaigns.
 - The hidden Playwright harness uses temp campaign roots, host plus `/guest` tabs, deterministic provider mocks, remote chaos, and failure artifacts so trust bugs do not pollute real campaign files.
@@ -92,19 +105,19 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Delayed async work must carry campaign/table/session identity and stand down when that identity changes.
 - Rejected actions should prove a negative: no provider call, no play-log message, no staged input, no combat turn advance, no controller transfer, no recovery modal.
 - Harness provider queues can hide mistakes if a test only checks the happy-path text. Chaos tests should verify state before and after actions, not only the visible response.
-- Copy changes can create trust debt when labels drift from ownership reality. Host is the software-side owner and party member; DM Voice/provider is the DM.
+- Copy changes can create trust debt when labels drift from ownership reality. Host is the software-side owner and party member; the configured DM model/provider is the DM at the table.
 
 ## State Invariant Matrix
 
 | State | Allowed actions | Forbidden actions | Hidden/disabled expectations |
 | --- | --- | --- | --- |
-| App front door | Continue a selected adventure, create New Adventure, Join A Table, open DM Voice or Preferences, delete selected visible campaign. | Provider turns, guest actions, combat changes, hidden starter campaign selection/deletion. | Table rails, notes, command input, diagnostics, and last-table controls stay hidden until a flow is chosen. |
+| App front door | Continue Table, Create New Table, Join Table, open Settings, delete selected visible campaign. | Provider turns, guest actions, combat changes, hidden starter campaign selection/deletion. | Table rails, notes, command input, diagnostics, model setup, and last-table controls stay hidden until a flow is chosen. |
 | Host setup / New Adventure | Edit premise/hero/party, add AI/remote/host seats, copy pre-table guest link, seat pre-table guests, create the ready table. | Provider calls, combat starts, guest character actions, deleting unrelated campaigns from the setup workspace. | Start Adventure is not shown until the campaign exists; old table rails stay hidden during setup. |
-| Adventure draft / opening ready | Host may Start Adventure, invite/seat guests, edit party/notes where safe, use Table Talk. | DM Nudge, Send Turn, AI companion Nudge, guest action/pass/vote, debug submit, combat advancement. | Composer disabled with Start Adventure copy; Start Adventure visible once per current table session; duplicate clicks do not call provider twice. |
+| Adventure draft / opening ready | Host may Start Adventure, invite/seat guests, edit party/notes where safe, use Table Talk; host Nudge buttons may be clicked only to explain the opening gate. | DM Nudge provider calls, Send Turn, AI companion Nudge provider calls, guest action/pass/vote, debug submit, combat advancement. | Composer disabled with Start Adventure copy; Start Adventure visible once per current table session; Nudge explains the block without generating; duplicate Start clicks do not call provider twice. |
 | Adventure live / roleplay | Host sends party action, guest sends assigned character action, Table Talk both directions, Nudge DM, stage/resolve approved companion or remote inputs. | Guest acting for other characters, stale-session actions, provider generation from empty input, hidden-state mutation from rejected requests. | Send Turn wakes only for text/staged inputs; guest pending/resolved states remain visible; host-only controls stay out of the shared play surface where possible. |
 | Guest waiting room | Guest previews public table, chooses a requestable seat, edits join draft, asks to join, leaves/back home. | Seeing hidden notes/enemy HP, sending table actions, voting, provider settings, host mutations. | Composer/action controls hidden or disabled until seated; host sees waiting guest without diagnostics. |
 | Guest seated | Guest Table Talk, assigned-character action/pass/vote only when table phase and combat turn allow it, leave/rejoin. | Host settings, other-character actions, pre-opening actions, wrong-combat-turn actions, stale-table/session actions. | Public routes reject wrong campaign/table/session; rejected guest routes must not alter host phase, messages, inputs, combat, or recovery. |
-| Provider generating | Cancel current generation, Table Talk refresh, wait for DM Voice. | New provider turn, recovery actions, duplicate Start Adventure, campaign-switch carryover. | Send/Nudge/Start/recovery actions disabled; side chat remains live; stale provider completions are ignored if campaign/session changed. |
+| Provider generating | Cancel current generation, Table Talk refresh, wait for the DM response. | New provider turn, recovery actions, duplicate Start Adventure, campaign-switch carryover. | Send/Nudge/Start/recovery actions disabled; side chat remains live; stale provider completions are ignored if campaign/session changed. |
 | Combat active | Active host/guest/AI/enemy actor resolves one turn at a time through app-owned mechanics and visible rolls/effects. | Non-active actor actions, provider advancing initiative by phrasing alone, guest acting outside assigned combat turn, duplicate enemy turn resolution. | Combat rail names active actor/controller; legal actions are phase-specific; enemy HP is redacted for guests. |
 | Recovery / review | Try Again, Details, Use Anyway only when allowed; hard agency violations force Try Again/Details; host can inspect review summary. | New turn submission, hidden Use Anyway on hard agency block, recovery actions during active generation, silent import of bad response. | Recovery CTA visible beside Now/Next; raw fallback stays tucked away; handlers guard the same states as disabled buttons. |
 
@@ -121,13 +134,13 @@ Permanent screen space should be reserved for play. The table should not ask pla
 
 ### Screen Review
 
-1. Front Door: improved, but still should eventually feel more like a game launcher with big Continue/New/Join affordances and DM Voice as secondary.
+1. Front Door: improved, now centered on Continue Table, Create New Table, Join Table, and compact Settings.
 2. New Adventure: improved by using full-screen setup, but still reads like a form. It should evolve into an adventure-builder flow with sections for Premise, Hero, Party, Friends.
 3. Join Flow: plain `/guest` is the right direction. The next UX step is a friendly table list plus seat cards, with direct links treated as shortcuts.
 4. Main Table: highest debt. Story must dominate; rails should be notebook/party shelves, not dashboards. Current pass collapses notes by default and compacts party cards, but phase-specific table chrome is still needed.
 5. Combat: mechanically stronger, but visually still too similar to roleplay. Combat should eventually emphasize initiative, current actor, available actions, visible rolls/effects, and clear end-turn flow.
 6. Notes: should feel like a notebook/codex opened when needed. Current pass moves toward this by collapsing World and Player notes by default.
-7. Preferences: still too much one-dialog surface. Split into App Preferences, Table Settings, DM Voice, and Developer Tools.
+7. Settings: still one dialog internally. Keep app/model setup in Settings, table sharing in Friends And Seats, and diagnostics/recovery focused behind explicit troubleshooting or recovery entry points.
 8. Local Table: should become "Invite Friends" and "Seats" in normal play, with network details hidden behind advanced details.
 9. Diagnostics: should remain available but never visually compete with play unless the table is stuck.
 10. Recovery: table-facing copy is better, but the long-term design should feel like "DM needs a ruling" rather than software repair.
@@ -147,7 +160,7 @@ High:
 6. Party cards still carry too much descriptive text for permanent rail space, though now clamped by default.
 7. Notes are records rather than a true notebook/codex experience.
 8. Local-table/guest tools still expose hosting mechanics in places.
-9. DM Voice setup still feels like configuration, not choosing a storyteller.
+9. Model setup is correctly configuration now, but it still needs more first-run polish around Ollama install, model download, and readiness.
 10. Guest seat requests need more immediate, friendly host-side presentation.
 
 Medium:
@@ -208,13 +221,13 @@ Risks:
 5. Party/character/vote/combat-actor choice targeting exists in the model contract and play log UI.
 6. Normal play hides raw provider meta while diagnostics remain available.
 7. Table status language has shifted toward table-facing wording: DM thinking, waiting for actor, recovery, staged input.
-8. Character creation is standardized across campaign creation, post-start host creation, browser guest join, and in-app Join A Table.
+8. Character creation is standardized across campaign creation, post-start host creation, browser guest join, and in-app Join Table.
 9. Additional host-created characters default to AI companions, while the first campaign character is host-controlled.
 10. Grouped enemies can expand into separate combatants and initiative rows.
 11. Guest inputs can drive provider turns through structured `user.playerInputs[]`.
 12. Failed provider turns preserve approved/remote inputs as visibly staged rather than silently consuming them.
 13. CombatEngine can now resolve app-owned attacks, DC checks, opposed checks/contests, simple spell saves, spell-slot spending, conditions, logged rolls/effects, and initiative advancement.
-14. The unified front door now treats Host, Join, and DM Voice readiness as first-class app-level flows.
+14. The unified front door now treats Continue Table, Create New Table, and Join Table as the three primary flows, with model setup living under Settings.
 15. The app starts in a neutral lobby mode instead of visibly sitting at the last active table.
 16. Join before connection is now a lobby flow with a Back control, not an in-campaign table view.
 17. Provider/App Settings open from the lobby without implicitly entering the last campaign.
@@ -333,23 +346,23 @@ Risks:
 130. Use Anyway is now hard-blocked for DM responses that speak or act for controlled party members. Format/proposed-change weirdness can still be reviewed by the host, but controlled-character agency failures require Try Again or Details instead of becoming table text.
 131. Host New pre-lobby waiting guests now show seat buttons for every open Invite Friend slot, even when the guest did not pick a specific character before asking to join.
 132. Character Auto-Complete now behaves like a reroll for generated flavor: it preserves hard facts such as name, ancestry, class, and level, while rotating the pitch, party tie, and DM note on each click.
-133. Preferences now open as calmer App, DM Voice, Friends, and Troubleshooting tabs, with local-table tools, diagnostics, and DM recovery hidden until that section is chosen.
-134. Settings entry points are now intent-aware: front-door Preferences opens App Preferences, DM Voice opens the storyteller setup surface, and the in-table gear opens Friends And Seats instead of app-level options.
+133. Settings now opens calmer App and Models tabs from the front door, with local-table tools, diagnostics, and DM recovery hidden unless the relevant table/troubleshooting surface is chosen.
+134. Settings entry points are now intent-aware: the front-door gear opens app/model setup, and the in-table Friends control opens Friends And Seats instead of app-level options.
 135. The in-table settings gear is now a labeled Friends control, so normal play points hosts toward seating/share actions instead of generic configuration.
-136. The front door now gives primary weight to Continue Adventure and Join A Table, with DM Voice demoted to the lower utility strip so setup no longer reads as a third play mode.
+136. The front door now gives primary weight to Continue Table, Create New Table, and Join Table, with Settings as a compact utility gear instead of a fourth play mode.
 137. Seat Guest now opens the Friends And Seats surface directly, so waiting-player prompts land on the relevant host action instead of a generic settings dialog.
 138. The command deck now shows a compact Now/Next cue from `TableSessionEngine`, making the input area reflect roleplay, combat, waiting, review, or recovery state instead of looking identical in every phase.
 139. The app shell now exposes `data-table-phase` and `data-table-tone`, giving the table screen a single phase hook for combat/recovery/waiting styling instead of scattered local flags.
 140. The default action prompt is now campaign-neutral instead of heist-specific, so new tables do not inherit an unrelated tone from placeholder copy.
 141. New tables now open with a clearer multi-line setup beat: location, seated party, premise, and a direct Next instruction to press Start Adventure for the opening narration.
 142. Table focus projection now lives in `app/table-focus-controller.js`, so phase-to-surface decisions are tested outside `app/app.js`; combat, party/waiting, and review states can visually elevate the right rail/section through a single `data-table-focus` hook.
-143. Preferences now open as separate intent surfaces: App Preferences shows only app startup behavior, DM Voice shows only storyteller setup, in-table Friends And Seats shows only seating/share controls, and diagnostics/recovery stay behind explicit troubleshooting or recovery entry points.
+143. Settings now keeps app/model setup together for first-run configuration, while in-table Friends And Seats shows only seating/share controls and diagnostics/recovery stay behind explicit troubleshooting or recovery entry points.
 144. Settings surface mode/copy/tab visibility now lives in `app/settings-surface-controller.js` with direct tests, so future settings UX changes do not have to add more policy to `app/app.js`.
 145. Start Adventure now has an in-wizard progress/error status and repeat-submit guard, so campaign creation failures no longer look like a dead button while the global table status is hidden.
 146. Freshly created ready tables now expose a table-level Start Adventure action that runs a dedicated first-session opening narration prompt after the host finishes last-minute invites and party edits.
 147. Friends And Seats now leads with the normal Guest Link/open/copy flow and tucks seat-link/check/collection controls under Table Options, reducing the old wall-of-settings feeling for host seating.
 148. Start Adventure opening readiness, button state, and first-session prompt policy now live in `app/table-opening-controller.js` with direct tests instead of being renderer-owned string/visibility logic.
-149. The front door now presents Continue Adventure, New Adventure, and Join A Table as three first-class launcher choices, with DM Voice/preferences still demoted to utility actions.
+149. The front door now presents Continue Table, Create New Table, and Join Table as the three first-class launcher choices, with app/model Settings behind a compact gear.
 150. Fresh-table Start Adventure now appears in the command deck next-step area instead of the status-strip action pile, making the first real table action harder to miss.
 151. Normal DM Nudge prompt policy now lives in `app/dm-nudge-controller.js` with direct tests, reducing another renderer-owned table-flow instruction string.
 152. Table action visibility for Nudge, Cancel DM Response, Start Adventure, Seat Guest, Review DM Response, Use Anyway, Try Again, and Read Latest now flows through `app/table-action-controller.js`, giving phase-aware CTAs one tested projection instead of scattered renderer functions.
@@ -381,21 +394,21 @@ Risks:
 178. Campaign/table switches now clear stale transient turn carryover without clearing same-campaign in-flight turns, and background local-table polling/guest auto-resolution stands down while a new campaign is being created. This prevents old table actions from leaking into or racing a newly hosted campaign.
 179. Guest auto-resolution policy now lives in `app/guest-auto-resolve-controller.js` with direct tests for host/client mode, campaign creation, table-running state, approval/group-hold settings, busy turn flow, host draft text, and staged-input readiness.
 180. Campaign payload adoption and multiplayer background polling branch order now live in `app/campaign-adoption-controller.js` and `app/table-background-polling-controller.js`, so campaign-switch transient resets, guest waiting-room refreshes, Table Talk during DM generation, and new-campaign wizard polling pauses are tested outside `app.js`.
-181. Hidden provider-status accessibility copy now uses DM Voice language instead of "Provider/manual bridge," closing one more player-facing naming leak without changing internal provider ids.
+181. Hidden provider-status accessibility copy now uses model-source language instead of "Provider/manual bridge," closing one more player-facing naming leak without changing internal provider ids.
 182. The Playwright UI harness now has an intentional visual audit mode: `npm run test:ui -- --scenario visual-audit-screenshots` captures successful screenshots for home, App Preferences, New Adventure, ready table, Friends and Seats, `/guest`, combat, and DM Recovery states under `data/runtime/ui-flow-artifacts/<timestamp>/visual-audit/`.
 183. Provider response import planning now lives in `app/provider-import-controller.js`: implicit scene/combat fallback changes, review-batch construction, choice-owner message metadata, and import diagnostics metadata are planned outside the renderer, while `app.js` executes the resulting append/commit/render side effects.
 184. Provider response cleanup and table-message splitting now live in `app/provider-import-controller.js`, including inline JSON/status-tail removal, readable choice formatting, companion beat extraction, and host-controlled PC autopost suppression hooks.
-185. AI companion Nudge is now gated before the first Start Adventure opening, for guests, and during non-active combat turns through `table-action-controller.js`; UI chaos now verifies a disabled pre-opening companion Nudge cannot start generation or trigger recovery.
+185. AI companion Nudge is now gated before the first Start Adventure opening, for guests, and during non-active combat turns through `table-action-controller.js`; UI chaos now verifies a blocked pre-opening companion Nudge cannot start generation or trigger recovery.
 186. Fresh ready tables now have a first-class `opening_ready` table phase: the Now/Next strip says Ready To Start, the composer and Send Turn are locked until Start Adventure, DM Nudge is also gated by opening readiness, and the UI harness starts RP/combat scenarios through the explicit opening beat.
 187. The front door now hides backend starter seed campaigns from saved-adventure counts/pickers and lets hosts delete real saved adventures from the starting page using the same recycled-file delete flow as the in-table rail.
 188. Failure-pattern audit tightened alternate entry points that bypassed visible button gates: public guest actions/passes now reject pre-opening submissions and wrong combat turns in `src/multiplayer/local-table.js`, guest choice votes must match the current DM-authored choice/options, the remote UI harness directly probes pre-opening guest action rejection, and companion "Resolve Now" checks the turn gate before mutating message status.
 189. New Adventure now says Set The Table while campaign files/seats are being prepared, leaving Start Adventure as the single explicit opening narration action on the table. Guest pre-opening composer copy now says it is waiting for the host to begin instead of implying the host already started.
-190. The front door now uses Set Up Table and DM Voice language, the DM Voice panel uses table-facing DM Source/model/test labels, and the join panel no longer exposes a duplicate Advanced join dialog beside the normal invite-link flow.
-191. DM Voice and Friends setup copy no longer exposes "AI" tabs, Guest Page labels, provider prompts, provider bridge, manual fallback, or campaign-chat status wording in normal live paths; visible host status now uses DM Voice, ChatGPT DM, Guest Lobby, and handoff language.
-192. Visual audit caught DM Voice leaking into Friends And Seats because host chrome refreshes were unhiding whole settings panels after the settings-surface projection ran. Host chrome no longer overrides scoped settings-panel visibility, and the UI harness asserts DM Voice stays hidden inside Friends And Seats.
+190. The front door now uses Continue Table, Create New Table, Join Table, and compact Settings language, while model configuration lives under Settings > Models with Ollama guidance.
+191. Model and Friends setup copy no longer exposes "AI" tabs, Guest Page labels, provider prompts, provider bridge, manual fallback, or campaign-chat status wording in normal live paths; visible host status now uses model-source, Guest Lobby, and handoff language.
+192. Visual audit caught model setup leaking into Friends And Seats because host chrome refreshes were unhiding whole settings panels after the settings-surface projection ran. Host chrome no longer overrides scoped settings-panel visibility, and the UI harness asserts Model Setup stays hidden inside Friends And Seats.
 193. Host-controlled combat input now prompts the host to choose the active character's action, spell, movement, or tactic instead of saying "Act as..." a party member.
 194. Product docs now explicitly separate host and DM roles: the host is a party member plus software-side table owner for setup/invites/provider access/recovery, while the provider/DM Voice is the DM at the table inside app-owned rails.
-195. Settings surfaces are now single-purpose at runtime: Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery no longer expose cross-surface tabs to normal users, while the hidden UI harness can still open diagnostics directly for chaos/audit coverage.
+195. Settings surfaces are scoped by intent at runtime: the front-door Settings surface exposes App and Models tabs, while Friends And Seats, Diagnostics, and DM Recovery remain focused entry points; the hidden UI harness can still open diagnostics directly for chaos/audit coverage.
 196. DM Recovery no longer invites users to open a replacement-response path when nothing is waiting, and the copied-response fallback is hidden unless it is actually relevant to a bridge/manual handoff or pasted draft.
 197. Slow ChatGPT DM progress copy no longer promises the replacement-response fallback while the app is still in extension/waiting mode; it tells the host they can keep waiting or start a new DM chat.
 198. Play-log lifecycle wording for waiting, recovery, retries, dropped guest actions, staged guest inputs, and the Stage/Drop message-action projection now lives in `app/play-log-controller.js` with direct tests instead of being embedded in `app/app.js` DOM rendering.
@@ -426,18 +439,22 @@ Risks:
 223. Recovery Retry/Use Anyway action gating now lives in `app/turn-repair-controller.js`; handlers block busy/no-repair/no-reviewed-response/hard-blocked states even if a hidden recovery button or debug path is invoked directly.
 224. The 5E-lite character sheet seed/profile/equipment/spell policy moved out of `app/app.js` into `src/rules/character-seed.js`, with direct tests and architecture guards preventing renderer ownership from creeping back.
 225. Play-message block parsing now lives in `app/message-block-controller.js`: DM/provider prose grouping, mechanics rows, parsed choice panels, structured choice override, and latest-choice lookup are tested outside `app/app.js`.
-226. DM Voice settings/model projection now lives in `app/provider-settings-controller.js`: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and selected-model chips are tested outside `app/app.js`.
+226. Model setup projection now lives in `app/provider-settings-controller.js`: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and selected-model chips are tested outside `app/app.js`.
 227. Renderer diagnostics/session-health/table-timeline projection now lives in `app/renderer-diagnostics-controller.js`, including debug play-log message normalization, diagnostics snapshot serialization, bounded timeline/event slices, and turn-flow timeline wording.
 228. Front-door saved-adventure projection now lives in `app/home-campaign-controller.js`: backend starter-campaign hiding, saved-adventure count copy, Continue/Delete enablement, selected campaign lookup, and safe delete-target projection are tested outside `app/app.js`.
 229. Scene intelligence and notebook projections now live in `app/scene-notebook-controller.js`: the table rail uses DM-context scene retrieval without letting generated fallback scene shells appear as player-visible notebook records.
 230. People/place/thing/quest notebook sections now live in `app/campaign-notebook-controller.js`, including current-place ordering, carried inventory, assets, related-entity labels, and DM-only story-thread filtering outside the renderer.
 231. Character sheet form projection and save-payload policy now live in `app/character-sheet-controller.js`: HP normalization, ability aliases, merged skill/ability/spell text, preserved resources/attacks, and parsed sheet fields are tested outside `app/app.js`.
 232. New Adventure wizard policy now lives in `app/campaign-wizard-controller.js`: primary/joiner normalization, host/remote/AI controller defaults, opening setup copy, and remote invite sheet fields are tested outside `app/app.js`.
+233. Model Setup now shows a tested first-run Ollama readiness checklist: install Ollama, start Ollama, download the selected model, then test it. The checklist is projected from `app/provider-settings-controller.js` instead of renderer-owned copy, and the portable release smoke command verifies the packaged app can serve `/guest` from a temp copy.
+234. Failed local-provider turns that produce no reviewed DM text now get a visible recovery path: Try Again and Details appear, opening failures release the Start Adventure latch, the composer no longer contradicts recovery state, and DM Recovery explains that the DM could not answer instead of showing an idle panel.
+235. Host-side Nudge buttons now stay clickable in safe blocked states, including pre-opening and failed-response recovery, so the host gets a table-facing explanation without accidentally starting a model turn. The UI harness verifies the click does not generate, mutate, or enter recovery.
+236. Failed-response DM Recovery now offers an explicit Open Model Setup action, with the action plan owned by `host-response-review-controller.js`; the renderer only switches the existing Settings dialog to the Models tab so hosts can check Ollama/model readiness without hunting through app settings after a 404 or missing-model error.
 
 ### Still Risky
 
 1. Combat resolution is still partly provider-led for improvised/richer actions and some manual import paths, though explicit legal-option mismatches, active-actor mismatches, and resolved-turn action economy are now app-owned.
-2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, play-log lifecycle/action wording, play-message block parsing, DM Voice settings/model projection, New Adventure wizard policy, character sheet projection/payload policy, renderer diagnostics/session-health/table-timeline projection, front-door saved-adventure projection, campaign/scene notebook projection, AI companion approval projection, party-vote choice math, send-turn preflight including pre-opening locks, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, AI companion Nudge gates, and Nudge/table action visibility policy are now extracted. Watch remaining message-bubble actions, debug hooks, and public routes for phase/session bypasses whenever a new UI gate is added.
+2. `app/app.js` still owns too much orchestration around submit/import/recovery/combat/multiplayer, though turn repair display/use-anyway policy, staged input recovery decisions/failure wording, play-log lifecycle/action wording, play-message block parsing, model settings projection, New Adventure wizard policy, character sheet projection/payload policy, renderer diagnostics/session-health/table-timeline projection, front-door saved-adventure projection, campaign/scene notebook projection, AI companion approval projection, party-vote choice math, send-turn preflight including pre-opening locks, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, core opening/nudge prompt policies, Nudge/Start command gates, AI companion Nudge gates, and Nudge/table action visibility policy are now extracted. Watch remaining message-bubble actions, debug hooks, and public routes for phase/session bypasses whenever a new UI gate is added.
 3. Recovery is more table-shaped in the live status strip, retry lifecycle, review/use-anyway copy, Settings labels, hard-blocked agency failures, focused DM Recovery surface, host review summary, and hidden copied-response fallback, but the underlying manual review textarea still exists as a rare bridge/manual fallback.
 4. AI companion approval now has table-shaped Stage/Pass/Resolve Now language in a tested controller, combat nudges are active-turn-only suggestions, and app-owned enemy turns now guard against stuck initiative after resolution, but the flow still needs real combat playtest polish.
 5. Party-vote collection now works for remote guests, clear leaders can be drafted by the host, ties are visible, and vote math/key identity are controller-tested. Final confirmation is still the normal Send Turn path rather than a dedicated modal.
@@ -449,7 +466,7 @@ Risks:
 11. Active campaign changes reset TurnFlow, but app-level helper state still coexists with engine state.
 12. Rail containment is improved, but long-session scroll behavior still needs a real campaign soak with many party members, notes, and combatants.
 13. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
-14. Settings still share one dialog component internally, but entry points now behave like separate App Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery surfaces instead of a tabbed control panel. A later visual pass can give each surface more bespoke layout.
+14. Settings still share one dialog component internally, but entry points now behave like separate App Preferences, Model Setup, Friends And Seats, Diagnostics, and DM Recovery surfaces instead of a tabbed control panel. A later visual pass can give each surface more bespoke layout.
 15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request and reserve Remote Invite seats before Create And Start, and the host can seat waiting guests from the draft lobby. Guests cannot yet edit their own character sheet in the shared draft lobby.
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
@@ -506,7 +523,7 @@ Risks:
 12. Soak-test clicked desktop invite links across fresh guest machine, guest reconnect, host campaign switch, combat, and new campaign/table flows.
 13. Continue tuning agency validation against real play logs; neutral presence and accidental host-name mentions now have fixtures, but broader phrasing still needs soak.
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
-15. Simplify app UX toward release quality: split Preferences/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: front-door DM Voice readiness is now secondary, settings entry points are single-purpose instead of visibly tabbed, table-facing copy and visual hierarchy are improved, but the table still exposes too many knobs for Steam-ready flow.
+15. Simplify app UX toward release quality: split app Settings/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: the front door is now Continue Table, Create New Table, Join Table, plus a compact Settings gear; model setup and Ollama guidance live under Settings > Models, but the table still exposes too many knobs for Steam-ready flow.
 16. Keep the host-surface stance explicit: the host is a party member and software-side table owner, not the DM. Host-only controls should collect setup, invites, provider/model access, party ownership, recovery, and tie-breaking without making the main table feel like a DM console.
 17. Add a local table session/invite model and Share Table panel for LAN guest links first, with host approval and explicit guest-safe route boundaries, before any relay implementation. Current state: LAN guest links already use host approval and session-stamped guest requests; multiplayer authority now owns a tested share-session projection with campaign/table/session identity, the LAN `/guest` link, and guest-safe route categories; host snapshots carry that share session, and Friends And Seats renders the boundary for the host. Remaining gap: promote this into a fuller first-class table invite/session lifecycle beyond the current host snapshot/UI contract.
 
@@ -559,7 +576,7 @@ Risks:
 - [x] Add a first-class TableSessionEngine projection for table phase, expected actor, DM status, review, recovery, combat, and multiplayer waiting state.
 - [x] Make repair retry lifecycle as table-shaped as auto-resume.
 - [x] Make fresh ready tables a first-class opening phase: Start Adventure is the only first provider turn, while DM Nudge, companion Nudge, Send Turn, and debug submit are blocked until the opening starts.
-- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, play-log lifecycle/action wording, play-message block parsing, DM Voice settings/model projection, New Adventure wizard policy, character sheet projection/payload policy, renderer diagnostics/session-health/table-timeline projection, front-door saved-adventure projection, campaign/scene notebook projection, record-dialog copy/value policy, AI companion approval projection, party-vote choice math, send-turn preflight including pre-opening submit locks, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, provider response import planning, provider response cleanup/table-message splitting, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, shared scene-situation text compaction, shared change-domain alias normalization, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import side-effect orchestration remains.
+- [ ] Move remaining recovery/import decisions out of `app/app.js`. Current state: turn repair display/use-anyway policy, staged input recovery decisions/failure wording, play-log lifecycle/action wording, play-message block parsing, model settings projection, New Adventure wizard policy, character sheet projection/payload policy, renderer diagnostics/session-health/table-timeline projection, front-door saved-adventure projection, campaign/scene notebook projection, record-dialog copy/value policy, AI companion approval projection, party-vote choice math, send-turn preflight including pre-opening submit locks, guest auto-resolution gating, campaign adoption resets, background multiplayer polling branch order, campaign-chat fallback/progress copy, provider import outcome copy, provider response import planning, provider response cleanup/table-message splitting, latest-response import gating, provider review auto-commit policy, stale combat-prompt repair policy, scene import fallback policy, combat import fallback policies, shared scene-situation text compaction, shared change-domain alias normalization, copied-response fallback copy/state, core opening/nudge prompt policies, Nudge/Start command gates, and Nudge/table action visibility policy are extracted; broader provider/import side-effect orchestration remains.
 - [x] Replace technical wording in live recovery controls.
 - [x] Replace remaining technical wording in diagnostics/manual import controls where it leaks into ordinary play.
 - [x] Soften manual review/use-anyway lifecycle wording so table surfaces do not mention JSON contracts or import mechanics.
@@ -605,7 +622,7 @@ Risks:
 
 ### Multiplayer And LoreKeeper Access
 
-- [x] Host owns software-side campaign files, provider access/model calls, canon review, guest approvals, and persistence; the provider remains the DM voice.
+- [x] Host owns software-side campaign files, provider access/model calls, canon review, guest approvals, and persistence; the configured provider/model remains the DM voice at the table.
 - [x] Browser guest access does not need Ollama or provider controls; the full LoreKeeper app can also join another host.
 - [x] Join-as flow supports richer character proposal and host integration note.
 - [x] Guest inputs are visible table messages and can become structured `user.playerInputs[]`.
@@ -615,7 +632,7 @@ Risks:
 - [x] Desktop protocol invite links preload the Join screen and clear stale saved sessions for different invites.
 - [x] Fixed-seat invite joins require a table-visible guest name.
 - [x] LoreKeeper has a single visible Host/Join front door; old split-client desktop distro identities are removed.
-- [x] DM Voice setup is reachable as a first-class front-door flow.
+- [x] Model setup is reachable from Settings instead of being a first-class front-door flow.
 - [x] Browser `/guest` waiting room lets guests ask for a seat before receiving any campaign state.
 - [x] Browser `/guest` previews the active host table and lets guests request an available non-host character seat.
 - [x] Host can copy a same-network Guest Link from Local Table.
@@ -649,7 +666,7 @@ Risks:
 - [x] Host remains authoritative for table state, provider calls, approvals, review, persistence, and controller transfers.
 - [x] Provider keys and local model access stay on the host side.
 - [x] Remote sharing exposes only guest-safe routes by policy. Current state: an explicit allowlist exists for `/guest`, static guest app assets, and public guest table APIs; Share Table route categories include waiting-room, fixed invite, action/pass/vote, disconnect/rejoin, combat participation, and Table Talk routes, and are cross-checked against server route security tests; no tunnel or relay consumes it yet.
-- [x] The host-facing share panel names the guest-safe boundary: preview, seat request, approved character actions, votes, pass, and Table Talk only; host settings, DM Voice, Ollama, files, and diagnostics stay host-side.
+- [x] The host-facing share panel names the guest-safe boundary: preview, seat request, approved character actions, votes, pass, and Table Talk only; host settings, model setup, Ollama, files, and diagnostics stay host-side.
 
 ### Character Creation
 
@@ -660,7 +677,7 @@ Risks:
 - [x] Remote Invite seat intent survives campaign record creation and appears as a joinable guest seat after Create And Start.
 - [x] Host New has an explicit Back action and no stale table rails while setup is open.
 - [x] Post-start host-created character flow uses same compact creator.
-- [x] Browser guest join and in-app Join A Table use aligned compact fields.
+- [x] Browser guest join and in-app Join Table use aligned compact fields.
 - [x] Auto-complete preserves supplied fields and fills missing details.
 - [x] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character. Current state: `/guest` shows the table preview, open character seats, and an optional character draft card; waiting-room registrations carry the draft through pre-table and active-table seating so the host can see what the guest is bringing.
 - [x] Let Host New Remote Invite slots appear on `/guest` before campaign start and preserve waiting guest requests after Create And Start.
@@ -675,16 +692,18 @@ Risks:
 - [x] Debug meta toggle available in Settings diagnostics.
 - [x] Right rail separates Campaign Notes from Player Notes, with Table Talk kept at the bottom.
 - [x] Empty states use more table-shaped language.
-- [x] Main menu separates Host, Join, and DM Voice setup from the in-campaign rails.
+- [x] Main menu separates Continue Table, Create New Table, Join Table, and compact Settings from the in-campaign rails.
 - [x] Main menu hides last-table rails, notes, and command input until a flow is chosen.
 - [x] Host on the main menu opens a selected campaign instead of implicitly resuming the last active campaign.
 - [x] Join setup hides table rails and command input until connected to a host table.
 - [x] Campaign/table view can return to the main menu without closing the app.
-- [x] Split settings into App Preferences and Campaign Settings as separate surfaces. Current state: the shared dialog component remains, but the runtime surfaces are single-purpose App Preferences, DM Voice, Friends And Seats, Diagnostics, and DM Recovery views with cross-surface tabs hidden from normal entry points.
-- [x] Rename first-pass technical UI language so normal users see Host/Join/DM Voice/Guests/Troubleshooting instead of provider/SQLite/import/control-panel wording.
-- [x] Reduce visible Preferences controls to App, DM Voice, Friends, and Troubleshooting tabs, with diagnostics/recovery hidden unless troubleshooting is chosen.
-- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, fresh-table Start Adventure, Seat Guest, and DM recovery actions live beside that cue, `app/table-action-controller.js` owns the main table CTA visibility policy, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; the party, combat, notebook, and Table Talk rails now receive tested primary/supporting/quiet states, provider-status updates repaint the composer to keep phase copy aligned, Start Adventure hides after the host requests the opening for the current table session, pre-opening DM/AI companion nudges and Send Turn are disabled until that opening has begun, backend starter seed campaigns are hidden from the front door, combat has an active-turn cue with controller responsibility plus legal actions, combat rows now show action/bonus/reaction/movement/concentration/resource state, and Inspect opens a focused recovery settings surface. Deeper combat action workflows and broader settings split work still need phase-specific behavior.
-- [x] Make the front door feel closer to a game launcher: recent campaign, new table, join table, DM Voice readiness, and no hidden last-table background. Current state: the primary grid now presents Continue Adventure, New Adventure, and Join A Table as first-class choices, with DM Voice and Preferences in the lower utility strip.
+- [x] Split settings into App Settings and Table Settings as separate surfaces. Current state: the shared dialog component remains, but the front-door Settings surface exposes App and Models tabs, while in-table Friends And Seats, Diagnostics, and DM Recovery remain focused entry points.
+- [x] Rename first-pass technical UI language so normal users see table, guest, model setup, Settings, and Troubleshooting instead of provider/SQLite/import/control-panel wording.
+- [x] Reduce visible Settings controls to App and Models on the front door, with Friends, diagnostics, and recovery reached from relevant table/troubleshooting entry points.
+- [ ] Rework the table screen into phase-aware action surfaces so users see what matters now instead of every system at once. Current state: the command deck now shows a TableSessionEngine-driven Now/Next cue, fresh-table Start Adventure, Seat Guest, and DM recovery actions live beside that cue, `app/table-action-controller.js` owns the main table CTA visibility policy, `app/table-focus-controller.js` maps phase to the surface that deserves attention, and the shell exposes `data-table-phase`/`data-table-focus`; the party, combat, notebook, and Table Talk rails now receive tested primary/supporting/quiet states, provider-status updates repaint the composer to keep phase copy aligned, Start Adventure hides after the host requests the opening for the current table session, pre-opening DM/AI companion nudges stay clickable only to explain the opening gate while Send Turn remains disabled until that opening has begun, backend starter seed campaigns are hidden from the front door, combat has an active-turn cue with controller responsibility plus legal actions, combat rows now show action/bonus/reaction/movement/concentration/resource state, and Inspect opens a focused recovery settings surface. Deeper combat action workflows and broader settings split work still need phase-specific behavior.
+- [x] Make the front door feel closer to a game launcher: recent table, new table, join table, compact Settings, and no hidden last-table background. Current state: the primary grid now presents Continue Table, Create New Table, and Join Table as first-class choices, with model setup under Settings > Models.
+- [x] Make Settings model setup first-run friendly enough for the portable LAN build. Current state: Model Setup now shows install/start/download/test readiness steps for Ollama and the selected model, with direct controller tests.
+- [x] Add release guardrails for the portable distro: `npm run release:check`, temp-copy runtime smoke through `npm run smoke:portable`, local git hooks via `npm run hooks:install`, and guarded release tags through `npm run release:tag -- <tag>`.
 - [x] Bound initial play-log rendering and keep older transcript entries reachable with Show Earlier.
 - [x] Keep side-chat rendering bounded. Current state: `app/table-talk-controller.js` owns the Table Talk freshness and visible-message projection, capped to the latest 80 side-chat messages for rendering while preserving the full count for unread/status copy.
 - [x] Soak-test scroll behavior during long sessions. Current state: hidden UI harness helpers can seed/append synthetic play-log messages, and `long-session-scroll-soak` proves bounded rendering, Show Earlier, reader-position preservation, and bottom auto-follow without requiring hundreds of real provider turns.
@@ -726,9 +745,9 @@ Risks:
 
 ### Before Guest Joins
 
-1. Open LoreKeeper on the host machine and choose Host.
-2. Open the campaign to show.
-3. Confirm DM Voice is ready.
+1. Open LoreKeeper on the host machine.
+2. Choose Continue Table or Create New Table.
+3. Confirm model setup is ready.
 4. Confirm debug meta in play log is off.
 5. Confirm Local Table is off until ready.
 6. Create/confirm host character.
@@ -805,7 +824,7 @@ Use this section for fresh observations before sorting them into the checklist.
 - 2026-06-18: Visual audit screenshots are now first-class in the hidden UI harness. Verification: `npm run test:ui -- --scenario visual-audit-screenshots --skip-build` passed and produced home, App Preferences, New Adventure, ready table, Friends and Seats, guest lobby, combat, and DM Recovery screenshots.
 - 2026-06-18: Provider response import planning was extracted from `app.js` into `provider-import-controller`, covering implicit scene/combat fallback changes, review-batch creation, and message import metadata. Verification: `npm run build`, `npm run test:all`, focused RP import UI, and focused combat import UI passed.
 - 2026-06-18: Provider response cleanup and table-message splitting moved into `provider-import-controller`, including readable choice cleanup and host-controlled PC autopost suppression hooks. Verification: `npm run build`, `npm run test:all`, focused RP import UI, and focused combat import UI passed.
-- 2026-06-18: Fresh-campaign playtest found AI companion Nudge was available before Start Adventure, which could send a model turn before the table's opening beat and fall into DM Recovery. Fix: companion Nudge is now disabled before the opening, and focused plus chaos UI harness coverage clicks the disabled button to prove it cannot start generation or recovery.
+- 2026-06-18: Fresh-campaign playtest found AI companion Nudge was available before Start Adventure, which could send a model turn before the table's opening beat and fall into DM Recovery. Current fix: host Nudge buttons can remain clickable for explanation, but the command gate blocks provider generation before the opening; focused plus chaos UI harness coverage clicks the blocked button to prove it cannot start generation or recovery.
 - 2026-06-18: Pre-opening table flow now treats Start Adventure as the only first provider turn. The table phase is `opening_ready`, Now/Next says Ready To Start, the composer/Send Turn/DM Nudge/AI companion Nudge/debug submit are gated until the opening begins, and UI scenarios now start RP/combat through Start Adventure. Verification: `npm run build`, `npm run test:engine`, focused pre-opening/RP/combat UI, seeded chaos UI (`pretest-phase-gates`, 2 runs), and full `npm run test:ui -- --skip-build` passed.
 - 2026-06-18: Front-door library polish: saved-adventure picker/counts now hide backend starter seed campaigns, Continue/Delete disable when no real saved adventures exist, and the starting page can delete selected saved adventures through the recycled-file delete dialog. Verification: `npm run test:engine`, `npm run build`, focused `home-delete-campaign` UI, and focused `home-baseline` UI passed.
 - 2026-06-18: Failure-pattern audit of the latest bug cluster found the shared smell: new phase/session rules often landed in visible controls first, while alternate entry points stayed permissive. Hardened public guest action/pass routes, choice-vote authority, and companion Resolve Now side effects. Verification: `npm run test:multiplayer`, focused remote `/guest` UI scenario, `npm run test:regression`, and `npm run test:engine` passed.

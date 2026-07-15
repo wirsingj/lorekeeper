@@ -2,7 +2,7 @@
 
 LoreKeeper is a local-first tabletop RPG desktop app for running a D&D-style campaign with a real table flow. The app owns campaign state, combat, continuity, recovery, multiplayer authority, and the shape of play. The AI provider owns narration, NPC behavior, atmosphere, and dialogue inside those app-owned rails.
 
-LoreKeeper is one app that can be experienced as a local host app, provider-backed host app, browser guest mode, and eventual remote guest link through a tunnel or relay. The current same-network `/guest` flow is the proof point: the host owns campaign state and DM Voice access, while guests join from a browser and do not need LoreKeeper, Ollama, provider tools, VPN software, or model runtimes.
+LoreKeeper is one app that can be experienced as a local host app, provider-backed host app, browser guest mode, and eventual remote guest link through a tunnel or relay. The current same-network `/guest` flow is the proof point: the host owns campaign state and model/provider access, while guests join from a browser and do not need LoreKeeper, Ollama, provider tools, VPN software, or model runtimes.
 
 The default rules profile is D&D 5e-lite: HP, AC, ability scores, checks, saves, initiative, conditions, abilities, spells, inventory, and combat turns are tracked where the app has enough information. LoreKeeper is not trying to become a full virtual tabletop; it is trying to make a campaign feel durable, coherent, and easy to resume.
 
@@ -46,6 +46,7 @@ Provider output is treated as a DM contribution, not as authority over campaign 
 
 ## Project Structure
 
+- `yaiml.yml`: YAIML discovery file for LoreKeeper project memory and the portable YAIML refresh note.
 - `docs/ARCHITECTURE.md`: current architecture, ownership boundaries, and code landmarks.
 - `docs/state-of-the-table.md`: working product state, priorities, checklist, and playtest notes.
 - `docs/REMOTE_TABLE_ACCESS_PLAN.md`: remote table access strategy, product doctrine, and route safety rules.
@@ -96,7 +97,27 @@ Build the Windows portable app:
 npm run package:portable
 ```
 
-The portable zip is the full LoreKeeper app. It can host a local table or join another host from the same app. It bundles the Electron/Node runtime used by LoreKeeper, but Ollama and model files remain external installs.
+The portable zip is the full LoreKeeper app. It can host a local table or join another host from the same app. It bundles the Electron/Node runtime used by LoreKeeper, so friends do not need to install Node.js or run npm commands. Ollama and model files remain external installs.
+
+Check that the current portable app is fresh before a commit or release tag:
+
+```bash
+npm run release:check
+```
+
+Smoke-test the portable app from a temporary copy:
+
+```bash
+npm run smoke:portable
+```
+
+Install the local git hooks once per clone:
+
+```bash
+npm run hooks:install
+```
+
+The hooks do not build the distro automatically. They fail fast when the portable package is missing or older than packaged sources, then tell you to run `npm run package:portable`. Before sharing or tagging a release, run `npm run smoke:portable` too.
 
 ## Local Persistence
 

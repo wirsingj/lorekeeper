@@ -47,7 +47,7 @@ mkdirSync(appDir, { recursive: true });
 
 copyDir("dist/app", "dist/app");
 copyDir("electron", "electron");
-copyDir("scripts", "scripts");
+copyFile("scripts/serve.js", "scripts/serve.js");
 copyDir("src", "src");
 copyDir("app", "app");
 copyDir("assets", "assets");
@@ -93,7 +93,7 @@ writeFileSync(
     "",
     "Ollama:",
     "- Ollama is still an outside install.",
-    "- Install Ollama before using Local DM Voice.",
+    "- Install Ollama before using a local model.",
     "- LoreKeeper will talk to Ollama at http://127.0.0.1:11434 by default.",
     "",
     "What is bundled:",
@@ -101,9 +101,10 @@ writeFileSync(
     "- The LoreKeeper app and local API server code.",
     "- Runtime dependency sql.js for local campaign files.",
     "- A clean empty data folder.",
+    "- Everything needed to launch LoreKeeper without installing Node.js.",
     "",
     "What is not bundled:",
-    "- Node.js/npm command-line setup.",
+    "- Node.js/npm command-line setup; friends do not need it for this portable build.",
     "- Ollama or model files.",
     "- The developer git repo.",
     "- The maintainer's campaigns, logs, runtime artifacts, or old guest-package artifacts.",
@@ -112,7 +113,7 @@ writeFileSync(
     "- Keep the folder together after unzipping.",
     "- Move it to a normal folder such as Desktop or Documents.",
     "- Make sure antivirus did not quarantine LoreKeeper.exe.",
-    "- Install or start Ollama if Local DM Voice is unavailable.",
+    "- Install or start Ollama if local model setup is unavailable.",
   ].join("\r\n"),
   "utf8",
 );

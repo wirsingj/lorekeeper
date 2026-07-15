@@ -1,3 +1,16 @@
+---
+yaiml: 0.2
+role: architecture
+title: LoreKeeper Architecture
+purpose: Durable system shape, ownership boundaries, invariants, transitional architecture, and retired approaches for LoreKeeper.
+belongs-here: product/runtime shape, data and authority boundaries, major components, invariants, danger zones, intended architecture, retired concepts.
+not-here: current priority queue, command reference, complete file inventory, chronological progress notes.
+durability: durable; update when architecture or boundaries change materially.
+read-with: LoreKeeper State Of The Table; LoreKeeper Maintainer Guide.
+update-when: responsibilities, authority rules, runtime surfaces, storage, multiplayer, recovery, provider, or release boundaries change.
+agent-guidance: Distinguish current implementation, declared intent, transitional paths, and obsolete approaches. Do not revive retired Thinclient/split-client concepts.
+---
+
 # LoreKeeper Architecture
 
 Updated: 2026-06-19
@@ -6,14 +19,14 @@ This is the durable architecture guide for LoreKeeper. Keep this file and `docs/
 
 ## Product Shape
 
-LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a local AI provider or provider-backed DM Voice, serve a same-network browser guest page, and eventually support remote browser guests through a tunnel or relay that exposes only guest-safe routes.
+LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a local model provider or provider-backed table narrator, serve a same-network browser guest page, and eventually support remote browser guests through a tunnel or relay that exposes only guest-safe routes.
 
 LoreKeeper is one app with multiple access surfaces: local host app, provider-backed host app, table-joining flow inside the app, browser guest mode, future relay-assisted remote guest links, and portable/packaged distribution. The retired Thinclient and standalone join-client concepts should not return as separate products or brands; use LoreKeeper app, Guest mode, Table session, Invite link, Relay, Provider, Local model, and Campaign canon instead.
 
 The north-star table model is:
 
 - the host is a party member plus the software-side table owner for setup, invites, provider access, recovery decisions, and persistence,
-- the provider/DM Voice is the DM at the table,
+- the configured DM model/provider is the DM at the table,
 - the app owns canon, rules, persistence, authority, and recovery rails,
 - the provider owns narration, atmosphere, NPC behavior, and proposed state changes inside those rails,
 - party members are player-facing table voices with controller ownership,
@@ -190,7 +203,7 @@ UI projections:
 
 - `app/*controller.js` files should keep growing as small projection/policy modules.
 - `app/message-block-controller.js` owns DM/provider play-message block parsing: prose grouping, mechanics block extraction, parsed choice panels, structured choice override, and latest-choice lookup. `app/app.js` should render the returned blocks, not parse provider text.
-- `app/provider-settings-controller.js` owns DM Voice settings projections: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and model summary chips. `app/app.js` should read/write controls and render projections, not import recommended-model policy directly.
+- `app/provider-settings-controller.js` owns model setup projections: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and model summary chips. `app/app.js` should read/write controls and render projections, not import recommended-model policy directly.
 - `app/campaign-wizard-controller.js` owns New Adventure wizard policy: character/joiner normalization, controller-kind defaults, opening-scene setup copy, and host/remote/AI sheet ownership fields.
 - `app/character-sheet-controller.js` owns character sheet form projection and save-payload policy: HP normalization, ability aliases, skill/ability/spell text merging, resources/attacks preservation, and parsed 5E-lite fields.
 - `app/renderer-diagnostics-controller.js` owns renderer diagnostics serialization, debug play-log message normalization, session-health projection, readable table timeline projection, and turn-flow timeline wording. `app/app.js` should provide current state/elements and render the returned projections.

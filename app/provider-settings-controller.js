@@ -70,6 +70,69 @@ export function selectedModelSummaryProjection({ selectedModel = "", ollama = {}
   };
 }
 
+export function buildOllamaReadinessProjection({ selectedModel = "", ollama = {} } = {}) {
+  const installedModels = installedOllamaModelIds(ollama);
+  const modelInstalled = isOllamaModelInstalled(selectedModel, installedModels);
+  const steps = [
+    {
+      key: "install",
+      label: "Install Ollama",
+      state: ollama.state === "ollama_not_installed" ? "current" : "done",
+      detail: ollama.state === "ollama_not_installed"
+        ? "Download Ollama, then reopen or refresh Model Setup."
+        : "Ollama is installed.",
+    },
+    {
+      key: "start",
+      label: "Start Ollama",
+      state: ollama.state === "ollama_not_installed"
+        ? "blocked"
+        : ollama.state === "ollama_not_running"
+          ? "current"
+          : "done",
+      detail: ollama.state === "ollama_not_running"
+        ? "Start the Ollama app or service, then refresh status."
+        : ollama.state === "ollama_not_installed"
+          ? "Available after Ollama is installed."
+          : "Ollama is running.",
+    },
+    {
+      key: "download",
+      label: `Download ${modelDisplayName(selectedModel)}`,
+      state: ollama.state === "ollama_not_installed" || ollama.state === "ollama_not_running"
+        ? "blocked"
+        : modelInstalled
+          ? "done"
+          : "current",
+      detail: modelInstalled
+        ? `${modelDisplayName(selectedModel)} is on this computer.`
+        : "Use Download to pull this model before hosting with local AI.",
+    },
+    {
+      key: "test",
+      label: "Test Model",
+      state: modelInstalled && ollama.state === "ready" ? "current" : "blocked",
+      detail: modelInstalled && ollama.state === "ready"
+        ? "Run a short test before the first table."
+        : "Available after the model is downloaded.",
+    },
+  ];
+
+  if (ollama.state === "ready" && modelInstalled) {
+    steps[3] = {
+      ...steps[3],
+      state: "current",
+      detail: "Ready for a quick test before play.",
+    };
+  }
+
+  return {
+    ready: ollama.state === "ready" && modelInstalled,
+    nextStep: steps.find((step) => step.state === "current")?.key ?? "ready",
+    steps,
+  };
+}
+
 export function providerStatusLabel(ollama = {}) {
   if (ollama.state === "ready") {
     return `Ollama ready: ${modelDisplayName(ollama.selectedModel)}`;
@@ -88,10 +151,10 @@ export function providerStatusLabel(ollama = {}) {
 
 export function providerSetupHint(ollama = {}, selectedModel = "") {
   if (ollama.state === "ollama_not_installed") {
-    return "Install Ollama from ollama.com, then reopen DM Voice and refresh.";
+    return "Install Ollama, then return to Model Setup and refresh status.";
   }
   if (ollama.state === "ollama_not_running") {
-    return "Start Ollama, then refresh DM Voice.";
+    return "Start Ollama, then refresh status.";
   }
   return `${modelDisplayName(selectedModel)} is missing. Use Download to pull it locally.`;
 }

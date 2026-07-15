@@ -73,6 +73,7 @@ export function buildTurnRepairActionGate({
   repair = null,
   action = "retry",
   activeGeneration = false,
+  retryableTurnError = false,
 } = {}) {
   if (activeGeneration) {
     return {
@@ -83,7 +84,7 @@ export function buildTurnRepairActionGate({
     };
   }
 
-  if (action === "retry" && !repair?.turn) {
+  if (action === "retry" && !repair?.turn && !retryableTurnError) {
     return {
       blocked: true,
       reason: "no_repair_turn",

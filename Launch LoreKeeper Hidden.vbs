@@ -10,12 +10,12 @@ launcher = repo & "\scripts\launch-desktop.js"
 dataFolder = repo & "\data"
 logFile = repo & "\data\launcher.log"
 childLogFile = repo & "\data\launcher-child.log"
-nodePath = FindNode()
 
 If Not filesystem.FolderExists(dataFolder) Then
   filesystem.CreateFolder(dataFolder)
 End If
 
+nodePath = FindNode()
 shell.CurrentDirectory = repo
 AppendLog logFile, "VBS host launch using node: " & nodePath
 command = "cmd.exe /d /s /c " & Chr(34) & Chr(34) & nodePath & Chr(34) & " " & Chr(34) & launcher & Chr(34) & " >> " & Chr(34) & childLogFile & Chr(34) & " 2>&1" & Chr(34)

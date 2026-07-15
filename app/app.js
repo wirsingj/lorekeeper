@@ -61,6 +61,7 @@ import {
   shouldScheduleGuestAutoResolve,
 } from "./guest-auto-resolve-controller.js";
 import {
+  buildHostResponseReviewActionPlan,
   applyManualResponseFallbackProjection,
   buildHostResponseReviewProjection,
   buildManualResponseFallbackProjection,
@@ -95,6 +96,7 @@ import {
   splitProviderTableMessages,
 } from "./provider-import-controller.js";
 import {
+  buildOllamaReadinessProjection,
   buildModelOptionsProjection,
   campaignCreationProviderSettings,
   installedOllamaModelIds,
@@ -355,7 +357,6 @@ const elements = {
   homePanel: document.querySelector("#home-panel"),
   homeHostFlow: document.querySelector("#home-host-flow"),
   homeJoinFlow: document.querySelector("#home-join-flow"),
-  homeProviderSetup: document.querySelector("#home-provider-setup"),
   homeNewCampaign: document.querySelector("#home-new-campaign"),
   homeSettings: document.querySelector("#home-settings"),
   homeCampaignSelect: document.querySelector("#home-campaign-select"),
@@ -479,9 +480,12 @@ const elements = {
   newProviderChat: document.querySelector("#new-provider-chat"),
   copyProviderPrompt: document.querySelector("#copy-provider-prompt"),
   providerMode: document.querySelector("#provider-mode"),
+  localAiCard: document.querySelector(".local-ai-card"),
+  ollamaInstallNote: document.querySelector("#ollama-install-note"),
   ollamaStatus: document.querySelector("#ollama-status"),
   ollamaModel: document.querySelector("#ollama-model"),
   ollamaModelSummary: document.querySelector("#ollama-model-summary"),
+  ollamaReadinessList: document.querySelector("#ollama-readiness-list"),
   refreshOllama: document.querySelector("#refresh-ollama"),
   testOllama: document.querySelector("#test-ollama"),
   pullOllamaModel: document.querySelector("#pull-ollama-model"),
@@ -654,10 +658,6 @@ elements.homeNewCampaign?.addEventListener("click", () => {
   openCampaignDialog({ returnToMainMenu: true });
 });
 
-elements.homeProviderSetup?.addEventListener("click", () => {
-  openSetupDialog({ focusProvider: true, mode: "ai" });
-});
-
 elements.homeSettings?.addEventListener("click", () => {
   openSetupDialog({ mode: "app" });
 });
@@ -764,7 +764,7 @@ elements.checkSidecar.addEventListener("click", async () => {
     return;
   }
 
-  elements.bridgeStatus.textContent = "No saved ChatGPT DM chat found; use New DM Chat first";
+  elements.bridgeStatus.textContent = "No saved ChatGPT handoff found; use New Chat first";
 });
 
 elements.newProviderChat.addEventListener("click", async () => {
@@ -815,6 +815,20 @@ elements.repairInspect?.addEventListener("click", async () => {
 
 elements.repairImportAnyway?.addEventListener("click", async () => {
   await importTurnRepairAnyway();
+});
+
+elements.hostResponseReview?.addEventListener("click", (event) => {
+  const button = event.target instanceof Element
+    ? event.target.closest("[data-review-action]")
+    : null;
+  if (!button) {
+    return;
+  }
+  const plan = buildHostResponseReviewActionPlan(button.dataset.reviewAction || "");
+  if (plan.action === "open_settings") {
+    openSetupDialog({ tab: plan.tab, mode: plan.mode });
+    setProviderActivity(plan.activityText, plan.activityState);
+  }
 });
 
 elements.seatWaitingGuest?.addEventListener("click", () => {
@@ -1001,7 +1015,9 @@ function openSetupDialog({ focusProvider = false, tab = "", mode = "" } = {}) {
   const requestedTab = focusProvider ? "ai" : tab || "app";
   const requestedMode = mode || settingsModeForTab(requestedTab);
   setSettingsTab(requestedTab, { mode: requestedMode });
-  elements.setupDialog.showModal();
+  if (!elements.setupDialog.open) {
+    elements.setupDialog.showModal();
+  }
   if (focusProvider) {
     window.setTimeout(() => {
       elements.providerSetupSection?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -1188,6 +1204,7 @@ async function nudgeAiPartyMember(member) {
   const gate = buildAiCompanionNudgeGate({
     isHost: Boolean(member?.id && !clientMode && !isRemoteTableClient()),
     readyForOpening: isCampaignReadyForOpening(),
+    turnProjection: turnProjection(),
     inCombat,
     isActiveCombatTurn: isActiveAiCompanionCombatTurn(member),
     companionName: member?.name || "This companion",
@@ -4230,7 +4247,7 @@ function createGuestShellCampaign() {
         body: guestWaitingRoomMode
           ? "Choose an open table, ask for a seat, and wait for your friend to bring you in."
           : "Join a hosted LoreKeeper table and play as an assigned party member.",
-        meta: "No local DM Voice setup is needed here.",
+        meta: "No local model setup is needed here.",
           source: "lorekeeper_join",
           createdAt: new Date().toISOString(),
           data: {},
@@ -5028,8 +5045,8 @@ function renderAppModeControls() {
   }
   if (elements.appModeNote) {
     elements.appModeNote.textContent = clientMode
-      ? "Join connects to a host and receives visible table state without local DM Voice setup."
-      : "Host runs campaigns, saves your table, manages DM Voice, and can also join another host when needed.";
+      ? "Join connects to a host and receives visible table state without local model setup."
+      : "Host runs campaigns, saves your table, manages model setup, and can also join another host when needed.";
   }
 }
 
@@ -5063,7 +5080,7 @@ async function saveProviderSettingsFromControls() {
   };
 
   try {
-    setProviderActivity("Saving DM Voice settings...", "working");
+    setProviderActivity("Saving model settings...", "working");
     const response = await fetch(apiProviderSettingsUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -5079,17 +5096,17 @@ async function saveProviderSettingsFromControls() {
     rememberProviderSettings(currentProviderSettings());
     state.providerStatus = payload.providerStatus ?? state.providerStatus;
     render();
-    setProviderActivity("DM Voice settings saved", "idle");
+    setProviderActivity("Model settings saved", "idle");
   } catch (error) {
-    elements.bridgeStatus.textContent = error instanceof Error ? `DM Voice settings failed: ${error.message}` : "DM Voice settings failed";
-    setProviderActivity("DM Voice settings save failed", "error");
+    elements.bridgeStatus.textContent = error instanceof Error ? `Model settings failed: ${error.message}` : "Model settings failed";
+    setProviderActivity("Model settings save failed", "error");
   }
 }
 
 async function refreshProviderStatus({ quiet = false } = {}) {
   try {
     if (!quiet) {
-      setProviderActivity("Checking local DM Voice...", "working");
+      setProviderActivity("Checking local model setup...", "working");
     }
     const response = await fetch(apiProviderStatusUrl);
     if (!response.ok) {
@@ -5133,8 +5150,18 @@ function renderProviderControls() {
     elements.recheckProvider.hidden = true;
     elements.bridgeCard.hidden = true;
     elements.promptDrawer.hidden = true;
-    elements.ollamaStatus.textContent = "Join mode uses the host's DM Voice.";
-    elements.ollamaBenchmark.textContent = "No local storyteller setup is needed in this window.";
+    elements.ollamaStatus.textContent = "Join mode uses the host's model setup.";
+    elements.ollamaBenchmark.textContent = "No local model setup is needed in this window.";
+    if (elements.localAiCard) {
+      elements.localAiCard.dataset.ollamaState = "join_mode";
+    }
+    if (elements.ollamaInstallNote) {
+      elements.ollamaInstallNote.hidden = true;
+    }
+    if (elements.ollamaReadinessList) {
+      elements.ollamaReadinessList.replaceChildren();
+      elements.ollamaReadinessList.dataset.ready = "false";
+    }
     applyJoinClientChrome();
     renderTableActions();
     return;
@@ -5153,7 +5180,14 @@ function renderProviderControls() {
     elements.ollamaBenchmark.textContent = ollama.selectedModelAvailable
       ? `${modelDisplayName(settings.selectedModel)} is installed and ready.`
       : providerSetupHint(ollama, settings.selectedModel);
+    if (elements.localAiCard) {
+      elements.localAiCard.dataset.ollamaState = ollama.state || "unknown";
+    }
+    if (elements.ollamaInstallNote) {
+      elements.ollamaInstallNote.hidden = ollama.state !== "ollama_not_installed";
+    }
     renderSelectedModelSummary(settings, ollama);
+    renderOllamaReadiness(settings, ollama);
   }
 
   elements.checkSidecar.disabled = settings.preferredProvider !== "bridge";
@@ -5331,6 +5365,30 @@ function renderSelectedModelSummary(settings, ollama) {
   elements.pullOllamaModel.disabled = summary.pullDisabled;
   elements.pullOllamaModel.textContent = summary.pullLabel;
   elements.pullOllamaModel.title = summary.pullTitle;
+}
+
+function renderOllamaReadiness(settings, ollama) {
+  if (!elements.ollamaReadinessList) {
+    return;
+  }
+  const readiness = buildOllamaReadinessProjection({
+    selectedModel: settings.selectedModel,
+    ollama,
+  });
+  elements.ollamaReadinessList.dataset.ready = readiness.ready ? "true" : "false";
+  elements.ollamaReadinessList.replaceChildren(
+    ...readiness.steps.map((step) => {
+      const item = document.createElement("li");
+      item.dataset.state = step.state;
+      item.dataset.step = step.key;
+      const label = document.createElement("strong");
+      label.textContent = step.label;
+      const detail = document.createElement("span");
+      detail.textContent = step.detail;
+      item.append(label, detail);
+      return item;
+    }),
+  );
 }
 
 async function testOllamaModel() {
@@ -5586,12 +5644,12 @@ function render() {
   renderSceneNotebook(campaign);
   const providerSettings = currentProviderSettings();
   elements.providerStatus.textContent = providerSettings.preferredProvider === "ollama"
-    ? `DM voice: Local DM ${providerSettings.selectedModel}`
-    : "DM voice: ChatGPT DM";
+    ? `Model source: Ollama ${providerSettings.selectedModel}`
+    : "Model source: ChatGPT handoff";
   if (providerSettings.preferredProvider === "bridge" && state.bridge.mode === "extension") {
     elements.providerStatus.textContent = state.bridge.ready
-      ? "DM voice: ChatGPT DM ready"
-      : "DM voice: ChatGPT DM waiting";
+      ? "Model source: ChatGPT handoff ready"
+      : "Model source: ChatGPT handoff waiting";
   }
   elements.saveStatus.textContent = clientMode || isRemoteTableClient()
     ? "Hosted table"
@@ -5661,6 +5719,17 @@ function markOpeningRequestedForCurrentSession(campaign = state.campaign) {
   if (key) {
     state.openingRequestedSessionKeys.add(key);
   }
+}
+
+function clearOpeningRequestedForCurrentSession(campaign = state.campaign) {
+  const key = currentOpeningRequestKey(campaign);
+  if (key) {
+    state.openingRequestedSessionKeys.delete(key);
+  }
+}
+
+function isAdventureOpeningTurn(turn) {
+  return /^\(Opening narration:/i.test(String(turn?.playerMessage ?? ""));
 }
 
 function announceWaitingGuestsIfNeeded() {
@@ -5749,7 +5818,7 @@ async function returnToMainMenu() {
   renderHomePanel();
   renderJoinClientPanel();
   setProviderActivity(
-    wasGuest ? "Left the hosted table. Choose Join to request another seat." : "Choose Continue, New Adventure, Join, or DM Voice.",
+    wasGuest ? "Left the hosted table. Choose Join Table to request another seat." : "Choose Continue Table, Create New Table, Join Table, or Settings.",
     "idle",
   );
 }
@@ -5899,7 +5968,7 @@ function renderJoinClientPanel() {
 
   const awaitingApproval = state.guestSession?.status === "pending" || state.guestSnapshot?.awaitingApproval;
   if (elements.joinClientTitle) {
-    elements.joinClientTitle.textContent = guestWaitingRoomMode ? "Find A Seat" : "Join A Table";
+    elements.joinClientTitle.textContent = guestWaitingRoomMode ? "Find A Seat" : "Join Table";
   }
   if (elements.joinBackHome) {
     elements.joinBackHome.hidden = false;
@@ -6650,6 +6719,9 @@ async function runPromptThroughLocalProvider(turn) {
       stack: error instanceof Error ? error.stack : "",
     });
     state.turnFlow.failGeneration(error);
+    if (isAdventureOpeningTurn(turn)) {
+      clearOpeningRequestedForCurrentSession();
+    }
     setProviderActivity(error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed", "error");
     elements.bridgeStatus.textContent = error instanceof Error ? `Ollama failed: ${error.message}` : "Ollama failed";
     render();
@@ -6731,22 +6803,30 @@ async function retryTurnRepair() {
     repair,
     action: "retry",
     activeGeneration: hasActiveGeneration(),
+    retryableTurnError: Boolean(turnProjection().canRetry),
   });
   if (gate.blocked) {
     setProviderActivity(gate.activityText, gate.activityState);
     return { providerReceived: false, reason: gate.reason };
   }
-  const retryMessage = await markRepairTurnRetrying(repair);
-  setProviderActivity("DM is reconsidering the response...", "working");
-  state.turnFlow.retryLastTurn();
+  const retryMessage = repair ? await markRepairTurnRetrying(repair) : null;
+  setProviderActivity(repair ? "DM is reconsidering the response..." : "Retrying the failed DM response...", "working");
+  const retryTurn = state.turnFlow.retryLastTurn();
+  const turnToRetry = repair?.turn || retryTurn;
+  if (!turnToRetry) {
+    setProviderActivity("No failed DM response is available to try again", "error");
+    renderTableActions();
+    return { providerReceived: false, reason: "no_failed_turn" };
+  }
   renderTableActions();
-  const runResult = await runPromptThroughLocalProvider(repair.turn);
+  const runResult = await runPromptThroughLocalProvider(turnToRetry);
   if (retryMessage?.id) {
     await updatePlayerTurnEchoLifecycle(retryMessage.id, {
       ...runResult,
       recovered: true,
     });
   }
+  return runResult;
 }
 
 async function markRepairTurnRetrying(repair) {
@@ -6780,12 +6860,12 @@ function findPlayerTurnMessageForRepair(repair) {
 }
 
 async function inspectTurnRepair() {
-  if (!activeTurnRepair()) {
+  if (!activeTurnRepair() && !turnProjection().canRetry) {
     return;
   }
   openSetupDialog({ tab: "troubleshooting", mode: "recovery" });
   await refreshDiagnostics();
-  setProviderActivity("DM response review is open", "waiting");
+  setProviderActivity(activeTurnRepair() ? "DM response review is open" : "DM failure details are open", "waiting");
 }
 
 async function importTurnRepairAnyway() {
@@ -8453,6 +8533,7 @@ function partyControllerActions(member, pendingConnection = null) {
     const nudgeGate = buildAiCompanionNudgeGate({
       isHost: !clientMode && !isRemoteTableClient(),
       readyForOpening: isCampaignReadyForOpening(),
+      turnProjection: turnProjection(),
       inCombat: Boolean(state.campaign?.combat?.inCombat),
       isActiveCombatTurn: isActiveAiCompanionCombatTurn(member),
       companionName: member.name || "This companion",
@@ -8466,7 +8547,7 @@ function partyControllerActions(member, pendingConnection = null) {
       label: "Nudge",
       title: nudgeGate.title,
       className: "nudge-action",
-      disabled: nudgeGate.blocked,
+      disabled: !member?.id || clientMode || isRemoteTableClient() || Boolean(turnProjection().hasActiveGeneration),
       onClick: () => nudgeAiPartyMember(member),
     });
     return actions;
@@ -8985,6 +9066,7 @@ function renderReviewBatch() {
   renderHostResponseReview(elements.hostResponseReview, buildHostResponseReviewProjection({
     repair,
     reviewBatch: state.reviewBatch,
+    turnProjection: turnProjection(),
   }));
   applyManualResponseFallbackProjection(elements, buildManualResponseFallbackProjection({
     repair,

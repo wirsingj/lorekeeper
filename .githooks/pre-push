@@ -1,0 +1,16 @@
+#!/bin/sh
+
+needs_release_check=0
+while read local_ref local_sha remote_ref remote_sha
+do
+  case "$local_ref $remote_ref" in
+    refs/tags/*\ *|*\ refs/tags/*)
+      needs_release_check=1
+      ;;
+  esac
+done
+
+if [ "$needs_release_check" -eq 1 ]; then
+  node scripts/check-portable-package.js
+  node scripts/smoke-portable-package.js
+fi

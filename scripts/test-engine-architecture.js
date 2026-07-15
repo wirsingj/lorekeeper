@@ -61,7 +61,7 @@ import {
   guestAutoResolvePinMatches,
   shouldScheduleGuestAutoResolve,
 } from "../app/guest-auto-resolve-controller.js";
-import { buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
+import { buildHostResponseReviewActionPlan, buildHostResponseReviewProjection, buildManualResponseFallbackProjection } from "../app/host-response-review-controller.js";
 import {
   activeCampaignDeleteTarget,
   buildHomeCampaignPickerProjection,
@@ -92,6 +92,7 @@ import {
   splitProviderTableMessages,
 } from "../app/provider-import-controller.js";
 import {
+  buildOllamaReadinessProjection,
   buildModelOptionsProjection,
   campaignCreationProviderSettings,
   providerSetupHint,
@@ -2220,6 +2221,16 @@ function testInputComposerProjection() {
   assert.equal(openingCampaignHostProjection.sendDisabled, true);
   assert.match(openingCampaignHostProjection.placeholder, /Start Adventure/);
 
+  const openingRecoveryHostProjection = buildInputComposerProjection({
+    campaign: openingCampaign,
+    turnProjection: { canSubmit: true, canRetry: true },
+    tableSession: { phase: tablePhases.RECOVERY },
+  });
+  assert.equal(openingRecoveryHostProjection.inputDisabled, true);
+  assert.equal(openingRecoveryHostProjection.sendDisabled, true);
+  assert.match(openingRecoveryHostProjection.placeholder, /Review the DM response/i);
+  assert.doesNotMatch(openingRecoveryHostProjection.placeholder, /Start Adventure/i);
+
   const openingHostProjection = buildInputComposerProjection({
     campaign,
     turnProjection: { canSubmit: true },
@@ -2240,6 +2251,19 @@ function testInputComposerProjection() {
   assert.equal(openingCampaignGuestProjection.inputDisabled, true);
   assert.equal(openingCampaignGuestProjection.sendDisabled, true);
   assert.match(openingCampaignGuestProjection.placeholder, /opening scene/);
+
+  const openingRecoveryGuestProjection = buildInputComposerProjection({
+    clientMode: true,
+    campaign: openingCampaign,
+    tableSession: { phase: tablePhases.RECOVERY },
+    guestSnapshot: {
+      connection: { status: "connected", partyMemberId: "thor" },
+      assignedCharacter: { name: "Thor" },
+    },
+  });
+  assert.equal(openingRecoveryGuestProjection.inputDisabled, true);
+  assert.equal(openingRecoveryGuestProjection.sendDisabled, true);
+  assert.match(openingRecoveryGuestProjection.placeholder, /Host is reviewing/i);
 
   const hostWaitingForDm = buildInputComposerProjection({
     campaign,
@@ -2821,7 +2845,7 @@ function testTableActionProjection() {
   assert.equal(freshTable.startAdventure.disabled, false);
   assert.equal(freshTable.seatGuest.visible, false);
   assert.equal(freshTable.cancelGeneration.visible, false);
-  assert.equal(freshTable.nudgeDm.disabled, true);
+  assert.equal(freshTable.nudgeDm.disabled, false);
   assert.match(freshTable.nudgeDm.title, /Start Adventure/);
 
   const guestsWaiting = buildTableActionProjection({
@@ -2846,6 +2870,20 @@ function testTableActionProjection() {
   assert.equal(recovery.repairUseAnyway.disabled, false);
   assert.equal(recovery.readLatest.visible, false);
   assert.equal(recovery.startAdventure.visible, false);
+
+  const failedGenerationRecovery = buildTableActionProjection({
+    campaign: readyCampaign,
+    turnProjection: { hasRepair: false, canRetry: true, hasActiveGeneration: false },
+    preferredProvider: "ollama",
+    isHost: true,
+  });
+  assert.equal(failedGenerationRecovery.repairRetry.visible, true);
+  assert.equal(failedGenerationRecovery.repairInspect.visible, true);
+  assert.equal(failedGenerationRecovery.repairUseAnyway.visible, false);
+  assert.equal(failedGenerationRecovery.startAdventure.visible, true);
+  assert.equal(failedGenerationRecovery.startAdventure.disabled, false);
+  assert.equal(failedGenerationRecovery.nudgeDm.disabled, false);
+  assert.match(failedGenerationRecovery.nudgeDm.title, /recovery/i);
 
   const hardBlocked = buildTableActionProjection({
     campaign: readyCampaign,
@@ -2910,6 +2948,14 @@ function testTableActionProjection() {
   assert.equal(preOpeningDmNudgeGate.blocked, true);
   assert.equal(preOpeningDmNudgeGate.reason, "opening_not_started");
   assert.match(preOpeningDmNudgeGate.activityText, /Start Adventure/);
+  const failedTurnNudgeGate = buildNudgeDmCommandGate({
+    isHost: true,
+    readyForOpening: true,
+    turnProjection: { canRetry: true, hasActiveGeneration: false },
+  });
+  assert.equal(failedTurnNudgeGate.blocked, true);
+  assert.equal(failedTurnNudgeGate.reason, "failed_turn_retry_available");
+  assert.match(failedTurnNudgeGate.activityText, /Try Again|Details/);
   const busyNudgeGate = buildNudgeDmCommandGate({ isHost: true, turnProjection: { hasActiveGeneration: true } });
   assert.equal(busyNudgeGate.blocked, true);
   assert.equal(busyNudgeGate.reason, "busy");
@@ -2921,6 +2967,15 @@ function testTableActionProjection() {
   assert.equal(preOpeningCompanionNudgeGate.blocked, true);
   assert.equal(preOpeningCompanionNudgeGate.reason, "opening_not_started");
   assert.match(preOpeningCompanionNudgeGate.activityText, /Start Adventure/);
+  const failedTurnCompanionNudgeGate = buildAiCompanionNudgeGate({
+    isHost: true,
+    readyForOpening: true,
+    turnProjection: { canRetry: true, hasActiveGeneration: false },
+    companionName: "Mira",
+  });
+  assert.equal(failedTurnCompanionNudgeGate.blocked, true);
+  assert.equal(failedTurnCompanionNudgeGate.reason, "failed_turn_retry_available");
+  assert.match(failedTurnCompanionNudgeGate.activityText, /Try Again|Details/);
   const wrongCombatCompanionNudgeGate = buildAiCompanionNudgeGate({
     isHost: true,
     readyForOpening: false,
@@ -3261,6 +3316,11 @@ function testTurnRepairController() {
     repair: {},
     action: "retry",
   }).reason, "no_repair_turn");
+  assert.equal(buildTurnRepairActionGate({
+    repair: null,
+    action: "retry",
+    retryableTurnError: true,
+  }).blocked, false);
 
   const agencyRepair = {
     reason: "table[1] appears to speak, decide, or act for controlled party member Thora without submitted controller input",
@@ -3339,6 +3399,25 @@ function testHostResponseReviewProjection() {
   assert.equal(idleFallback.open, false);
   assert.match(idleFallback.hint, /Rare fallback/i);
   assert.doesNotMatch(`${idleFallback.summary} ${idleFallback.hint}`, /JSON|contract|import|paste box/i);
+
+  const failedTurn = buildHostResponseReviewProjection({
+    turnProjection: {
+      canRetry: true,
+      error: { message: "Ollama generation failed (404)." },
+    },
+  });
+  assert.equal(failedTurn.state, "failed");
+  assert.match(failedTurn.title, /Could Not Answer/);
+  assert.match(failedTurn.nextStep, /Try Again/);
+  assert.match(failedTurn.nextStep, /Model Setup/);
+  assert.equal(failedTurn.actions?.[0]?.id, "open_model_setup");
+  assert.equal(failedTurn.actions?.[0]?.label, "Open Model Setup");
+  assert.doesNotMatch(`${failedTurn.title} ${failedTurn.body} ${failedTurn.nextStep}`, /JSON|contract|import|paste box/i);
+  const modelSetupAction = buildHostResponseReviewActionPlan("open_model_setup");
+  assert.equal(modelSetupAction.action, "open_settings");
+  assert.equal(modelSetupAction.tab, "ai");
+  assert.equal(modelSetupAction.mode, "app");
+  assert.equal(buildHostResponseReviewActionPlan("unknown").action, "none");
 
   const repair = buildHostResponseReviewProjection({
     repair: {
@@ -3596,6 +3675,35 @@ function testProviderSettingsController() {
 
   assert.equal(providerStatusLabel({ state: "ready", selectedModel: "qwen3:14b" }), "Ollama ready: Qwen3 14B");
   assert.match(providerSetupHint({ state: "ollama_not_running" }, "qwen3:14b"), /Start Ollama/);
+
+  const notInstalledReadiness = buildOllamaReadinessProjection({
+    selectedModel: "qwen3:14b",
+    ollama: { state: "ollama_not_installed", models: [] },
+  });
+  assert.equal(notInstalledReadiness.nextStep, "install");
+  assert.deepEqual(notInstalledReadiness.steps.map((step) => step.state), ["current", "blocked", "blocked", "blocked"]);
+
+  const notRunningReadiness = buildOllamaReadinessProjection({
+    selectedModel: "qwen3:14b",
+    ollama: { state: "ollama_not_running", models: [] },
+  });
+  assert.equal(notRunningReadiness.nextStep, "start");
+  assert.deepEqual(notRunningReadiness.steps.map((step) => step.state), ["done", "current", "blocked", "blocked"]);
+
+  const missingModelReadiness = buildOllamaReadinessProjection({
+    selectedModel: "qwen3:14b",
+    ollama,
+  });
+  assert.equal(missingModelReadiness.nextStep, "download");
+  assert.deepEqual(missingModelReadiness.steps.map((step) => step.state), ["done", "done", "current", "blocked"]);
+
+  const readyReadiness = buildOllamaReadinessProjection({
+    selectedModel: "qwen3:14b",
+    ollama: { state: "ready", selectedModel: "qwen3:14b", models: [{ name: "qwen3:14b" }] },
+  });
+  assert.equal(readyReadiness.ready, true);
+  assert.equal(readyReadiness.nextStep, "test");
+  assert.deepEqual(readyReadiness.steps.map((step) => step.state), ["done", "done", "done", "current"]);
 }
 
 function testHomeCampaignController() {
@@ -4149,14 +4257,19 @@ function testReviewPanelProjection() {
 
 function testSettingsSurfaceProjection() {
   const appSurface = buildSettingsSurfaceProjection({ tab: "app", mode: "app" });
-  assert.deepEqual(appSurface.allowedTabs, ["app"]);
+  assert.deepEqual(appSurface.allowedTabs, ["app", "ai"]);
   assert.equal(appSurface.activeTab, "app");
-  assert.equal(appSurface.copy.title, "App Preferences");
+  assert.equal(appSurface.copy.title, "Settings");
+
+  const modelTabInSettings = buildSettingsSurfaceProjection({ tab: "ai", mode: "app" });
+  assert.deepEqual(modelTabInSettings.allowedTabs, ["app", "ai"]);
+  assert.equal(modelTabInSettings.activeTab, "ai");
+  assert.equal(modelTabInSettings.copy.title, "Model Setup");
 
   const aiSurface = buildSettingsSurfaceProjection({ tab: "ai", mode: "ai" });
   assert.deepEqual(aiSurface.allowedTabs, ["ai"]);
   assert.equal(aiSurface.activeTab, "ai");
-  assert.equal(aiSurface.copy.title, "DM Voice");
+  assert.equal(aiSurface.copy.title, "Model Setup");
 
   const tableSurface = buildSettingsSurfaceProjection({ tab: "friends", mode: "table" });
   assert.deepEqual(tableSurface.allowedTabs, ["friends"]);
@@ -4237,8 +4350,8 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(playLogController, /turn_retrying[\s\S]*?label:\s*"Trying again"/, "repair retry bubbles should use table-facing lifecycle wording");
   assert.match(
     appJs,
-    /const runResult = await runPromptThroughLocalProvider\(repair\.turn\);[\s\S]*?await updatePlayerTurnEchoLifecycle\(retryMessage\.id/,
-    "Try Again should update the original player action after the retry result",
+    /const retryTurn = state\.turnFlow\.retryLastTurn\(\);[\s\S]*?const turnToRetry = repair\?\.turn \|\| retryTurn;[\s\S]*?const runResult = await runPromptThroughLocalProvider\(turnToRetry\);[\s\S]*?await updatePlayerTurnEchoLifecycle\(retryMessage\.id/,
+    "Try Again should retry either reviewed repair text or a failed provider turn, then update the original player action after repair retries",
   );
   assert.match(appJs, /renderTableTimelineSummary/, "diagnostics should render a readable table timeline");
   assert.match(rendererDiagnosticsController, /function buildSessionHealthSummary/, "diagnostics should include a plain session health summary");
@@ -4283,10 +4396,10 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   assert.match(appJs, /provider-import-controller\.js/, "provider import status policy should live outside the main app renderer");
   assert.match(appJs, /buildProviderImportOutcome/, "renderer should use provider import outcome projection");
   assert.match(appJs, /prepareAutoCommitReviewBatch/, "provider auto-commit policy should live outside the main app renderer");
-  assert.match(appJs, /provider-settings-controller\.js/, "DM Voice settings projection should live outside the main app renderer");
-  assert.match(providerSettingsController, /function providerStatusLabel/, "DM Voice status labels should live in provider-settings-controller");
-  assert.match(providerSettingsController, /function buildModelOptionsProjection/, "DM Voice model option projection should live in provider-settings-controller");
-  assert.doesNotMatch(appJs, /function providerStatusLabel/, "renderer should not own DM Voice status labels");
+  assert.match(appJs, /provider-settings-controller\.js/, "model settings projection should live outside the main app renderer");
+  assert.match(providerSettingsController, /function providerStatusLabel/, "model status labels should live in provider-settings-controller");
+  assert.match(providerSettingsController, /function buildModelOptionsProjection/, "model option projection should live in provider-settings-controller");
+  assert.doesNotMatch(appJs, /function providerStatusLabel/, "renderer should not own model status labels");
   assert.doesNotMatch(appJs, /function dedupeModelOptions/, "renderer should not own local model option policy");
   assert.doesNotMatch(appJs, /recommendedOllamaModels/, "renderer should not import recommended model policy directly");
   assert.match(appJs, /provider-result-controller\.js/, "provider result validation summary policy should live outside the renderer");
@@ -4340,15 +4453,35 @@ async function testNewCampaignPreTableJoinerWiring() {
   const electronMain = await readFile(path.join("electron", "main.js"), "utf8");
   const localTable = await readFile(path.join("src", "multiplayer", "local-table.js"), "utf8");
   const server = await readFile(path.join("scripts", "serve.js"), "utf8");
+  const hiddenLauncher = await readFile("Launch LoreKeeper Hidden.vbs", "utf8");
+  const cmdLauncher = await readFile("Launch LoreKeeper.cmd", "utf8");
   const packageJson = JSON.parse(await readFile(path.join("package.json"), "utf8"));
   assert.match(packageJson.description, /host and browser guest play/i, "package metadata should describe LoreKeeper's current host/guest product shape");
   assert.doesNotMatch(packageJson.description, /browser-extension|thinclient/i, "package metadata should not revive stale product identities");
   assert.equal(packageJson.keywords.includes("browser-extension"), false, "package keywords should not describe LoreKeeper as a browser extension");
   assert.equal(packageJson.scripts["package:portable"], "npm run package:host", "portable packaging should build the full LoreKeeper app");
   assert.equal(packageJson.scripts["package:host"], "npm run build && node ./scripts/package-portable-host.js", "host packaging should create the full portable app");
+  assert.equal(packageJson.scripts["release:check"], "node ./scripts/check-portable-package.js", "release checks should verify the local portable artifact before commits/tags");
+  assert.equal(packageJson.scripts["smoke:portable"], "node ./scripts/smoke-portable-package.js", "portable smoke should exercise the packaged app from a temp copy");
+  assert.equal(packageJson.scripts["release:tag"], "node ./scripts/tag-release.js", "release tags should go through the portable freshness check");
+  const releaseTagScript = await readFile(path.join("scripts", "tag-release.js"), "utf8");
+  const prePushHook = await readFile(path.join(".githooks", "pre-push"), "utf8");
+  assert.match(releaseTagScript, /check-portable-package\.js[\s\S]*smoke-portable-package\.js[\s\S]*git", \["tag"/, "release tags should run freshness and smoke before creating the tag");
+  assert.match(prePushHook, /check-portable-package\.js[\s\S]*smoke-portable-package\.js/, "tag pushes should rerun portable freshness and smoke");
+  assert.equal(packageJson.scripts["hooks:install"], "node ./scripts/install-git-hooks.js", "local git hooks should be installable for portable freshness checks");
   assert.equal("package:guest" in packageJson.scripts, false, "guest packaging should not be a separate distro");
   assert.equal("package:join" in packageJson.scripts, false, "join packaging should not be a separate distro");
   assert.equal("package:thin" in packageJson.scripts, false, "thin packaging should not remain as a distro alias");
+  assert.match(hiddenLauncher, /scripts\\launch-desktop\.js/, "desktop shortcut launcher should remain a developer Node launcher");
+  assert.match(hiddenLauncher, /FindNode\(\)/, "desktop shortcut launcher should resolve local Node for dev use");
+  assert.doesNotMatch(hiddenLauncher, /dist\\portable\\LoreKeeper\\LoreKeeper\.exe/, "developer desktop shortcut should not silently switch to the portable package");
+  assert.match(cmdLauncher, /node "\.\\scripts\\launch-desktop\.js"/, "visible launcher should remain the developer Node launcher");
+  assert.doesNotMatch(cmdLauncher, /dist\\portable\\LoreKeeper\\LoreKeeper\.exe/, "visible developer launcher should not silently switch to the portable package");
+  await assert.rejects(
+    readFile(path.join("scripts", "package-thin-client.js"), "utf8"),
+    /ENOENT/,
+    "stale thin-client package entrypoint should not remain in scripts",
+  );
   assert.doesNotMatch(localTable, /ThinLoreKeeper|LoreKeeper Join/, "multiplayer-created character notes should use the unified LoreKeeper identity");
   assert.match(appShell, /Party/);
   assert.match(appShell, /Add Crew/);
@@ -4396,20 +4529,24 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Ask To Join/);
   assert.match(appShell, /home-campaign-select/);
   assert.match(appShell, /home-delete-campaign/);
-  assert.match(appShell, /home-flow-card-new/, "New Adventure should be its own front-door card, not a secondary continue action");
-  assert.match(appShell, /Set Up Table/);
+  assert.match(appShell, /home-flow-card-new/, "Create New Table should be its own front-door card, not a secondary continue action");
+  assert.match(appShell, /Continue Table/);
+  assert.match(appShell, /Create New Table/);
+  assert.match(appShell, /Join Table/);
+  assert.match(appShell, /aria-label="Settings"/);
   assert.match(appShell, />Delete</, "front door should allow deleting saved adventures");
   assert.match(styles, /\.home-flow-card-new/);
-  assert.match(appShell, /Saved adventure/);
+  assert.match(appShell, /Saved table/);
   assert.ok(
     appShell.indexOf('id="home-host-flow"') < appShell.indexOf('id="home-new-campaign"')
       && appShell.indexOf('id="home-new-campaign"') < appShell.indexOf('id="home-join-flow"'),
-    "front door should read as Continue, New Adventure, then Join",
+    "front door should read as Continue Table, Create New Table, then Join Table",
   );
   assert.ok(
-    appShell.indexOf('className="home-library-strip"') < appShell.indexOf('id="home-provider-setup"'),
-    "DM Voice readiness should live in the lower utility strip, not as a primary front-door mode",
+    appShell.indexOf('className="home-library-strip"') < appShell.indexOf('id="home-settings"'),
+    "Settings should live in the lower utility strip, not as a primary front-door mode",
   );
+  assert.doesNotMatch(appShell, /id="home-provider-setup"/, "model setup should live inside Settings, not as a front-door button");
   assert.doesNotMatch(appShell, /home-flow-card-setup/);
   assert.doesNotMatch(styles, /home-flow-card-setup/);
   assert.match(appShell, /id="waiting-guests"/);
@@ -4498,8 +4635,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(appShell, /id="load-imported"/, "saved adventure loading belongs on the front door, not inside Preferences");
   assert.match(appJs, /settings-surface-controller\.js/, "settings surface policy should live outside the main app renderer");
   assert.match(settingsSurfaceController, /settingsSurfaceModes = Object\.freeze/, "settings surfaces should declare allowed tab groups");
-  assert.match(settingsSurfaceController, /app: \["app"\]/, "app preferences should open as a single-purpose surface");
-  assert.match(settingsSurfaceController, /ai: \["ai"\]/, "DM Voice should open as a single-purpose surface");
+  assert.match(settingsSurfaceController, /app: \["app", "ai"\]/, "app Settings should include the Models tab");
+  assert.match(settingsSurfaceController, /ai: \["ai"\]/, "direct model setup should remain a focused surface when explicitly opened");
   assert.match(settingsSurfaceController, /table: \["friends"\]/, "Friends And Seats should open as a single-purpose surface");
   assert.match(settingsSurfaceController, /troubleshooting: \["troubleshooting"\]/, "diagnostics should remain a separate troubleshooting surface");
   assert.match(settingsSurfaceController, /recovery: \["troubleshooting"\]/, "DM response review should be able to open as a focused recovery surface");
@@ -4513,12 +4650,15 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.doesNotMatch(
     appJs,
     /function applyHostModeChrome\(\) \{[\s\S]*?hideSetupSection\(elements\.providerMode, false\)/,
-    "host chrome refreshes must not unhide the DM Voice settings panel inside table-scoped Friends And Seats",
+    "host chrome refreshes must not unhide the Model Setup panel inside table-scoped Friends And Seats",
   );
   assert.match(appJs, /elements\.openSetup\.addEventListener\("click", \(\) => \{\s*openSetupDialog\(\{ tab: "friends", mode: "table" \}\);/s, "in-table gear should open friend/table settings, not app preferences");
   assert.match(appJs, /function openLocalTableSeating\(\) \{[\s\S]*openSetupDialog\(\{ tab: "friends", mode: "table" \}\)/, "Seat Guest should land on Friends And Seats");
   assert.match(appJs, /applySettingsSurfaceProjection\(elements, projection\)/);
   assert.match(appJs, /openSetupDialog\(\{ tab: "troubleshooting", mode: "recovery" \}\)/, "DM response details should open the focused recovery surface");
+  assert.match(appJs, /buildHostResponseReviewActionPlan\(button\.dataset\.reviewAction \|\| ""\)/, "failed DM recovery actions should be planned outside the renderer");
+  assert.doesNotMatch(appJs, /dataset\.reviewAction === "open_model_setup"/, "renderer should not own individual DM recovery action ids");
+  assert.match(appJs, /if \(!elements\.setupDialog\.open\) \{\s*elements\.setupDialog\.showModal\(\);\s*\}/, "settings surface switching should not reopen an already open dialog");
   assert.doesNotMatch(appJs, /DM response details are open in Troubleshooting/);
   assert.match(styles, /\.settings-tabs/);
   assert.match(styles, /\.settings-tab\.active/);

@@ -1,5 +1,5 @@
 export const settingsSurfaceModes = Object.freeze({
-  app: ["app"],
+  app: ["app", "ai"],
   ai: ["ai"],
   table: ["friends"],
   troubleshooting: ["troubleshooting"],
@@ -9,13 +9,13 @@ export const settingsSurfaceModes = Object.freeze({
 const settingsCopy = Object.freeze({
   app: {
     eyebrow: "Preferences",
-    title: "App Preferences",
-    subtitle: "Choose how LoreKeeper starts and behaves before you sit down.",
+    title: "Settings",
+    subtitle: "Choose app behavior, model setup, and local runtime preferences.",
   },
   ai: {
-    eyebrow: "DM Voice",
-    title: "DM Voice",
-    subtitle: "Choose or tune the storyteller before you host.",
+    eyebrow: "Preferences",
+    title: "Model Setup",
+    subtitle: "Choose the local model or handoff path LoreKeeper uses for table narration.",
   },
   friends: {
     eyebrow: "Table Settings",
