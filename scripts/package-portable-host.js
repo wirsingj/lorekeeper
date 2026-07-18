@@ -10,6 +10,7 @@ const outRoot = path.join(rootDir, "dist", "portable");
 const packageDir = path.join(outRoot, "LoreKeeper");
 const appDir = path.join(packageDir, "resources", "app");
 const zipPath = path.join(outRoot, "LoreKeeper.zip");
+const extractFirstPath = path.join(outRoot, "EXTRACT-FIRST.txt");
 const legacyJoinDir = path.join(outRoot, "LoreKeeperJoin");
 const legacyJoinZipPath = path.join(outRoot, "LoreKeeperJoin.zip");
 const legacyThinDir = path.join(outRoot, "ThinLoreKeeper");
@@ -29,6 +30,7 @@ if (!existsSync(builtApp)) {
 
 rmSync(packageDir, { recursive: true, force: true });
 rmSync(zipPath, { force: true });
+rmSync(extractFirstPath, { force: true });
 rmSync(legacyJoinDir, { recursive: true, force: true });
 rmSync(legacyJoinZipPath, { force: true });
 rmSync(legacyThinDir, { recursive: true, force: true });
@@ -84,8 +86,13 @@ writeFileSync(
     "",
     "This is the full LoreKeeper host app for Windows.",
     "",
+    "Important:",
+    "- Do not run LoreKeeper from inside the zip preview.",
+    "- Right-click LoreKeeper.zip, choose Extract All..., then open the extracted LoreKeeper folder.",
+    "- If Windows opens a Temp folder path, the zip was not extracted yet.",
+    "",
     "Start:",
-    "1. Unzip the whole LoreKeeper folder.",
+    "1. Extract the whole LoreKeeper folder from the zip.",
     "2. Double-click LoreKeeper.exe or Open LoreKeeper.cmd.",
     "3. If Windows Defender Firewall asks, allow LoreKeeper on private networks so LAN guests can join.",
     "4. Create or open a table.",
@@ -110,6 +117,7 @@ writeFileSync(
     "- The maintainer's campaigns, logs, runtime artifacts, or old guest-package artifacts.",
     "",
     "If the app cannot start:",
+    "- If you see a Temp-folder error, extract the zip first instead of running from the compressed view.",
     "- Keep the folder together after unzipping.",
     "- Move it to a normal folder such as Desktop or Documents.",
     "- Make sure antivirus did not quarantine LoreKeeper.exe.",
@@ -122,18 +130,58 @@ writeFileSync(
   path.join(packageDir, "Open LoreKeeper.cmd"),
   [
     "@echo off",
+    "setlocal",
     "cd /d \"%~dp0\"",
+    "if not exist \"%~dp0LoreKeeper.exe\" (",
+    "  echo LoreKeeper.exe is missing next to this launcher.",
+    "  echo.",
+    "  echo If you opened this from inside LoreKeeper.zip, close this window,",
+    "  echo right-click LoreKeeper.zip, choose Extract All..., then open the",
+    "  echo extracted LoreKeeper folder and run Open LoreKeeper.cmd again.",
+    "  echo.",
+    "  pause",
+    "  exit /b 1",
+    ")",
+    "if not exist \"%~dp0resources\\app\\package.json\" (",
+    "  echo LoreKeeper resources are missing next to the executable.",
+    "  echo.",
+    "  echo Extract the whole LoreKeeper folder from LoreKeeper.zip before launching.",
+    "  echo Do not run the app from the zip preview or a temporary extraction folder.",
+    "  echo.",
+    "  pause",
+    "  exit /b 1",
+    ")",
     "start \"\" \"%~dp0LoreKeeper.exe\"",
   ].join("\r\n"),
   "utf8",
 );
 
+writeFileSync(
+  extractFirstPath,
+  [
+    "Extract LoreKeeper Before Opening",
+    "",
+    "Do not run LoreKeeper.exe or Open LoreKeeper.cmd from inside the zip preview.",
+    "",
+    "Use this first:",
+    "1. Right-click LoreKeeper.zip.",
+    "2. Choose Extract All...",
+    "3. Open the extracted LoreKeeper folder.",
+    "4. Double-click LoreKeeper.exe or Open LoreKeeper.cmd.",
+    "",
+    "If Windows mentions a Temp folder, the app is being run from the compressed zip view.",
+    "LoreKeeper needs its resources folder and DLL files beside LoreKeeper.exe.",
+  ].join("\r\n"),
+  "utf8",
+);
+
 normalizeZipTimestamps(packageDir);
+normalizeZipTimestamps(extractFirstPath);
 
 const zipResult = spawnSync("powershell.exe", [
   "-NoProfile",
   "-Command",
-  `Compress-Archive -LiteralPath ${quotePowerShell(packageDir)} -DestinationPath ${quotePowerShell(zipPath)} -Force`,
+  `Compress-Archive -LiteralPath ${quotePowerShell(packageDir)},${quotePowerShell(extractFirstPath)} -DestinationPath ${quotePowerShell(zipPath)} -Force`,
 ], {
   cwd: rootDir,
   stdio: "inherit",

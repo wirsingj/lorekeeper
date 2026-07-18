@@ -2131,21 +2131,43 @@ function sanitizePublicValue(value, depth = 0) {
   if (typeof value !== "object" || isHiddenValue(value)) {
     return undefined;
   }
-  const blockedKeys = new Set([
-    "token",
-    "secret",
-    "rawResponse",
-    "rawPrompt",
-    "providerPrompt",
-    "dmOnly",
-    "dmNotes",
-  ]);
   const entries = Object.entries(value)
-    .filter(([key]) => !blockedKeys.has(key))
+    .filter(([key]) => !isPublicBlockedKey(key))
     .slice(0, tableStateLimits.objectKeys)
     .map(([key, item]) => [key, sanitizePublicValue(item, depth + 1)])
     .filter(([, item]) => item !== undefined);
   return Object.fromEntries(entries);
+}
+
+function isPublicBlockedKey(key) {
+  const normalized = String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!normalized) {
+    return false;
+  }
+  if (
+    normalized.includes("secret") ||
+    normalized.includes("token") ||
+    normalized.includes("password") ||
+    normalized.includes("apikey") ||
+    normalized.includes("authorization") ||
+    normalized.includes("credential")
+  ) {
+    return true;
+  }
+  return new Set([
+    "rawresponse",
+    "rawprompt",
+    "providerprompt",
+    "providersettings",
+    "sqlitepath",
+    "filepath",
+    "localpath",
+    "originalpath",
+    "assetpath",
+    "path",
+    "dmonly",
+    "dmnotes",
+  ]).has(normalized);
 }
 
 function isHiddenValue(value) {

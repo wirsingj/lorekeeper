@@ -710,6 +710,39 @@ campaign.combat = {
   ],
   enemies: [{ id: "wolf", name: "Wolf", hp: { current: 7, max: 7 } }],
 };
+campaign.party.find((member) => member.id === "kevric").notes.push({
+  visible: "Kevric carries a brass lantern.",
+  connectionSecret: "guest-secret-should-not-leak",
+  waitingSecret: "waiting-secret-should-not-leak",
+  providerSettings: { selectedModel: "private-model" },
+  sqlitePath: "C:\\private\\campaign.sqlite",
+  nested: {
+    apiKey: "provider-key-should-not-leak",
+    originalPath: "C:\\private\\asset.png",
+    partyConnection: "Met Jarin on the road.",
+  },
+});
+campaign.sessionLog.messages.push({
+  id: "sensitive-debug-message",
+  sessionId: "session-main",
+  role: "system",
+  title: "LoreKeeper",
+  body: "Visible table update.",
+  meta: "Sanitizer regression.",
+  source: "test",
+  createdAt: new Date().toISOString(),
+  data: {
+    visible: true,
+    connectionSecret: "guest-secret-should-not-leak",
+    rawResponse: "raw model output should not leak",
+    providerPrompt: "prompt should not leak",
+    localPath: "C:\\private\\debug.txt",
+    nested: {
+      apiKey: "provider-key-should-not-leak",
+      partyConnection: "Met Jarin on the road.",
+    },
+  },
+});
 const guestSnapshot = createGuestSnapshot(campaign, connected.id, { clientId: "guest-client", connectionSecret });
 assert.equal(guestSnapshot.assignedCharacter.name, "Kevric");
 assert.ok(guestSnapshot.revision);
@@ -720,6 +753,23 @@ assert.equal(guestSnapshot.tableState.items.find((item) => item.id === "flag").n
 assert.equal(guestSnapshot.tableState.updatedAt, campaign.updatedAt);
 assert.equal(guestSnapshot.tableState.people.some((person) => person.name === "Hidden Handler"), false);
 assert.equal(guestSnapshot.tableState.party.find((member) => member.id === "kevric").notes.some((note) => /secret/i.test(note)), false);
+const redactedNote = guestSnapshot.tableState.party.find((member) => member.id === "kevric").notes.find((note) => note.visible);
+assert.equal(redactedNote.visible, "Kevric carries a brass lantern.");
+assert.equal("connectionSecret" in redactedNote, false);
+assert.equal("waitingSecret" in redactedNote, false);
+assert.equal("providerSettings" in redactedNote, false);
+assert.equal("sqlitePath" in redactedNote, false);
+assert.equal("apiKey" in redactedNote.nested, false);
+assert.equal("originalPath" in redactedNote.nested, false);
+assert.equal(redactedNote.nested.partyConnection, "Met Jarin on the road.");
+const redactedMessage = guestSnapshot.messages.find((message) => message.id === "sensitive-debug-message");
+assert.equal(redactedMessage.data.visible, true);
+assert.equal("connectionSecret" in redactedMessage.data, false);
+assert.equal("rawResponse" in redactedMessage.data, false);
+assert.equal("providerPrompt" in redactedMessage.data, false);
+assert.equal("localPath" in redactedMessage.data, false);
+assert.equal("apiKey" in redactedMessage.data.nested, false);
+assert.equal(redactedMessage.data.nested.partyConnection, "Met Jarin on the road.");
 assert.deepEqual(guestSnapshot.tableState.combat.enemies[0].hp, { hidden: true });
 assert.deepEqual(guestSnapshot.tableState.combat.turnOrder.find((entry) => entry.id === "wolf").hp, { hidden: true });
 

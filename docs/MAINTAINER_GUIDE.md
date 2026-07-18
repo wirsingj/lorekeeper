@@ -85,9 +85,9 @@ npm run hooks:install
 npm run release:tag -- v0.1.0 "LoreKeeper v0.1.0"
 ```
 
-This creates `dist/portable/LoreKeeper.zip`, the one-app portable distribution. It bundles the Electron/Node runtime, built renderer, local API server code, and runtime dependency `sql.js`, but it does not bundle Ollama or model files. The package script creates a clean `data/` folder and removes stale split-client portable artifacts so the distributable remains a single LoreKeeper app.
+This creates `dist/portable/LoreKeeper.zip`, the one-app portable distribution. It bundles the Electron/Node runtime, built renderer, local API server code, and runtime dependency `sql.js`, but it does not bundle Ollama or model files. The package script creates a clean `data/` folder, root-level `EXTRACT-FIRST.txt`, and a guarded `Open LoreKeeper.cmd` so friends get a clear message if they try to run the app from Windows' compressed zip preview. The distributable must be extracted as a whole folder before launch because Electron needs DLLs and `resources/` beside `LoreKeeper.exe`. The package script also removes stale split-client portable artifacts so the distributable remains a single LoreKeeper app.
 
-`release:check` verifies the local portable folder and zip exist, do not contain stale split-client outputs, and are newer than packaged source files. `smoke:portable` copies the portable folder to a temp directory, starts the packaged executable as the bundled Node runtime, and verifies `/api/runtime` plus `/guest` without mutating the distributable. `hooks:install` points local git hooks at `.githooks`; the pre-commit hook runs the freshness check without rebuilding the distro, and the pre-push hook runs freshness plus smoke when pushing tags. Use `release:tag` for release tags so freshness plus smoke run before the tag is created.
+`release:check` verifies the local portable folder and zip exist, do not contain stale split-client outputs, are newer than packaged source files, and that the generated zip contains the extraction note, executable, guarded launcher, start note, app manifest, and server entry. `smoke:portable` copies the portable folder to a temp directory, starts the packaged executable as the bundled Node runtime, and verifies `/api/runtime` plus `/guest` without mutating the distributable. `hooks:install` points local git hooks at `.githooks`; the pre-commit hook runs the freshness check without rebuilding the distro, and the pre-push hook runs freshness plus smoke when pushing tags. Use `release:tag` for release tags so freshness plus smoke run before the tag is created.
 
 Local server only:
 
@@ -283,7 +283,7 @@ Inspect:
 
 - Shortcut target should be `wscript.exe` with `Launch LoreKeeper Hidden.vbs` as the argument.
 - The repo desktop shortcut is a developer launcher and uses local Node through `scripts/launch-desktop.js`.
-- The shareable distro is separate: unzip `dist/portable/LoreKeeper.zip`, then start `LoreKeeper.exe` or `Open LoreKeeper.cmd`.
+- The shareable distro is separate: extract `dist/portable/LoreKeeper.zip` with **Extract All...**, then start `LoreKeeper.exe` or `Open LoreKeeper.cmd` from the extracted `LoreKeeper` folder. Do not launch from inside the zip preview or Windows may run a partial copy from `%LocalAppData%\Temp`.
 - `data/launcher.log` for launcher mode/build/Electron spawn status.
 - `data/launcher-child.log` for child process build/Electron stdout and stderr.
 - `data/electron.log` for Electron startup and local API readiness errors.

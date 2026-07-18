@@ -97,7 +97,7 @@ Build the Windows portable app:
 npm run package:portable
 ```
 
-The portable zip is the full LoreKeeper app. It can host a local table or join another host from the same app. It bundles the Electron/Node runtime used by LoreKeeper, so friends do not need to install Node.js or run npm commands. Ollama and model files remain external installs.
+The portable zip is the full LoreKeeper app. It can host a local table or join another host from the same app. It bundles the Electron/Node runtime used by LoreKeeper, so friends do not need to install Node.js or run npm commands. Ollama and model files remain external installs. Friends should right-click `LoreKeeper.zip`, choose **Extract All...**, then run `LoreKeeper.exe` or `Open LoreKeeper.cmd` from the extracted folder. Running the app from inside the zip preview can produce a Temp-folder launch error because Windows does not extract the adjacent runtime files.
 
 Check that the current portable app is fresh before a commit or release tag:
 

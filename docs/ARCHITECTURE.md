@@ -267,6 +267,7 @@ The guest page can show the active table, available non-host seats, and a waitin
 Security rules:
 
 - public guest routes validate campaign/table/session identity and guest secrets,
+- guest snapshots sanitize nested generic data for secrets, tokens, provider prompts/settings, local filesystem paths, raw provider/debug payloads, and other host-only fields before browser exposure,
 - host routes require host authorization,
 - stale `campaignId`, `tableId`, or `sessionId` must reject instead of applying to the active table,
 - guest leave should release the remote controller back to host control and make the seat requestable again,

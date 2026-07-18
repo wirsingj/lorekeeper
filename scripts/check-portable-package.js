@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,6 +6,7 @@ const rootDir = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const packageRoot = path.join(rootDir, "dist", "portable");
 const packageDir = path.join(packageRoot, "LoreKeeper");
 const zipPath = path.join(packageRoot, "LoreKeeper.zip");
+const extractFirst = path.join(packageRoot, "EXTRACT-FIRST.txt");
 const packageExe = path.join(packageDir, "LoreKeeper.exe");
 const startHere = path.join(packageDir, "START-HERE.txt");
 const toleranceMs = 2000;
@@ -36,6 +37,7 @@ const legacyArtifacts = [
 
 const requiredArtifacts = [
   zipPath,
+  extractFirst,
   packageDir,
   packageExe,
   startHere,
@@ -46,11 +48,37 @@ const requiredArtifacts = [
   path.join(packageDir, "resources", "app", "data", "runtime", ".keep"),
 ];
 
+const requiredZipEntries = [
+  "EXTRACT-FIRST.txt",
+  "LoreKeeper/LoreKeeper.exe",
+  "LoreKeeper/Open LoreKeeper.cmd",
+  "LoreKeeper/START-HERE.txt",
+  "LoreKeeper/resources/app/package.json",
+  "LoreKeeper/resources/app/scripts/serve.js",
+];
+
 const problems = [];
 for (const artifact of requiredArtifacts) {
   if (!existsSync(artifact)) {
     problems.push(`Missing portable artifact: ${relative(artifact)}`);
   }
+}
+
+if (existsSync(extractFirst)) {
+  assertFileContains(extractFirst, "Extract All", "Portable extract-first note must tell friends to extract the zip.");
+  assertFileContains(extractFirst, "Temp folder", "Portable extract-first note must explain Temp-folder launch errors.");
+}
+if (existsSync(startHere)) {
+  assertFileContains(startHere, "Do not run LoreKeeper from inside the zip preview", "START-HERE must warn against zip-preview launching.");
+  assertFileContains(startHere, "Extract All", "START-HERE must tell friends to extract the zip.");
+}
+const openCommand = path.join(packageDir, "Open LoreKeeper.cmd");
+if (existsSync(openCommand)) {
+  assertFileContains(openCommand, "resources\\app\\package.json", "Open LoreKeeper.cmd must verify packaged resources exist.");
+  assertFileContains(openCommand, "Extract the whole LoreKeeper folder", "Open LoreKeeper.cmd must explain partial zip extraction failures.");
+}
+if (existsSync(zipPath)) {
+  assertZipContains(zipPath, requiredZipEntries);
 }
 
 for (const artifact of legacyArtifacts) {
@@ -105,6 +133,63 @@ function scanPath(target) {
 
 function newer(left, right) {
   return right.mtimeMs > left.mtimeMs ? right : left;
+}
+
+function assertFileContains(filePath, expected, message) {
+  const content = readFileSync(filePath, "utf8");
+  if (!content.includes(expected)) {
+    problems.push(`${message} Missing text in ${relative(filePath)}: ${expected}`);
+  }
+}
+
+function assertZipContains(filePath, expectedEntries) {
+  let entries;
+  try {
+    entries = new Set(readZipEntries(filePath));
+  } catch (error) {
+    problems.push(`Could not inspect portable zip ${relative(filePath)}: ${error.message}`);
+    return;
+  }
+  for (const expected of expectedEntries) {
+    if (!entries.has(expected)) {
+      problems.push(`Portable zip is missing required entry: ${expected}`);
+    }
+  }
+}
+
+function readZipEntries(filePath) {
+  const data = readFileSync(filePath);
+  const eocdOffset = findEndOfCentralDirectory(data);
+  if (eocdOffset < 0) {
+    throw new Error("end of central directory record was not found");
+  }
+
+  const entryCount = data.readUInt16LE(eocdOffset + 10);
+  let offset = data.readUInt32LE(eocdOffset + 16);
+  const entries = [];
+
+  for (let index = 0; index < entryCount; index += 1) {
+    if (data.readUInt32LE(offset) !== 0x02014b50) {
+      throw new Error(`central directory header ${index + 1} was not found`);
+    }
+    const nameLength = data.readUInt16LE(offset + 28);
+    const extraLength = data.readUInt16LE(offset + 30);
+    const commentLength = data.readUInt16LE(offset + 32);
+    const nameStart = offset + 46;
+    entries.push(data.toString("utf8", nameStart, nameStart + nameLength).replace(/\\/g, "/").replace(/^\.\//, ""));
+    offset = nameStart + nameLength + extraLength + commentLength;
+  }
+
+  return entries;
+}
+
+function findEndOfCentralDirectory(data) {
+  for (let offset = data.length - 22; offset >= 0 && offset >= data.length - 65557; offset -= 1) {
+    if (data.readUInt32LE(offset) === 0x06054b50) {
+      return offset;
+    }
+  }
+  return -1;
 }
 
 function relative(target) {
