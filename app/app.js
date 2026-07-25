@@ -613,6 +613,11 @@ const elements = {
   newJoinerAutoSheet: document.querySelector("#new-joiner-auto-sheet"),
   preTableLobbyPanel: document.querySelector("#pretable-lobby-panel"),
   preTableGuestLink: document.querySelector("#pretable-guest-link"),
+  preTableRemoteLink: document.querySelector("#pretable-remote-link"),
+  preTableRemoteCode: document.querySelector("#pretable-remote-code"),
+  startPreTableRemoteSharing: document.querySelector("#start-pretable-remote-sharing"),
+  copyPreTableRemoteLink: document.querySelector("#copy-pretable-remote-link"),
+  copyPreTableRemoteCode: document.querySelector("#copy-pretable-remote-code"),
   copyPreTableGuestLink: document.querySelector("#copy-pretable-guest-link"),
   preTableWaitingGuests: document.querySelector("#pretable-waiting-guests"),
   closeCampaignDialog: document.querySelector("#close-campaign-dialog"),
@@ -930,6 +935,18 @@ elements.copyCharacterInvite?.addEventListener("click", async () => {
 
 elements.copyGuestLink?.addEventListener("click", async () => {
   await copyGuestLinkFromUi();
+});
+
+elements.startPreTableRemoteSharing?.addEventListener("click", async () => {
+  await startPreTableRemoteSharingFromUi();
+});
+
+elements.copyPreTableRemoteLink?.addEventListener("click", async () => {
+  await copyPreTableRemoteLinkFromUi();
+});
+
+elements.copyPreTableRemoteCode?.addEventListener("click", async () => {
+  await copyPreTableRemoteCodeFromUi();
 });
 
 elements.startRemoteSharing?.addEventListener("click", async () => {
@@ -2737,7 +2754,8 @@ async function openRemoteInviteLobbyForNewCampaign(seeds = []) {
         return null;
       }
     }
-    await adoptPreTableLobbyIntoActiveCampaign();
+    const adopted = await adoptPreTableLobbyIntoActiveCampaign();
+    notifyRemoteRelayGuestsAfterPreTableAdoption(adopted);
     const link = currentLocalGuestLink();
     if (!link) {
       return null;
@@ -2773,6 +2791,15 @@ function providerSettingsForNewCampaign() {
     selectedControlModel: elements.ollamaModel?.value,
     installedModels: installedOllamaModelIds(state.providerStatus?.providers?.ollama),
   });
+}
+
+function notifyRemoteRelayGuestsAfterPreTableAdoption(result = {}) {
+  const waitingGuests = result?.campaign?.multiplayer?.waitingGuests ?? [];
+  for (const waitingGuest of waitingGuests) {
+    if (waitingGuest?.connectionId && waitingGuest?.preferredPartyMemberId) {
+      notifyRemoteRelayGuestSeated(result, waitingGuest.id, waitingGuest.preferredPartyMemberId);
+    }
+  }
 }
 
 function openCampaignDialog({ returnToMainMenu = false } = {}) {
@@ -2839,6 +2866,53 @@ async function publishPreTableLobbyFromWizard() {
   }
 }
 
+async function startPreTableRemoteSharingFromUi() {
+  const snapshot = await publishPreTableLobbyFromWizard();
+  const session = snapshot?.remoteFriendCodeSession;
+  if (!session?.code || !session?.internalToken || !session?.relayBaseUrl) {
+    setProviderActivity("Remote setup link is not ready yet.", "waiting");
+    return null;
+  }
+  const connected = connectRemoteRelayHost(session);
+  setProviderActivity(
+    connected
+      ? `Remote setup code ${session.code} is live. Friends can request seats before you start.`
+      : "Remote setup link could not connect.",
+    connected ? "idle" : "error",
+  );
+  return snapshot;
+}
+
+async function copyPreTableRemoteLinkFromUi() {
+  const snapshot = await startPreTableRemoteSharingFromUi();
+  const link = snapshot?.remoteFriendCode?.link || elements.preTableRemoteLink?.value || "";
+  if (!link) {
+    setProviderActivity("Remote browser link is not ready yet.", "waiting");
+    return false;
+  }
+  const copied = await writeClipboardText(link);
+  if (!copied) {
+    selectFieldText(elements.preTableRemoteLink);
+  }
+  setProviderActivity(copied ? "Remote browser link copied" : "Remote browser link ready in Create Table.", copied ? "idle" : "waiting");
+  return copied;
+}
+
+async function copyPreTableRemoteCodeFromUi() {
+  const snapshot = await startPreTableRemoteSharingFromUi();
+  const code = snapshot?.remoteFriendCode?.code || elements.preTableRemoteCode?.value || "";
+  if (!code) {
+    setProviderActivity("Remote friend code is not ready yet.", "waiting");
+    return false;
+  }
+  const copied = await writeClipboardText(code);
+  if (!copied) {
+    selectFieldText(elements.preTableRemoteCode);
+  }
+  setProviderActivity(copied ? "Remote friend code copied" : `Remote friend code: ${code}`, copied ? "idle" : "waiting");
+  return copied;
+}
+
 function startPreTableLobbyPolling() {
   stopPreTableLobbyPolling();
   preTableLobbyHostPollTimer = setInterval(() => {
@@ -2888,6 +2962,7 @@ function preTableLobbyPayloadFromWizard() {
     premise: elements.newCampaignPremise?.value || "",
     startingLocation: elements.newCampaignStartingLocation?.value || "",
     tone: elements.newCampaignTone?.value || "",
+    hostSlug: elements.newCampaignTitle?.value || "LoreKeeper Table",
     party,
   };
 }
@@ -2898,6 +2973,21 @@ function renderPreTableLobby(snapshot = {}) {
   }
   if (elements.preTableGuestLink) {
     elements.preTableGuestLink.value = snapshot.guestLink || "";
+  }
+  if (elements.preTableRemoteLink) {
+    elements.preTableRemoteLink.value = snapshot.remoteFriendCode?.link || "";
+  }
+  if (elements.preTableRemoteCode) {
+    elements.preTableRemoteCode.value = snapshot.remoteFriendCode?.code || "";
+  }
+  if (elements.startPreTableRemoteSharing) {
+    elements.startPreTableRemoteSharing.disabled = !snapshot.remoteFriendCodeSession?.internalToken;
+  }
+  if (elements.copyPreTableRemoteLink) {
+    elements.copyPreTableRemoteLink.disabled = !snapshot.remoteFriendCode?.link;
+  }
+  if (elements.copyPreTableRemoteCode) {
+    elements.copyPreTableRemoteCode.disabled = !snapshot.remoteFriendCode?.code;
   }
   if (!elements.preTableWaitingGuests) {
     return;
@@ -2977,6 +3067,9 @@ async function closePreTableLobby() {
   if (elements.preTableLobbyPanel) {
     elements.preTableLobbyPanel.hidden = true;
   }
+  if (!remoteRelaySocketMatchesSession(state.campaign?.multiplayer?.remoteFriendCodeSession)) {
+    closeRemoteRelayHost();
+  }
   try {
     await postJson(apiPreTableLobbyCloseUrl, {});
   } catch {
@@ -2992,8 +3085,17 @@ async function copyPreTableGuestLinkFromUi() {
     return false;
   }
   const copied = await writeClipboardText(link);
+  if (!copied) {
+    selectFieldText(elements.preTableGuestLink);
+  }
   setProviderActivity(copied ? "Guest link copied" : "Guest link ready in Host New", copied ? "idle" : "waiting");
   return copied;
+}
+
+function remoteRelaySocketMatchesSession(session = {}) {
+  const code = String(session?.code || "").trim();
+  const relayBaseUrl = String(session?.relayBaseUrl || "").trim().replace(/\/+$/, "");
+  return Boolean(code && relayBaseUrl && state.remoteRelaySessionId === `${relayBaseUrl}|${code}`);
 }
 
 function resetCampaignWizardDefaults() {
@@ -3212,10 +3314,19 @@ async function startRemoteSharingFromUi() {
     render();
     connectRemoteRelayHost(result.remoteFriendCodeSession || state.campaign?.multiplayer?.remoteFriendCodeSession);
     const link = currentRemoteFriendLink();
+    let copied = false;
     if (link) {
-      await writeClipboardText(link);
+      copied = await writeClipboardText(link);
+      if (!copied) {
+        selectFieldText(elements.remoteFriendLink);
+      }
     }
-    setProviderActivity(link ? "Remote friend link copied" : "Remote friend code started", "idle");
+    const statusMessage = link
+      ? copied
+        ? "Remote friend link copied"
+        : "Remote friend link ready; copy it from Friends And Seats."
+      : "Remote friend code started";
+    setProviderActivity(statusMessage, copied || !link ? "idle" : "waiting");
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     setProviderActivity(
@@ -3254,6 +3365,9 @@ async function copyRemoteFriendCodeFromUi() {
     return;
   }
   const copied = await writeClipboardText(code);
+  if (!copied) {
+    selectFieldText(elements.remoteFriendCode);
+  }
   setProviderActivity(copied ? "Remote friend code copied" : `Remote friend code: ${code}`, copied ? "idle" : "waiting");
 }
 
@@ -3264,6 +3378,9 @@ async function copyRemoteFriendLinkFromUi() {
     return;
   }
   const copied = await writeClipboardText(link);
+  if (!copied) {
+    selectFieldText(elements.remoteFriendLink);
+  }
   setProviderActivity(copied ? "Remote friend link copied" : `Remote friend link: ${link}`, copied ? "idle" : "waiting");
 }
 
@@ -3271,6 +3388,20 @@ function currentRemoteFriendLink() {
   return state.multiplayerSnapshot?.remoteFriendCode?.link
     || elements.remoteFriendLink?.value
     || "";
+}
+
+function selectFieldText(field) {
+  if (!field) {
+    return false;
+  }
+  try {
+    field.hidden = false;
+    field.focus();
+    field.select();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function remoteHostSlugFromUi() {

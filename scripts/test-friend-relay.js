@@ -22,23 +22,28 @@ assert.equal(parseRelayMessage(JSON.stringify({
 
 assert.equal(parseRelayMessage(JSON.stringify({
   kind: "host.provider.settings.read",
-}), guestAllowed).valid, false);
+}), guestAllowed, { direction: "guest" }).valid, false);
 
 assert.match(parseRelayMessage(JSON.stringify({
   kind: "guest.action.submit",
   providerSettings: { selectedModel: "private" },
-}), guestAllowed).errors.join(" "), /host_only_field/);
+}), guestAllowed, { direction: "guest" }).errors.join(" "), /host_only_field/);
+
+assert.match(parseRelayMessage(JSON.stringify({
+  kind: "guest.action.submit",
+  sessionKey: "guest-secret-should-not-ride-guest-messages",
+}), guestAllowed, { direction: "guest" }).errors.join(" "), /host_only_field:sessionKey/);
 
 assert.match(parseRelayMessage(JSON.stringify({
   kind: "guest.tableTalk.post",
   text: "x".repeat(20_000),
-}), guestAllowed).errors.join(" "), /payload_too_large/);
+}), guestAllowed, { direction: "guest" }).errors.join(" "), /payload_too_large/);
 
 assert.equal(parseRelayMessage(JSON.stringify({
   kind: "host.snapshot",
   guestId: "guest-1",
   snapshot: { scene: { immediateSituation: "The road is quiet." } },
-}), hostAllowed).valid, true);
+}), hostAllowed, { direction: "host" }).valid, true);
 
 assert.equal(parseRelayMessage(JSON.stringify({
   kind: "host.guest.approved",
@@ -46,7 +51,29 @@ assert.equal(parseRelayMessage(JSON.stringify({
   connectionId: "conn-1",
   sessionKey: "guest-session-key",
   characterName: "Rowan",
-}), hostAllowed).valid, true);
+}), hostAllowed, { direction: "host" }).valid, true);
+
+assert.match(parseRelayMessage(JSON.stringify({
+  kind: "host.guest.approved",
+  connectionId: "conn-1",
+  sessionKey: "guest-session-key",
+}), hostAllowed, { direction: "host" }).errors.join(" "), /target_guest_required/);
+
+assert.match(parseRelayMessage(JSON.stringify({
+  kind: "host.guest.approved",
+  guestId: "guest-1",
+  connectionId: "conn-1",
+}), hostAllowed, { direction: "host" }).errors.join(" "), /session_key_required/);
+
+assert.match(parseRelayMessage(JSON.stringify({
+  kind: "host.guest.pending",
+}), hostAllowed, { direction: "host" }).errors.join(" "), /target_guest_required/);
+
+assert.match(parseRelayMessage(JSON.stringify({
+  kind: "host.snapshot",
+  snapshot: { scene: { immediateSituation: "The road is quiet." } },
+  sessionKey: "guest-session-key",
+}), hostAllowed, { direction: "host" }).errors.join(" "), /host_only_field:sessionKey/);
 
 assert.equal(parseRelayMessage("{", guestAllowed).valid, false);
 

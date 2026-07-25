@@ -70,6 +70,9 @@ try {
   });
   assert.equal(draftLobby.open, true);
   assert.match(draftLobby.guestLink, /^http:\/\/.+:\d+\/guest$/);
+  assert.match(draftLobby.remoteFriendCode.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.match(draftLobby.remoteFriendCode.link, /^https:\/\/lorekeeper-friend-relay\.wirsingj\.workers\.dev\/host\/.+\/table-code\/[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.ok(draftLobby.remoteFriendCodeSession.internalToken);
   assert.equal(draftLobby.joinableSeats[0].id, "party-tilli");
 
   const draftPreview = await fetchJson(`${baseUrl}/api/multiplayer/join-preview?campaign=old&table=old&session=old`);
@@ -254,7 +257,7 @@ try {
     }),
   });
   assert.equal(remoteStop.multiplayer.remoteFriendCode.status, "stopped");
-  await fetchJson(`${baseUrl}/api/pretable-lobby/publish`, {
+  const draftRemoteLobby = await fetchJson(`${baseUrl}/api/pretable-lobby/publish`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -269,6 +272,7 @@ try {
       ],
     }),
   });
+  assert.match(draftRemoteLobby.remoteFriendCode.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
   const draftSeatRequest = await fetchJson(`${baseUrl}/api/multiplayer/waiting-room/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -303,6 +307,11 @@ try {
     }),
   });
   const adoptedGuest = adoptedLobby.campaign.multiplayer.waitingGuests.find((guest) => guest.displayName === "Ada");
+  assert.equal(adoptedLobby.campaign.multiplayer.remoteFriendCodeSession.code, draftRemoteLobby.remoteFriendCode.code);
+  assert.equal(adoptedLobby.multiplayer.remoteFriendCode.code, draftRemoteLobby.remoteFriendCode.code);
+  assert.equal(adoptedLobby.campaign.multiplayer.remoteFriendCodeSession.campaignId, created.campaign.id);
+  assert.equal(adoptedLobby.campaign.multiplayer.remoteFriendCodeSession.tableId, table.tableId);
+  assert.equal(adoptedLobby.campaign.multiplayer.remoteFriendCodeSession.sessionId, table.sessionId);
   assert.ok(adoptedGuest);
   assert.equal(adoptedGuest.tableId, table.tableId);
   assert.equal(adoptedGuest.sessionId, table.sessionId);

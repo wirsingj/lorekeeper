@@ -1,6 +1,6 @@
 const MAX_PAYLOAD_BYTES = 16 * 1024;
 const FRIEND_CODE_PATTERN = /^[A-Z2-9]{4}-[A-Z2-9]{4}$/;
-const RELAY_VERSION = "2026-07-25-approval-bridge";
+const RELAY_VERSION = "2026-07-25-targeted-approval-rails";
 
 const GUEST_SAFE_KINDS = new Set([
   "guest.hello",
@@ -23,6 +23,13 @@ const HOST_SAFE_KINDS = new Set([
   "host.guest.denied",
   "host.snapshot",
   "host.tableTalk",
+  "host.error",
+]);
+
+const TARGET_REQUIRED_HOST_KINDS = new Set([
+  "host.guest.pending",
+  "host.guest.approved",
+  "host.guest.denied",
   "host.error",
 ]);
 
@@ -128,21 +135,34 @@ export class TableRelay {
   }
 
   onHostMessage(event) {
-    const parsed = parseRelayMessage(event.data, HOST_SAFE_KINDS);
+    const parsed = parseRelayMessage(event.data, HOST_SAFE_KINDS, { direction: "host" });
     if (!parsed.valid) {
       this.send(this.hostSocket, { kind: "relay.error", errors: parsed.errors });
       return;
     }
     const targetGuestId = parsed.message.guestId || "";
-    if (targetGuestId && this.guestSockets.has(targetGuestId)) {
+    if (TARGET_REQUIRED_HOST_KINDS.has(parsed.message.kind)) {
+      if (!targetGuestId || !this.guestSockets.has(targetGuestId)) {
+        this.send(this.hostSocket, { kind: "relay.error", errors: ["target_guest_not_connected"] });
+        return;
+      }
       this.send(this.guestSockets.get(targetGuestId), parsed.message);
+      return;
+    }
+    if (targetGuestId) {
+      const socket = this.guestSockets.get(targetGuestId);
+      if (!socket) {
+        this.send(this.hostSocket, { kind: "relay.error", errors: ["target_guest_not_connected"] });
+        return;
+      }
+      this.send(socket, parsed.message);
       return;
     }
     this.broadcastGuests(parsed.message);
   }
 
   onGuestMessage(guestId, event) {
-    const parsed = parseRelayMessage(event.data, GUEST_SAFE_KINDS);
+    const parsed = parseRelayMessage(event.data, GUEST_SAFE_KINDS, { direction: "guest" });
     if (!parsed.valid) {
       this.send(this.guestSockets.get(guestId), { kind: "relay.error", errors: parsed.errors });
       return;
@@ -187,7 +207,7 @@ export class TableRelay {
   }
 }
 
-export function parseRelayMessage(data, allowedKinds) {
+export function parseRelayMessage(data, allowedKinds, { direction = "guest" } = {}) {
   const errors = [];
   const raw = typeof data === "string" ? data : "";
   if (new TextEncoder().encode(raw).length > MAX_PAYLOAD_BYTES) {
@@ -203,9 +223,17 @@ export function parseRelayMessage(data, allowedKinds) {
   if (!allowedKinds.has(kind)) {
     errors.push("message_kind_not_allowed");
   }
-  const blocked = firstBlockedKey(message);
+  const blocked = firstBlockedKey(message, {
+    allowSessionKey: direction === "host" && kind === "host.guest.approved",
+  });
   if (blocked) {
     errors.push(`host_only_field:${blocked}`);
+  }
+  if (direction === "host" && TARGET_REQUIRED_HOST_KINDS.has(kind) && !String(message?.guestId || "").trim()) {
+    errors.push("target_guest_required");
+  }
+  if (direction === "host" && kind === "host.guest.approved" && !String(message?.sessionKey || "").trim()) {
+    errors.push("session_key_required");
   }
   return {
     valid: errors.length === 0,
@@ -245,13 +273,13 @@ function isValidFriendCode(code) {
   return FRIEND_CODE_PATTERN.test(code);
 }
 
-function firstBlockedKey(value, depth = 0) {
+function firstBlockedKey(value, { allowSessionKey = false } = {}, depth = 0) {
   if (!value || typeof value !== "object" || depth > 6) {
     return "";
   }
   if (Array.isArray(value)) {
     for (const item of value) {
-      const blocked = firstBlockedKey(item, depth + 1);
+      const blocked = firstBlockedKey(item, { allowSessionKey }, depth + 1);
       if (blocked) {
         return blocked;
       }
@@ -260,6 +288,12 @@ function firstBlockedKey(value, depth = 0) {
   }
   for (const [key, item] of Object.entries(value)) {
     const normalized = String(key).toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (normalized === "sessionkey") {
+      if (allowSessionKey) {
+        continue;
+      }
+      return key;
+    }
     if (
       normalized.includes("secret") ||
       normalized.includes("token") ||
@@ -279,7 +313,7 @@ function firstBlockedKey(value, depth = 0) {
     ) {
       return key;
     }
-    const blocked = firstBlockedKey(item, depth + 1);
+    const blocked = firstBlockedKey(item, { allowSessionKey }, depth + 1);
     if (blocked) {
       return blocked;
     }

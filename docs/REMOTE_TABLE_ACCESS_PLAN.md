@@ -358,12 +358,15 @@ Current repo state:
 - It defines default alpha limits: short-lived code, idle timeout, max session duration, max guests, and max payload size.
 - It validates guest-safe relay message kinds and rejects host-only fields such as provider settings, secrets/tokens, Ollama/local paths, raw provider payloads, diagnostics, and filesystem/debug-shaped data.
 - Host snapshots expose only a public `remoteFriendCode` projection.
-- Friends And Seats has a disabled Remote Friend Code panel so the product surface is visible without pretending the relay exists.
-- A Cloudflare Worker/Durable Object relay skeleton exists under `workers/relay`, with tested message parsing and guest/host allowlists.
+- Create Table has a draft Remote Browser Link and Friend Code so friends can request seats before the opening scene.
+- Draft remote friend-code sessions are adopted into the real campaign/table/session when the table is created, so the same browser link survives setup.
+- Friends And Seats has a live Remote Friend Code panel for created tables.
+- A Cloudflare Worker/Durable Object relay exists under `workers/relay`, with tested message parsing, guest/host allowlists, and targeted approval-secret rules.
 - The alpha relay is deployed at `https://lorekeeper-friend-relay.wirsingj.workers.dev`.
 - Public smoke checks pass for `/`, friendly `/host/:hostSlug/table-code/:code` links, `/health`, and `/api/session/:code`.
 - Host WebSocket connect smoke checks prove a live host flips `/api/session/:code` to `active: true`.
 - The LoreKeeper host UI can create a remote friend-code session, copy the link/code, and open a host relay WebSocket.
+- The Create Table setup flow can create/connect a draft remote friend-code session before the campaign is saved.
 - The public relay guest page can submit a browser `guest.join.request`; relay smoke checks prove the connected host receives that request with a relay guest id.
 - The LoreKeeper host app handles `guest.join.request` by registering the friend into the existing waiting-room flow, so host approval/seating stays local and authoritative.
 - When the host seats that waiting guest, the host app sends a targeted `host.guest.approved` message back through the relay; live relay smoke checks prove the browser guest receives it and moves past waiting.
@@ -372,10 +375,11 @@ Current repo state:
 Host-facing behavior:
 
 - Friends And Seats shows Local LAN Link and Remote Friend Code as separate share methods.
+- Create Table shows Remote Browser Link/Friend Code first and keeps the LAN setup link as a fallback.
 - Host clicks Start Remote Sharing.
 - LoreKeeper opens an outbound relay connection.
 - Relay returns a short friend code and optional browser link.
-- Host can Copy Code, Copy Link, Regenerate, and Stop Sharing.
+- Host can Copy Browser Link, Copy Friend Code, and Stop Sharing. Regenerate remains planned polish.
 - Host sees waiting guests and approves/denies/removes them.
 
 Guest-facing behavior:
@@ -488,6 +492,8 @@ Rules:
 12. Debug/dev endpoints must not be reachable through remote sharing.
 13. Logs should avoid leaking provider keys or sensitive local paths.
 14. Guest-visible state should be intentionally shaped, not raw DB dumps.
+15. Relay messages that carry a guest session key must be targeted to exactly one approved guest and must not be broadcast.
+16. Guest-originated relay messages must never carry session keys, provider settings, local model fields, diagnostics, filesystem paths, raw prompts, raw responses, or host tokens.
 
 ## Architecture Doctrine
 
@@ -569,8 +575,8 @@ The current LAN link is useful, but the next share surface should establish both
 
 - Local LAN Link
 - Remote Friend Code
-- Copy Code
-- Copy Link
+- Copy Friend Code
+- Copy Browser Link
 - Regenerate
 - Stop Sharing
 - See waiting/connected guests

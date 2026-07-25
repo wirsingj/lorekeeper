@@ -62,6 +62,10 @@ import {
   submitGuestChoiceVote,
   updateMultiplayerSettings,
 } from "../src/multiplayer/local-table.js";
+import {
+  createFriendCodeSession,
+  publicFriendCodeSession,
+} from "../src/multiplayer/friend-code-session.js";
 
 // Local HTTP surface for both the desktop host and same-network guests.
 // This file is still intentionally pragmatic: route handling, campaign loading,
@@ -974,6 +978,16 @@ function publishPreTableLobby(input = {}) {
   const draftId = compactLobbyLine(input.draftId || `draft-${slugifyLobby(title)}`, 140);
   const party = normalizePreTableParty(input.party ?? []);
   const joinableSeatIds = new Set(party.filter((member) => member.inviteIntent === "remote_player").map((member) => member.id));
+  const existingRemote = preTableLobby?.remoteFriendCodeSession?.campaignId === draftId
+    ? preTableLobby.remoteFriendCodeSession
+    : null;
+  const remoteFriendCodeSession = existingRemote ?? createFriendCodeSession({
+    campaignId: draftId,
+    tableId: `draft-table-${draftId}`,
+    sessionId: `draft-session-${draftId}`,
+    relayBaseUrl: input.relayBaseUrl || defaultRemoteRelayBaseUrl,
+    hostSlug: input.hostSlug || title,
+  });
   return {
     open: true,
     kind: "pre_table_lobby",
@@ -994,6 +1008,7 @@ function publishPreTableLobby(input = {}) {
       lanAddress: firstLanAddress() || "127.0.0.1",
       startedAt: preTableLobby?.localTable?.startedAt || new Date().toISOString(),
     },
+    remoteFriendCodeSession,
     party,
     waitingGuests: existingWaiting
       .filter((guest) => !guest.preferredPartyMemberId || joinableSeatIds.has(guest.preferredPartyMemberId))
@@ -1008,6 +1023,8 @@ function preTableLobbyHostSnapshot(lobby) {
     campaignId: lobby?.campaignId || "",
     campaignTitle: lobby?.title || "",
     guestLink: lobby?.localTable ? localGuestUrl(lobby.localTable) : "",
+    remoteFriendCode: lobby?.remoteFriendCodeSession ? publicFriendCodeSession(lobby.remoteFriendCodeSession) : null,
+    remoteFriendCodeSession: lobby?.remoteFriendCodeSession ?? null,
     localTable: lobby?.localTable ?? null,
     joinableSeats: preTableJoinableSeats(lobby),
     waitingGuests: (lobby?.waitingGuests ?? []).filter(isFreshPreTableGuest).map(publicPreTableWaitingGuest),
@@ -1137,6 +1154,16 @@ function adoptPreTableWaitingGuests(campaign) {
     return campaign;
   }
   const localTable = campaign.multiplayer?.localTable ?? {};
+  const adoptedRemoteFriendCodeSession = preTableLobby.remoteFriendCodeSession
+    ? {
+        ...preTableLobby.remoteFriendCodeSession,
+        campaignId: campaign.id,
+        tableId: localTable.tableId || preTableLobby.remoteFriendCodeSession.tableId || "",
+        sessionId: localTable.sessionId || preTableLobby.remoteFriendCodeSession.sessionId || "",
+        status: "active",
+        lastHostSeenAt: new Date().toISOString(),
+      }
+    : null;
   const draftGuests = preTableLobby.waitingGuests
     .filter(isFreshPreTableGuest)
     .map((guest) => ({
@@ -1156,6 +1183,7 @@ function adoptPreTableWaitingGuests(campaign) {
     ...campaign,
     multiplayer: {
       ...(campaign.multiplayer ?? {}),
+      remoteFriendCodeSession: adoptedRemoteFriendCodeSession ?? campaign.multiplayer?.remoteFriendCodeSession ?? null,
       waitingGuests: mergeWaitingGuests(campaign.multiplayer?.waitingGuests ?? [], draftGuests),
     },
     updatedAt: new Date().toISOString(),

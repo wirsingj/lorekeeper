@@ -98,7 +98,7 @@ npm run test:friend-relay
 npm run relay:deploy
 ```
 
-`relay:deploy` publishes `workers/relay` with Wrangler. Keep Cloudflare credentials in the user environment or shell only; never commit them. The current alpha relay is `https://lorekeeper-friend-relay.wirsingj.workers.dev`; verify it with `/health`, `/host/host-123515123/table-code/M7SS-7K4P`, `/api/session/M7SS-7K4P`, and a short host plus guest WebSocket smoke after deploy. The root `wrangler.toml` mirrors the relay config so Cloudflare GitHub/root deploys publish the intended Worker once this repo state is committed and pushed.
+`relay:deploy` publishes the Cloudflare Worker with the root `wrangler.toml`, which explicitly points at `workers/relay/src/index.js` and matches Cloudflare GitHub/root deploys. Keep Cloudflare credentials in the user environment or shell only; never commit them. The current alpha relay is `https://lorekeeper-friend-relay.wirsingj.workers.dev`; verify it with `/health`, `/host/host-123515123/table-code/M7SS-7K4P`, `/api/session/M7SS-7K4P`, and a short host plus guest WebSocket smoke after deploy. `workers/relay/wrangler.toml` is retained for relay-local context, but root deploy is the maintained command path.
 
 Local server only:
 

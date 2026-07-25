@@ -575,9 +575,22 @@ function CampaignDialog() {
             <div id="pretable-lobby-panel" className="pretable-lobby-panel" hidden>
               <div className="pretable-lobby-heading">
                 <span>Friends Waiting</span>
-                <button id="copy-pretable-guest-link" className="mini-action" type="button">Copy Link</button>
+                <button id="copy-pretable-remote-link" className="mini-action" type="button">Copy Remote Link</button>
               </div>
-              <input id="pretable-guest-link" readOnly placeholder="Guest link appears here when the local lobby is visible." />
+              <label className="field-stack local-table-share">
+                <span>Remote Browser Link</span>
+                <input id="pretable-remote-link" readOnly placeholder="Remote browser link appears here while setup is open." />
+              </label>
+              <label className="field-stack local-table-share">
+                <span>Friend Code</span>
+                <input id="pretable-remote-code" readOnly placeholder="Friend code appears here while setup is open." />
+              </label>
+              <div className="button-stack two-up">
+                <button id="start-pretable-remote-sharing" className="mini-action" type="button">Start Remote Link</button>
+                <button id="copy-pretable-remote-code" className="mini-action" type="button">Copy Friend Code</button>
+                <button id="copy-pretable-guest-link" className="mini-action" type="button">Copy LAN Link</button>
+              </div>
+              <input id="pretable-guest-link" readOnly placeholder="LAN guest link appears here when the local setup lobby is visible." />
               <div id="pretable-waiting-guests" className="pretable-waiting-guests">No guests waiting yet.</div>
             </div>
           </section>
@@ -897,8 +910,8 @@ function SetupDialog() {
             </p>
             <div className="button-stack two-up">
               <button id="start-remote-sharing" type="button" disabled>Start Remote Sharing</button>
-              <button id="copy-remote-friend-code" type="button" disabled>Copy Code</button>
-              <button id="copy-remote-friend-link" type="button" disabled>Copy Link</button>
+              <button id="copy-remote-friend-link" type="button" disabled>Copy Browser Link</button>
+              <button id="copy-remote-friend-code" type="button" disabled>Copy Friend Code</button>
               <button id="stop-remote-sharing" type="button" disabled>Stop Sharing</button>
             </div>
           </div>
