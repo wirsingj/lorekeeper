@@ -116,6 +116,8 @@ assert.match(relayGuestPageSource, /id="table-panel"/, "public guest page should
 assert.match(relayGuestPageSource, /id="send-action"/, "public guest page should let approved guests send actions");
 assert.match(relayGuestPageSource, /guest\.snapshot\.request/, "public guest page should request guest-safe snapshots after approval");
 assert.match(relayGuestPageSource, /setInterval\(requestSnapshot, 5000\)/, "public guest page should auto-refresh approved guest snapshots");
+assert.match(relayGuestPageSource, /pendingJoin/, "public guest page should remember a pending join across host relay reconnects");
+assert.match(relayGuestPageSource, /relay\.host\.ready[\s\S]*guest\.join\.request/, "public guest page should resend a pending join when the host reconnects");
 assert.match(relayGuestPageSource, /guest\.tableTalk\.post/, "public guest page should send Table Talk through the relay");
 assert.match(relayGuestPageSource, /guest\.disconnect/, "public guest page should notify the host when the browser tab leaves");
 assert.match(relaySource, /relay\.host\.disconnected/, "relay should notify guests when the host socket disconnects");

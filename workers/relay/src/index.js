@@ -419,6 +419,7 @@ function renderGuestEntryPage(initialCode) {
     let session = null;
     let latestSnapshot = null;
     let snapshotTimer = null;
+    let pendingJoin = null;
     const send = (message) => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(message));
@@ -453,6 +454,7 @@ function renderGuestEntryPage(initialCode) {
         return;
       }
       const displayName = nameInput.value.trim() || "Remote Friend";
+      pendingJoin = { code, displayName };
       socket?.close();
       socket = new WebSocket(location.origin.replace(/^http/i, "ws") + "/api/guest/connect?code=" + encodeURIComponent(code));
       join.disabled = true;
@@ -491,6 +493,11 @@ function renderGuestEntryPage(initialCode) {
           status.textContent = message.message || "The host could not complete that request.";
         } else if (message?.kind === "relay.host.ready") {
           status.textContent = "Host is connected. Sending request...";
+          if (!session && pendingJoin) {
+            socket.send(JSON.stringify({ kind: "guest.join.request", code: pendingJoin.code, displayName: pendingJoin.displayName }));
+          } else if (session) {
+            requestSnapshot();
+          }
         } else if (message?.kind === "relay.host.disconnected") {
           status.textContent = "The host disconnected. Ask for a fresh code or wait for them to reconnect.";
         } else if (message?.kind === "relay.error") {
