@@ -1,4 +1,4 @@
-name = "lorekeeper-friend-relay"
+name = "lorekeeper"
 main = "workers/relay/src/index.js"
 compatibility_date = "2026-07-25"
 account_id = "783bfcab2dc3ff9fc1ef44eb6ed4c01b"
