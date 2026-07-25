@@ -613,8 +613,9 @@ function renderGuestEntryPage(initialCode) {
     let pendingJoin = null;
     let reconnecting = false;
     const setStatus = (text) => {
-      status.textContent = text;
-      tableNotice.textContent = text;
+      const message = compactText(text, 260);
+      status.textContent = message;
+      tableNotice.textContent = message;
     };
     const setTableConnected = (connected) => {
       tablePanel.dataset.connection = connected ? "connected" : "disconnected";
@@ -806,8 +807,8 @@ function renderGuestEntryPage(initialCode) {
       joinPanel.hidden = true;
       tableTitle.textContent = snapshot.campaignTitle || "LoreKeeper Table";
       const characterName = snapshot.assignedCharacter?.name || session?.characterName || snapshot.connection?.displayName || "Your seat";
-      seat.textContent = "You are " + characterName + ".";
-      scene.textContent = snapshot.scene?.immediateSituation || snapshot.tableState?.scene?.immediateSituation || "The table is quiet.";
+      seat.textContent = "You are " + compactText(characterName, 80) + ".";
+      scene.textContent = compactText(snapshot.scene?.immediateSituation || snapshot.tableState?.scene?.immediateSituation || "The table is quiet.", 420);
       renderMoment(snapshot);
       renderParty(snapshot.tableState?.party || snapshot.party || []);
       renderMessages(snapshot.messages || snapshot.tableState?.messages || []);
@@ -874,7 +875,7 @@ function renderGuestEntryPage(initialCode) {
       strong.textContent = title;
       const meta = document.createElement("span");
       meta.className = "meta";
-      meta.textContent = detail;
+      meta.textContent = compactText(detail, 180);
       momentPanel.append(strong, meta);
     }
     function actionContext(snapshot) {
@@ -895,13 +896,13 @@ function renderGuestEntryPage(initialCode) {
     }
     function renderMessages(messages) {
       log.innerHTML = "";
-      for (const message of messages.slice(-8)) {
+      for (const message of safeList(messages, 10)) {
         const div = document.createElement("div");
         div.className = "msg";
         const title = document.createElement("strong");
-        title.textContent = message.title || String(message.role || "Table").toUpperCase();
+        title.textContent = compactText(message.title || String(message.role || "Table").toUpperCase(), 80);
         const body = document.createElement("div");
-        body.textContent = message.body || "";
+        body.textContent = compactText(message.body || "", 1600);
         div.append(title, body);
         log.append(div);
       }
@@ -915,16 +916,16 @@ function renderGuestEntryPage(initialCode) {
     function renderParty(party) {
       partyList.innerHTML = "";
       const assignedId = latestSnapshot?.assignedCharacter?.id || session?.partyMemberId || "";
-      for (const member of party) {
+      for (const member of safeList(party, 8)) {
         const div = document.createElement("div");
         div.className = "party-card" + (member.id === assignedId ? " active" : "");
         const name = document.createElement("strong");
-        name.textContent = member.name || "Party member";
+        name.textContent = compactText(member.name || "Party member", 80);
         const meta = document.createElement("div");
         meta.className = "meta";
         const hp = Number.isFinite(member.hp) && Number.isFinite(member.maxHp) ? "HP " + member.hp + "/" + member.maxHp : "";
         const role = [member.ancestry, member.characterClass].filter(Boolean).join(" ");
-        meta.textContent = [role, hp, member.id === assignedId ? "You" : ""].filter(Boolean).join(" - ");
+        meta.textContent = compactText([role, hp, member.id === assignedId ? "You" : ""].filter(Boolean).join(" - "), 120);
         div.append(name, meta);
         partyList.append(div);
       }
@@ -937,13 +938,13 @@ function renderGuestEntryPage(initialCode) {
     }
     function renderTalk(messages) {
       talkLog.innerHTML = "";
-      for (const message of messages.slice(-10)) {
+      for (const message of safeList(messages, 12)) {
         const div = document.createElement("div");
         div.className = "talk";
         const title = document.createElement("strong");
-        title.textContent = message.playerName || "Table";
+        title.textContent = compactText(message.playerName || "Table", 80);
         const body = document.createElement("div");
-        body.textContent = message.text || "";
+        body.textContent = compactText(message.text || "", 800);
         div.append(title, body);
         talkLog.append(div);
       }
@@ -964,22 +965,22 @@ function renderGuestEntryPage(initialCode) {
       }
       choices.className = "choice-panel";
       const prompt = document.createElement("p");
-      prompt.textContent = block.prompt || "What do you do?";
+      prompt.textContent = compactText(block.prompt || "What do you do?", 360);
       choices.append(prompt);
-      block.options.forEach((option, index) => {
+      safeList(block.options, 6).forEach((option, index) => {
         const button = document.createElement("button");
         button.className = "choice";
         const label = String.fromCharCode(65 + index);
-        button.textContent = label + ". " + (option.text || option.label || "Choice");
+        button.textContent = compactText(label + ". " + (option.text || option.label || "Choice"), 360);
         button.addEventListener("click", () => {
           send({
             kind: "guest.choice.vote",
             code: session?.code || input.value.trim().toUpperCase(),
             choiceKey: choiceKey(block),
-            optionId: option.id || label,
+            optionId: compactText(option.id || label, 80),
             optionLabel: label,
-            optionText: option.text || option.label || "",
-            prompt: block.prompt || "",
+            optionText: compactText(option.text || option.label || "", 360),
+            prompt: compactText(block.prompt || "", 360),
           });
           setStatus("Vote sent.");
         });
@@ -991,12 +992,20 @@ function renderGuestEntryPage(initialCode) {
         block.prompt || "",
         block.scope || "",
         block.forActorId || "",
-        (block.options || []).map((option, index) => {
+        safeList(block.options, 6).map((option, index) => {
           const label = String.fromCharCode(65 + index);
           const id = option.id || label;
           return id + ":" + (option.text || option.label || "");
         }).join("|"),
       ].join("::")).slice(0, 500);
+    }
+    function safeList(value, limit) {
+      return Array.isArray(value) ? value.slice(-limit) : [];
+    }
+    function compactText(value, max = 500) {
+      const text = String(value || "").replace(/\\s+/g, " ").trim();
+      if (text.length <= max) return text;
+      return text.slice(0, Math.max(0, max - 3)).trimEnd() + "...";
     }
     function compactCompareText(value) {
       return String(value || "")
@@ -1025,6 +1034,10 @@ function html(value) {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
     },
   });
 }

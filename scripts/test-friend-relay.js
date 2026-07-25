@@ -129,6 +129,10 @@ assert.match(relayGuestPageSource, /Your action is already queued at the host ta
 assert.match(relayGuestPageSource, /Waiting for " \+ \(context\.activeActorName/, "public guest page should tell guests whose combat turn is active");
 assert.match(relayGuestPageSource, /It is your combat turn/, "public guest page should unlock actions with clear combat-turn copy");
 assert.match(relayGuestPageSource, /function actionContext/, "public guest action gating should use guest-safe snapshot context");
+assert.match(relayGuestPageSource, /function compactText/, "public guest page should clamp rendered snapshot text client-side");
+assert.match(relayGuestPageSource, /function safeList/, "public guest page should bound rendered snapshot lists client-side");
+assert.match(relayGuestPageSource, /safeList\(block\.options, 6\)/, "public guest page should bound rendered choice options");
+assert.match(relayGuestPageSource, /compactText\(message\.body \|\| "", 1600\)/, "public guest page should bound rendered story text");
 assert.match(relayGuestPageSource, /refresh\.textContent = connected \? "Sync" : "Reconnect"/, "public guest Sync button should become Reconnect when the socket is closed");
 assert.match(relayGuestPageSource, /Connection paused\. Press Reconnect/, "public guest page should not strand seated guests on socket close");
 assert.match(relayGuestPageSource, /const guestSocket = socket/, "public guest page should pin reconnect handlers to the socket that created them");
@@ -145,5 +149,9 @@ assert.match(relayGuestPageSource, /guest\.disconnect/, "public guest page shoul
 assert.match(relaySource, /relay\.host\.disconnected/, "relay should notify guests when the host socket disconnects");
 assert.doesNotMatch(relaySource, /sessionKey:\s*message\.sessionKey/, "guest-originated relay messages must not forward session keys");
 assert.doesNotMatch(relayGuestPageSource, /providerSettings|Ollama|diagnostics|sqlite/i, "public guest page should not expose host/provider/debug language");
+assert.match(relaySource, /content-security-policy/, "public guest HTML should send a Content-Security-Policy header");
+assert.match(relaySource, /frame-ancestors 'none'/, "public guest HTML should not be frameable");
+assert.match(relaySource, /x-content-type-options/, "public guest HTML should send nosniff");
+assert.match(relaySource, /permissions-policy/, "public guest HTML should disable unused browser permissions");
 
 console.log("LoreKeeper friend relay tests passed.");
