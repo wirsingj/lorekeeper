@@ -33,7 +33,9 @@
     "package:portable": "npm run package:host",
     "package:host": "npm run build && node ./scripts/package-portable-host.js",
     "cleanup": "node ./scripts/cleanup-processes.js",
-    "shortcut": "cscript //nologo \"Create LoreKeeper Desktop Shortcut.vbs\""
+    "shortcut": "cscript //nologo \"Create LoreKeeper Desktop Shortcut.vbs\"",
+    "deploy": "npm run build && wrangler deploy",
+    "preview": "npm run build && wrangler dev"
   },
   "keywords": [
     "campaign",
@@ -51,7 +53,9 @@
     "vite": "^8.0.16"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.47.0",
     "electron": "^42.4.0",
-    "playwright": "^1.61.0"
+    "playwright": "^1.61.0",
+    "wrangler": "^4.114.0"
   }
 }
