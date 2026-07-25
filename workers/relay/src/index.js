@@ -1,6 +1,6 @@
 const MAX_PAYLOAD_BYTES = 16 * 1024;
 const FRIEND_CODE_PATTERN = /^[A-Z2-9]{4}-[A-Z2-9]{4}$/;
-const RELAY_VERSION = "2026-07-25-join-request";
+const RELAY_VERSION = "2026-07-25-approval-bridge";
 
 const GUEST_SAFE_KINDS = new Set([
   "guest.hello",
@@ -350,6 +350,11 @@ function renderGuestEntryPage(initialCode) {
         try { message = JSON.parse(event.data); } catch {}
         if (message?.kind === "host.guest.pending") {
           status.textContent = "The host sees your request. Waiting for a seat.";
+        } else if (message?.kind === "host.guest.approved") {
+          status.textContent = message.characterName
+            ? "Joined as " + message.characterName + ". Guest table controls are coming next."
+            : "Joined the table. Guest table controls are coming next.";
+          join.disabled = true;
         } else if (message?.kind === "relay.host.ready") {
           status.textContent = "Host is connected. Sending request...";
         } else if (message?.kind === "relay.error") {

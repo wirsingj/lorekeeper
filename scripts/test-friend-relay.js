@@ -40,6 +40,14 @@ assert.equal(parseRelayMessage(JSON.stringify({
   snapshot: { scene: { immediateSituation: "The road is quiet." } },
 }), hostAllowed).valid, true);
 
+assert.equal(parseRelayMessage(JSON.stringify({
+  kind: "host.guest.approved",
+  guestId: "guest-1",
+  connectionId: "conn-1",
+  sessionKey: "guest-session-key",
+  characterName: "Rowan",
+}), hostAllowed).valid, true);
+
 assert.equal(parseRelayMessage("{", guestAllowed).valid, false);
 
 console.log("LoreKeeper friend relay tests passed.");

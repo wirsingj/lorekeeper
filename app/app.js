@@ -4042,12 +4042,53 @@ async function seatWaitingGuestAtTable(waitingGuestId, partyMemberId) {
     });
     setCampaignFromPayload(result, "local_table_waiting_guest_seated");
     state.multiplayerSnapshot = result.multiplayer;
+    notifyRemoteRelayGuestSeated(result, waitingGuestId, partyMemberId);
     render();
     const guest = result.multiplayer?.connections?.find((connection) => connection.partyMemberId === partyMemberId && connection.status === "connected");
     setProviderActivity(`${guest?.displayName || "Guest"} seated at the table`, "idle");
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Seat guest failed: ${error.message}` : "Seat guest failed", "error");
   }
+}
+
+function notifyRemoteRelayGuestSeated(result = {}, waitingGuestId = "", partyMemberId = "") {
+  const relayEntry = remoteRelayGuestByWaitingId(waitingGuestId);
+  if (!relayEntry?.guestId) {
+    return false;
+  }
+  const waitingGuest = result.campaign?.multiplayer?.waitingGuests?.find((guest) => guest.id === waitingGuestId);
+  const connectionId = waitingGuest?.connectionId || "";
+  const connection = result.campaign?.multiplayer?.connections?.find((item) => item.id === connectionId)
+    || result.campaign?.multiplayer?.connections?.find((item) => item.partyMemberId === partyMemberId && item.status === "connected");
+  const member = result.campaign?.party?.find((item) => item.id === (connection?.partyMemberId || partyMemberId));
+  if (!connection?.id || !connection?.secret) {
+    return false;
+  }
+  relayEntry.connectionId = connection.id;
+  relayEntry.partyMemberId = connection.partyMemberId || partyMemberId;
+  sendRemoteHostMessage({
+    kind: "host.guest.approved",
+    guestId: relayEntry.guestId,
+    displayName: connection.displayName || relayEntry.displayName || "Remote Friend",
+    campaignId: connection.campaignId || result.campaign?.id || "",
+    tableId: connection.tableId || result.campaign?.multiplayer?.localTable?.tableId || "",
+    sessionId: connection.sessionId || result.campaign?.multiplayer?.localTable?.sessionId || "",
+    connectionId: connection.id,
+    clientId: connection.clientId || relayEntry.clientId || "",
+    sessionKey: connection.secret,
+    partyMemberId: connection.partyMemberId || partyMemberId,
+    characterName: member?.name || "",
+  });
+  return true;
+}
+
+function remoteRelayGuestByWaitingId(waitingGuestId = "") {
+  for (const [guestId, entry] of state.remoteRelayGuests.entries()) {
+    if (entry.waitingGuestId === waitingGuestId) {
+      return { ...entry, guestId };
+    }
+  }
+  return null;
 }
 
 async function refreshGuestSnapshot({ explicit = false } = {}) {

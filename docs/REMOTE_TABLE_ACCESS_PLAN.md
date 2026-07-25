@@ -366,7 +366,8 @@ Current repo state:
 - The LoreKeeper host UI can create a remote friend-code session, copy the link/code, and open a host relay WebSocket.
 - The public relay guest page can submit a browser `guest.join.request`; relay smoke checks prove the connected host receives that request with a relay guest id.
 - The LoreKeeper host app handles `guest.join.request` by registering the friend into the existing waiting-room flow, so host approval/seating stays local and authoritative.
-- There is no live full guest table page after seating yet; approved guest table snapshots/actions still need relay-to-table bridge work.
+- When the host seats that waiting guest, the host app sends a targeted `host.guest.approved` message back through the relay; live relay smoke checks prove the browser guest receives it and moves past waiting.
+- There is no live full guest table page after approval yet; approved guest table snapshots/actions still need relay-to-table bridge work.
 
 Host-facing behavior:
 
