@@ -295,6 +295,7 @@ const state = {
   remoteRelaySocket: null,
   remoteRelaySessionId: "",
   remoteRelayGuests: new Map(),
+  remoteRelayReconnectAttemptedAt: 0,
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
@@ -3394,6 +3395,36 @@ function closeRemoteRelayHost() {
   state.remoteRelaySessionId = "";
 }
 
+function ensureRemoteRelayHostConnected({ force = false } = {}) {
+  if (clientMode || !state.campaign?.multiplayer?.localTable?.running) {
+    return false;
+  }
+  const session = state.campaign?.multiplayer?.remoteFriendCodeSession;
+  if (!isActiveRemoteFriendCodeSession(session)) {
+    return false;
+  }
+  const code = String(session.code || "").trim();
+  const relayBaseUrl = String(session.relayBaseUrl || "").trim().replace(/\/+$/, "");
+  const sessionKey = `${relayBaseUrl}|${code}`;
+  if (state.remoteRelaySocket && state.remoteRelaySessionId === sessionKey && state.remoteRelaySocket.readyState <= WebSocket.OPEN) {
+    return true;
+  }
+  const now = Date.now();
+  if (!force && now - state.remoteRelayReconnectAttemptedAt < 5000) {
+    return false;
+  }
+  state.remoteRelayReconnectAttemptedAt = now;
+  return connectRemoteRelayHost(session);
+}
+
+function isActiveRemoteFriendCodeSession(session = {}) {
+  if (!session || session.status !== "active" || session.stoppedAt) {
+    return false;
+  }
+  const expiresAt = Date.parse(session.expiresAt || "");
+  return Number.isFinite(expiresAt) && Date.now() < expiresAt;
+}
+
 function currentLocalGuestLink() {
   const table = state.campaign?.multiplayer?.localTable ?? state.multiplayerSnapshot?.localTable ?? {};
   return buildShareTableSession({
@@ -5947,6 +5978,7 @@ function render() {
   renderCampaignSelector();
   renderProviderControls();
   renderDebugMetaControl();
+  ensureRemoteRelayHostConnected();
   renderMultiplayerPanel();
   renderTableActions();
 }

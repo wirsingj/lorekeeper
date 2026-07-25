@@ -4775,6 +4775,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /effectiveWaitingGuests/);
   assert.match(appJs, /copyGuestLinkFromUi/);
   assert.match(appJs, /currentLocalGuestLink/);
+  assert.match(appJs, /ensureRemoteRelayHostConnected\(\)/, "host render should reconnect active remote friend-code sessions");
+  assert.match(appJs, /state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay reconnect must use the private local campaign session, not the public host snapshot");
+  assert.match(appJs, /remoteRelayReconnectAttemptedAt/, "remote relay reconnect attempts should be throttled");
+  assert.match(appJs, /Date\.now\(\) < expiresAt/, "remote relay reconnect should not revive expired friend codes");
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited friend/);
   assert.match(appJs, /renderDebugMetaControl/);
