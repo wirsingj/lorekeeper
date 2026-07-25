@@ -418,6 +418,7 @@ function renderGuestEntryPage(initialCode) {
     let socket = null;
     let session = null;
     let latestSnapshot = null;
+    let snapshotTimer = null;
     const send = (message) => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(message));
@@ -430,6 +431,14 @@ function renderGuestEntryPage(initialCode) {
       if (session) {
         send({ kind: "guest.snapshot.request", code: session.code });
       }
+    };
+    const startSnapshotPolling = () => {
+      window.clearInterval(snapshotTimer);
+      snapshotTimer = window.setInterval(requestSnapshot, 5000);
+    };
+    const stopSnapshotPolling = () => {
+      window.clearInterval(snapshotTimer);
+      snapshotTimer = null;
     };
     document.querySelector("#join").addEventListener("click", async () => {
       const code = input.value.trim().toUpperCase();
@@ -474,6 +483,7 @@ function renderGuestEntryPage(initialCode) {
           seat.textContent = message.characterName ? "Seated as " + message.characterName + "." : "Seated at the table.";
           join.disabled = true;
           requestSnapshot();
+          startSnapshotPolling();
         } else if (message?.kind === "host.snapshot") {
           latestSnapshot = message.snapshot || null;
           renderSnapshot(latestSnapshot);
@@ -489,9 +499,11 @@ function renderGuestEntryPage(initialCode) {
       });
       socket.addEventListener("close", () => {
         join.disabled = false;
+        stopSnapshotPolling();
       });
       socket.addEventListener("error", () => {
         join.disabled = false;
+        stopSnapshotPolling();
         status.textContent = "Could not connect to the relay.";
       });
     });
