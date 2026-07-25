@@ -4200,6 +4200,24 @@ function testMultiplayerSessionProjection() {
   assert.match(remoteProjection.remoteFriendCode.safety, /Experimental remote sharing/);
   assert.match(remoteProjection.remoteFriendCode.safety, /provider keys/);
   assert.match(remoteProjection.remoteFriendCode.safety, /stay on this machine/);
+  const publicSnapshotRemoteProjection = buildMultiplayerSessionProjection({
+    campaign,
+    hostSnapshot: {
+      ...campaign.multiplayer,
+      remoteFriendCode: {
+        status: "active",
+        code: "X5Y2-Z98L",
+        link: "https://lorekeeper-friend-relay.example/host/jeff1/table-code/X5Y2-Z98L",
+        expiresAt: "2026-07-25T12:00:00.000Z",
+        maxGuests: 5,
+        idleTimeoutMs: 10 * 60 * 1000,
+      },
+      localTable: campaign.multiplayer.localTable,
+    },
+    remoteRelayStatus: "reconnecting",
+  });
+  assert.match(publicSnapshotRemoteProjection.remoteFriendCode.statusDetail, /Code expires/);
+  assert.equal(publicSnapshotRemoteProjection.remoteFriendCode.relayStatus, "reconnecting");
 
   const liveWaitingProjection = buildMultiplayerSessionProjection({
     campaign: {
@@ -4935,6 +4953,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /Remote relay disconnected\. LoreKeeper will try to reconnect/, "unexpected remote relay socket closes should produce a host-visible reconnect cue");
   assert.match(appJs, /currentRemoteRelayConnectionStatus/, "share panel should receive live relay socket state");
   assert.match(multiplayerSessionPanel, /Relay reconnecting\. Guests may need to wait or retry\./, "remote share panel should show reconnecting state instead of looking simply on");
+  assert.match(multiplayerSessionPanel, /Reconnect Sharing/, "remote share panel should let the host reconnect an active code with a closed relay socket");
+  assert.match(appJs, /Reconnecting remote friend code/, "Start Remote Sharing should reconnect an active local session instead of forcing a new code");
   assert.match(appShell, /id="regenerate-remote-sharing"/, "remote friend-code sharing should expose a direct regenerate control");
   assert.match(appShell, /id="remote-friend-code-detail"/, "remote friend-code expiry and idle status should be visible without hover");
   assert.match(appJs, /remoteFriendCodeDetail/, "remote friend-code status detail should be wired into the app shell");

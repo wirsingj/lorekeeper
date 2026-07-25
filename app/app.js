@@ -3323,6 +3323,17 @@ async function startRemoteSharingFromUi() {
         return;
       }
     }
+    const existingSession = state.campaign?.multiplayer?.remoteFriendCodeSession;
+    if (isActiveRemoteFriendCodeSession(existingSession) && currentRemoteRelayConnectionStatus() === "reconnecting") {
+      setProviderActivity("Reconnecting remote friend code...", "working");
+      const connected = connectRemoteRelayHost(existingSession);
+      render();
+      setProviderActivity(
+        connected ? `Remote friend code ${existingSession.code} is reconnecting.` : "Remote friend code could not reconnect.",
+        connected ? "waiting" : "error",
+      );
+      return;
+    }
     setProviderActivity("Starting remote friend code...", "working");
     const result = await postJson(apiMultiplayerRemoteStartUrl, localTableAuthorityPayload({
       hostSlug: remoteHostSlugFromUi(),

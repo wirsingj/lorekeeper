@@ -44,8 +44,8 @@ export function buildMultiplayerSessionProjection({
   };
   const campaignId = multiplayer.campaignId || campaign?.id || "";
   const shareSession = multiplayer.shareSession ?? buildShareTableSession({ table, campaignId, locationPort });
-  const remoteFriendCode = multiplayer.remoteFriendCode
-    ?? (multiplayer.remoteFriendCodeSession ? publicRemoteFriendCode(multiplayer.remoteFriendCodeSession) : emptyRemoteFriendCode());
+  const remoteFriendCode = decorateRemoteFriendCode(multiplayer.remoteFriendCode
+    ?? (multiplayer.remoteFriendCodeSession ? publicRemoteFriendCode(multiplayer.remoteFriendCodeSession) : emptyRemoteFriendCode()));
   if (remoteFriendCode && remoteRelayStatus) {
     remoteFriendCode.relayStatus = remoteRelayStatus;
   }
@@ -164,6 +164,8 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
   const status = remoteFriendCode?.status || "off";
   const active = status === "active";
   const relayStatus = remoteFriendCode?.relayStatus || "";
+  const connected = relayStatus === "connected";
+  const connecting = relayStatus === "connecting";
   if (elements.remoteFriendCodeState) {
     elements.remoteFriendCodeState.textContent = remoteFriendCodeStateLabel({ active, status, relayStatus });
     elements.remoteFriendCodeState.title = remoteFriendCode?.statusDetail || "";
@@ -183,8 +185,13 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
     elements.remoteFriendCodeSafety.textContent = remoteFriendCode?.safety || "";
   }
   if (elements.startRemoteSharing) {
-    elements.startRemoteSharing.disabled = active;
-    elements.startRemoteSharing.title = active ? "Remote sharing is already active." : "Start remote browser sharing through the LoreKeeper relay.";
+    elements.startRemoteSharing.disabled = active && (connected || connecting);
+    elements.startRemoteSharing.textContent = active && !connected && !connecting ? "Reconnect Sharing" : "Start Remote Sharing";
+    elements.startRemoteSharing.title = active && !connected && !connecting
+      ? "Reconnect this active friend code to the LoreKeeper relay."
+      : active
+        ? "Remote sharing is already connected."
+        : "Start remote browser sharing through the LoreKeeper relay.";
   }
   if (elements.copyRemoteFriendCode) {
     elements.copyRemoteFriendCode.disabled = !active || !remoteFriendCode?.code;
@@ -201,6 +208,16 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
   if (elements.stopRemoteSharing) {
     elements.stopRemoteSharing.disabled = !active;
   }
+}
+
+function decorateRemoteFriendCode(remoteFriendCode = emptyRemoteFriendCode()) {
+  const source = remoteFriendCode ?? {};
+  const next = { ...emptyRemoteFriendCode(), ...source };
+  if (!source.statusDetail || (next.status === "active" && /remote sharing is off/i.test(source.statusDetail))) {
+    next.statusDetail = remoteFriendCodeStatusDetail(next);
+  }
+  next.safety = next.safety || `Experimental remote sharing. ${next.statusDetail} Browser guests can preview, request a seat, send approved character actions, vote, pass, leave/rejoin, and use Table Talk. Host settings, model setup, Ollama, files, diagnostics, provider keys, and campaign storage stay on this machine.`;
+  return next;
 }
 
 function remoteFriendCodeStateLabel({ active = false, status = "off", relayStatus = "" } = {}) {
