@@ -4170,6 +4170,35 @@ function testMultiplayerSessionProjection() {
   assert.match(hostProjection.flowSummary, /queued/i);
   assert.match(hostProjection.pendingInputs[0].statusLabel, /queued for the DM/i);
 
+  const remoteProjection = buildMultiplayerSessionProjection({
+    campaign: {
+      ...campaign,
+      multiplayer: {
+        ...campaign.multiplayer,
+        remoteFriendCodeSession: {
+          status: "active",
+          code: "MOSS-7K4P",
+          relayBaseUrl: "https://lorekeeper-friend-relay.example",
+          hostSlug: "demo table",
+          expiresAt: "2026-07-25T12:00:00.000Z",
+          limits: {
+            maxGuests: 5,
+            idleTimeoutMs: 10 * 60 * 1000,
+          },
+        },
+      },
+    },
+    locationPort: "4173",
+  });
+  assert.equal(remoteProjection.remoteFriendCode.status, "active");
+  assert.match(remoteProjection.remoteFriendCode.link, /\/host\/demo-table\/table-code\/MOSS-7K4P$/);
+  assert.match(remoteProjection.remoteFriendCode.statusDetail, /Code expires/);
+  assert.match(remoteProjection.remoteFriendCode.statusDetail, /Idle timeout 10m/);
+  assert.match(remoteProjection.remoteFriendCode.statusDetail, /Max 5 guests/);
+  assert.match(remoteProjection.remoteFriendCode.safety, /Experimental remote sharing/);
+  assert.match(remoteProjection.remoteFriendCode.safety, /provider keys/);
+  assert.match(remoteProjection.remoteFriendCode.safety, /stay on this machine/);
+
   const liveWaitingProjection = buildMultiplayerSessionProjection({
     campaign: {
       ...campaign,

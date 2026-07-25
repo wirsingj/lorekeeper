@@ -81,7 +81,8 @@ function emptyRemoteFriendCode() {
     expiresAt: "",
     maxGuests: 5,
     idleTimeoutMs: 10 * 60 * 1000,
-    safety: "Remote friend code is not active. When enabled, browser guests will join through a guest-safe relay while the host keeps provider keys, Ollama, files, diagnostics, and campaign storage local.",
+    statusDetail: "Remote sharing is off.",
+    safety: "Experimental remote sharing is off. When enabled, browser guests join through a guest-safe relay while provider keys, Ollama, files, diagnostics, and campaign storage stay on this machine.",
   };
 }
 
@@ -94,15 +95,19 @@ function publicRemoteFriendCode(session = {}) {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48) || "host";
-  return {
+  const remoteFriendCode = {
     status: session.status || "active",
     code,
     link: relayBaseUrl && code ? `${relayBaseUrl}/host/${encodeURIComponent(hostSlug)}/table-code/${encodeURIComponent(code)}` : "",
     expiresAt: session.expiresAt || "",
     maxGuests: Number(session.limits?.maxGuests) || 5,
     idleTimeoutMs: Number(session.limits?.idleTimeoutMs) || 10 * 60 * 1000,
-    safety: "Remote friend code shares browser guest mode only: preview, seat request, approved character actions, votes, pass, leave/rejoin, and Table Talk. Host settings, model setup, Ollama, files, diagnostics, provider keys, and campaign storage stay on the host.",
+    statusDetail: "",
+    safety: "",
   };
+  remoteFriendCode.statusDetail = remoteFriendCodeStatusDetail(remoteFriendCode);
+  remoteFriendCode.safety = `Experimental remote sharing. ${remoteFriendCode.statusDetail} Browser guests can preview, request a seat, send approved character actions, vote, pass, leave/rejoin, and use Table Talk. Host settings, model setup, Ollama, files, diagnostics, provider keys, and campaign storage stay on this machine.`;
+  return remoteFriendCode;
 }
 
 export function renderMultiplayerSessionPanel({
@@ -156,6 +161,7 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
   const active = status === "active";
   if (elements.remoteFriendCodeState) {
     elements.remoteFriendCodeState.textContent = active ? "On" : status === "expired" ? "Expired" : status === "stopped" ? "Stopped" : "Off";
+    elements.remoteFriendCodeState.title = remoteFriendCode?.statusDetail || "";
   }
   if (elements.remoteFriendCode) {
     elements.remoteFriendCode.value = remoteFriendCode?.code || "";
@@ -181,6 +187,37 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
   if (elements.stopRemoteSharing) {
     elements.stopRemoteSharing.disabled = !active;
   }
+}
+
+function remoteFriendCodeStatusDetail(remoteFriendCode = {}) {
+  const pieces = [];
+  const expiresAt = Date.parse(remoteFriendCode.expiresAt || "");
+  if (Number.isFinite(expiresAt)) {
+    pieces.push(`Code expires ${new Date(expiresAt).toLocaleString()}.`);
+  }
+  const idleTimeout = Number(remoteFriendCode.idleTimeoutMs) || 0;
+  if (idleTimeout > 0) {
+    pieces.push(`Idle timeout ${formatDuration(idleTimeout)}.`);
+  }
+  const maxGuests = Number(remoteFriendCode.maxGuests) || 0;
+  if (maxGuests > 0) {
+    pieces.push(`Max ${maxGuests} guest${maxGuests === 1 ? "" : "s"}.`);
+  }
+  return pieces.join(" ") || "Remote sharing is active.";
+}
+
+function formatDuration(milliseconds) {
+  const totalSeconds = Math.max(1, Math.round(Number(milliseconds) / 1000));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
 function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWaitingGuest } = {}) {
