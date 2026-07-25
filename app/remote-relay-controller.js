@@ -6,7 +6,7 @@ export function buildRemoteRelayGuestAuthorityPayload({
   activeSession = null,
 } = {}) {
   const normalizedGuestId = String(guestId || message.guestId || "");
-  assertActiveRemoteFriendCode({ message, activeSession });
+  assertRemoteRelayMessageMatchesActiveSession({ message, activeSession });
   if (!entry?.connectionId || !entry?.connectionSecret) {
     throw new Error("Remote guest is not seated yet.");
   }
@@ -20,6 +20,17 @@ export function buildRemoteRelayGuestAuthorityPayload({
     tableId: entry.tableId || fallbackAuthority.tableId || "",
     sessionId: entry.sessionId || fallbackAuthority.sessionId || "",
   };
+}
+
+export function assertRemoteRelayMessageMatchesActiveSession({ message = {}, activeSession = null } = {}) {
+  const activeCode = normalizeFriendCode(activeSession?.code || "");
+  if (!activeCode) {
+    return;
+  }
+  const messageCode = normalizeFriendCode(message.code || "");
+  if (messageCode !== activeCode) {
+    throw new Error("Remote friend code is no longer active. Ask the host for a fresh code.");
+  }
 }
 
 export function buildRemoteRelayGuestSnapshotQuery({
@@ -80,17 +91,6 @@ export function buildRemoteRelaySnapshotPayload(snapshot = {}) {
     tableTalk: boundedTalk(snapshot.tableTalk ?? tableState?.tableTalk),
     tableState,
   };
-}
-
-function assertActiveRemoteFriendCode({ message = {}, activeSession = null } = {}) {
-  const activeCode = normalizeFriendCode(activeSession?.code || "");
-  if (!activeCode) {
-    return;
-  }
-  const messageCode = normalizeFriendCode(message.code || "");
-  if (messageCode !== activeCode) {
-    throw new Error("Remote friend code is no longer active. Ask the host for a fresh code.");
-  }
 }
 
 function normalizeFriendCode(value = "") {

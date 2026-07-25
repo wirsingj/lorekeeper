@@ -109,6 +109,7 @@ import {
 import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
 import { recordDialogConfig, recordLabel, recordNotesValue, recordRoleValue } from "./record-dialog-controller.js";
 import {
+  assertRemoteRelayMessageMatchesActiveSession,
   buildRemoteRelayGuestAuthorityPayload,
   buildRemoteRelayGuestSnapshotQuery,
   buildRemoteRelaySnapshotPayload,
@@ -3584,6 +3585,15 @@ function refreshRemoteRelayHostUi() {
 async function handleRemoteGuestJoinRequest(message = {}) {
   const guestId = String(message.guestId || "");
   if (!guestId) {
+    return;
+  }
+  try {
+    assertRemoteRelayMessageMatchesActiveSession({
+      message,
+      activeSession: state.campaign?.multiplayer?.remoteFriendCodeSession,
+    });
+  } catch (error) {
+    sendRemoteRelayGuestError(guestId, error, "Ask the host for a fresh code.");
     return;
   }
   const displayName = String(message.displayName || "Remote Friend").slice(0, 40);

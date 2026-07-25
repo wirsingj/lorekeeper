@@ -102,6 +102,7 @@ import {
 } from "../app/provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "../app/provider-result-controller.js";
 import {
+  assertRemoteRelayMessageMatchesActiveSession,
   buildRemoteRelayGuestAuthorityPayload,
   buildRemoteRelayGuestSnapshotQuery,
   buildRemoteRelaySnapshotPayload,
@@ -4342,6 +4343,17 @@ function testRemoteRelayController() {
     }),
     /fresh code/i,
   );
+  assert.doesNotThrow(() => assertRemoteRelayMessageMatchesActiveSession({
+    message: { code: "MOSS-7K4P" },
+    activeSession: { code: "MOSS-7K4P" },
+  }));
+  assert.throws(
+    () => assertRemoteRelayMessageMatchesActiveSession({
+      message: { code: "OLD1-7K4P" },
+      activeSession: { code: "MOSS-7K4P" },
+    }),
+    /fresh code/i,
+  );
   assert.throws(
     () => buildRemoteRelayGuestSnapshotQuery({
       guestId: "guest-approved",
@@ -5068,6 +5080,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(multiplayerSessionPanel, /remoteFriendCodeDetail\.textContent/, "remote friend-code status detail should be rendered as visible panel copy");
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
   assert.match(appJs, /activeSession: state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay browser requests should be pinned to the active friend code before using local authority");
+  assert.match(appJs, /handleRemoteGuestJoinRequest[\s\S]*assertRemoteRelayMessageMatchesActiveSession[\s\S]*apiMultiplayerWaitingRegisterUrl/, "remote relay join requests should verify the active friend code before entering the local waiting room");
   assert.match(appJs, /proposedCharacter:\s*message\.proposedCharacter \|\| null/, "remote relay join requests should preserve browser character drafts into the local waiting room");
   assert.match(appJs, /preferredPartyMemberId:\s*message\.preferredPartyMemberId \|\| ""/, "remote relay rejoin requests should preserve preferred seat hints without granting authority");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
