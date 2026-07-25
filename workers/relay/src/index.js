@@ -121,6 +121,9 @@ export class TableRelay {
     if (upgrade.toLowerCase() !== "websocket") {
       return json({ ok: false, error: "websocket_required" }, 426);
     }
+    if (!this.hostSocket) {
+      return json({ ok: false, error: "host_not_connected" }, 409);
+    }
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     const guestId = `guest-${crypto.randomUUID()}`;

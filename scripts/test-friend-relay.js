@@ -155,6 +155,7 @@ assert.match(relayGuestPageSource, /relay\.host\.ready[\s\S]*guest\.join\.reques
 assert.match(relayGuestPageSource, /guest\.tableTalk\.post/, "public guest page should send Table Talk through the relay");
 assert.match(relayGuestPageSource, /guest\.disconnect/, "public guest page should notify the host when the browser tab leaves");
 assert.match(relaySource, /relay\.host\.disconnected/, "relay should notify guests when the host socket disconnects");
+assert.match(relaySource, /if \(!this\.hostSocket\) \{[\s\S]*host_not_connected/, "relay should reject fresh guest sockets when no host is connected");
 assert.doesNotMatch(relaySource, /sessionKey:\s*message\.sessionKey/, "guest-originated relay messages must not forward session keys");
 assert.doesNotMatch(relayGuestPageSource, /providerSettings|Ollama|diagnostics|sqlite/i, "public guest page should not expose host/provider/debug language");
 assert.match(relaySource, /content-security-policy/, "public guest HTML should send a Content-Security-Policy header");

@@ -122,6 +122,7 @@ External work required from the human:
 - Remote relay host status is more immediate: socket open/close/error events repaint Friends And Seats directly so the host sees connected, reconnecting, and error states without waiting for an unrelated render.
 - Remote browser guest entry is more forgiving: friend codes auto-format while typing, Enter moves from code to player name and submits from the name field, and direct code links focus the name field first.
 - Remote browser seated controls are more natural: Ctrl/Cmd+Enter sends character actions, Enter sends Table Talk from its field, and choice buttons disable after a vote is sent to avoid accidental duplicate clicks.
+- Remote relay guest socket admission is tighter: fresh guest WebSocket attempts are rejected when no host socket is connected, matching the public page's session check and reducing useless relay occupancy.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
 - AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
@@ -154,6 +155,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Host-side remote relay status UX is improved: sharing controls refresh immediately when the relay socket connects, disconnects, or errors.
 - Remote browser guest entry UX is improved: friends can paste rough codes and use Enter naturally instead of fiddling with exact hyphen/case formatting.
 - Remote browser seated-control UX is improved: common keyboard submission works and choice votes give immediate duplicate-click protection.
+- Remote relay resource hygiene is improved: direct/fresh guest WebSocket attempts no longer sit open when the host is not connected.
 
 ### Remaining Trust Risks
 
