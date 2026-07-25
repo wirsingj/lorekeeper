@@ -508,6 +508,16 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       background: rgba(32, 38, 42, 0.78);
       padding: 10px;
     }
+    .talk.pending {
+      border-color: rgba(142, 198, 165, 0.34);
+      background: rgba(33, 53, 43, 0.78);
+      opacity: .84;
+    }
+    .talk.pending strong::after {
+      content: " sending";
+      color: var(--muted);
+      font-weight: 700;
+    }
     .moment-panel {
       border: 1px solid rgba(168, 132, 91, 0.24);
       border-radius: 8px;
@@ -662,6 +672,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
     let latestSnapshot = null;
     let snapshotTimer = null;
     let pendingJoin = null;
+    let pendingTableTalk = [];
     let reconnecting = false;
     const normalizeCodeInput = (value) => {
       const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/[OI]/g, "");
@@ -940,9 +951,12 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         return;
       }
       if (send({ kind: "guest.tableTalk.post", code: session?.code || input.value.trim().toUpperCase(), text })) {
+        rememberPendingTableTalk(text);
         talk.value = "";
         if (talkMobile) talkMobile.value = "";
-        setStatus("Table Talk sent.");
+        renderTalk(latestSnapshot?.tableTalk || latestSnapshot?.tableState?.tableTalk || []);
+        setStatus("Table Talk sent. Syncing with the host table.");
+        window.setTimeout(requestSnapshot, 700);
       }
     }
     function renderSnapshot(snapshot) {
@@ -960,7 +974,9 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       renderMoment(snapshot);
       renderParty(snapshot.tableState?.party || snapshot.party || []);
       renderMessages(snapshot.messages || snapshot.tableState?.messages || []);
-      renderTalk(snapshot.tableTalk || snapshot.tableState?.tableTalk || []);
+      const tableTalkMessages = snapshot.tableTalk || snapshot.tableState?.tableTalk || [];
+      reconcilePendingTableTalk(tableTalkMessages);
+      renderTalk(tableTalkMessages);
       renderChoices(snapshot.messages || snapshot.tableState?.messages || []);
       const pending = snapshot.pendingInput || snapshot.tableState?.pendingInput;
       updateActionAvailability(snapshot);
@@ -1119,9 +1135,9 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
     }
     function renderTalk(messages) {
       talkLog.innerHTML = "";
-      for (const message of safeList(messages, 12)) {
+      for (const message of safeList([...messages, ...pendingTableTalk], 12)) {
         const div = document.createElement("div");
-        div.className = "talk";
+        div.className = "talk" + (message.pending ? " pending" : "");
         const title = document.createElement("strong");
         title.textContent = compactText(message.playerName || "Table", 80);
         const body = document.createElement("div");
@@ -1135,6 +1151,31 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         empty.textContent = "Table Talk is quiet.";
         talkLog.append(empty);
       }
+      talkLog.scrollTop = talkLog.scrollHeight;
+    }
+    function rememberPendingTableTalk(text) {
+      const playerName = session?.characterName || nameInput.value.trim() || "You";
+      pendingTableTalk = [...pendingTableTalk, {
+        id: "pending-talk-" + Date.now().toString(36),
+        playerName,
+        text,
+        pending: true,
+      }].slice(-4);
+    }
+    function reconcilePendingTableTalk(messages) {
+      if (!pendingTableTalk.length) {
+        return;
+      }
+      const delivered = new Set(safeList(messages, 12).map((message) =>
+        compactCompareText([message.playerName || "", message.text || ""].join("::"))
+      ));
+      pendingTableTalk = pendingTableTalk.filter((message) => {
+        const key = compactCompareText([message.playerName || "", message.text || ""].join("::"));
+        const textOnlyDelivered = safeList(messages, 12).some((entry) =>
+          compactCompareText(entry.text || "") === compactCompareText(message.text || "")
+        );
+        return !delivered.has(key) && !textOnlyDelivered;
+      });
     }
     function renderChoices(messages) {
       choices.innerHTML = "";

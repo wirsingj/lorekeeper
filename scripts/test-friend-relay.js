@@ -174,6 +174,11 @@ assert.match(relayGuestPageSource, /setInterval\(requestSnapshot, 5000\)/, "publ
 assert.match(relayGuestPageSource, /pendingJoin/, "public guest page should remember a pending join across host relay reconnects");
 assert.match(relayGuestPageSource, /relay\.host\.ready[\s\S]*joinRequestMessage\(pendingJoin\)/, "public guest page should resend a pending join when the host reconnects");
 assert.match(relayGuestPageSource, /guest\.tableTalk\.post/, "public guest page should send Table Talk through the relay");
+assert.match(relayGuestPageSource, /pendingTableTalk/, "public guest page should keep local pending Table Talk echoes");
+assert.match(relayGuestPageSource, /rememberPendingTableTalk\(text\)/, "public guest Table Talk should render immediately after send");
+assert.match(relayGuestPageSource, /reconcilePendingTableTalk/, "public guest Table Talk should reconcile local echoes with host snapshots");
+assert.match(relayGuestPageSource, /Table Talk sent\. Syncing with the host table\./, "public guest Table Talk status should explain the sync step");
+assert.match(relayGuestPageSource, /talk\.pending/, "public guest page should visibly mark optimistic Table Talk messages");
 assert.match(relayGuestPageSource, /guest\.disconnect/, "public guest page should notify the host when the browser tab leaves");
 assert.match(relaySource, /relay\.host\.disconnected/, "relay should notify guests when the host socket disconnects");
 assert.match(relaySource, /if \(!this\.hostSocket\) \{[\s\S]*host_not_connected/, "relay should reject fresh guest sockets when no host is connected");
