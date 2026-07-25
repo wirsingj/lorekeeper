@@ -912,6 +912,7 @@ function SetupDialog() {
               <button id="start-remote-sharing" type="button" disabled>Start Remote Sharing</button>
               <button id="copy-remote-friend-link" type="button" disabled>Copy Browser Link</button>
               <button id="copy-remote-friend-code" type="button" disabled>Copy Friend Code</button>
+              <button id="regenerate-remote-sharing" type="button" disabled>Regenerate Code</button>
               <button id="stop-remote-sharing" type="button" disabled>Stop Sharing</button>
             </div>
           </div>

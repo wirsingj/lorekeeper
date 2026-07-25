@@ -4550,6 +4550,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   const tableOpeningController = await readFile(path.join("app", "table-opening-controller.js"), "utf8");
   const playLogController = await readFile(path.join("app", "play-log-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
+  const multiplayerSessionPanel = await readFile(path.join("app", "multiplayer-session-panel.js"), "utf8");
   const characterSeedRules = await readFile(path.join("src", "rules", "character-seed.js"), "utf8");
   const appShell = await readFile(path.join("app", "App.jsx"), "utf8");
   const styles = await readFile(path.join("app", "styles.css"), "utf8");
@@ -4891,6 +4892,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /remoteRelayReconnectAttemptedAt/, "remote relay reconnect attempts should be throttled");
   assert.match(appJs, /Date\.now\(\) < expiresAt/, "remote relay reconnect should not revive expired friend codes");
   assert.match(appJs, /Remote relay disconnected\. LoreKeeper will try to reconnect/, "unexpected remote relay socket closes should produce a host-visible reconnect cue");
+  assert.match(appShell, /id="regenerate-remote-sharing"/, "remote friend-code sharing should expose a direct regenerate control");
+  assert.match(appJs, /regenerateRemoteSharingFromUi/, "remote friend-code sharing should wire the regenerate control");
+  assert.match(multiplayerSessionPanel, /regenerateRemoteSharing/, "remote friend-code regenerate availability should be projected with the rest of the share panel");
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");

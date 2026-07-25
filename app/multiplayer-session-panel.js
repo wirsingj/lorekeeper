@@ -184,6 +184,12 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
   if (elements.copyRemoteFriendLink) {
     elements.copyRemoteFriendLink.disabled = !active || !remoteFriendCode?.link;
   }
+  if (elements.regenerateRemoteSharing) {
+    elements.regenerateRemoteSharing.disabled = !active;
+    elements.regenerateRemoteSharing.title = active
+      ? "Create a fresh friend code and close the old relay room."
+      : "Start remote sharing before regenerating the code.";
+  }
   if (elements.stopRemoteSharing) {
     elements.stopRemoteSharing.disabled = !active;
   }

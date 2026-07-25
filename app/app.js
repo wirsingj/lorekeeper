@@ -525,6 +525,7 @@ const elements = {
   startRemoteSharing: document.querySelector("#start-remote-sharing"),
   copyRemoteFriendCode: document.querySelector("#copy-remote-friend-code"),
   copyRemoteFriendLink: document.querySelector("#copy-remote-friend-link"),
+  regenerateRemoteSharing: document.querySelector("#regenerate-remote-sharing"),
   stopRemoteSharing: document.querySelector("#stop-remote-sharing"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
@@ -964,6 +965,10 @@ elements.copyRemoteFriendCode?.addEventListener("click", async () => {
 
 elements.copyRemoteFriendLink?.addEventListener("click", async () => {
   await copyRemoteFriendLinkFromUi();
+});
+
+elements.regenerateRemoteSharing?.addEventListener("click", async () => {
+  await regenerateRemoteSharingFromUi();
 });
 
 elements.stopRemoteSharing?.addEventListener("click", async () => {
@@ -3360,6 +3365,38 @@ async function stopRemoteSharingFromUi() {
     setProviderActivity("Remote friend code stopped", "idle");
   } catch (error) {
     setProviderActivity(error instanceof Error ? `Stop remote sharing failed: ${error.message}` : "Stop remote sharing failed", "error");
+  }
+}
+
+async function regenerateRemoteSharingFromUi() {
+  try {
+    if (!state.campaign?.multiplayer?.localTable?.running) {
+      setProviderActivity("Start the local table before regenerating the remote friend code.", "waiting");
+      return;
+    }
+    closeRemoteRelayHost();
+    setProviderActivity("Regenerating remote friend code...", "working");
+    const result = await postJson(apiMultiplayerRemoteStartUrl, localTableAuthorityPayload({
+      hostSlug: remoteHostSlugFromUi(),
+    }));
+    setCampaignFromPayload(result, "remote_friend_code_regenerated");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    const connected = connectRemoteRelayHost(result.remoteFriendCodeSession || state.campaign?.multiplayer?.remoteFriendCodeSession);
+    const link = currentRemoteFriendLink();
+    if (link) {
+      const copied = await writeClipboardText(link);
+      if (!copied) {
+        selectFieldText(elements.remoteFriendLink);
+      }
+    }
+    setProviderActivity(
+      connected ? "Remote friend code regenerated" : "Remote friend code regenerated, but relay did not connect.",
+      connected ? "idle" : "error",
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    setProviderActivity(message ? `Regenerate remote code failed: ${message}` : "Regenerate remote code failed", "error");
   }
 }
 

@@ -383,7 +383,7 @@ Host-facing behavior:
 - Host clicks Start Remote Sharing.
 - LoreKeeper opens an outbound relay connection.
 - Relay returns a short friend code and optional browser link.
-- Host can Copy Browser Link, Copy Friend Code, and Stop Sharing. Regenerate remains planned polish.
+- Host can Copy Browser Link, Copy Friend Code, Regenerate Code to invalidate a stale/leaked relay room, and Stop Sharing.
 - Host sees waiting guests and approves/denies/removes them.
 
 Guest-facing behavior:
