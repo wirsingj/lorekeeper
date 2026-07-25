@@ -3438,7 +3438,7 @@ function connectRemoteRelayHost(session = {}) {
       sessionId: session.sessionId || "",
     }));
     socket.send(JSON.stringify({ kind: "host.session.ready", code }));
-    setProviderActivity(`Remote friend code ${code} is live. Guest table UI wiring comes next.`, "idle");
+    setProviderActivity(`Remote friend code ${code} is live. Browser guests can ask to join.`, "idle");
   });
   socket.addEventListener("message", (event) => {
     let message = null;
@@ -3448,10 +3448,25 @@ function connectRemoteRelayHost(session = {}) {
       return;
     }
     if (message?.kind === "relay.guest.connected") {
-      setProviderActivity("A remote browser guest reached the relay. Seat approval wiring comes next.", "waiting");
+      setProviderActivity("A remote browser guest reached the relay.", "waiting");
     }
     if (message?.kind === "guest.join.request") {
       handleRemoteGuestJoinRequest(message);
+    }
+    if (message?.kind === "guest.snapshot.request") {
+      handleRemoteRelayGuestSnapshotRequest(message);
+    }
+    if (message?.kind === "guest.action.submit") {
+      handleRemoteRelayGuestAction(message);
+    }
+    if (message?.kind === "guest.pass") {
+      handleRemoteRelayGuestPass(message);
+    }
+    if (message?.kind === "guest.choice.vote") {
+      handleRemoteRelayGuestChoiceVote(message);
+    }
+    if (message?.kind === "guest.tableTalk.post") {
+      handleRemoteRelayGuestTableTalk(message);
     }
     if (message?.kind === "relay.error") {
       setProviderActivity(`Remote relay rejected a message: ${(message.errors || []).join(", ")}`, "error");
@@ -3486,6 +3501,9 @@ async function handleRemoteGuestJoinRequest(message = {}) {
       waitingGuestId: result.waitingGuest?.id || "",
       clientId,
       displayName,
+      campaignId: result.waitingGuest?.campaignId || state.campaign?.id || "",
+      tableId: result.waitingGuest?.tableId || state.campaign?.multiplayer?.localTable?.tableId || "",
+      sessionId: result.waitingGuest?.sessionId || state.campaign?.multiplayer?.localTable?.sessionId || "",
     });
     await refreshMultiplayerSnapshot({ quiet: true });
     render();
@@ -3504,6 +3522,154 @@ async function handleRemoteGuestJoinRequest(message = {}) {
     });
     setProviderActivity(error instanceof Error ? `Remote join failed: ${error.message}` : "Remote join failed", "error");
   }
+}
+
+async function handleRemoteRelayGuestSnapshotRequest(message = {}) {
+  await sendRemoteRelayGuestSnapshot(message.guestId, { reason: "snapshot" });
+}
+
+async function handleRemoteRelayGuestAction(message = {}) {
+  const guestId = String(message.guestId || "");
+  try {
+    const payload = remoteRelayGuestActionPayload(message);
+    await postJson(apiMultiplayerActionUrl, {
+      ...payload,
+      text: message.text || message.actionText || "",
+      ready: true,
+    });
+    await refreshMultiplayerSnapshot({ quiet: true });
+    render();
+    await sendRemoteRelayGuestSnapshot(guestId, { reason: "action" });
+    setProviderActivity(`${payload.characterName || "Remote guest"} sent an action.`, "waiting");
+  } catch (error) {
+    sendRemoteRelayGuestError(guestId, error, "That action could not be sent.");
+  }
+}
+
+async function handleRemoteRelayGuestPass(message = {}) {
+  const guestId = String(message.guestId || "");
+  try {
+    const payload = remoteRelayGuestActionPayload(message);
+    await postJson(apiMultiplayerPassUrl, payload);
+    await refreshMultiplayerSnapshot({ quiet: true });
+    render();
+    await sendRemoteRelayGuestSnapshot(guestId, { reason: "pass" });
+    setProviderActivity(`${payload.characterName || "Remote guest"} passed.`, "waiting");
+  } catch (error) {
+    sendRemoteRelayGuestError(guestId, error, "Pass could not be sent.");
+  }
+}
+
+async function handleRemoteRelayGuestChoiceVote(message = {}) {
+  const guestId = String(message.guestId || "");
+  try {
+    const payload = remoteRelayGuestActionPayload(message);
+    await postJson(apiMultiplayerChoiceVoteUrl, {
+      ...payload,
+      choiceKey: message.choiceKey || "",
+      optionId: message.optionId || "",
+      optionLabel: message.optionLabel || "",
+      optionText: message.optionText || "",
+      prompt: message.prompt || "",
+    });
+    await refreshMultiplayerSnapshot({ quiet: true });
+    render();
+    await sendRemoteRelayGuestSnapshot(guestId, { reason: "vote" });
+    setProviderActivity(`${payload.characterName || "Remote guest"} voted.`, "waiting");
+  } catch (error) {
+    sendRemoteRelayGuestError(guestId, error, "Vote could not be sent.");
+  }
+}
+
+async function handleRemoteRelayGuestTableTalk(message = {}) {
+  const guestId = String(message.guestId || "");
+  try {
+    const payload = remoteRelayGuestActionPayload(message);
+    const result = await postJson(apiMultiplayerTableTalkUrl, {
+      ...payload,
+      text: message.text || "",
+    });
+    setCampaignFromPayload(result, "remote_relay_table_talk");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    await sendRemoteRelayGuestSnapshot(guestId, { reason: "table_talk" });
+    broadcastRemoteRelaySnapshotsExcept(guestId).catch(() => {});
+    setProviderActivity("Remote table talk sent", "idle");
+  } catch (error) {
+    sendRemoteRelayGuestError(guestId, error, "Table Talk could not be sent.");
+  }
+}
+
+function remoteRelayGuestActionPayload(message = {}) {
+  const guestId = String(message.guestId || "");
+  const entry = state.remoteRelayGuests.get(guestId);
+  if (!entry?.connectionId || !entry?.connectionSecret) {
+    throw new Error("Remote guest is not seated yet.");
+  }
+  return {
+    connectionId: entry.connectionId,
+    clientId: entry.clientId || `relay-${guestId}`,
+    connectionSecret: entry.connectionSecret,
+    characterId: entry.partyMemberId || message.characterId || "",
+    characterName: entry.characterName || "",
+    campaignId: entry.campaignId || state.campaign?.id || "",
+    tableId: entry.tableId || state.campaign?.multiplayer?.localTable?.tableId || "",
+    sessionId: entry.sessionId || state.campaign?.multiplayer?.localTable?.sessionId || "",
+  };
+}
+
+async function sendRemoteRelayGuestSnapshot(guestId, { reason = "snapshot" } = {}) {
+  const entry = state.remoteRelayGuests.get(String(guestId || ""));
+  if (!entry?.connectionId || !entry?.connectionSecret) {
+    sendRemoteRelayGuestError(guestId, new Error("Remote guest is not seated yet."), "Ask the host to seat you first.");
+    return false;
+  }
+  try {
+    const url = new URL(apiMultiplayerGuestSnapshotUrl, window.location.origin);
+    url.searchParams.set("connectionId", entry.connectionId);
+    url.searchParams.set("clientId", entry.clientId || `relay-${guestId}`);
+    url.searchParams.set("connectionSecret", entry.connectionSecret);
+    url.searchParams.set("campaignId", entry.campaignId || state.campaign?.id || "");
+    url.searchParams.set("tableId", entry.tableId || state.campaign?.multiplayer?.localTable?.tableId || "");
+    url.searchParams.set("sessionId", entry.sessionId || state.campaign?.multiplayer?.localTable?.sessionId || "");
+    url.searchParams.set("t", String(Date.now()));
+    const snapshot = await fetchJson(url.toString());
+    sendRemoteHostMessage({
+      kind: "host.snapshot",
+      guestId,
+      reason,
+      snapshot,
+    });
+    return true;
+  } catch (error) {
+    sendRemoteRelayGuestError(guestId, error, "The host could not refresh your table view.");
+    return false;
+  }
+}
+
+async function broadcastRemoteRelaySnapshotsExcept(exceptGuestId = "") {
+  const tasks = [];
+  for (const guestId of state.remoteRelayGuests.keys()) {
+    if (guestId !== exceptGuestId) {
+      tasks.push(sendRemoteRelayGuestSnapshot(guestId, { reason: "broadcast" }));
+    }
+  }
+  await Promise.allSettled(tasks);
+}
+
+function sendRemoteRelayGuestError(guestId, error, fallbackMessage) {
+  const message = error instanceof Error ? error.message : String(error || fallbackMessage || "Remote guest request failed.");
+  sendRemoteHostMessage({
+    kind: "host.error",
+    guestId,
+    message: compactRemoteRelayError(message, fallbackMessage),
+  });
+  setProviderActivity(`Remote guest request failed: ${compactRemoteRelayError(message, fallbackMessage)}`, "error");
+}
+
+function compactRemoteRelayError(message, fallbackMessage = "Remote request failed.") {
+  const compact = String(message || fallbackMessage).replace(/\s+/g, " ").trim();
+  return compact.slice(0, 240) || fallbackMessage;
 }
 
 function sendRemoteHostMessage(message = {}) {
@@ -4227,7 +4393,14 @@ function notifyRemoteRelayGuestSeated(result = {}, waitingGuestId = "", partyMem
     return false;
   }
   relayEntry.connectionId = connection.id;
+  relayEntry.connectionSecret = connection.secret;
+  relayEntry.clientId = connection.clientId || relayEntry.clientId || "";
   relayEntry.partyMemberId = connection.partyMemberId || partyMemberId;
+  relayEntry.characterName = member?.name || "";
+  relayEntry.campaignId = connection.campaignId || result.campaign?.id || "";
+  relayEntry.tableId = connection.tableId || result.campaign?.multiplayer?.localTable?.tableId || "";
+  relayEntry.sessionId = connection.sessionId || result.campaign?.multiplayer?.localTable?.sessionId || "";
+  state.remoteRelayGuests.set(relayEntry.guestId, relayEntry);
   sendRemoteHostMessage({
     kind: "host.guest.approved",
     guestId: relayEntry.guestId,
@@ -4241,6 +4414,7 @@ function notifyRemoteRelayGuestSeated(result = {}, waitingGuestId = "", partyMem
     partyMemberId: connection.partyMemberId || partyMemberId,
     characterName: member?.name || "",
   });
+  sendRemoteRelayGuestSnapshot(relayEntry.guestId, { reason: "approved" }).catch(() => {});
   return true;
 }
 

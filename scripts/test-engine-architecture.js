@@ -4787,6 +4787,13 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay reconnect must use the private local campaign session, not the public host snapshot");
   assert.match(appJs, /remoteRelayReconnectAttemptedAt/, "remote relay reconnect attempts should be throttled");
   assert.match(appJs, /Date\.now\(\) < expiresAt/, "remote relay reconnect should not revive expired friend codes");
+  assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
+  assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
+  assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
+  assert.match(appJs, /sendRemoteRelayGuestSnapshot/, "host app should respond to remote browser guests with guest-safe snapshots");
+  assert.match(appJs, /connectionSecret: entry\.connectionSecret/, "remote relay bridge should attach local connection secrets only inside host-local API calls");
+  assert.match(appJs, /state\.remoteRelayGuests\.set\(relayEntry\.guestId, relayEntry\)/, "remote relay seating should persist the approved local connection secret back into host relay state");
+  assert.match(appJs, /kind: "host\.snapshot"/, "remote relay snapshot responses should use the targeted host.snapshot message");
   assert.match(appJs, /partyControllerDetail/);
   assert.match(appJs, /Waiting for an invited friend/);
   assert.match(appJs, /renderDebugMetaControl/);

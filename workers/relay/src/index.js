@@ -1,6 +1,6 @@
 const MAX_PAYLOAD_BYTES = 16 * 1024;
 const FRIEND_CODE_PATTERN = /^[A-Z2-9]{4}-[A-Z2-9]{4}$/;
-const RELAY_VERSION = "2026-07-25-targeted-approval-rails";
+const RELAY_VERSION = "2026-07-25-playable-browser-guest-alpha";
 
 const GUEST_SAFE_KINDS = new Set([
   "guest.hello",
@@ -330,33 +330,97 @@ function renderGuestEntryPage(initialCode) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LoreKeeper Remote Table</title>
   <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #101416; color: #edf2f4; font-family: system-ui, sans-serif; }
-    main { width: min(420px, calc(100vw - 32px)); display: grid; gap: 14px; }
+    body { margin: 0; min-height: 100vh; background: #101416; color: #edf2f4; font-family: system-ui, sans-serif; }
+    main { width: min(840px, calc(100vw - 32px)); margin: 0 auto; padding: 32px 0; display: grid; gap: 14px; }
     h1 { margin: 0; font-size: 1.6rem; }
     p { color: #aebbc2; line-height: 1.45; }
     label { display: grid; gap: 6px; color: #cbd5da; font-size: .82rem; font-weight: 700; }
-    input { min-height: 44px; border-radius: 8px; border: 1px solid #3b474d; background: #151b1f; color: #fff; padding: 0 12px; font: inherit; }
+    input, textarea { border-radius: 8px; border: 1px solid #3b474d; background: #151b1f; color: #fff; padding: 10px 12px; font: inherit; }
+    input { min-height: 44px; }
+    textarea { min-height: 96px; resize: vertical; }
     #code { letter-spacing: .08em; text-transform: uppercase; }
     button { min-height: 44px; border: 0; border-radius: 8px; background: #8ec6a5; color: #07100b; font-weight: 800; cursor: pointer; }
     button:disabled { opacity: .55; cursor: default; }
+    section { border: 1px solid #283237; border-radius: 8px; background: #151b1f; padding: 14px; display: grid; gap: 10px; }
+    section[hidden] { display: none; }
+    .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row button { flex: 1 1 140px; }
+    .muted { color: #aebbc2; }
+    .log { display: grid; gap: 8px; max-height: 320px; overflow: auto; }
+    .msg, .talk { border: 1px solid #303b41; border-radius: 8px; padding: 10px; background: #101416; }
+    .msg strong, .talk strong { display: block; margin-bottom: 4px; color: #edf2f4; }
+    .choices { display: grid; gap: 8px; }
+    .choice { text-align: left; background: #22312b; color: #eaf8ef; }
     code { color: #8ec6a5; }
   </style>
 </head>
 <body>
   <main>
-    <h1>LoreKeeper</h1>
-    <p>Enter a friend code to join a remote table. The host keeps campaign state and the DM brain on their machine.</p>
-    <label>Friend Code<input id="code" value="${escapeHtml(code)}" placeholder="M7SS-7K4P" maxlength="9" /></label>
-    <label>Your Name<input id="name" value="" placeholder="Player name" maxlength="40" /></label>
-    <button id="join">Ask To Join</button>
-    <p id="status">Remote relay is online. Guest table UI is the next integration step.</p>
+    <section id="join-panel">
+      <h1>LoreKeeper</h1>
+      <p>Enter a friend code to join a remote table. The host keeps campaign state and the DM brain on their machine.</p>
+      <div class="grid">
+        <label>Friend Code<input id="code" value="${escapeHtml(code)}" placeholder="M7SS-7K4P" maxlength="9" /></label>
+        <label>Your Name<input id="name" value="" placeholder="Player name" maxlength="40" /></label>
+      </div>
+      <button id="join">Ask To Join</button>
+      <p id="status">Remote relay is online.</p>
+    </section>
+    <section id="table-panel" hidden>
+      <h1 id="table-title">LoreKeeper Table</h1>
+      <p id="seat" class="muted">Waiting for a seat.</p>
+      <p id="scene">Waiting for the host table.</p>
+      <div id="choices" class="choices"></div>
+      <label>Your Action<textarea id="action" maxlength="1200" placeholder="What do you do?"></textarea></label>
+      <div class="row">
+        <button id="send-action">Send Action</button>
+        <button id="pass">Pass</button>
+        <button id="refresh">Refresh</button>
+      </div>
+      <label>Table Talk<input id="talk" maxlength="800" placeholder="Say something out of character..." /></label>
+      <button id="send-talk">Send Table Talk</button>
+      <h2>Story</h2>
+      <div id="log" class="log"></div>
+      <h2>Table Talk</h2>
+      <div id="talk-log" class="log"></div>
+    </section>
   </main>
   <script>
     const input = document.querySelector("#code");
     const nameInput = document.querySelector("#name");
     const status = document.querySelector("#status");
     const join = document.querySelector("#join");
+    const joinPanel = document.querySelector("#join-panel");
+    const tablePanel = document.querySelector("#table-panel");
+    const tableTitle = document.querySelector("#table-title");
+    const seat = document.querySelector("#seat");
+    const scene = document.querySelector("#scene");
+    const log = document.querySelector("#log");
+    const talkLog = document.querySelector("#talk-log");
+    const choices = document.querySelector("#choices");
+    const action = document.querySelector("#action");
+    const talk = document.querySelector("#talk");
+    const sendAction = document.querySelector("#send-action");
+    const sendTalk = document.querySelector("#send-talk");
+    const pass = document.querySelector("#pass");
+    const refresh = document.querySelector("#refresh");
     let socket = null;
+    let session = null;
+    let latestSnapshot = null;
+    const send = (message) => {
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(message));
+        return true;
+      }
+      status.textContent = "Relay connection is closed. Rejoin with a fresh code.";
+      return false;
+    };
+    const requestSnapshot = () => {
+      if (session) {
+        send({ kind: "guest.snapshot.request", code: session.code });
+      }
+    };
     document.querySelector("#join").addEventListener("click", async () => {
       const code = input.value.trim().toUpperCase();
       const res = await fetch("/api/session/" + encodeURIComponent(code));
@@ -385,10 +449,26 @@ function renderGuestEntryPage(initialCode) {
         if (message?.kind === "host.guest.pending") {
           status.textContent = "The host sees your request. Waiting for a seat.";
         } else if (message?.kind === "host.guest.approved") {
+          session = {
+            code,
+            connectionId: message.connectionId || "",
+            clientId: message.clientId || "",
+            partyMemberId: message.partyMemberId || "",
+            characterName: message.characterName || "",
+          };
           status.textContent = message.characterName
-            ? "Joined as " + message.characterName + ". Guest table controls are coming next."
-            : "Joined the table. Guest table controls are coming next.";
+            ? "Joined as " + message.characterName + "."
+            : "Joined the table.";
+          joinPanel.hidden = true;
+          tablePanel.hidden = false;
+          seat.textContent = message.characterName ? "Seated as " + message.characterName + "." : "Seated at the table.";
           join.disabled = true;
+          requestSnapshot();
+        } else if (message?.kind === "host.snapshot") {
+          latestSnapshot = message.snapshot || null;
+          renderSnapshot(latestSnapshot);
+        } else if (message?.kind === "host.error") {
+          status.textContent = message.message || "The host could not complete that request.";
         } else if (message?.kind === "relay.host.ready") {
           status.textContent = "Host is connected. Sending request...";
         } else if (message?.kind === "relay.error") {
@@ -403,6 +483,136 @@ function renderGuestEntryPage(initialCode) {
         status.textContent = "Could not connect to the relay.";
       });
     });
+    refresh.addEventListener("click", requestSnapshot);
+    sendAction.addEventListener("click", () => {
+      const text = action.value.trim();
+      if (!text) {
+        status.textContent = "Write an action first.";
+        return;
+      }
+      if (send({ kind: "guest.action.submit", code: session?.code || input.value.trim().toUpperCase(), text })) {
+        action.value = "";
+        status.textContent = "Action sent. Waiting for the host table.";
+      }
+    });
+    pass.addEventListener("click", () => {
+      if (send({ kind: "guest.pass", code: session?.code || input.value.trim().toUpperCase() })) {
+        status.textContent = "Passed. Waiting for the host table.";
+      }
+    });
+    sendTalk.addEventListener("click", () => {
+      const text = talk.value.trim();
+      if (!text) {
+        return;
+      }
+      if (send({ kind: "guest.tableTalk.post", code: session?.code || input.value.trim().toUpperCase(), text })) {
+        talk.value = "";
+        status.textContent = "Table Talk sent.";
+      }
+    });
+    function renderSnapshot(snapshot) {
+      if (!snapshot) {
+        return;
+      }
+      tablePanel.hidden = false;
+      joinPanel.hidden = true;
+      tableTitle.textContent = snapshot.campaignTitle || "LoreKeeper Table";
+      const characterName = snapshot.assignedCharacter?.name || session?.characterName || snapshot.connection?.displayName || "Your seat";
+      seat.textContent = "You are " + characterName + ".";
+      scene.textContent = snapshot.scene?.immediateSituation || snapshot.tableState?.scene?.immediateSituation || "The table is quiet.";
+      renderMessages(snapshot.messages || snapshot.tableState?.messages || []);
+      renderTalk(snapshot.tableTalk || snapshot.tableState?.tableTalk || []);
+      renderChoices(snapshot.messages || snapshot.tableState?.messages || []);
+      const pending = snapshot.pendingInput || snapshot.tableState?.pendingInput;
+      if (pending?.text) {
+        status.textContent = "Your action is queued: " + pending.text;
+      } else if (pending?.passed) {
+        status.textContent = "You passed this turn.";
+      } else {
+        status.textContent = "Connected.";
+      }
+    }
+    function renderMessages(messages) {
+      log.innerHTML = "";
+      for (const message of messages.slice(-8)) {
+        const div = document.createElement("div");
+        div.className = "msg";
+        const title = document.createElement("strong");
+        title.textContent = message.title || String(message.role || "Table").toUpperCase();
+        const body = document.createElement("div");
+        body.textContent = message.body || "";
+        div.append(title, body);
+        log.append(div);
+      }
+      if (!log.children.length) {
+        log.textContent = "No story messages yet.";
+      }
+    }
+    function renderTalk(messages) {
+      talkLog.innerHTML = "";
+      for (const message of messages.slice(-10)) {
+        const div = document.createElement("div");
+        div.className = "talk";
+        const title = document.createElement("strong");
+        title.textContent = message.playerName || "Table";
+        const body = document.createElement("div");
+        body.textContent = message.text || "";
+        div.append(title, body);
+        talkLog.append(div);
+      }
+      if (!talkLog.children.length) {
+        talkLog.textContent = "Table Talk is quiet.";
+      }
+    }
+    function renderChoices(messages) {
+      choices.innerHTML = "";
+      const choiceMessage = [...messages].reverse().find((message) => message?.data?.choices?.options?.length);
+      const block = choiceMessage?.data?.choices;
+      if (!block) {
+        return;
+      }
+      const prompt = document.createElement("p");
+      prompt.textContent = block.prompt || "What do you do?";
+      choices.append(prompt);
+      block.options.forEach((option, index) => {
+        const button = document.createElement("button");
+        button.className = "choice";
+        const label = String.fromCharCode(65 + index);
+        button.textContent = label + ". " + (option.text || option.label || "Choice");
+        button.addEventListener("click", () => {
+          send({
+            kind: "guest.choice.vote",
+            code: session?.code || input.value.trim().toUpperCase(),
+            choiceKey: choiceKey(block),
+            optionId: option.id || label,
+            optionLabel: label,
+            optionText: option.text || option.label || "",
+            prompt: block.prompt || "",
+          });
+          status.textContent = "Vote sent.";
+        });
+        choices.append(button);
+      });
+    }
+    function choiceKey(block) {
+      return compactCompareText([
+        block.prompt || "",
+        block.scope || "",
+        block.forActorId || "",
+        (block.options || []).map((option, index) => {
+          const label = String.fromCharCode(65 + index);
+          const id = option.id || label;
+          return id + ":" + (option.text || option.label || "");
+        }).join("|"),
+      ].join("::")).slice(0, 500);
+    }
+    function compactCompareText(value) {
+      return String(value || "")
+        .toLowerCase()
+        .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+        .replace(/\\s+/g, " ")
+        .trim();
+    }
   </script>
 </body>
 </html>`;

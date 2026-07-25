@@ -370,7 +370,10 @@ Current repo state:
 - The public relay guest page can submit a browser `guest.join.request`; relay smoke checks prove the connected host receives that request with a relay guest id.
 - The LoreKeeper host app handles `guest.join.request` by registering the friend into the existing waiting-room flow, so host approval/seating stays local and authoritative.
 - When the host seats that waiting guest, the host app sends a targeted `host.guest.approved` message back through the relay; live relay smoke checks prove the browser guest receives it and moves past waiting.
-- There is no live full guest table page after approval yet; approved guest table snapshots/actions still need relay-to-table bridge work.
+- After approval, the public browser page can render a first-pass guest table with assigned character, scene text, recent story messages, choices, action/pass controls, refresh, and Table Talk.
+- The LoreKeeper host app bridges approved browser guest `guest.snapshot.request`, `guest.action.submit`, `guest.pass`, `guest.choice.vote`, and `guest.tableTalk.post` messages into the existing local guest authority routes, attaching the local connection secret only inside host-local API calls.
+- Live relay-only WebSocket smoke checks prove host connect, guest join request, targeted approval, and guest action forwarding without `sessionKey` leakage from guest-originated messages.
+- Remaining alpha gaps: real Electron-host plus remote-browser two-machine soak, reconnect/disconnect/rejoin polish, expiry/idle UI, Regenerate, browser seat/character draft polish, and no-mutation tests tied directly to actual relay-to-authority handlers.
 
 Host-facing behavior:
 
@@ -386,8 +389,8 @@ Guest-facing behavior:
 
 - Guest opens the public browser page.
 - Guest enters friend code.
-- Guest sees only guest-safe table preview and seat request UI.
-- Guest can submit Table Talk and assigned-character actions after approval.
+- Guest sees only guest-safe table preview and seat request UI before approval.
+- Guest can see a first-pass browser table, submit Table Talk, send assigned-character actions, pass, refresh, and vote on visible choices after approval.
 - Guest sees clear waiting/rejected/disconnected states.
 
 Internal requirements:
