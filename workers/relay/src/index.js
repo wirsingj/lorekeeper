@@ -40,7 +40,8 @@ export default {
       return json({ ok: true, service: "lorekeeper-friend-relay", version: RELAY_VERSION });
     }
     if (!url.pathname.startsWith("/api/")) {
-      return html(renderGuestEntryPage(extractFriendCodeFromUrl(url)));
+      const cspNonce = createCspNonce();
+      return html(renderGuestEntryPage(extractFriendCodeFromUrl(url), cspNonce), { cspNonce });
     }
     if (url.pathname.startsWith("/api/host/connect")) {
       const code = normalizeFriendCode(url.searchParams.get("code") || "");
@@ -334,7 +335,7 @@ function firstBlockedKey(value, { allowSessionKey = false } = {}, depth = 0) {
   return "";
 }
 
-function renderGuestEntryPage(initialCode) {
+function renderGuestEntryPage(initialCode, cspNonce = "") {
   const code = normalizeFriendCode(initialCode);
   return `<!doctype html>
 <html lang="en">
@@ -342,7 +343,7 @@ function renderGuestEntryPage(initialCode) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LoreKeeper Remote Table</title>
-  <style>
+  <style nonce="${escapeHtml(cspNonce)}">
     :root {
       color-scheme: dark;
       --ink: #e8edf0;
@@ -601,7 +602,7 @@ function renderGuestEntryPage(initialCode) {
       </section>
     </section>
   </main>
-  <script>
+  <script nonce="${escapeHtml(cspNonce)}">
     const input = document.querySelector("#code");
     const nameInput = document.querySelector("#name");
     const status = document.querySelector("#status");
@@ -1137,17 +1138,22 @@ function json(value, status = 200) {
   });
 }
 
-function html(value) {
+function html(value, { cspNonce = "" } = {}) {
+  const inlinePolicy = cspNonce ? `'nonce-${cspNonce}'` : "'none'";
   return new Response(value, {
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
-      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "content-security-policy": `default-src 'self'; script-src 'self' ${inlinePolicy}; style-src 'self' ${inlinePolicy}; connect-src 'self' https: wss:; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'`,
       "referrer-policy": "no-referrer",
       "x-content-type-options": "nosniff",
       "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
     },
   });
+}
+
+function createCspNonce() {
+  return crypto.randomUUID().replace(/-/g, "");
 }
 
 function escapeHtml(value) {

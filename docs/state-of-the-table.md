@@ -152,6 +152,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Remote browser guest reconnect UX is improved: host disconnects now produce a visible reconnect cue in the table deck, action buttons disable while disconnected, and browser-side reconnects honestly re-enter the host seating path when the relay assigns a fresh guest identity.
 - Remote browser guest action UX is improved: the Worker page now derives action availability from guest-safe snapshot state so friends see why they are waiting before they click Send.
 - Remote browser guest page hardening is improved: client-side rendering has list/text bounds, and Worker HTML responses now include basic browser security headers.
+- Remote browser guest CSP is tighter: the Worker page now uses per-response script/style nonces instead of `unsafe-inline`, with a live header probe confirming the deployed page sends nonce CSP and no `unsafe-inline`.
 - Host-side remote sharing copy UX is improved: blocked clipboard writes no longer leave the host guessing whether the friend link copied.
 - Host-side remote relay status UX is improved: sharing controls refresh immediately when the relay socket connects, disconnects, or errors, and an active code with no live relay bridge is labeled Needs Reconnect instead of ambiguously On.
 - Remote browser guest entry UX is improved: friends can paste rough codes and use Enter naturally instead of fiddling with exact hyphen/case formatting.

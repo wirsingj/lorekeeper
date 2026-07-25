@@ -166,5 +166,9 @@ assert.match(relaySource, /content-security-policy/, "public guest HTML should s
 assert.match(relaySource, /frame-ancestors 'none'/, "public guest HTML should not be frameable");
 assert.match(relaySource, /x-content-type-options/, "public guest HTML should send nosniff");
 assert.match(relaySource, /permissions-policy/, "public guest HTML should disable unused browser permissions");
+assert.match(relaySource, /function createCspNonce/, "public guest HTML should create a per-response CSP nonce");
+assert.match(relayGuestPageSource, /<style nonce="\$\{escapeHtml\(cspNonce\)\}">/, "public guest inline styles should be nonce-gated");
+assert.match(relayGuestPageSource, /<script nonce="\$\{escapeHtml\(cspNonce\)\}">/, "public guest inline script should be nonce-gated");
+assert.doesNotMatch(relaySource, /unsafe-inline/, "public guest CSP should avoid unsafe-inline");
 
 console.log("LoreKeeper friend relay tests passed.");
