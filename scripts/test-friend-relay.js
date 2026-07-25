@@ -121,6 +121,10 @@ assert.match(relayGuestPageSource, /class="rail right-rail"/, "public guest page
 assert.match(relayGuestPageSource, /class="command-deck"/, "public guest page should keep actions in a bottom command deck");
 assert.match(relayGuestPageSource, /id="party-list"/, "public guest page should render guest-safe party details");
 assert.match(relayGuestPageSource, /id="moment-panel"/, "public guest page should show the current table moment");
+assert.match(relayGuestPageSource, /id="now-cue"/, "public guest page should show a host-app-style Now cue");
+assert.match(relayGuestPageSource, /function tableCues/, "public guest page should derive Now/Next copy from guest-safe state");
+assert.match(relayGuestPageSource, /Now: Your Combat Turn/, "public guest page should make active combat turns obvious");
+assert.match(relayGuestPageSource, /Next: Wait for the host table to resolve your action/, "public guest page should explain queued-action waiting");
 assert.match(relayGuestPageSource, /id="table-notice"/, "public guest page should show seated guests visible connection/action feedback");
 assert.match(relayGuestPageSource, /setTableConnected/, "public guest page should centralize connected/disconnected action button state");
 assert.match(relayGuestPageSource, /updateActionAvailability/, "public guest page should project action availability from guest-safe state");

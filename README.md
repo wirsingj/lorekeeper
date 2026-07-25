@@ -2,7 +2,7 @@
 
 LoreKeeper is a local-first tabletop RPG desktop app for running a D&D-style campaign with a real table flow. The app owns campaign state, combat, continuity, recovery, multiplayer authority, and the shape of play. The AI provider owns narration, NPC behavior, atmosphere, and dialogue inside those app-owned rails.
 
-LoreKeeper is one app that can be experienced as a local host app, provider-backed host app, browser guest mode, and eventual remote guest link through a tunnel or relay. The current same-network `/guest` flow is the proof point: the host owns campaign state and model/provider access, while guests join from a browser and do not need LoreKeeper, Ollama, provider tools, VPN software, or model runtimes.
+LoreKeeper is one app that can be experienced as a local host app, provider-backed host app, browser guest mode, and the current Remote Friend Code alpha through a guest-safe relay. The host owns campaign state and model/provider access, while guests can join from a browser and do not need LoreKeeper, Ollama, provider tools, VPN software, tunnel software, or model runtimes.
 
 The default rules profile is D&D 5e-lite: HP, AC, ability scores, checks, saves, initiative, conditions, abilities, spells, inventory, and combat turns are tracked where the app has enough information. LoreKeeper is not trying to become a full virtual tabletop; it is trying to make a campaign feel durable, coherent, and easy to resume.
 
@@ -27,7 +27,7 @@ The near-term product direction is to make the app feel less like a developer/ad
 
 1. Host starts LoreKeeper and opens or creates a local campaign.
 2. LoreKeeper loads the campaign SQLite file and projects the current table phase.
-3. Players sit down locally or through the same-network guest page.
+3. Players sit down locally, through the same-network guest page, or through the Remote Friend Code alpha.
 4. The host sends a table action, or a guest submits an action for the host/table to resolve.
 5. LoreKeeper builds a bounded DM task from campaign state, table state, and rules.
 6. Local AI or a campaign chat provider generates narration and proposed state updates.
@@ -97,7 +97,7 @@ Build the Windows portable app:
 npm run package:portable
 ```
 
-The portable zip is the full LoreKeeper app. It can host a local table or join another host from the same app. It bundles the Electron/Node runtime used by LoreKeeper, so friends do not need to install Node.js or run npm commands. Ollama and model files remain external installs. Friends should right-click `LoreKeeper.zip`, choose **Extract All...**, then run `LoreKeeper.exe` or `Open LoreKeeper.cmd` from the extracted folder. Running the app from inside the zip preview can produce a Temp-folder launch error because Windows does not extract the adjacent runtime files.
+The portable zip is the full LoreKeeper app. It can host a local table, join another host from the same app, serve LAN browser guests, and share the current Remote Friend Code alpha through the public relay. It bundles the Electron/Node runtime used by LoreKeeper, so friends do not need to install Node.js or run npm commands. Ollama and model files remain external installs for hosts. Browser guests do not install anything. Friends should right-click `LoreKeeper.zip`, choose **Extract All...**, then run `LoreKeeper.exe` or `Open LoreKeeper.cmd` from the extracted folder. Running the app from inside the zip preview can produce a Temp-folder launch error because Windows does not extract the adjacent runtime files.
 
 Check that the current portable app is fresh before a commit or release tag:
 

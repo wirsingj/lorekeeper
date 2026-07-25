@@ -116,7 +116,7 @@ External work required from the human:
 - Remote friend-code guests are browser guests, not app users. Downloadable distro/Steam/Itch solves host distribution; friend code solves guest access.
 - Remote friend-code browser guests must see a LoreKeeper table surface, not a relay/debug form. The public Worker page now uses the app-like Adventure/Party rail, center story stage, Table Talk rail, and bottom command deck while still exposing only guest-safe messages.
 - Remote browser guests must never be stranded in a silent disconnected state. The public Worker page now shows seated/action status in the table deck, changes Sync into Reconnect when the browser socket closes, tells guests when the host needs to click Reconnect Sharing, and guards against stale socket events flipping the current UI state.
-- Remote browser guests should understand the current table moment without learning server rules by rejection. The public Worker page now shows an At The Table/Your Turn/Combat/Action Queued moment panel and disables action/pass while the first snapshot is syncing, while an action is already queued, or while combat belongs to another actor.
+- Remote browser guests should understand the current table moment without learning server rules by rejection. The public Worker page now shows an At The Table/Your Turn/Combat/Action Queued moment panel, mirrors the host app's compact Now/Next cue in the story header, and disables action/pass while the first snapshot is syncing, while an action is already queued, or while combat belongs to another actor.
 - Remote browser guest rendering is now bounded on both sides: guest snapshots are already server-redacted, and the Worker page also clamps rendered story, party, Table Talk, status, and choice text/lists while using text-only DOM writes. The Worker HTML now sends CSP, no-frame, no-referrer, nosniff, and restrictive permissions headers.
 - Remote share copy feedback is clearer for hosts: if automatic clipboard copy fails, the remote browser link/code field is selected and the status says it is selected for manual copy. Regenerating a friend code now reports whether the fresh browser link was copied.
 - Remote relay host status is more immediate: socket open/close/error events repaint Friends And Seats directly so the host sees connected, reconnecting, and error states without waiting for an unrelated render.
@@ -154,7 +154,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Host-side remote sharing copy UX is improved: blocked clipboard writes no longer leave the host guessing whether the friend link copied.
 - Host-side remote relay status UX is improved: sharing controls refresh immediately when the relay socket connects, disconnects, or errors.
 - Remote browser guest entry UX is improved: friends can paste rough codes and use Enter naturally instead of fiddling with exact hyphen/case formatting.
-- Remote browser seated-control UX is improved: common keyboard submission works and choice votes give immediate duplicate-click protection.
+- Remote browser seated-control UX is improved: common keyboard submission works, choice votes give immediate duplicate-click protection, and the story header tells guests what is happening now and what to do next.
 - Remote relay resource hygiene is improved: direct/fresh guest WebSocket attempts no longer sit open when the host is not connected.
 
 ### Remaining Trust Risks

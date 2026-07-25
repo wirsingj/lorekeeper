@@ -19,9 +19,9 @@ This is the durable architecture guide for LoreKeeper. Keep this file and `docs/
 
 ## Product Shape
 
-LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a local model provider or provider-backed table narrator, serve a same-network browser guest page, and eventually support remote browser guests through a tunnel or relay that exposes only guest-safe routes.
+LoreKeeper is a local-first tabletop RPG app. It can host a campaign with a local model provider or provider-backed table narrator, serve a same-network browser guest page, and share the current Remote Friend Code alpha through a relay that exposes only guest-safe messages.
 
-LoreKeeper is one app with multiple access surfaces: local host app, provider-backed host app, table-joining flow inside the app, browser guest mode, future relay-assisted remote guest links, and portable/packaged distribution. The retired Thinclient and standalone join-client concepts should not return as separate products or brands; use LoreKeeper app, Guest mode, Table session, Invite link, Relay, Provider, Local model, and Campaign canon instead.
+LoreKeeper is one app with multiple access surfaces: local host app, provider-backed host app, table-joining flow inside the app, LAN browser guest mode, relay-assisted Remote Friend Code browser links, and portable/packaged distribution. The retired Thinclient and standalone join-client concepts should not return as separate products or brands; use LoreKeeper app, Guest mode, Table session, Invite link, Remote Friend Code, Relay, Provider, Local model, and Campaign canon instead.
 
 The north-star table model is:
 

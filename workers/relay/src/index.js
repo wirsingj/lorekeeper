@@ -458,6 +458,21 @@ function renderGuestEntryPage(initialCode) {
       color: var(--muted);
       font-weight: 750;
     }
+    .status-copy { display: grid; gap: 2px; min-width: 0; }
+    .status-copy strong {
+      color: var(--ink);
+      font-size: .86rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .status-copy span {
+      color: var(--muted);
+      font-size: .76rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--moss); box-shadow: 0 0 14px rgba(142, 198, 165, 0.5); }
     .table-shell[data-connection="disconnected"] .dot { background: var(--red); box-shadow: 0 0 14px rgba(179, 104, 98, 0.5); }
     .table-shell[data-connection="disconnected"] .command-deck { border-color: rgba(179, 104, 98, 0.36); }
@@ -560,7 +575,7 @@ function renderGuestEntryPage(initialCode) {
         <div id="party-list" class="choices"></div>
       </aside>
       <section class="stage">
-        <div class="table-status"><span class="dot"></span><span id="scene">Waiting for the host table.</span></div>
+        <div class="table-status"><span class="dot"></span><div class="status-copy"><strong id="now-cue">Now: Waiting</strong><span id="scene">Next: Waiting for the host table.</span></div></div>
         <div id="log" class="story-log"></div>
       </section>
       <aside class="rail right-rail">
@@ -597,6 +612,7 @@ function renderGuestEntryPage(initialCode) {
     const tableTitle = document.querySelector("#table-title");
     const seat = document.querySelector("#seat");
     const momentPanel = document.querySelector("#moment-panel");
+    const nowCue = document.querySelector("#now-cue");
     const scene = document.querySelector("#scene");
     const log = document.querySelector("#log");
     const talkLog = document.querySelector("#talk-log");
@@ -858,7 +874,9 @@ function renderGuestEntryPage(initialCode) {
       tableTitle.textContent = snapshot.campaignTitle || "LoreKeeper Table";
       const characterName = snapshot.assignedCharacter?.name || session?.characterName || snapshot.connection?.displayName || "Your seat";
       seat.textContent = "You are " + compactText(characterName, 80) + ".";
-      scene.textContent = compactText(snapshot.scene?.immediateSituation || snapshot.tableState?.scene?.immediateSituation || "The table is quiet.", 420);
+      const cues = tableCues(snapshot);
+      nowCue.textContent = compactText(cues.now, 140);
+      scene.textContent = compactText(cues.next, 220);
       renderMoment(snapshot);
       renderParty(snapshot.tableState?.party || snapshot.party || []);
       renderMessages(snapshot.messages || snapshot.tableState?.messages || []);
@@ -900,33 +918,66 @@ function renderGuestEntryPage(initialCode) {
       pass.title = available ? "Pass this turn." : reason;
     }
     function renderMoment(snapshot) {
-      const context = actionContext(snapshot);
-      const pending = snapshot?.pendingInput || snapshot?.tableState?.pendingInput;
-      let title = "Waiting";
-      let detail = "The host table is syncing.";
-      if (pending?.text) {
-        title = "Action Queued";
-        detail = "The host has your action and will resolve it at the table.";
-      } else if (pending?.passed) {
-        title = "Passed";
-        detail = "You passed. Waiting for the host table.";
-      } else if (context.inCombat && context.activeActorId === context.assignedId) {
-        title = "Your Turn";
-        detail = "Choose your combat action, pass, or use Table Talk.";
-      } else if (context.inCombat && context.activeActorId) {
-        title = "Combat";
-        detail = "Waiting for " + (context.activeActorName || "the active combatant") + ".";
-      } else if (snapshot) {
-        title = "At The Table";
-        detail = "Send an action when you are ready, or use Table Talk.";
-      }
+      const cues = tableCues(snapshot);
       momentPanel.replaceChildren();
       const strong = document.createElement("strong");
-      strong.textContent = title;
+      strong.textContent = cues.title;
       const meta = document.createElement("span");
       meta.className = "meta";
-      meta.textContent = compactText(detail, 180);
+      meta.textContent = compactText(cues.detail, 180);
       momentPanel.append(strong, meta);
+    }
+    function tableCues(snapshot) {
+      const context = actionContext(snapshot);
+      const pending = snapshot?.pendingInput || snapshot?.tableState?.pendingInput;
+      const situation = snapshot?.scene?.immediateSituation || snapshot?.tableState?.scene?.immediateSituation || "";
+      if (pending?.text) {
+        return {
+          title: "Action Queued",
+          detail: "The host has your action and will resolve it at the table.",
+          now: "Now: Action Queued",
+          next: "Next: Wait for the host table to resolve your action.",
+        };
+      }
+      if (pending?.passed) {
+        return {
+          title: "Passed",
+          detail: "You passed. Waiting for the host table.",
+          now: "Now: Passed",
+          next: "Next: Wait for the host table.",
+        };
+      }
+      if (context.inCombat && context.activeActorId === context.assignedId) {
+        return {
+          title: "Your Turn",
+          detail: "Choose your combat action, pass, or use Table Talk.",
+          now: "Now: Your Combat Turn",
+          next: "Next: Send an action, vote, or pass.",
+        };
+      }
+      if (context.inCombat && context.activeActorId) {
+        const actor = context.activeActorName || "the active combatant";
+        return {
+          title: "Combat",
+          detail: "Waiting for " + actor + ".",
+          now: "Now: Combat - " + actor,
+          next: "Next: Watch the table or use Table Talk.",
+        };
+      }
+      if (snapshot) {
+        return {
+          title: "At The Table",
+          detail: situation || "Send an action when you are ready, or use Table Talk.",
+          now: "Now: At The Table",
+          next: "Next: Send an action when you are ready, or use Table Talk.",
+        };
+      }
+      return {
+        title: "Waiting",
+        detail: "The host table is syncing.",
+        now: "Now: Waiting",
+        next: "Next: Waiting for the host table.",
+      };
     }
     function actionContext(snapshot) {
       const tableState = snapshot?.tableState || snapshot || {};
