@@ -333,6 +333,20 @@ try {
   assert.equal(adoptedStatus.seated, true);
   assert.equal(adoptedStatus.connection.partyMemberId, activeSeatId);
 
+  const rejectedRelayBaseline = await fetchJson(`${baseUrl}/api/multiplayer/snapshot`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  const rejectedRelayBaselineSignature = JSON.stringify({
+    pendingTurnInputs: rejectedRelayBaseline.pendingTurnInputs ?? [],
+    choiceVotes: rejectedRelayBaseline.choiceVotes ?? [],
+    tableTalk: rejectedRelayBaseline.tableTalk ?? [],
+    connections: (rejectedRelayBaseline.connections ?? []).map((connection) => ({
+      id: connection.id,
+      status: connection.status,
+      partyMemberId: connection.partyMemberId,
+    })),
+  });
+
   const wrongSessionAction = await fetch(`${baseUrl}/api/multiplayer/action`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -349,6 +363,19 @@ try {
   });
   assert.equal(wrongSessionAction.status, 409);
   assert.match(await wrongSessionAction.text(), /session is no longer active/i);
+  const afterWrongSessionAction = await fetchJson(`${baseUrl}/api/multiplayer/snapshot`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  assert.equal(JSON.stringify({
+    pendingTurnInputs: afterWrongSessionAction.pendingTurnInputs ?? [],
+    choiceVotes: afterWrongSessionAction.choiceVotes ?? [],
+    tableTalk: afterWrongSessionAction.tableTalk ?? [],
+    connections: (afterWrongSessionAction.connections ?? []).map((connection) => ({
+      id: connection.id,
+      status: connection.status,
+      partyMemberId: connection.partyMemberId,
+    })),
+  }), rejectedRelayBaselineSignature, "stale relay-shaped guest action must not mutate table state");
 
   const wrongTableVote = await fetch(`${baseUrl}/api/multiplayer/choice-vote`, {
     method: "POST",
@@ -366,6 +393,19 @@ try {
   });
   assert.equal(wrongTableVote.status, 409);
   assert.match(await wrongTableVote.text(), /different table/i);
+  const afterWrongTableVote = await fetchJson(`${baseUrl}/api/multiplayer/snapshot`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  assert.equal(JSON.stringify({
+    pendingTurnInputs: afterWrongTableVote.pendingTurnInputs ?? [],
+    choiceVotes: afterWrongTableVote.choiceVotes ?? [],
+    tableTalk: afterWrongTableVote.tableTalk ?? [],
+    connections: (afterWrongTableVote.connections ?? []).map((connection) => ({
+      id: connection.id,
+      status: connection.status,
+      partyMemberId: connection.partyMemberId,
+    })),
+  }), rejectedRelayBaselineSignature, "stale relay-shaped guest vote must not mutate table state");
 
   const unauthHostCombatJoin = await fetch(`${baseUrl}/api/multiplayer/combat/join`, {
     method: "POST",
