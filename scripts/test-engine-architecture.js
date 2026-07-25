@@ -4633,8 +4633,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appShell, /Open Guest Lobby/);
   assert.match(appShell, /pretable-remote-link/, "create-table draft lobby should expose a remote browser link");
   assert.match(appShell, /pretable-remote-code/, "create-table draft lobby should expose a friend code");
-  assert.match(appShell, /Start Remote Link/, "create-table draft lobby should be able to connect the remote setup link");
-  assert.match(appShell, /Copy Remote Link/, "create-table draft lobby should prioritize remote sharing");
+  assert.match(appShell, /pretable-remote-status/, "create-table draft lobby should explain the setup-stage browser link state");
+  assert.match(appShell, /Open Browser Link/, "create-table draft lobby should be able to connect the remote setup link");
+  assert.match(appShell, /Copy Browser Link/, "create-table draft lobby should prioritize browser sharing");
+  assert.match(appJs, /Browser link is live/, "create-table remote sharing should render visible live status once a link exists");
   assert.match(appShell, /Copy LAN Link/, "create-table draft lobby should keep LAN as a fallback");
   assert.match(appShell, /Copy Browser Link/, "remote sharing should prioritize the browser link over the raw friend code");
   assert.match(appShell, /Copy Friend Code/, "remote sharing should use friend-code language instead of token language");

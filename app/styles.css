@@ -1864,6 +1864,10 @@ button:disabled {
   font-weight: 850;
 }
 
+.pretable-remote-status {
+  color: #d7e4dc;
+}
+
 .pretable-waiting-guests,
 .pretable-waiting-guest {
   color: #c8d2d8;

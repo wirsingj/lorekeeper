@@ -622,6 +622,7 @@ const elements = {
   preTableGuestLink: document.querySelector("#pretable-guest-link"),
   preTableRemoteLink: document.querySelector("#pretable-remote-link"),
   preTableRemoteCode: document.querySelector("#pretable-remote-code"),
+  preTableRemoteStatus: document.querySelector("#pretable-remote-status"),
   startPreTableRemoteSharing: document.querySelector("#start-pretable-remote-sharing"),
   copyPreTableRemoteLink: document.querySelector("#copy-pretable-remote-link"),
   copyPreTableRemoteCode: document.querySelector("#copy-pretable-remote-code"),
@@ -2991,8 +2992,15 @@ function renderPreTableLobby(snapshot = {}) {
   if (elements.preTableRemoteCode) {
     elements.preTableRemoteCode.value = snapshot.remoteFriendCode?.code || "";
   }
+  if (elements.preTableRemoteStatus) {
+    const remote = snapshot.remoteFriendCode;
+    elements.preTableRemoteStatus.textContent = remote?.link
+      ? `Browser link is live. Code ${remote.code} can request setup seats before you start the table.`
+      : "Remote friends can request seats from a browser before you start the table.";
+  }
   if (elements.startPreTableRemoteSharing) {
     elements.startPreTableRemoteSharing.disabled = !snapshot.remoteFriendCodeSession?.internalToken;
+    elements.startPreTableRemoteSharing.textContent = snapshot.remoteFriendCode?.link ? "Refresh Browser Link" : "Open Browser Link";
   }
   if (elements.copyPreTableRemoteLink) {
     elements.copyPreTableRemoteLink.disabled = !snapshot.remoteFriendCode?.link;

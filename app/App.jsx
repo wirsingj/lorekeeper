@@ -574,9 +574,12 @@ function CampaignDialog() {
             </label>
             <div id="pretable-lobby-panel" className="pretable-lobby-panel" hidden>
               <div className="pretable-lobby-heading">
-                <span>Friends Waiting</span>
-                <button id="copy-pretable-remote-link" className="mini-action" type="button">Copy Remote Link</button>
+                <span>Remote Friends</span>
+                <button id="copy-pretable-remote-link" className="mini-action" type="button">Copy Browser Link</button>
               </div>
+              <p id="pretable-remote-status" className="setup-note pretable-remote-status">
+                Remote friends can request seats from a browser before you start the table.
+              </p>
               <label className="field-stack local-table-share">
                 <span>Remote Browser Link</span>
                 <input id="pretable-remote-link" readOnly placeholder="Remote browser link appears here while setup is open." />
@@ -586,7 +589,7 @@ function CampaignDialog() {
                 <input id="pretable-remote-code" readOnly placeholder="Friend code appears here while setup is open." />
               </label>
               <div className="button-stack two-up">
-                <button id="start-pretable-remote-sharing" className="mini-action" type="button">Start Remote Link</button>
+                <button id="start-pretable-remote-sharing" className="mini-action" type="button">Open Browser Link</button>
                 <button id="copy-pretable-remote-code" className="mini-action" type="button">Copy Friend Code</button>
                 <button id="copy-pretable-guest-link" className="mini-action" type="button">Copy LAN Link</button>
               </div>
