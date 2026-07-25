@@ -118,6 +118,7 @@ External work required from the human:
 - Remote browser guests must never be stranded in a silent disconnected state. The public Worker page now shows seated/action status in the table deck, changes Sync into Reconnect when the browser socket closes, tells guests when the host needs to click Reconnect Sharing, and guards against stale socket events flipping the current UI state.
 - Remote browser guests should understand the current table moment without learning server rules by rejection. The public Worker page now shows an At The Table/Your Turn/Combat/Action Queued moment panel and disables action/pass while the first snapshot is syncing, while an action is already queued, or while combat belongs to another actor.
 - Remote browser guest rendering is now bounded on both sides: guest snapshots are already server-redacted, and the Worker page also clamps rendered story, party, Table Talk, status, and choice text/lists while using text-only DOM writes. The Worker HTML now sends CSP, no-frame, no-referrer, nosniff, and restrictive permissions headers.
+- Remote share copy feedback is clearer for hosts: if automatic clipboard copy fails, the remote browser link/code field is selected and the status says it is selected for manual copy. Regenerating a friend code now reports whether the fresh browser link was copied.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
 - AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
@@ -146,6 +147,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Remote browser guest reconnect UX is improved: host disconnects now produce a visible reconnect cue in the table deck, action buttons disable while disconnected, and browser-side reconnects honestly re-enter the host seating path when the relay assigns a fresh guest identity.
 - Remote browser guest action UX is improved: the Worker page now derives action availability from guest-safe snapshot state so friends see why they are waiting before they click Send.
 - Remote browser guest page hardening is improved: client-side rendering has list/text bounds, and Worker HTML responses now include basic browser security headers.
+- Host-side remote sharing copy UX is improved: blocked clipboard writes no longer leave the host guessing whether the friend link copied.
 
 ### Remaining Trust Risks
 

@@ -2901,12 +2901,15 @@ async function copyPreTableRemoteLinkFromUi() {
     setProviderActivity("Remote browser link is not ready yet.", "waiting");
     return false;
   }
-  const copied = await writeClipboardText(link);
-  if (!copied) {
+  const copyResult = await writeClipboardTextWithResult(link);
+  if (!copyResult.copied) {
     selectFieldText(elements.preTableRemoteLink);
   }
-  setProviderActivity(copied ? "Remote browser link copied" : "Remote browser link ready in Create Table.", copied ? "idle" : "waiting");
-  return copied;
+  setProviderActivity(
+    copyResult.copied ? "Remote browser link copied" : "Remote browser link selected for manual copy.",
+    copyResult.copied ? "idle" : "waiting",
+  );
+  return copyResult.copied;
 }
 
 async function copyPreTableRemoteCodeFromUi() {
@@ -2916,12 +2919,15 @@ async function copyPreTableRemoteCodeFromUi() {
     setProviderActivity("Remote friend code is not ready yet.", "waiting");
     return false;
   }
-  const copied = await writeClipboardText(code);
-  if (!copied) {
+  const copyResult = await writeClipboardTextWithResult(code);
+  if (!copyResult.copied) {
     selectFieldText(elements.preTableRemoteCode);
   }
-  setProviderActivity(copied ? "Remote friend code copied" : `Remote friend code: ${code}`, copied ? "idle" : "waiting");
-  return copied;
+  setProviderActivity(
+    copyResult.copied ? "Remote friend code copied" : "Remote friend code selected for manual copy.",
+    copyResult.copied ? "idle" : "waiting",
+  );
+  return copyResult.copied;
 }
 
 function startPreTableLobbyPolling() {
@@ -3343,19 +3349,19 @@ async function startRemoteSharingFromUi() {
     render();
     connectRemoteRelayHost(result.remoteFriendCodeSession || state.campaign?.multiplayer?.remoteFriendCodeSession);
     const link = currentRemoteFriendLink();
-    let copied = false;
+    let copyResult = { copied: false };
     if (link) {
-      copied = await writeClipboardText(link);
-      if (!copied) {
+      copyResult = await writeClipboardTextWithResult(link);
+      if (!copyResult.copied) {
         selectFieldText(elements.remoteFriendLink);
       }
     }
     const statusMessage = link
-      ? copied
+      ? copyResult.copied
         ? "Remote friend link copied"
-        : "Remote friend link ready; copy it from Friends And Seats."
+        : "Remote friend link selected for manual copy."
       : "Remote friend code started";
-    setProviderActivity(statusMessage, copied || !link ? "idle" : "waiting");
+    setProviderActivity(statusMessage, copyResult.copied || !link ? "idle" : "waiting");
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     setProviderActivity(
@@ -3403,15 +3409,20 @@ async function regenerateRemoteSharingFromUi() {
     render();
     const connected = connectRemoteRelayHost(result.remoteFriendCodeSession || state.campaign?.multiplayer?.remoteFriendCodeSession);
     const link = currentRemoteFriendLink();
+    let copyResult = { copied: false };
     if (link) {
-      const copied = await writeClipboardText(link);
-      if (!copied) {
+      copyResult = await writeClipboardTextWithResult(link);
+      if (!copyResult.copied) {
         selectFieldText(elements.remoteFriendLink);
       }
     }
     setProviderActivity(
-      connected ? "Remote friend code regenerated" : "Remote friend code regenerated, but relay did not connect.",
-      connected ? "idle" : "error",
+      connected
+        ? copyResult.copied
+          ? "Remote friend code regenerated and browser link copied"
+          : "Remote friend code regenerated; browser link selected for manual copy."
+        : "Remote friend code regenerated, but relay did not connect.",
+      connected && !copyResult.copied ? "waiting" : connected ? "idle" : "error",
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -3425,11 +3436,14 @@ async function copyRemoteFriendCodeFromUi() {
     setProviderActivity("No remote friend code is active yet.", "waiting");
     return;
   }
-  const copied = await writeClipboardText(code);
-  if (!copied) {
+  const copyResult = await writeClipboardTextWithResult(code);
+  if (!copyResult.copied) {
     selectFieldText(elements.remoteFriendCode);
   }
-  setProviderActivity(copied ? "Remote friend code copied" : `Remote friend code: ${code}`, copied ? "idle" : "waiting");
+  setProviderActivity(
+    copyResult.copied ? "Remote friend code copied" : "Remote friend code selected for manual copy.",
+    copyResult.copied ? "idle" : "waiting",
+  );
 }
 
 async function copyRemoteFriendLinkFromUi() {
@@ -3438,11 +3452,14 @@ async function copyRemoteFriendLinkFromUi() {
     setProviderActivity("No remote friend link is active yet.", "waiting");
     return;
   }
-  const copied = await writeClipboardText(link);
-  if (!copied) {
+  const copyResult = await writeClipboardTextWithResult(link);
+  if (!copyResult.copied) {
     selectFieldText(elements.remoteFriendLink);
   }
-  setProviderActivity(copied ? "Remote friend link copied" : `Remote friend link: ${link}`, copied ? "idle" : "waiting");
+  setProviderActivity(
+    copyResult.copied ? "Remote friend link copied" : "Remote friend link selected for manual copy.",
+    copyResult.copied ? "idle" : "waiting",
+  );
 }
 
 function currentRemoteFriendLink() {
@@ -3916,11 +3933,16 @@ function revealInviteLink() {
 }
 
 async function writeClipboardText(text) {
+  const result = await writeClipboardTextWithResult(text);
+  return result.copied;
+}
+
+async function writeClipboardTextWithResult(text) {
   const result = await writeTextWithFallback(text, {
     desktopWriteText: window.lorekeeperDesktop?.writeClipboardText,
     browserWriteText: navigator.clipboard?.writeText?.bind(navigator.clipboard),
   });
-  return result.copied;
+  return result;
 }
 
 async function setPartyMemberController(member, controllerKind) {
