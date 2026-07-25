@@ -528,7 +528,7 @@ Risks:
 26. Automated UI coverage is now much stronger, including host plus `/guest` browser-tab flows, but it is still a local harness. The real multiplayer target remains a provider-hosting Electron/desktop authority plus one or more guests on `/guest` in a browser or desktop app.
 27. The Playwright harness now has a stable visual-audit screenshot mode for core host, guest, combat, and recovery states, but it remains a local browser harness. Visual QA still needs occasional Electron-host and real LAN guest review to catch shell/window/device details.
 28. Host play still blends party-member table play with software-owner controls in one shell. That is functional for authority, but the UX needs a clearer stance: host-only controls should feel like a tucked-away table-owner surface, while the center surface feels shared with the players and the provider remains the DM voice.
-29. Remote table access has a doctrine doc but not a built-in relay yet. Current `/guest` is LAN-first; future tunnel/relay work must begin from an explicit guest-safe route allowlist and keep provider keys, Ollama/local model endpoints, filesystem/debug routes, and host/admin controls private to the host.
+29. Remote Friend Code has a built-in alpha relay and first-pass browser guest table, but it is not release-calm yet. The remaining risk is live soak and hardening: reconnect/disconnect/rejoin, expiry/idle UI, Regenerate, actual relay-to-authority no-mutation tests, and real off-LAN Electron-host plus browser-guest play.
 
 ## Live Acceptance Matrix
 
@@ -573,7 +573,7 @@ Risks:
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
 15. Simplify app UX toward release quality: split app Settings/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: the front door is now Continue Table, Create New Table, Join Table, plus a compact Settings gear; model setup and Ollama guidance live under Settings > Models, but the table still exposes too many knobs for Steam-ready flow.
 16. Keep the host-surface stance explicit: the host is a party member and software-side table owner, not the DM. Host-only controls should collect setup, invites, provider/model access, party ownership, recovery, and tie-breaking without making the main table feel like a DM console.
-17. Keep LAN guest Share Table useful as the local fallback, but do not let it block the Remote Friend Code MVP. Current state: LAN guest links already use host approval and session-stamped guest requests; multiplayer authority now owns a tested share-session projection with campaign/table/session identity, the LAN `/guest` link, and guest-safe route categories; host snapshots carry that share session, and Friends And Seats renders the boundary for the host. Remaining gap: promote the same authority model into a remote friend-code lifecycle.
+17. Keep LAN guest Share Table useful as the local fallback, but harden the Remote Friend Code lifecycle as the primary off-LAN guest path. Current state: LAN guest links already use host approval and session-stamped guest requests; multiplayer authority owns a tested share-session projection; Remote Friend Code now reuses that authority through a host outbound relay bridge and first-pass browser guest table. Remaining gap: real off-LAN soak, reconnect/disconnect polish, and relay-to-authority no-mutation coverage.
 
 ### Medium
 
