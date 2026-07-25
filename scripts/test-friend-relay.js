@@ -131,6 +131,10 @@ assert.match(relayGuestPageSource, /It is your combat turn/, "public guest page 
 assert.match(relayGuestPageSource, /function actionContext/, "public guest action gating should use guest-safe snapshot context");
 assert.match(relayGuestPageSource, /function compactText/, "public guest page should clamp rendered snapshot text client-side");
 assert.match(relayGuestPageSource, /function safeList/, "public guest page should bound rendered snapshot lists client-side");
+assert.match(relayGuestPageSource, /const normalizeCodeInput/, "public guest page should normalize friend codes while typing");
+assert.match(relayGuestPageSource, /input\.addEventListener\("input"[\s\S]*normalizeCodeInput/, "public guest page should format friend code input immediately");
+assert.match(relayGuestPageSource, /nameInput\.addEventListener\("keydown"[\s\S]*await joinRemoteTable/, "public guest page should submit from the name field with Enter");
+assert.match(relayGuestPageSource, /input\.value\.trim\(\)[\s\S]*nameInput\.focus\(\)/, "direct friend-code links should focus the player's name field");
 assert.match(relayGuestPageSource, /safeList\(block\.options, 6\)/, "public guest page should bound rendered choice options");
 assert.match(relayGuestPageSource, /compactText\(message\.body \|\| "", 1600\)/, "public guest page should bound rendered story text");
 assert.match(relayGuestPageSource, /refresh\.textContent = connected \? "Sync" : "Reconnect"/, "public guest Sync button should become Reconnect when the socket is closed");

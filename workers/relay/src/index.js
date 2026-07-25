@@ -612,6 +612,10 @@ function renderGuestEntryPage(initialCode) {
     let snapshotTimer = null;
     let pendingJoin = null;
     let reconnecting = false;
+    const normalizeCodeInput = (value) => {
+      const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/[OI]/g, "");
+      return compact.length > 4 ? compact.slice(0, 4) + "-" + compact.slice(4, 8) : compact;
+    };
     const setStatus = (text) => {
       const message = compactText(text, 260);
       status.textContent = message;
@@ -740,7 +744,8 @@ function renderGuestEntryPage(initialCode) {
       });
     };
     const joinRemoteTable = async ({ rejoin = false } = {}) => {
-      const code = (session?.code || input.value).trim().toUpperCase();
+      input.value = normalizeCodeInput(session?.code || input.value);
+      const code = input.value.trim().toUpperCase();
       const res = await fetch("/api/session/" + encodeURIComponent(code));
       const body = await res.json();
       if (!body.ok) {
@@ -759,6 +764,26 @@ function renderGuestEntryPage(initialCode) {
     document.querySelector("#join").addEventListener("click", async () => {
       await joinRemoteTable();
     });
+    input.addEventListener("input", () => {
+      input.value = normalizeCodeInput(input.value);
+    });
+    input.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        nameInput.focus();
+      }
+    });
+    nameInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        await joinRemoteTable();
+      }
+    });
+    if (input.value.trim()) {
+      nameInput.focus();
+    } else {
+      input.focus();
+    }
     refresh.addEventListener("click", async () => {
       if (socket?.readyState === WebSocket.OPEN) {
         requestSnapshot();
