@@ -104,6 +104,7 @@ import { contractIssueFromProviderResult, providerResultMeta } from "../app/prov
 import {
   buildRemoteRelayGuestAuthorityPayload,
   buildRemoteRelayGuestSnapshotQuery,
+  buildRemoteRelaySnapshotPayload,
   compactRemoteRelayError,
 } from "../app/remote-relay-controller.js";
 import {
@@ -4386,6 +4387,79 @@ function testRemoteRelayController() {
     /not seated/i,
   );
   assert.equal(compactRemoteRelayError(` ${"x".repeat(500)} `).length, 240);
+
+  const oversizedSnapshot = {
+    campaignTitle: "Remote payload test",
+    campaignSummary: "s".repeat(4000),
+    scene: {
+      immediateSituation: "scene ".repeat(900),
+      hiddenNotes: "should already be redacted upstream, but still bounded here ".repeat(200),
+    },
+    assignedCharacter: {
+      id: "party-approved",
+      name: "Mira",
+      background: "b".repeat(5000),
+      notes: Array.from({ length: 40 }, (_, index) => `note ${index} ${"n".repeat(200)}`),
+    },
+    connection: {
+      id: "conn-approved",
+      displayName: "Mira Player",
+      status: "connected",
+      partyMemberId: "party-approved",
+      connectionSecret: "must-not-ride-snapshot",
+    },
+    party: Array.from({ length: 24 }, (_, index) => ({
+      id: `party-${index}`,
+      name: `Party ${index}`,
+      summary: "party ".repeat(500),
+    })),
+    messages: Array.from({ length: 30 }, (_, index) => ({
+      id: `msg-${index}`,
+      title: "DM",
+      body: `Message ${index} ${"story ".repeat(900)}`,
+      meta: "meta ".repeat(100),
+      blocks: Array.from({ length: 12 }, (_, blockIndex) => ({
+        type: "paragraph",
+        text: `Block ${blockIndex} ${"choice ".repeat(300)}`,
+      })),
+    })),
+    tableTalk: Array.from({ length: 30 }, (_, index) => ({
+      id: `talk-${index}`,
+      playerName: `Player ${index}`,
+      text: "hello ".repeat(500),
+    })),
+    tableState: {
+      revision: "revision-big",
+      party: Array.from({ length: 24 }, (_, index) => ({
+        id: `table-party-${index}`,
+        name: `Table Party ${index}`,
+        summary: "table party ".repeat(500),
+      })),
+      messages: Array.from({ length: 30 }, (_, index) => ({
+        id: `table-msg-${index}`,
+        title: "DM",
+        body: `Table message ${index} ${"story ".repeat(900)}`,
+      })),
+      tableTalk: Array.from({ length: 30 }, (_, index) => ({
+        id: `table-talk-${index}`,
+        playerName: `Talker ${index}`,
+        text: "talk ".repeat(500),
+      })),
+    },
+  };
+  const remoteSnapshot = buildRemoteRelaySnapshotPayload(oversizedSnapshot);
+  const hostMessageBytes = new TextEncoder().encode(JSON.stringify({
+    kind: "host.snapshot",
+    guestId: "guest-approved",
+    reason: "test",
+    snapshot: remoteSnapshot,
+  })).length;
+  assert.ok(hostMessageBytes < 16 * 1024, `remote host.snapshot should stay under relay payload cap, got ${hostMessageBytes}`);
+  assert.equal(remoteSnapshot.messages.length, 3);
+  assert.equal(remoteSnapshot.tableTalk.length, 6);
+  assert.equal(remoteSnapshot.party.length, 6);
+  assert.equal(remoteSnapshot.tableState.messages.length, 0);
+  assert.equal("connectionSecret" in remoteSnapshot.connection, false);
 }
 
 function testReviewPanelProjection() {

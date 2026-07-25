@@ -111,6 +111,7 @@ import { recordDialogConfig, recordLabel, recordNotesValue, recordRoleValue } fr
 import {
   buildRemoteRelayGuestAuthorityPayload,
   buildRemoteRelayGuestSnapshotQuery,
+  buildRemoteRelaySnapshotPayload,
   compactRemoteRelayError,
 } from "./remote-relay-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
@@ -3759,7 +3760,7 @@ async function sendRemoteRelayGuestSnapshot(guestId, { reason = "snapshot", mess
       kind: "host.snapshot",
       guestId,
       reason,
-      snapshot,
+      snapshot: buildRemoteRelaySnapshotPayload(snapshot),
     });
     return true;
   } catch (error) {

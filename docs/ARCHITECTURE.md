@@ -183,6 +183,7 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - The same Worker owns the public browser guest page for the remote alpha. That page should visually behave like a guest-safe LoreKeeper table surface, collect only a compact guest character draft before seating, and remain a thin relay client: render guest-safe snapshots, send allowed guest messages, and avoid host/provider/settings/debug concepts.
 - The host renderer opens an outbound relay WebSocket, registers browser join requests and compact character drafts into the existing local waiting room, returns targeted approvals, and bridges approved browser guest snapshot/action/pass/vote/Table Talk messages into the same host-local authority routes used by LAN guests.
 - `app/remote-relay-controller.js` owns the pure renderer-side policy for turning an approved relay guest entry into a host-local guest authority payload. It must prefer the host-stored approved connection/party/session identity over any browser-supplied identity and must never echo `sessionKey`.
+- Remote relay snapshots must be compacted before crossing the Worker WebSocket. The host app keeps full campaign/story canon locally, while browser guests receive a bounded recent table window small enough for the relay payload cap.
 - The relay must stay a mail slot: no campaign canon ownership, no provider/model calls, no host filesystem/debug/admin access, no provider keys, and no long-term campaign storage.
 
 `ObservabilityTrace`
