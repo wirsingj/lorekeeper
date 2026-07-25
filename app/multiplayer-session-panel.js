@@ -85,8 +85,8 @@ function emptyRemoteFriendCode() {
     expiresAt: "",
     maxGuests: 5,
     idleTimeoutMs: 10 * 60 * 1000,
-    statusDetail: "Remote sharing is off.",
-    safety: "Experimental remote sharing is off. When enabled, browser guests join through a guest-safe relay while provider keys, Ollama, files, diagnostics, and campaign storage stay on this machine.",
+    statusDetail: "Click Start Remote Sharing to create a browser link and friend code.",
+    safety: "Remote browser guests join through a guest-safe relay. Provider keys, Ollama, files, diagnostics, and campaign storage stay on this machine.",
   };
 }
 
@@ -172,11 +172,11 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
   }
   if (elements.remoteFriendCode) {
     elements.remoteFriendCode.value = remoteFriendCode?.code || "";
-    elements.remoteFriendCode.placeholder = active ? "" : "Remote relay is not configured yet.";
+    elements.remoteFriendCode.placeholder = active ? "" : "Friend code appears after Start Remote Sharing.";
   }
   if (elements.remoteFriendLink) {
     elements.remoteFriendLink.value = remoteFriendCode?.link || "";
-    elements.remoteFriendLink.placeholder = active ? "" : "Remote browser link appears here when sharing is active.";
+    elements.remoteFriendLink.placeholder = active ? "" : "Browser link appears after Start Remote Sharing.";
   }
   if (elements.remoteFriendCodeDetail) {
     elements.remoteFriendCodeDetail.textContent = remoteFriendCodeStatusLine(remoteFriendCode);
@@ -237,7 +237,7 @@ function remoteFriendCodeStateLabel({ active = false, status = "off", relayStatu
 }
 
 function remoteFriendCodeStatusLine(remoteFriendCode = {}) {
-  const detail = remoteFriendCode?.statusDetail || "Remote sharing is off.";
+  const detail = remoteFriendCode?.statusDetail || "Click Start Remote Sharing to create a browser link and friend code.";
   if (remoteFriendCode?.status !== "active") {
     return detail;
   }
