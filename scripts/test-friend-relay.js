@@ -23,6 +23,14 @@ assert.equal(parseRelayMessage(JSON.stringify({
   code: "M7SS-7K4P",
   displayName: "Nora",
   preferredPartyMemberId: "lysa",
+  proposedCharacter: {
+    name: "Nora",
+    ancestry: "Human",
+    characterClass: "Ranger",
+    level: 2,
+    roleIntent: "careful scout",
+    backstory: "Tracking the same trouble as the party.",
+  },
 }), guestAllowed).valid, true);
 
 assert.equal(parseRelayMessage(JSON.stringify({
@@ -113,6 +121,11 @@ const relaySource = readFileSync(new URL("../workers/relay/src/index.js", import
 const relayGuestPageSource = relaySource.slice(relaySource.indexOf("function renderGuestEntryPage"));
 assert.match(relaySource, /playable-browser-guest-alpha/, "relay health should identify the playable browser guest alpha build");
 assert.match(relayGuestPageSource, /id="table-panel"/, "public guest page should include a post-approval table panel");
+assert.match(relayGuestPageSource, /class="character-draft"/, "public guest page should collect a character draft before asking to join");
+assert.match(relayGuestPageSource, /id="character-name"/, "public guest page should collect character name");
+assert.match(relayGuestPageSource, /id="character-class"/, "public guest page should collect character class");
+assert.match(relayGuestPageSource, /collectCharacterDraft =/, "public guest page should build a structured character draft");
+assert.match(relayGuestPageSource, /proposedCharacter/, "public guest join requests should carry the character draft through the relay");
 assert.match(relayGuestPageSource, /id="send-action"/, "public guest page should let approved guests send actions");
 assert.match(relayGuestPageSource, /class="table-shell"/, "public guest page should use the LoreKeeper table shell instead of a plain form");
 assert.match(relayGuestPageSource, /class="rail left-rail"/, "public guest page should show a party/adventure rail like the full app");
@@ -159,7 +172,7 @@ assert.match(relayGuestPageSource, /Rejoin request sent\. The host may need to s
 assert.match(relayGuestPageSource, /guest\.snapshot\.request/, "public guest page should request guest-safe snapshots after approval");
 assert.match(relayGuestPageSource, /setInterval\(requestSnapshot, 5000\)/, "public guest page should auto-refresh approved guest snapshots");
 assert.match(relayGuestPageSource, /pendingJoin/, "public guest page should remember a pending join across host relay reconnects");
-assert.match(relayGuestPageSource, /relay\.host\.ready[\s\S]*guest\.join\.request/, "public guest page should resend a pending join when the host reconnects");
+assert.match(relayGuestPageSource, /relay\.host\.ready[\s\S]*joinRequestMessage\(pendingJoin\)/, "public guest page should resend a pending join when the host reconnects");
 assert.match(relayGuestPageSource, /guest\.tableTalk\.post/, "public guest page should send Table Talk through the relay");
 assert.match(relayGuestPageSource, /guest\.disconnect/, "public guest page should notify the host when the browser tab leaves");
 assert.match(relaySource, /relay\.host\.disconnected/, "relay should notify guests when the host socket disconnects");

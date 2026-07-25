@@ -432,6 +432,16 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       font-weight: 950;
     }
     .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .character-draft {
+      border: 1px solid rgba(142, 198, 165, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      background: rgba(18, 30, 25, 0.7);
+    }
+    .character-draft h2 { font-size: 14px; margin: 0; text-transform: uppercase; color: var(--muted); }
+    .character-draft textarea { min-height: 82px; }
     #code { letter-spacing: .08em; text-transform: uppercase; }
     .table-shell {
       min-height: 100vh;
@@ -561,6 +571,17 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         <label>Friend Code<input id="code" value="${escapeHtml(code)}" placeholder="M7SS-7K4P" maxlength="9" /></label>
         <label>Your Name<input id="name" value="" placeholder="Player name" maxlength="40" /></label>
       </div>
+      <div class="character-draft">
+        <h2>Your Character</h2>
+        <div class="grid">
+          <label>Character Name<input id="character-name" value="" placeholder="Rowan" maxlength="80" /></label>
+          <label>Level<input id="character-level" value="1" inputmode="numeric" maxlength="2" /></label>
+          <label>Ancestry<input id="character-ancestry" value="" placeholder="Human, elf, dwarf..." maxlength="80" /></label>
+          <label>Class<input id="character-class" value="" placeholder="Fighter, wizard, rogue..." maxlength="80" /></label>
+        </div>
+        <label>Table Role<input id="character-role" value="" placeholder="Scout, healer, protector, wildcard..." maxlength="160" /></label>
+        <label>Why They Are Here<textarea id="character-backstory" maxlength="900" placeholder="A quick hook the host can use when seating you."></textarea></label>
+      </div>
       <button id="join" class="primary">Ask To Join</button>
       <p id="status">Remote relay is online.</p>
       </div>
@@ -609,6 +630,12 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
   <script nonce="${escapeHtml(cspNonce)}">
     const input = document.querySelector("#code");
     const nameInput = document.querySelector("#name");
+    const characterNameInput = document.querySelector("#character-name");
+    const characterLevelInput = document.querySelector("#character-level");
+    const characterAncestryInput = document.querySelector("#character-ancestry");
+    const characterClassInput = document.querySelector("#character-class");
+    const characterRoleInput = document.querySelector("#character-role");
+    const characterBackstoryInput = document.querySelector("#character-backstory");
     const status = document.querySelector("#status");
     const tableNotice = document.querySelector("#table-notice");
     const join = document.querySelector("#join");
@@ -683,7 +710,21 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       renderChoices([]);
       renderMoment(null);
     };
-    const openGuestSocket = ({ code, displayName, rejoin = false }) => {
+    const collectCharacterDraft = (displayName) => ({
+      name: characterNameInput.value.trim() || displayName,
+      ancestry: characterAncestryInput.value.trim(),
+      characterClass: characterClassInput.value.trim(),
+      level: characterLevelInput.value.trim() || "1",
+      roleIntent: characterRoleInput.value.trim(),
+      backstory: characterBackstoryInput.value.trim(),
+    });
+    const joinRequestMessage = ({ code, displayName, proposedCharacter }) => ({
+      kind: "guest.join.request",
+      code,
+      displayName,
+      proposedCharacter,
+    });
+    const openGuestSocket = ({ code, displayName, proposedCharacter, rejoin = false }) => {
       socket?.close();
       socket = new WebSocket(location.origin.replace(/^http/i, "ws") + "/api/guest/connect?code=" + encodeURIComponent(code));
       const guestSocket = socket;
@@ -696,13 +737,13 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         setTableConnected(true);
         if (rejoin && session) {
           guestSocket.send(JSON.stringify({ kind: "guest.hello", code, displayName }));
-          guestSocket.send(JSON.stringify({ kind: "guest.join.request", code, displayName }));
+          guestSocket.send(JSON.stringify(joinRequestMessage({ code, displayName, proposedCharacter })));
           setStatus("Rejoin request sent. The host may need to seat you again.");
           reconnecting = false;
           return;
         }
         guestSocket.send(JSON.stringify({ kind: "guest.hello", code, displayName }));
-        guestSocket.send(JSON.stringify({ kind: "guest.join.request", code, displayName }));
+        guestSocket.send(JSON.stringify(joinRequestMessage({ code, displayName, proposedCharacter })));
         setStatus("Join request sent. Waiting for the host to seat you.");
       });
       guestSocket.addEventListener("message", (event) => {
@@ -738,7 +779,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
           setStatus("Host is connected. Syncing the table...");
           setTableConnected(true);
           if (!session && pendingJoin) {
-            socket.send(JSON.stringify({ kind: "guest.join.request", code: pendingJoin.code, displayName: pendingJoin.displayName }));
+            socket.send(JSON.stringify(joinRequestMessage(pendingJoin)));
           } else if (session) {
             requestSnapshot();
           }
@@ -782,8 +823,9 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         return;
       }
       const displayName = nameInput.value.trim() || session?.characterName || "Remote Friend";
-      pendingJoin = { code, displayName };
-      openGuestSocket({ code, displayName, rejoin });
+      const proposedCharacter = collectCharacterDraft(displayName);
+      pendingJoin = { code, displayName, proposedCharacter };
+      openGuestSocket({ code, displayName, proposedCharacter, rejoin });
     };
     const checkFriendCodeAvailability = async ({ quiet = false } = {}) => {
       input.value = normalizeCodeInput(input.value);
@@ -825,6 +867,12 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
     });
     nameInput.addEventListener("keydown", async (event) => {
       if (event.key === "Enter") {
+        event.preventDefault();
+        characterNameInput.focus();
+      }
+    });
+    characterBackstoryInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         await joinRemoteTable();
       }
