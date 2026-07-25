@@ -589,7 +589,7 @@ function CampaignDialog() {
                 <input id="pretable-remote-code" readOnly placeholder="Friend code appears here while setup is open." />
               </label>
               <div className="button-stack two-up">
-                <button id="start-pretable-remote-sharing" className="mini-action" type="button">Open Browser Link</button>
+                <button id="start-pretable-remote-sharing" className="mini-action" type="button">Start Remote Sharing</button>
                 <button id="copy-pretable-remote-code" className="mini-action" type="button">Copy Friend Code</button>
                 <button id="copy-pretable-guest-link" className="mini-action" type="button">Copy LAN Link</button>
               </div>

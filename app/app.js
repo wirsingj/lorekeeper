@@ -3000,12 +3000,12 @@ function renderPreTableLobby(snapshot = {}) {
   if (elements.preTableRemoteStatus) {
     const remote = snapshot.remoteFriendCode;
     elements.preTableRemoteStatus.textContent = remote?.link
-      ? `Browser link is live. Code ${remote.code} can request setup seats before you start the table.`
+      ? `Browser link is live. Code ${remote.code} can request setup seats before you start the table. Keep LoreKeeper open; click Reconnect Sharing if a friend sees host-not-connected.`
       : "Remote friends can request seats from a browser before you start the table.";
   }
   if (elements.startPreTableRemoteSharing) {
     elements.startPreTableRemoteSharing.disabled = !snapshot.remoteFriendCodeSession?.internalToken;
-    elements.startPreTableRemoteSharing.textContent = snapshot.remoteFriendCode?.link ? "Refresh Browser Link" : "Open Browser Link";
+    elements.startPreTableRemoteSharing.textContent = snapshot.remoteFriendCode?.link ? "Reconnect Sharing" : "Start Remote Sharing";
   }
   if (elements.copyPreTableRemoteLink) {
     elements.copyPreTableRemoteLink.disabled = !snapshot.remoteFriendCode?.link;
