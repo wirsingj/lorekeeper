@@ -7,6 +7,7 @@ import { buildShareTableSession, guestSafeShareRouteBoundary } from "./share-tab
 export { buildShareTableSession, guestSafeShareRouteBoundary };
 import { buildAggregatedPlayerTurn as buildAggregatedPlayerTurnPure } from "./turn-inputs.js";
 import { addMissingCombatantsToTurnOrder } from "../rules/combat-turns.js";
+import { buildFiveELiteCharacterSeed } from "../rules/character-seed.js";
 import { choiceLabelForIndex, choicePanelKey } from "../engine/choice-vote-identity.js";
 
 // Current local-table authority center.
@@ -470,10 +471,11 @@ export function seatWaitingGuest(campaign, { waitingGuestId, partyMemberId } = {
   if (!isFreshWaitingGuest(waitingGuest)) {
     throw publicMultiplayerError(`${waitingGuest.displayName || "That guest"} is no longer connected to the waiting room. Ask them to click Ask To Join again.`, 409);
   }
-  const member = next.party.find((item) => item.id === partyMemberId);
+  let member = next.party.find((item) => item.id === partyMemberId);
   if (!member) {
     throw new Error("Party member not found.");
   }
+  member = applyWaitingGuestCharacterToSeat(next, member.id, waitingGuest.proposedCharacter, waitingGuest.displayName);
   const playerId = `player-${slugify(waitingGuest.displayName || waitingGuest.clientId || "guest")}-${randomToken(4)}`;
   const connectionId = `conn-${randomToken(10)}`;
   const invite = {
@@ -2388,6 +2390,114 @@ function createPartyMemberFromProposal(proposal = {}, playerName = "", options =
     fallbackControllerKind: controllerKinds.HOST,
     createdAt: nowIso(),
   };
+}
+
+function applyWaitingGuestCharacterToSeat(campaign, partyMemberId, proposedCharacter, playerName = "") {
+  if (!hasCharacterProposal(proposedCharacter)) {
+    return campaign.party.find((member) => member.id === partyMemberId);
+  }
+  const index = campaign.party.findIndex((member) => member.id === partyMemberId);
+  if (index < 0) {
+    return null;
+  }
+
+  const current = campaign.party[index];
+  const normalized = normalizeControllerFields(current);
+  const isFriendDraftSeat =
+    current.inviteIntent === "remote_player" ||
+    normalized.controllerKind === controllerKinds.UNASSIGNED ||
+    /remote invite seat/i.test(String(current.playerRole || ""));
+  if (!isFriendDraftSeat) {
+    return current;
+  }
+
+  const character = normalizeCharacterProposal(proposedCharacter, playerName);
+  const ancestryClass = [character.ancestry, character.characterClass].filter(Boolean).join(" ");
+  const seed = buildFiveELiteCharacterSeed({
+    name: character.name || current.name || playerName || "Guest Character",
+    ancestry: character.ancestry,
+    characterClass: character.characterClass,
+    level: character.level,
+    concept: [character.roleIntent, character.backstory, character.personality, character.goals].filter(Boolean).join(" "),
+  });
+
+  const updated = {
+    ...current,
+    name: character.name || current.name || seed.name,
+    type: current.type || "player_character",
+    playerRole: "Remote player character",
+    ancestryClass: ancestryClass || current.ancestryClass || seed.ancestryClass,
+    level: character.level || current.level || seed.level,
+    experience: current.experience ?? current.xp ?? seed.experience,
+    proficiencyBonus: current.proficiencyBonus ?? current.stats?.proficiencyBonus ?? seed.proficiencyBonus,
+    background: character.backstory || current.background || current.summary || seed.background,
+    appearance: character.appearance || current.appearance || "",
+    dmIntegrationPrompt: character.integrationPrompt || current.dmIntegrationPrompt || "",
+    summary: [
+      ancestryClass || current.ancestryClass || seed.ancestryClass,
+      character.roleIntent,
+      character.personality,
+      character.goals,
+    ].filter(Boolean).join(" - ") || current.summary || seed.summary,
+    stats: mergeSeededCharacterStats(current.stats, seed.stats),
+    speedFt: current.speedFt ?? current.speed ?? current.stats?.speedFt ?? seed.speedFt,
+    resources: nonEmptyValue(current.resources) ?? nonEmptyValue(current.stats?.resources) ?? seed.resources,
+    attacks: nonEmptyValue(current.attacks) ?? nonEmptyValue(current.weapons) ?? seed.attacks,
+    conditions: current.conditions ?? current.stats?.conditions ?? seed.conditions,
+    skills: nonEmptyValue(current.skills) ?? nonEmptyValue(current.proficiencies) ?? seed.skills,
+    abilities: nonEmptyValue(current.abilities) ?? nonEmptyValue(current.features) ?? seed.abilities,
+    spells: nonEmptyValue(current.spells) ?? nonEmptyValue(current.stats?.spells) ?? seed.spells,
+    inventory: nonEmptyValue(current.inventory) ?? nonEmptyValue(current.equipment?.inventory) ?? seed.inventory,
+    equipment: nonEmptyValue(current.equipment) ?? seed.equipment,
+    notes: uniqueList([
+      ...(Array.isArray(current.notes) ? current.notes : current.notes ? [current.notes] : []),
+      "Character draft applied when the host seated this remote player.",
+      character.roleIntent ? `Table role: ${character.roleIntent}` : "",
+      character.integrationPrompt ? `DM integration prompt: ${character.integrationPrompt}` : "",
+    ].filter(Boolean)),
+  };
+
+  campaign.party = campaign.party.map((member) => (member.id === partyMemberId ? updated : member));
+  return updated;
+}
+
+function mergeSeededCharacterStats(currentStats = {}, seedStats = {}) {
+  return {
+    ...seedStats,
+    ...(currentStats ?? {}),
+    hp: {
+      ...(seedStats.hp ?? {}),
+      ...(currentStats?.hp ?? {}),
+    },
+    abilityScores: {
+      ...(seedStats.abilityScores ?? {}),
+      ...(currentStats?.abilityScores ?? {}),
+    },
+    spellSlots: nonEmptyValue(currentStats?.spellSlots) ?? seedStats.spellSlots ?? {},
+    spells: nonEmptyValue(currentStats?.spells) ?? seedStats.spells ?? [],
+  };
+}
+
+function nonEmptyValue(value) {
+  if (Array.isArray(value)) {
+    return value.length ? value : null;
+  }
+  if (value && typeof value === "object") {
+    return Object.keys(value).length ? value : null;
+  }
+  return value ?? null;
+}
+
+function uniqueList(values = []) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const key = String(value).trim().toLowerCase();
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function appendCharacterJoinMessage(campaign, member, connection) {

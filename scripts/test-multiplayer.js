@@ -309,6 +309,60 @@ campaign.multiplayer.waitingGuests = campaign.multiplayer.waitingGuests.map((gue
   guest.id === waitingResult.waitingGuest.id ? { ...guest, status: "closed", closedAt: new Date().toISOString() } : guest
 ));
 
+let friendChairCampaign = startLocalTable({
+  ...testCampaign(),
+  party: [
+    ...testCampaign().party,
+    {
+      id: "friend-chair",
+      name: "Open Chair",
+      type: "player_character",
+      playerRole: "Remote invite seat",
+      controllerKind: controllerKinds.HOST,
+      inviteIntent: "remote_player",
+    },
+  ],
+}, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
+const friendChairWait = registerWaitingGuest(friendChairCampaign, {
+  playerName: "Riven Player",
+  clientId: "friend-chair-client",
+  preferredPartyMemberId: "friend-chair",
+  proposedCharacter: {
+    name: "Riven",
+    ancestry: "Elf",
+    characterClass: "Wizard",
+    level: 3,
+    roleIntent: "careful battlefield controller",
+    backstory: "An academy runaway carrying a borrowed spellbook.",
+    integrationPrompt: "Riven has been following the same arcane trail as the party.",
+  },
+});
+friendChairCampaign = seatWaitingGuest(friendChairWait.campaign, {
+  waitingGuestId: friendChairWait.waitingGuest.id,
+  partyMemberId: "friend-chair",
+});
+const rivenChair = friendChairCampaign.party.find((member) => member.id === "friend-chair");
+assert.equal(rivenChair.name, "Riven");
+assert.equal(rivenChair.playerRole, "Remote player character");
+assert.equal(rivenChair.ancestryClass, "Elf Wizard");
+assert.equal(rivenChair.level, 3);
+assert.equal(rivenChair.controllerKind, controllerKinds.REMOTE_PLAYER);
+assert.equal(rivenChair.proficiencyBonus, 2);
+assert.equal(rivenChair.stats.hp.max, 15);
+assert.equal(rivenChair.stats.armorClass, 12);
+assert.deepEqual(rivenChair.stats.spellSlots, { 1: { max: 4, used: 0 }, 2: { max: 2, used: 0 } });
+assert.ok(rivenChair.spells.some((spell) => spell.name === "Magic Missile"));
+assert.ok(rivenChair.attacks.some((attack) => attack.name === "Dagger"));
+assert.match(rivenChair.background, /academy runaway/);
+assert.match(rivenChair.dmIntegrationPrompt, /arcane trail/);
+assert.ok(rivenChair.notes.some((note) => /Character draft applied/.test(note)));
+const rivenStatus = createWaitingGuestSnapshot(friendChairCampaign, {
+  waitingGuestId: friendChairWait.waitingGuest.id,
+  clientId: "friend-chair-client",
+  waitingSecret: friendChairWait.waitingSecret,
+});
+assert.equal(rivenStatus.snapshot.assignedCharacter.name, "Riven");
+
 const inviteResult = createInviteForPartyMember(campaign, {
   partyMemberId: "kevric",
   host: "192.168.1.24",

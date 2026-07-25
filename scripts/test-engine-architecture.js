@@ -4095,7 +4095,10 @@ function testCharacterSheetController() {
     stats: {
       skills: ["Stealth", "Survival"],
       spells: [{ name: "Hunter's Mark" }],
-      resources: { spellSlots: { 1: { current: 2, max: 2 } } },
+      resources: {
+        spellSlots: { 1: { current: 2, max: 2 } },
+        uses: { favoredFoe: { used: 0, max: 2 } },
+      },
     },
     abilities: ["Favored Enemy"],
     features: ["Natural Explorer"],
@@ -4111,6 +4114,9 @@ function testCharacterSheetController() {
   assert.equal(projection.fields.dex, 16);
   assert.equal(projection.fields.skills, "Stealth\nPerception\nSurvival");
   assert.equal(projection.fields.spells, "Hunter's Mark");
+  assert.equal(projection.fields.spellSlots, "1: 2/2");
+  assert.equal(projection.fields.resources, "favoredFoe: 0/2");
+  assert.equal(projection.fields.attacks, "Longbow");
 
   assert.equal(mergeSheetText("Stealth\nPerception", ["Stealth", "Arcana"]), "Stealth\nPerception\nArcana");
 
@@ -4137,6 +4143,10 @@ function testCharacterSheetController() {
       skills: "Stealth\nSurvival",
       abilities: "Favored Enemy\nNatural Explorer",
       spells: "Hunter's Mark, Cure Wounds",
+      spellSlots: "1: 1/2\n2: 0/1",
+      resources: "favoredFoe: 1/2",
+      attacks: "Longbow +5, 1d8+3, 150/600 ft\nDagger +5, 1d4+3",
+      inventory: "Rope\nTorch",
       notes: "Keeps watch.\nTrusts Mira.",
     },
   });
@@ -4146,8 +4156,10 @@ function testCharacterSheetController() {
   assert.deepEqual(payload.stats.abilityScores, { STR: 9, DEX: 16, CON: 12, WIS: 14, CHA: 10 });
   assert.deepEqual(payload.spells, ["Hunter's Mark", "Cure Wounds"]);
   assert.equal(payload.speedFt, 35);
-  assert.equal(payload.resources, member.stats.resources);
-  assert.equal(payload.attacks, member.attacks);
+  assert.deepEqual(payload.resources.spellSlots, { 1: { used: 1, max: 2 }, 2: { used: 0, max: 1 } });
+  assert.deepEqual(payload.resources.uses, { favoredFoe: { used: 1, max: 2 } });
+  assert.deepEqual(payload.attacks, ["Longbow +5, 1d8+3, 150/600 ft", "Dagger +5, 1d4+3"]);
+  assert.deepEqual(payload.inventory, ["Rope", "Torch"]);
 }
 
 function testMultiplayerSessionProjection() {

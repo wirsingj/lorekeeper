@@ -36,6 +36,10 @@ The user should not feel like they are debugging a model, managing queue machine
 
 Every table surface should answer the same practical questions a real table answers without explanation: where are we, whose attention is needed, who controls this character, what just happened, what can I do now, and what is remembered as true.
 
+Player seating should feel like real chairs at the same table across every moment: table creation, pre-start table, and started play. The host creates/exposes chairs, a guest asks to sit, the host seats them, and that chair is the guest's character identity. Remote Invite seats are drafts until occupied; when the host seats a waiting guest there, the guest's character draft should become the canonical party member sheet. Established host/AI characters are different: seating a guest there means "play this existing character," not "overwrite this character."
+
+Full D&D5E simulator is the product direction, not a completed claim. Current implementation is still 5E-lite: it tracks HP/AC/ability scores/proficiency, skills, abilities, spells, spell slots, class resources, attacks, inventory/equipment, conditions, and combat rails, but it does not yet cover complete 5E character building, spell rules, reactions, concentration, rest economy, leveling, inventory/equipment rules, all conditions, all actions, or rules-source completeness.
+
 ## Project Read
 
 LoreKeeper's goal is unusually strong because it is not "chat with a fantasy bot." It is a digital table: host, guests, party members, DM model, rules, memory, authority, recovery, and table flow all have separate jobs. That distinction is the project's best product insight and should stay protected.
@@ -163,6 +167,8 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Remote browser guest entry UX is improved: friends can paste rough codes and use Enter naturally instead of fiddling with exact hyphen/case formatting.
 - Remote browser seated-control UX is improved: common keyboard submission works, choice votes give immediate duplicate-click protection, and the story header tells guests what is happening now and what to do next.
 - Remote relay resource hygiene is improved: direct/fresh guest WebSocket attempts no longer sit open when the host is not connected.
+- Remote Invite chair seating is more real now: when the host seats a waiting guest into a Remote Invite/unassigned friend chair, the guest's character draft is applied to that party member and seeded with 5E-lite HP, AC, abilities, spells, spell slots, resources, attacks, and inventory. This is covered for active-table waiting-room seating and pre-table Host New adoption.
+- Character sheet editing now exposes the tracked table-use fields that were previously mostly preserved behind the scenes: spell slots, class resources, attacks, and inventory, alongside identity, HP, AC, ability scores, skills, features, spells, and notes.
 
 ### Remaining Trust Risks
 
@@ -542,7 +548,7 @@ Risks:
 12. Rail containment is improved, but long-session scroll behavior still needs a real campaign soak with many party members, notes, and combatants.
 13. Context retrieval now has scene-focus, noisy ranking, thousands-record load fixtures, bounded SQLite query helpers, and bounded play-log rendering; the app still needs to use the query helpers more broadly instead of hydrating whole snapshots everywhere.
 14. Settings still share one dialog component internally, but entry points now behave like separate App Preferences, Model Setup, Friends And Seats, Diagnostics, and DM Recovery surfaces instead of a tabbed control panel. A later visual pass can give each surface more bespoke layout.
-15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request and reserve Remote Invite seats before Create And Start, and the host can seat waiting guests from the draft lobby. Guests cannot yet edit their own character sheet in the shared draft lobby.
+15. Pre-table guest lobby is improved for Host New drafts, but still needs live UX soak: guests can request and reserve Remote Invite seats before Create And Start, the host can seat waiting guests from the draft lobby, and Remote Invite draft characters now adopt into the active campaign sheet on launch. Remaining gap: guests cannot yet keep editing a full character sheet live from the shared draft lobby after the initial request.
 16. Player Notes are campaign-SQLite-backed for local/host continuity, but not yet a proper per-user private/shared notes model for multiplayer devices.
 17. Campaign Notes are populated from campaign records, but extraction/retrieval quality still needs scenario testing to prove the right people, places, things, and threads appear at the right time.
 18. The migration runner exists and blocks unsupported versions, but no historical upgrade steps exist yet because there is only one SQLite schema lineage in the repo.
@@ -764,9 +770,13 @@ Risks:
 - [x] Build shared pre-table lobby for invited players with read-only campaign/party state and editable own character. Current state: `/guest` shows the table preview, open character seats, and an optional character draft card; waiting-room registrations carry the draft through pre-table and active-table seating so the host can see what the guest is bringing.
 - [x] Let Host New Remote Invite slots appear on `/guest` before campaign start and preserve waiting guest requests after Create And Start.
 - [x] Let the host seat waiting guests from Host New before Create And Start.
+- [x] Apply a waiting guest's character draft to the canonical Remote Invite chair when the host seats them, including active-table seating and pre-table adoption into the real table.
+- [x] Expose tracked sheet fields for HP, AC, ability scores, skills, features, spells, spell slots, class resources, attacks, inventory, and notes in the host character sheet editor.
 - [x] Make auto-complete campaign-aware without overriding user facts.
 - [x] Add party-template flow for repeated related companions.
 - [x] Improve class/spell/equipment depth beyond shallow 5E-lite starts.
+- [ ] Let seated/pre-seated guests keep editing their own full character sheet from browser guest mode with host-safe validation and no access to host/admin/provider surfaces.
+- [ ] Expand from current 5E-lite sheet/rules toward a fuller D&D5E simulator: class/subclass features, prepared/known spell rules, rests, leveling, reactions, concentration, movement, inventory/equipment rules, conditions, saves/checks, and rules-complete combat actions.
 
 ### UI Comfort
 

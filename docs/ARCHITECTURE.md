@@ -13,7 +13,7 @@ agent-guidance: Distinguish current implementation, declared intent, transitiona
 
 # LoreKeeper Architecture
 
-Updated: 2026-06-19
+Updated: 2026-07-25
 
 This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers, `docs/REMOTE_TABLE_ACCESS_PLAN.md` is the host/guest remote-access doctrine, and `docs/living-world.md` explains long-term continuity memory.
 
@@ -59,6 +59,7 @@ Domain engine:
 - `src/storage/*` owns campaign file persistence, SQLite import/export, migrations, and review commits.
 - `src/model-contract/*` owns provider response validation, rendering, fixtures, and agency guard rails.
 - `src/multiplayer/*` owns invites, table identity, waiting-room guests, guest snapshots, staged inputs, table talk, and seat assignments.
+- Remote invite seats are character chairs, not just sockets. When a waiting guest is seated into a Remote Invite/unassigned friend chair, multiplayer authority may apply that guest's character draft to the canonical party member and seed the current 5E-lite sheet fields; established AI/host characters should not be overwritten by a draft merely because a guest controls them.
 - `src/observability/*` owns internal trace/log helpers used by diagnostics and automation harnesses. These hooks are hidden/internal, not player-facing UI.
 
 Tests:
@@ -101,6 +102,12 @@ Every multiplayer request should be able to answer:
 - Which table owns this?
 - Which live host session owns this?
 - Which guest/client/seat is authorized to act?
+
+Seat lifecycle invariant:
+
+- Table creation, pre-start table, and started table should use the same chair model: host creates or exposes character chairs, guests request a chair, the host seats them, and the assigned party member becomes the guest's table identity.
+- A pre-table draft reservation is not canon until the real campaign/table exists, but its waiting guest, reserved chair, and character draft must adopt into the active table without losing campaign/table/session authority.
+- A seated guest controls one party member. Guest actions are requests routed through host-local authority, not direct state mutations.
 
 Renderer state is never authority. It can hold selected views, form drafts, local convenience caches, and display projections. Server/domain modules must validate ownership before persistence.
 
@@ -215,7 +222,7 @@ UI projections:
 - `app/message-block-controller.js` owns DM/provider play-message block parsing: prose grouping, mechanics block extraction, parsed choice panels, structured choice override, and latest-choice lookup. `app/app.js` should render the returned blocks, not parse provider text.
 - `app/provider-settings-controller.js` owns model setup projections: provider defaults, campaign-creation model fallback, Ollama status labels, setup hints, model option labels, and model summary chips. `app/app.js` should read/write controls and render projections, not import recommended-model policy directly.
 - `app/campaign-wizard-controller.js` owns New Adventure wizard policy: character/joiner normalization, controller-kind defaults, opening-scene setup copy, and host/remote/AI sheet ownership fields.
-- `app/character-sheet-controller.js` owns character sheet form projection and save-payload policy: HP normalization, ability aliases, skill/ability/spell text merging, resources/attacks preservation, and parsed 5E-lite fields.
+- `app/character-sheet-controller.js` owns character sheet form projection and save-payload policy: HP normalization, ability aliases, skill/ability/spell text merging, spell slots/class resources, attacks, inventory, and parsed 5E-lite fields.
 - `app/renderer-diagnostics-controller.js` owns renderer diagnostics serialization, debug play-log message normalization, session-health projection, readable table timeline projection, and turn-flow timeline wording. `app/app.js` should provide current state/elements and render the returned projections.
 - `app/home-campaign-controller.js` owns front-door saved-adventure projection: backend starter-campaign hiding, saved-adventure count copy, Continue/Delete enablement, selected campaign lookup, and safe delete-target projection.
 - `app/campaign-notebook-controller.js` owns player notebook sections for people, places, things, and quests, including current-place ordering, inventory/assets, related-entity labels, and DM-only story-thread filtering.

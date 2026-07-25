@@ -1,6 +1,7 @@
 export function buildCharacterSheetProjection(member = {}) {
   const hp = normalizeHpForForm(member.stats?.hp ?? member.hp ?? member.hitPoints);
   const scores = characterAbilityScores(member);
+  const resources = member.resources ?? member.stats?.resources ?? {};
   return {
     title: member.name || "Unnamed party member",
     subtitle: [
@@ -29,6 +30,10 @@ export function buildCharacterSheetProjection(member = {}) {
       skills: characterSkills(member).join("\n"),
       abilities: characterAbilities(member).join("\n"),
       spells: uniqueTextList([member.spells, member.stats?.spells]).join("\n"),
+      spellSlots: formatSpellSlots(resources.spellSlots ?? member.stats?.spellSlots),
+      resources: formatResourceUses(resources),
+      attacks: formatNamedEntries(member.attacks ?? member.weapons ?? member.equipment?.weapons),
+      inventory: formatNamedEntries(member.inventory ?? member.equipment?.inventory ?? member.items),
       notes: (member.notes ?? []).join("\n"),
     },
   };
@@ -36,7 +41,16 @@ export function buildCharacterSheetProjection(member = {}) {
 
 export function buildCharacterSheetPayload({ member = {}, autoSheet = null, values = {} } = {}) {
   const preservedResources = autoSheet?.resources ?? member.resources ?? member.stats?.resources ?? {};
+  const editedSpellSlots = parseSpellSlots(values.spellSlots);
+  const editedResourceUses = parseResourceUses(values.resources);
+  const resources = {
+    ...preservedResources,
+    ...(editedResourceUses ? { uses: editedResourceUses } : {}),
+    spellSlots: editedSpellSlots ?? preservedResources.spellSlots ?? member.stats?.spellSlots ?? {},
+  };
   const preservedAttacks = autoSheet?.attacks ?? member.attacks ?? member.weapons ?? member.equipment?.weapons ?? [];
+  const editedAttacks = splitSheetLines(values.attacks);
+  const editedInventory = splitSheetLines(values.inventory);
   const preservedConditions = member.conditions ?? member.stats?.conditions ?? autoSheet?.conditions ?? [];
   return {
     domain: "party",
@@ -53,16 +67,16 @@ export function buildCharacterSheetPayload({ member = {}, autoSheet = null, valu
       hp: buildHpPayload(values),
       armorClass: parseSheetNumber(values.armorClass),
       abilityScores: buildAbilityScorePayload(values),
-      spellSlots: preservedResources.spellSlots ?? member.stats?.spellSlots ?? null,
-      resources: preservedResources,
+      spellSlots: resources.spellSlots ?? null,
+      resources,
       conditions: preservedConditions,
       spells: splitSheetText(values.spells),
     },
     speedFt: autoSheet?.speedFt ?? member.speedFt ?? member.speed ?? member.stats?.speedFt ?? member.stats?.speed ?? null,
-    resources: preservedResources,
-    attacks: preservedAttacks,
+    resources,
+    attacks: editedAttacks.length ? editedAttacks : preservedAttacks,
     conditions: preservedConditions,
-    inventory: member.inventory ?? member.equipment ?? member.items ?? [],
+    inventory: editedInventory.length ? editedInventory : member.inventory ?? member.equipment?.inventory ?? member.equipment ?? member.items ?? [],
     skills: splitSheetText(values.skills),
     abilities: splitSheetText(values.abilities),
     spells: splitSheetText(values.spells),
@@ -185,9 +199,91 @@ function uniqueTextList(values) {
     });
 }
 
+function formatSpellSlots(slots = {}) {
+  if (!slots || typeof slots !== "object" || Array.isArray(slots)) {
+    return "";
+  }
+  return Object.entries(slots)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([level, slot]) => {
+      if (!slot || typeof slot !== "object") {
+        return `${level}: ${slot}`;
+      }
+      const used = slot.used ?? slot.current ?? 0;
+      const max = slot.max ?? "";
+      return max === "" ? `${level}: ${used}` : `${level}: ${used}/${max}`;
+    })
+    .join("\n");
+}
+
+function formatResourceUses(resources = {}) {
+  const uses = resources?.uses && typeof resources.uses === "object" ? resources.uses : {};
+  return Object.entries(uses)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, use]) => {
+      if (!use || typeof use !== "object") {
+        return `${name}: ${use}`;
+      }
+      const used = use.used ?? use.current ?? 0;
+      const max = use.max ?? "";
+      return max === "" ? `${name}: ${used}` : `${name}: ${used}/${max}`;
+    })
+    .join("\n");
+}
+
+function formatNamedEntries(entries) {
+  return uniqueTextList([entries]).join("\n");
+}
+
+function parseSpellSlots(value) {
+  const entries = splitSheetText(value);
+  if (!entries.length) {
+    return null;
+  }
+  const slots = {};
+  for (const entry of entries) {
+    const match = /^(\d+)\s*[:=-]\s*(?:(\d+)\s*\/\s*)?(\d+)$/i.exec(entry);
+    if (!match) {
+      continue;
+    }
+    const level = match[1];
+    slots[level] = {
+      used: Number(match[2] ?? 0),
+      max: Number(match[3]),
+    };
+  }
+  return Object.keys(slots).length ? slots : null;
+}
+
+function parseResourceUses(value) {
+  const entries = splitSheetText(value);
+  if (!entries.length) {
+    return null;
+  }
+  const uses = {};
+  for (const entry of entries) {
+    const match = /^([^:=]+)\s*[:=-]\s*(?:(\d+)\s*\/\s*)?(\d+)$/i.exec(entry);
+    if (!match) {
+      continue;
+    }
+    uses[match[1].trim()] = {
+      used: Number(match[2] ?? 0),
+      max: Number(match[3]),
+    };
+  }
+  return Object.keys(uses).length ? uses : null;
+}
+
 function splitSheetText(value) {
   return String(value || "")
     .split(/[,;\n]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function splitSheetLines(value) {
+  return String(value || "")
+    .split(/\n+/)
     .map((entry) => entry.trim())
     .filter(Boolean);
 }

@@ -421,6 +421,10 @@ const elements = {
   sheetSkills: document.querySelector("#sheet-skills"),
   sheetAbilities: document.querySelector("#sheet-abilities"),
   sheetSpells: document.querySelector("#sheet-spells"),
+  sheetSpellSlots: document.querySelector("#sheet-spell-slots"),
+  sheetResources: document.querySelector("#sheet-resources"),
+  sheetAttacks: document.querySelector("#sheet-attacks"),
+  sheetInventory: document.querySelector("#sheet-inventory"),
   sheetNotes: document.querySelector("#sheet-notes"),
   autoFillCharacterSheet: document.querySelector("#auto-fill-character-sheet"),
   partyRailSection: document.querySelector("#party-rail-section"),
@@ -9368,7 +9372,32 @@ function renderCharacterSheet(member) {
   elements.sheetSkills.value = projection.fields.skills;
   elements.sheetAbilities.value = projection.fields.abilities;
   elements.sheetSpells.value = projection.fields.spells;
+  elements.sheetSpellSlots.value = projection.fields.spellSlots;
+  elements.sheetResources.value = projection.fields.resources;
+  elements.sheetAttacks.value = projection.fields.attacks;
+  elements.sheetInventory.value = projection.fields.inventory;
   elements.sheetNotes.value = projection.fields.notes;
+}
+
+function renderEditableResourceMap(resources = {}) {
+  if (!resources || typeof resources !== "object" || Array.isArray(resources)) {
+    return "";
+  }
+  return Object.entries(resources)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([name, value]) => {
+      if (!value || typeof value !== "object") {
+        return `${name}: ${value}`;
+      }
+      const used = value.used ?? value.current ?? 0;
+      const max = value.max ?? "";
+      return max === "" ? `${name}: ${used}` : `${name}: ${used}/${max}`;
+    })
+    .join("\n");
+}
+
+function renderEditableResourceUses(resources = {}) {
+  return renderEditableResourceMap(resources?.uses ?? {});
 }
 
 function autoFillOpenCharacterSheet() {
@@ -9405,6 +9434,10 @@ function autoFillOpenCharacterSheet() {
   elements.sheetSkills.value = mergeSheetText(elements.sheetSkills.value, sheet.skills);
   elements.sheetAbilities.value = mergeSheetText(elements.sheetAbilities.value, sheet.abilities);
   elements.sheetSpells.value = mergeSheetText(elements.sheetSpells.value, sheet.spells);
+  elements.sheetSpellSlots.value = renderEditableResourceMap(sheet.resources?.spellSlots);
+  elements.sheetResources.value = renderEditableResourceUses(sheet.resources);
+  elements.sheetAttacks.value = mergeSheetText(elements.sheetAttacks.value, sheet.attacks);
+  elements.sheetInventory.value = mergeSheetText(elements.sheetInventory.value, sheet.inventory);
   elements.sheetNotes.value = mergeSheetText(elements.sheetNotes.value, ["Auto-filled with a 5E-lite standard array."]);
   state.activeCharacterSheetAutofill = sheet;
   elements.bridgeStatus.textContent = `${sheet.name} sheet auto-filled; review and save when ready`;
@@ -9431,6 +9464,10 @@ function readCharacterSheetFormValues() {
     skills: elements.sheetSkills.value,
     abilities: elements.sheetAbilities.value,
     spells: elements.sheetSpells.value,
+    spellSlots: elements.sheetSpellSlots.value,
+    resources: elements.sheetResources.value,
+    attacks: elements.sheetAttacks.value,
+    inventory: elements.sheetInventory.value,
     notes: elements.sheetNotes.value,
   };
 }

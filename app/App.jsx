@@ -1116,6 +1116,30 @@ function CharacterSheetDialog() {
           </article>
 
           <article className="sheet-card">
+            <span>Spell Slots / Uses</span>
+            <div className="sheet-two">
+              <label>
+                <span>Spell Slots</span>
+                <textarea id="sheet-spell-slots" rows="4" placeholder="1: 0/2&#10;2: 0/1"></textarea>
+              </label>
+              <label>
+                <span>Class Resources</span>
+                <textarea id="sheet-resources" rows="4" placeholder="wildShape: 0/2&#10;secondWind: 0/1"></textarea>
+              </label>
+            </div>
+          </article>
+
+          <article className="sheet-card">
+            <span>Attacks</span>
+            <textarea id="sheet-attacks" rows="4" placeholder="Longbow +4, 1d8+2, 150/600 ft"></textarea>
+          </article>
+
+          <article className="sheet-card">
+            <span>Inventory</span>
+            <textarea id="sheet-inventory" rows="4" placeholder="Longbow&#10;Quiver of arrows&#10;Explorer's pack"></textarea>
+          </article>
+
+          <article className="sheet-card">
             <span>Notes</span>
             <textarea id="sheet-notes" rows="4"></textarea>
           </article>

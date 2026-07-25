@@ -280,6 +280,14 @@ try {
       playerName: "Ada",
       clientId: "draft-client-after-start",
       preferredPartyMemberId: activeSeatId,
+      proposedCharacter: {
+        name: "Ada",
+        ancestry: "Gnome",
+        characterClass: "Wizard",
+        level: 2,
+        roleIntent: "curious spellwright",
+        backstory: "A local tinkerer who prepared for the expedition before the first scene.",
+      },
     }),
   });
   await fetchJson(`${baseUrl}/api/pretable-lobby/seat`, {
@@ -318,6 +326,12 @@ try {
   assert.equal(adoptedGuest.preferredPartyMemberId, activeSeatId);
   assert.equal(adoptedGuest.status, "seated");
   assert.ok(adoptedGuest.connectionId);
+  const adoptedChair = adoptedLobby.campaign.party.find((member) => member.id === activeSeatId);
+  assert.equal(adoptedChair.name, "Ada");
+  assert.equal(adoptedChair.playerRole, "Remote player character");
+  assert.equal(adoptedChair.ancestryClass, "Gnome Wizard");
+  assert.equal(adoptedChair.stats.spellSlots[1].max, 3);
+  assert.ok(adoptedChair.spells.some((spell) => spell.name === "Magic Missile"));
 
   const adoptedStatus = await fetchJson(`${baseUrl}/api/multiplayer/waiting-room/status?${new URLSearchParams({
     waitingGuestId: draftSeatRequest.waitingGuest.id,
