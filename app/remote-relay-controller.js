@@ -33,6 +33,18 @@ export function assertRemoteRelayMessageMatchesActiveSession({ message = {}, act
   }
 }
 
+export function buildRemoteRelayJoinRequestPayload({ guestId = "", message = {}, activeSession = null } = {}) {
+  const normalizedGuestId = String(guestId || message.guestId || "");
+  assertRemoteRelayMessageMatchesActiveSession({ message, activeSession });
+  return {
+    guestId: normalizedGuestId,
+    displayName: String(message.displayName || "Remote Friend").slice(0, 40),
+    clientId: `relay-${normalizedGuestId}`,
+    preferredPartyMemberId: String(message.preferredPartyMemberId || ""),
+    proposedCharacter: message.proposedCharacter || null,
+  };
+}
+
 export function buildRemoteRelayGuestSnapshotQuery({
   guestId = "",
   entry = {},

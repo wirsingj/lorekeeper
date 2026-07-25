@@ -109,9 +109,9 @@ import {
 import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
 import { recordDialogConfig, recordLabel, recordNotesValue, recordRoleValue } from "./record-dialog-controller.js";
 import {
-  assertRemoteRelayMessageMatchesActiveSession,
   buildRemoteRelayGuestAuthorityPayload,
   buildRemoteRelayGuestSnapshotQuery,
+  buildRemoteRelayJoinRequestPayload,
   buildRemoteRelaySnapshotPayload,
   compactRemoteRelayError,
 } from "./remote-relay-controller.js";
@@ -3587,8 +3587,10 @@ async function handleRemoteGuestJoinRequest(message = {}) {
   if (!guestId) {
     return;
   }
+  let relayJoin = null;
   try {
-    assertRemoteRelayMessageMatchesActiveSession({
+    relayJoin = buildRemoteRelayJoinRequestPayload({
+      guestId,
       message,
       activeSession: state.campaign?.multiplayer?.remoteFriendCodeSession,
     });
@@ -3596,20 +3598,18 @@ async function handleRemoteGuestJoinRequest(message = {}) {
     sendRemoteRelayGuestError(guestId, error, "Ask the host for a fresh code.");
     return;
   }
-  const displayName = String(message.displayName || "Remote Friend").slice(0, 40);
-  const clientId = `relay-${guestId}`;
   try {
     const result = await postJson(apiMultiplayerWaitingRegisterUrl, {
-      playerName: displayName,
-      clientId,
-      preferredPartyMemberId: message.preferredPartyMemberId || "",
-      proposedCharacter: message.proposedCharacter || null,
+      playerName: relayJoin.displayName,
+      clientId: relayJoin.clientId,
+      preferredPartyMemberId: relayJoin.preferredPartyMemberId,
+      proposedCharacter: relayJoin.proposedCharacter,
       ...localTableAuthorityPayload(),
     });
     state.remoteRelayGuests.set(guestId, {
       waitingGuestId: result.waitingGuest?.id || "",
-      clientId,
-      displayName,
+      clientId: relayJoin.clientId,
+      displayName: relayJoin.displayName,
       campaignId: result.waitingGuest?.campaignId || state.campaign?.id || "",
       tableId: result.waitingGuest?.tableId || state.campaign?.multiplayer?.localTable?.tableId || "",
       sessionId: result.waitingGuest?.sessionId || state.campaign?.multiplayer?.localTable?.sessionId || "",
@@ -3619,10 +3619,10 @@ async function handleRemoteGuestJoinRequest(message = {}) {
     sendRemoteHostMessage({
       kind: "host.guest.pending",
       guestId,
-      displayName,
+      displayName: relayJoin.displayName,
       waitingGuestId: result.waitingGuest?.id || "",
     });
-    setProviderActivity(`${displayName} asked to join through Remote Friend Code. Seat them in Friends.`, "waiting");
+    setProviderActivity(`${relayJoin.displayName} asked to join through Remote Friend Code. Seat them in Friends.`, "waiting");
   } catch (error) {
     sendRemoteHostMessage({
       kind: "host.error",

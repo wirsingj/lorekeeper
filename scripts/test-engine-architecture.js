@@ -105,6 +105,7 @@ import {
   assertRemoteRelayMessageMatchesActiveSession,
   buildRemoteRelayGuestAuthorityPayload,
   buildRemoteRelayGuestSnapshotQuery,
+  buildRemoteRelayJoinRequestPayload,
   buildRemoteRelaySnapshotPayload,
   compactRemoteRelayError,
 } from "../app/remote-relay-controller.js";
@@ -4354,6 +4355,29 @@ function testRemoteRelayController() {
     }),
     /fresh code/i,
   );
+  const joinPayload = buildRemoteRelayJoinRequestPayload({
+    guestId: "guest-join",
+    message: {
+      code: "MOSS-7K4P",
+      displayName: "A very long remote player name that should be compacted at the relay boundary",
+      preferredPartyMemberId: "party-rowan",
+      proposedCharacter: { name: "Rowan", characterClass: "Rogue" },
+    },
+    activeSession: { code: "MOSS-7K4P" },
+  });
+  assert.equal(joinPayload.guestId, "guest-join");
+  assert.equal(joinPayload.clientId, "relay-guest-join");
+  assert.equal(joinPayload.displayName.length, 40);
+  assert.equal(joinPayload.preferredPartyMemberId, "party-rowan");
+  assert.equal(joinPayload.proposedCharacter.name, "Rowan");
+  assert.throws(
+    () => buildRemoteRelayJoinRequestPayload({
+      guestId: "guest-join",
+      message: { code: "OLD1-7K4P" },
+      activeSession: { code: "MOSS-7K4P" },
+    }),
+    /fresh code/i,
+  );
   assert.throws(
     () => buildRemoteRelayGuestSnapshotQuery({
       guestId: "guest-approved",
@@ -4555,6 +4579,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
   const rendererDiagnosticsController = await readFile(path.join("app", "renderer-diagnostics-controller.js"), "utf8");
   const partySuggestionController = await readFile(path.join("app", "party-suggestion-controller.js"), "utf8");
   const choiceVoteController = await readFile(path.join("app", "choice-vote-controller.js"), "utf8");
+  const remoteRelayController = await readFile(path.join("app", "remote-relay-controller.js"), "utf8");
   const tableSessionEngine = await readFile(path.join("src", "engine", "table-session-engine.js"), "utf8");
   assert.equal(/function hostCombatInputGate/.test(appJs), false);
   assert.equal(/function renderConnectedGuests/.test(appJs), false);
@@ -4682,6 +4707,7 @@ async function testAppJsNoLongerOwnsExtractedStateMachines() {
 
 async function testNewCampaignPreTableJoinerWiring() {
   const appJs = await readFile(path.join("app", "app.js"), "utf8");
+  const remoteRelayController = await readFile(path.join("app", "remote-relay-controller.js"), "utf8");
   const dmNudgeController = await readFile(path.join("app", "dm-nudge-controller.js"), "utf8");
   const tableActionController = await readFile(path.join("app", "table-action-controller.js"), "utf8");
   const turnRepairController = await readFile(path.join("app", "turn-repair-controller.js"), "utf8");
@@ -5080,9 +5106,9 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(multiplayerSessionPanel, /remoteFriendCodeDetail\.textContent/, "remote friend-code status detail should be rendered as visible panel copy");
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
   assert.match(appJs, /activeSession: state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay browser requests should be pinned to the active friend code before using local authority");
-  assert.match(appJs, /handleRemoteGuestJoinRequest[\s\S]*assertRemoteRelayMessageMatchesActiveSession[\s\S]*apiMultiplayerWaitingRegisterUrl/, "remote relay join requests should verify the active friend code before entering the local waiting room");
-  assert.match(appJs, /proposedCharacter:\s*message\.proposedCharacter \|\| null/, "remote relay join requests should preserve browser character drafts into the local waiting room");
-  assert.match(appJs, /preferredPartyMemberId:\s*message\.preferredPartyMemberId \|\| ""/, "remote relay rejoin requests should preserve preferred seat hints without granting authority");
+  assert.match(appJs, /buildRemoteRelayJoinRequestPayload[\s\S]*apiMultiplayerWaitingRegisterUrl/, "remote relay join requests should be projected by the controller before entering the local waiting room");
+  assert.match(remoteRelayController, /proposedCharacter:\s*message\.proposedCharacter \|\| null/, "remote relay join projection should preserve browser character drafts into the local waiting room");
+  assert.match(remoteRelayController, /preferredPartyMemberId:\s*String\(message\.preferredPartyMemberId \|\| ""\)/, "remote relay rejoin projection should preserve preferred seat hints without granting authority");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
   assert.match(appJs, /kind:\s*"host\.tableTalk"[\s\S]*status:\s*"delivered"/, "host app should explicitly acknowledge delivered remote Table Talk before relying on snapshot polling");
