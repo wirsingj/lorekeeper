@@ -3484,6 +3484,9 @@ function connectRemoteRelayHost(session = {}) {
     if (state.remoteRelaySocket === socket) {
       state.remoteRelaySocket = null;
       state.remoteRelaySessionId = "";
+      if (isActiveRemoteFriendCodeSession(state.campaign?.multiplayer?.remoteFriendCodeSession)) {
+        setProviderActivity("Remote relay disconnected. LoreKeeper will try to reconnect while sharing is still active.", "waiting");
+      }
     }
   });
   socket.addEventListener("error", () => {

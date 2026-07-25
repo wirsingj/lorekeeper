@@ -4890,6 +4890,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay reconnect must use the private local campaign session, not the public host snapshot");
   assert.match(appJs, /remoteRelayReconnectAttemptedAt/, "remote relay reconnect attempts should be throttled");
   assert.match(appJs, /Date\.now\(\) < expiresAt/, "remote relay reconnect should not revive expired friend codes");
+  assert.match(appJs, /Remote relay disconnected\. LoreKeeper will try to reconnect/, "unexpected remote relay socket closes should produce a host-visible reconnect cue");
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
