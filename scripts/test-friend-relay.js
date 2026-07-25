@@ -9,6 +9,7 @@ const guestAllowed = new Set([
   "guest.pass",
   "guest.choice.vote",
   "guest.tableTalk.post",
+  "guest.disconnect",
 ]);
 
 const hostAllowed = new Set([
@@ -50,6 +51,10 @@ assert.equal(parseRelayMessage(JSON.stringify({
 
 assert.equal(parseRelayMessage(JSON.stringify({
   kind: "guest.pass",
+}), guestAllowed, { direction: "guest" }).valid, true);
+
+assert.equal(parseRelayMessage(JSON.stringify({
+  kind: "guest.disconnect",
 }), guestAllowed, { direction: "guest" }).valid, true);
 
 assert.equal(parseRelayMessage(JSON.stringify({
@@ -111,6 +116,8 @@ assert.match(relayGuestPageSource, /id="table-panel"/, "public guest page should
 assert.match(relayGuestPageSource, /id="send-action"/, "public guest page should let approved guests send actions");
 assert.match(relayGuestPageSource, /guest\.snapshot\.request/, "public guest page should request guest-safe snapshots after approval");
 assert.match(relayGuestPageSource, /guest\.tableTalk\.post/, "public guest page should send Table Talk through the relay");
+assert.match(relayGuestPageSource, /guest\.disconnect/, "public guest page should notify the host when the browser tab leaves");
+assert.match(relaySource, /relay\.host\.disconnected/, "relay should notify guests when the host socket disconnects");
 assert.doesNotMatch(relaySource, /sessionKey:\s*message\.sessionKey/, "guest-originated relay messages must not forward session keys");
 assert.doesNotMatch(relayGuestPageSource, /providerSettings|Ollama|diagnostics|sqlite/i, "public guest page should not expose host/provider/debug language");
 

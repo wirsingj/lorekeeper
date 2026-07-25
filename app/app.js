@@ -3468,6 +3468,9 @@ function connectRemoteRelayHost(session = {}) {
     if (message?.kind === "guest.tableTalk.post") {
       handleRemoteRelayGuestTableTalk(message);
     }
+    if (message?.kind === "guest.disconnect") {
+      handleRemoteRelayGuestDisconnect(message);
+    }
     if (message?.kind === "relay.error") {
       setProviderActivity(`Remote relay rejected a message: ${(message.errors || []).join(", ")}`, "error");
     }
@@ -3597,6 +3600,33 @@ async function handleRemoteRelayGuestTableTalk(message = {}) {
     setProviderActivity("Remote table talk sent", "idle");
   } catch (error) {
     sendRemoteRelayGuestError(guestId, error, "Table Talk could not be sent.");
+  }
+}
+
+async function handleRemoteRelayGuestDisconnect(message = {}) {
+  const guestId = String(message.guestId || "");
+  const entry = state.remoteRelayGuests.get(guestId);
+  if (!entry?.connectionId || !entry?.connectionSecret) {
+    state.remoteRelayGuests.delete(guestId);
+    return;
+  }
+  try {
+    const result = await postJson(apiMultiplayerDisconnectUrl, {
+      connectionId: entry.connectionId,
+      clientId: entry.clientId || `relay-${guestId}`,
+      connectionSecret: entry.connectionSecret,
+      campaignId: entry.campaignId || state.campaign?.id || "",
+      tableId: entry.tableId || state.campaign?.multiplayer?.localTable?.tableId || "",
+      sessionId: entry.sessionId || state.campaign?.multiplayer?.localTable?.sessionId || "",
+    });
+    state.remoteRelayGuests.delete(guestId);
+    setCampaignFromPayload(result, "remote_relay_guest_disconnect");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    setProviderActivity(`${entry.displayName || "Remote friend"} disconnected.`, "waiting");
+  } catch (error) {
+    state.remoteRelayGuests.delete(guestId);
+    setProviderActivity(error instanceof Error ? `Remote disconnect cleanup failed: ${error.message}` : "Remote disconnect cleanup failed", "error");
   }
 }
 

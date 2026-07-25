@@ -372,8 +372,9 @@ Current repo state:
 - When the host seats that waiting guest, the host app sends a targeted `host.guest.approved` message back through the relay; live relay smoke checks prove the browser guest receives it and moves past waiting.
 - After approval, the public browser page can render a first-pass guest table with assigned character, scene text, recent story messages, choices, action/pass controls, refresh, and Table Talk.
 - The LoreKeeper host app bridges approved browser guest `guest.snapshot.request`, `guest.action.submit`, `guest.pass`, `guest.choice.vote`, and `guest.tableTalk.post` messages into the existing local guest authority routes, attaching the local connection secret only inside host-local API calls.
-- Live relay-only WebSocket smoke checks prove host connect, guest join request, targeted approval, and guest action forwarding without `sessionKey` leakage from guest-originated messages.
-- Remaining alpha gaps: real Electron-host plus remote-browser two-machine soak, reconnect/disconnect/rejoin polish, expiry/idle UI, Regenerate, browser seat/character draft polish, and no-mutation tests tied directly to actual relay-to-authority handlers.
+- Browser close sends `guest.disconnect` through the relay, and the host app cleans up the local guest connection through the existing local disconnect route.
+- Live relay-only WebSocket smoke checks prove host connect, guest join request, targeted approval, guest action forwarding without `sessionKey` leakage from guest-originated messages, and browser disconnect forwarding.
+- Remaining alpha gaps: real Electron-host plus remote-browser two-machine soak, reconnect/rejoin polish, expiry/idle UI, Regenerate, browser seat/character draft polish, and no-mutation tests tied directly to actual relay-to-authority handlers.
 
 Host-facing behavior:
 

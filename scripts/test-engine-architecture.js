@@ -4790,6 +4790,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
+  assert.match(appJs, /handleRemoteRelayGuestDisconnect/, "host app should clean up local guest authority when a remote browser guest disconnects");
   assert.match(appJs, /sendRemoteRelayGuestSnapshot/, "host app should respond to remote browser guests with guest-safe snapshots");
   assert.match(appJs, /connectionSecret: entry\.connectionSecret/, "remote relay bridge should attach local connection secrets only inside host-local API calls");
   assert.match(appJs, /state\.remoteRelayGuests\.set\(relayEntry\.guestId, relayEntry\)/, "remote relay seating should persist the approved local connection secret back into host relay state");

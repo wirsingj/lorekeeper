@@ -109,8 +109,8 @@ export class TableRelay {
       startedAt: new Date().toISOString(),
     };
     server.addEventListener("message", (event) => this.onHostMessage(event));
-    server.addEventListener("close", () => this.closeHost("host_disconnected"));
-    server.addEventListener("error", () => this.closeHost("host_error"));
+    server.addEventListener("close", () => this.closeHost("host_disconnected", { notifyGuests: true }));
+    server.addEventListener("error", () => this.closeHost("host_error", { notifyGuests: true }));
     this.send(server, { kind: "relay.host.ready", code, guests: this.guestSockets.size });
     this.broadcastGuests({ kind: "relay.host.ready", code });
     return new Response(null, { status: 101, webSocket: client });
@@ -127,8 +127,8 @@ export class TableRelay {
     server.accept();
     this.guestSockets.set(guestId, server);
     server.addEventListener("message", (event) => this.onGuestMessage(guestId, event));
-    server.addEventListener("close", () => this.guestSockets.delete(guestId));
-    server.addEventListener("error", () => this.guestSockets.delete(guestId));
+    server.addEventListener("close", () => this.closeGuest(guestId, "guest_disconnected"));
+    server.addEventListener("error", () => this.closeGuest(guestId, "guest_error"));
     this.send(server, { kind: "relay.guest.ready", code, guestId, hostConnected: Boolean(this.hostSocket) });
     this.sendHost({ kind: "relay.guest.connected", code, guestId });
     return new Response(null, { status: 101, webSocket: client });
@@ -195,7 +195,14 @@ export class TableRelay {
     }
   }
 
-  closeHost(reason) {
+  closeGuest(guestId, reason = "guest_disconnected") {
+    const existed = this.guestSockets.delete(guestId);
+    if (existed) {
+      this.sendHost({ kind: "guest.disconnect", guestId, reason });
+    }
+  }
+
+  closeHost(reason, { notifyGuests = false } = {}) {
     if (this.hostSocket) {
       try {
         this.hostSocket.close(1012, reason);
@@ -204,6 +211,9 @@ export class TableRelay {
       }
     }
     this.hostSocket = null;
+    if (notifyGuests) {
+      this.broadcastGuests({ kind: "relay.host.disconnected", reason });
+    }
   }
 }
 
@@ -471,6 +481,8 @@ function renderGuestEntryPage(initialCode) {
           status.textContent = message.message || "The host could not complete that request.";
         } else if (message?.kind === "relay.host.ready") {
           status.textContent = "Host is connected. Sending request...";
+        } else if (message?.kind === "relay.host.disconnected") {
+          status.textContent = "The host disconnected. Ask for a fresh code or wait for them to reconnect.";
         } else if (message?.kind === "relay.error") {
           status.textContent = "Relay rejected the request. Ask the host for a fresh code.";
         }
@@ -484,6 +496,11 @@ function renderGuestEntryPage(initialCode) {
       });
     });
     refresh.addEventListener("click", requestSnapshot);
+    window.addEventListener("beforeunload", () => {
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ kind: "guest.disconnect", code: session?.code || input.value.trim().toUpperCase() }));
+      }
+    });
     sendAction.addEventListener("click", () => {
       const text = action.value.trim();
       if (!text) {
