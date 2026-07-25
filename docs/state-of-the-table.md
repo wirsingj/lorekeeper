@@ -76,6 +76,8 @@ Target experience:
 
 The relay is shared infrastructure, not the host. Multiple small alpha hosts can use the same public relay doorway, but each host still runs their own full LoreKeeper app locally and owns their own campaign, DM brain, Ollama/provider configuration, and provider keys. Do not embed or obfuscate a shared provider key in the shipped app; obfuscation is not protection. The Cloudflare deploy token is deployment-only and must never ship. The host/table name in remote links is cosmetic; the friend code and internal host token are the real boundary.
 
+Maintained Cloudflare deploy target: `lorekeeper-friend-relay`. A plain `lorekeeper` Worker/Pages app in the Cloudflare dashboard is stale account state from earlier GitHub-link experiments unless it is deliberately repurposed later.
+
 This is the top near-term product question because it solves both pain points at once:
 
 - Discord/GW2/file-size sharing friction goes away for guests.
