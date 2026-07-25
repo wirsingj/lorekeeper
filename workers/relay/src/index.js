@@ -783,6 +783,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       code,
       displayName,
       proposedCharacter,
+      preferredPartyMemberId: session?.partyMemberId || readGuestMemory().session?.partyMemberId || "",
     });
     const openGuestSocket = ({ code, displayName, proposedCharacter, rejoin = false }) => {
       rememberGuestDraft();

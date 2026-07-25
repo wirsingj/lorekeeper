@@ -3592,6 +3592,7 @@ async function handleRemoteGuestJoinRequest(message = {}) {
     const result = await postJson(apiMultiplayerWaitingRegisterUrl, {
       playerName: displayName,
       clientId,
+      preferredPartyMemberId: message.preferredPartyMemberId || "",
       proposedCharacter: message.proposedCharacter || null,
       ...localTableAuthorityPayload(),
     });

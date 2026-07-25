@@ -141,6 +141,7 @@ assert.match(relayGuestPageSource, /id="character-name"/, "public guest page sho
 assert.match(relayGuestPageSource, /id="character-class"/, "public guest page should collect character class");
 assert.match(relayGuestPageSource, /collectCharacterDraft =/, "public guest page should build a structured character draft");
 assert.match(relayGuestPageSource, /proposedCharacter/, "public guest join requests should carry the character draft through the relay");
+assert.match(relayGuestPageSource, /preferredPartyMemberId:\s*session\?\.partyMemberId/, "public guest rejoin requests should carry the last seated character as a preferred seat only");
 assert.match(relayGuestPageSource, /id="send-action"/, "public guest page should let approved guests send actions");
 assert.match(relayGuestPageSource, /class="table-shell"/, "public guest page should use the LoreKeeper table shell instead of a plain form");
 assert.match(relayGuestPageSource, /class="rail left-rail"/, "public guest page should show a party/adventure rail like the full app");

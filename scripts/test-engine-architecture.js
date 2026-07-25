@@ -5069,6 +5069,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
   assert.match(appJs, /activeSession: state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay browser requests should be pinned to the active friend code before using local authority");
   assert.match(appJs, /proposedCharacter:\s*message\.proposedCharacter \|\| null/, "remote relay join requests should preserve browser character drafts into the local waiting room");
+  assert.match(appJs, /preferredPartyMemberId:\s*message\.preferredPartyMemberId \|\| ""/, "remote relay rejoin requests should preserve preferred seat hints without granting authority");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
   assert.match(appJs, /kind:\s*"host\.tableTalk"[\s\S]*status:\s*"delivered"/, "host app should explicitly acknowledge delivered remote Table Talk before relying on snapshot polling");
