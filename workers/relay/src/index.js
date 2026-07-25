@@ -684,9 +684,48 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
     let pendingJoin = null;
     let pendingTableTalk = [];
     let reconnecting = false;
+    const guestMemoryKey = "lorekeeper.remoteGuest.v1";
     const normalizeCodeInput = (value) => {
       const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/[OI]/g, "");
       return compact.length > 4 ? compact.slice(0, 4) + "-" + compact.slice(4, 8) : compact;
+    };
+    const readGuestMemory = () => {
+      try {
+        return JSON.parse(window.localStorage.getItem(guestMemoryKey) || "{}") || {};
+      } catch {
+        return {};
+      }
+    };
+    const writeGuestMemory = (patch) => {
+      try {
+        const next = {
+          ...readGuestMemory(),
+          ...patch,
+          updatedAt: new Date().toISOString(),
+        };
+        window.localStorage.setItem(guestMemoryKey, JSON.stringify(next));
+      } catch {
+        // Browser storage is a convenience only; reconnect still works from the form.
+      }
+    };
+    const rememberGuestDraft = () => {
+      writeGuestMemory({
+        code: normalizeCodeInput(input.value),
+        displayName: nameInput.value.trim(),
+        character: collectCharacterDraft(nameInput.value.trim() || "Remote Friend"),
+      });
+    };
+    const restoreGuestDraft = () => {
+      const memory = readGuestMemory();
+      const character = memory.character || {};
+      if (!input.value.trim() && memory.code) input.value = normalizeCodeInput(memory.code);
+      if (!nameInput.value.trim() && memory.displayName) nameInput.value = String(memory.displayName || "").slice(0, 40);
+      if (!characterNameInput.value.trim() && character.name) characterNameInput.value = String(character.name || "").slice(0, 80);
+      if ((!characterLevelInput.value.trim() || characterLevelInput.value.trim() === "1") && character.level) characterLevelInput.value = String(character.level || "1").slice(0, 2);
+      if (!characterAncestryInput.value.trim() && character.ancestry) characterAncestryInput.value = String(character.ancestry || "").slice(0, 80);
+      if (!characterClassInput.value.trim() && character.characterClass) characterClassInput.value = String(character.characterClass || "").slice(0, 80);
+      if (!characterRoleInput.value.trim() && character.roleIntent) characterRoleInput.value = String(character.roleIntent || "").slice(0, 160);
+      if (!characterBackstoryInput.value.trim() && character.backstory) characterBackstoryInput.value = String(character.backstory || "").slice(0, 900);
     };
     const setStatus = (text) => {
       const message = compactText(text, 260);
@@ -746,6 +785,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       proposedCharacter,
     });
     const openGuestSocket = ({ code, displayName, proposedCharacter, rejoin = false }) => {
+      rememberGuestDraft();
       socket?.close();
       socket = new WebSocket(location.origin.replace(/^http/i, "ws") + "/api/guest/connect?code=" + encodeURIComponent(code));
       const guestSocket = socket;
@@ -781,6 +821,16 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
             partyMemberId: message.partyMemberId || "",
             characterName: message.characterName || "",
           };
+          writeGuestMemory({
+            code,
+            displayName: nameInput.value.trim() || displayName,
+            character: collectCharacterDraft(displayName),
+            session: {
+              code,
+              partyMemberId: session.partyMemberId,
+              characterName: session.characterName,
+            },
+          });
           setTableConnected(true);
           setStatus(message.characterName
             ? "Joined as " + message.characterName + "."
@@ -874,14 +924,18 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       }
     };
     document.querySelector("#join").addEventListener("click", async () => {
+      rememberGuestDraft();
       await joinRemoteTable();
     });
     input.addEventListener("input", () => {
       input.value = normalizeCodeInput(input.value);
+      rememberGuestDraft();
       if (input.value.length === 9) {
         checkFriendCodeAvailability({ quiet: true });
       }
     });
+    [nameInput, characterNameInput, characterLevelInput, characterAncestryInput, characterClassInput, characterRoleInput, characterBackstoryInput]
+      .forEach((field) => field.addEventListener("input", rememberGuestDraft));
     input.addEventListener("keydown", async (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -900,6 +954,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         await joinRemoteTable();
       }
     });
+    restoreGuestDraft();
     if (input.value.trim()) {
       nameInput.focus();
       checkFriendCodeAvailability({ quiet: true });

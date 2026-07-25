@@ -188,6 +188,10 @@ assert.match(relayGuestPageSource, /guest\.snapshot\.request/, "public guest pag
 assert.match(relayGuestPageSource, /setInterval\(requestSnapshot, 5000\)/, "public guest page should auto-refresh approved guest snapshots");
 assert.match(relayGuestPageSource, /pendingJoin/, "public guest page should remember a pending join across host relay reconnects");
 assert.match(relayGuestPageSource, /relay\.host\.ready[\s\S]*joinRequestMessage\(pendingJoin\)/, "public guest page should resend a pending join when the host reconnects");
+assert.match(relayGuestPageSource, /lorekeeper\.remoteGuest\.v1/, "public guest page should persist guest-facing reconnect context locally");
+assert.match(relayGuestPageSource, /function restoreGuestDraft|const restoreGuestDraft =/, "public guest page should restore the player's friend code, name, and character draft after refresh");
+assert.match(relayGuestPageSource, /function rememberGuestDraft|const rememberGuestDraft =/, "public guest page should save guest-facing reconnect context while the form changes");
+assert.doesNotMatch(relayGuestPageSource, /localStorage\.setItem[\s\S]{0,160}sessionKey/, "public guest page should not store local authority session keys in browser storage");
 assert.match(relayGuestPageSource, /guest\.tableTalk\.post/, "public guest page should send Table Talk through the relay");
 assert.match(relayGuestPageSource, /pendingTableTalk/, "public guest page should keep local pending Table Talk echoes");
 assert.match(relayGuestPageSource, /rememberPendingTableTalk\(text\)/, "public guest Table Talk should render immediately after send");
