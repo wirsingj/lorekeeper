@@ -781,11 +781,37 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       pendingJoin = { code, displayName };
       openGuestSocket({ code, displayName, rejoin });
     };
+    const checkFriendCodeAvailability = async ({ quiet = false } = {}) => {
+      input.value = normalizeCodeInput(input.value);
+      const code = input.value.trim().toUpperCase();
+      if (code.length < 9) {
+        if (!quiet) setStatus("Enter the friend code from your host.");
+        return null;
+      }
+      try {
+        const res = await fetch("/api/session/" + encodeURIComponent(code));
+        const body = await res.json();
+        if (!body.ok) {
+          if (!quiet) setStatus("That friend code was not recognized.");
+          return body;
+        }
+        setStatus(body.active
+          ? "Friend code found. Enter your name and ask to join."
+          : "Friend code found, but the host is not connected yet. Ask the host to click Reconnect Sharing.");
+        return body;
+      } catch {
+        if (!quiet) setStatus("Could not check that friend code. Try again in a moment.");
+        return null;
+      }
+    };
     document.querySelector("#join").addEventListener("click", async () => {
       await joinRemoteTable();
     });
     input.addEventListener("input", () => {
       input.value = normalizeCodeInput(input.value);
+      if (input.value.length === 9) {
+        checkFriendCodeAvailability({ quiet: true });
+      }
     });
     input.addEventListener("keydown", async (event) => {
       if (event.key === "Enter") {
@@ -801,6 +827,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
     });
     if (input.value.trim()) {
       nameInput.focus();
+      checkFriendCodeAvailability({ quiet: true });
     } else {
       input.focus();
     }

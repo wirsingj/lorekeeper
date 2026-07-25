@@ -136,6 +136,9 @@ assert.match(relayGuestPageSource, /function actionContext/, "public guest actio
 assert.match(relayGuestPageSource, /function compactText/, "public guest page should clamp rendered snapshot text client-side");
 assert.match(relayGuestPageSource, /function safeList/, "public guest page should bound rendered snapshot lists client-side");
 assert.match(relayGuestPageSource, /const normalizeCodeInput/, "public guest page should normalize friend codes while typing");
+assert.match(relayGuestPageSource, /checkFriendCodeAvailability/, "public guest page should check direct friend-code links before join submit");
+assert.match(relayGuestPageSource, /Friend code found\. Enter your name and ask to join\./, "public guest page should confirm active direct codes");
+assert.match(relayGuestPageSource, /host is not connected yet\. Ask the host to click Reconnect Sharing/, "public guest page should explain inactive direct codes before submit");
 assert.match(relayGuestPageSource, /input\.addEventListener\("input"[\s\S]*normalizeCodeInput/, "public guest page should format friend code input immediately");
 assert.match(relayGuestPageSource, /nameInput\.addEventListener\("keydown"[\s\S]*await joinRemoteTable/, "public guest page should submit from the name field with Enter");
 assert.match(relayGuestPageSource, /input\.value\.trim\(\)[\s\S]*nameInput\.focus\(\)/, "direct friend-code links should focus the player's name field");
