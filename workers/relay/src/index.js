@@ -456,6 +456,8 @@ function renderGuestEntryPage(initialCode) {
       font-weight: 750;
     }
     .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--moss); box-shadow: 0 0 14px rgba(142, 198, 165, 0.5); }
+    .table-shell[data-connection="disconnected"] .dot { background: var(--red); box-shadow: 0 0 14px rgba(179, 104, 98, 0.5); }
+    .table-shell[data-connection="disconnected"] .command-deck { border-color: rgba(179, 104, 98, 0.36); }
     .story-log { padding: 18px; display: grid; align-content: start; gap: 16px; overflow: auto; }
     .msg {
       max-width: 850px;
@@ -595,16 +597,25 @@ function renderGuestEntryPage(initialCode) {
     let latestSnapshot = null;
     let snapshotTimer = null;
     let pendingJoin = null;
+    let reconnecting = false;
     const setStatus = (text) => {
       status.textContent = text;
       tableNotice.textContent = text;
+    };
+    const setTableConnected = (connected) => {
+      tablePanel.dataset.connection = connected ? "connected" : "disconnected";
+      sendAction.disabled = !connected;
+      pass.disabled = !connected;
+      sendTalk.disabled = !connected;
+      refresh.textContent = connected ? "Sync" : "Reconnect";
     };
     const send = (message) => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(message));
         return true;
       }
-      setStatus("Relay connection is closed. Rejoin with a fresh code.");
+      setTableConnected(false);
+      setStatus("Connection paused. Press Reconnect when the host is back.");
       return false;
     };
     const requestSnapshot = () => {
@@ -620,30 +631,38 @@ function renderGuestEntryPage(initialCode) {
       window.clearInterval(snapshotTimer);
       snapshotTimer = null;
     };
-    document.querySelector("#join").addEventListener("click", async () => {
-      const code = input.value.trim().toUpperCase();
-      const res = await fetch("/api/session/" + encodeURIComponent(code));
-      const body = await res.json();
-      if (!body.ok) {
-        setStatus("That friend code was not recognized.");
-        return;
-      }
-      if (!body.active) {
-        setStatus("That code exists, but the host is not connected right now.");
-        return;
-      }
-      const displayName = nameInput.value.trim() || "Remote Friend";
-      pendingJoin = { code, displayName };
+    const showWaitingTable = () => {
+      tablePanel.hidden = false;
+      joinPanel.hidden = true;
+      renderParty([]);
+      renderMessages([]);
+      renderTalk([]);
+      renderChoices([]);
+    };
+    const openGuestSocket = ({ code, displayName, rejoin = false }) => {
       socket?.close();
       socket = new WebSocket(location.origin.replace(/^http/i, "ws") + "/api/guest/connect?code=" + encodeURIComponent(code));
+      const guestSocket = socket;
       join.disabled = true;
-      setStatus("Connecting to the host...");
-      socket.addEventListener("open", () => {
-        socket.send(JSON.stringify({ kind: "guest.hello", code, displayName }));
-        socket.send(JSON.stringify({ kind: "guest.join.request", code, displayName }));
+      reconnecting = Boolean(rejoin);
+      setTableConnected(false);
+      setStatus(rejoin ? "Reconnecting to the host..." : "Connecting to the host...");
+      guestSocket.addEventListener("open", () => {
+        if (socket !== guestSocket) return;
+        setTableConnected(true);
+        if (rejoin && session) {
+          guestSocket.send(JSON.stringify({ kind: "guest.hello", code, displayName }));
+          guestSocket.send(JSON.stringify({ kind: "guest.join.request", code, displayName }));
+          setStatus("Rejoin request sent. The host may need to seat you again.");
+          reconnecting = false;
+          return;
+        }
+        guestSocket.send(JSON.stringify({ kind: "guest.hello", code, displayName }));
+        guestSocket.send(JSON.stringify({ kind: "guest.join.request", code, displayName }));
         setStatus("Join request sent. Waiting for the host to seat you.");
       });
-      socket.addEventListener("message", (event) => {
+      guestSocket.addEventListener("message", (event) => {
+        if (socket !== guestSocket) return;
         let message = null;
         try { message = JSON.parse(event.data); } catch {}
         if (message?.kind === "host.guest.pending") {
@@ -656,44 +675,81 @@ function renderGuestEntryPage(initialCode) {
             partyMemberId: message.partyMemberId || "",
             characterName: message.characterName || "",
           };
+          setTableConnected(true);
           setStatus(message.characterName
             ? "Joined as " + message.characterName + "."
             : "Joined the table.");
-          joinPanel.hidden = true;
-          tablePanel.hidden = false;
+          showWaitingTable();
           seat.textContent = message.characterName ? "Seated as " + message.characterName + "." : "Seated at the table.";
           join.disabled = true;
           requestSnapshot();
           startSnapshotPolling();
         } else if (message?.kind === "host.snapshot") {
           latestSnapshot = message.snapshot || null;
+          setTableConnected(true);
           renderSnapshot(latestSnapshot);
         } else if (message?.kind === "host.error") {
           setStatus(message.message || "The host could not complete that request.");
         } else if (message?.kind === "relay.host.ready") {
-          setStatus("Host is connected. Sending request...");
+          setStatus("Host is connected. Syncing the table...");
+          setTableConnected(true);
           if (!session && pendingJoin) {
             socket.send(JSON.stringify({ kind: "guest.join.request", code: pendingJoin.code, displayName: pendingJoin.displayName }));
           } else if (session) {
             requestSnapshot();
           }
         } else if (message?.kind === "relay.host.disconnected") {
-          setStatus("The host disconnected. Ask for a fresh code or wait for them to reconnect.");
+          setTableConnected(false);
+          setStatus("The host disconnected. Press Reconnect after they start sharing again.");
         } else if (message?.kind === "relay.error") {
           setStatus("Relay rejected the request. Ask the host for a fresh code.");
         }
       });
-      socket.addEventListener("close", () => {
+      guestSocket.addEventListener("close", () => {
+        if (socket !== guestSocket) return;
         join.disabled = false;
         stopSnapshotPolling();
+        reconnecting = false;
+        if (session || reconnecting) {
+          setTableConnected(false);
+          setStatus("Connection paused. Press Reconnect when the host is back.");
+        }
       });
-      socket.addEventListener("error", () => {
+      guestSocket.addEventListener("error", () => {
+        if (socket !== guestSocket) return;
         join.disabled = false;
         stopSnapshotPolling();
-        setStatus("Could not connect to the relay.");
+        setTableConnected(false);
+        setStatus("Could not connect to the relay. Press Reconnect to try again.");
       });
+    };
+    const joinRemoteTable = async ({ rejoin = false } = {}) => {
+      const code = (session?.code || input.value).trim().toUpperCase();
+      const res = await fetch("/api/session/" + encodeURIComponent(code));
+      const body = await res.json();
+      if (!body.ok) {
+        setStatus("That friend code was not recognized.");
+        return;
+      }
+      if (!body.active) {
+        setTableConnected(false);
+        setStatus("That code exists, but the host is not connected right now. Ask the host to click Reconnect Sharing.");
+        return;
+      }
+      const displayName = nameInput.value.trim() || session?.characterName || "Remote Friend";
+      pendingJoin = { code, displayName };
+      openGuestSocket({ code, displayName, rejoin });
+    };
+    document.querySelector("#join").addEventListener("click", async () => {
+      await joinRemoteTable();
     });
-    refresh.addEventListener("click", requestSnapshot);
+    refresh.addEventListener("click", async () => {
+      if (socket?.readyState === WebSocket.OPEN) {
+        requestSnapshot();
+        return;
+      }
+      await joinRemoteTable({ rejoin: Boolean(session) });
+    });
     window.addEventListener("beforeunload", () => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ kind: "guest.disconnect", code: session?.code || input.value.trim().toUpperCase() }));

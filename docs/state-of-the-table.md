@@ -115,6 +115,7 @@ External work required from the human:
 - LoreKeeper is one app with host and guest access surfaces. Thinclient is retired as a separate product concept; do not revive it as user-facing product or brand language.
 - Remote friend-code guests are browser guests, not app users. Downloadable distro/Steam/Itch solves host distribution; friend code solves guest access.
 - Remote friend-code browser guests must see a LoreKeeper table surface, not a relay/debug form. The public Worker page now uses the app-like Adventure/Party rail, center story stage, Table Talk rail, and bottom command deck while still exposing only guest-safe messages.
+- Remote browser guests must never be stranded in a silent disconnected state. The public Worker page now shows seated/action status in the table deck, changes Sync into Reconnect when the browser socket closes, tells guests when the host needs to click Reconnect Sharing, and guards against stale socket events flipping the current UI state.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
 - AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
@@ -140,6 +141,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - The hidden Playwright harness uses temp campaign roots, host plus `/guest` tabs, deterministic provider mocks, remote chaos, and failure artifacts so trust bugs do not pollute real campaign files.
 - Provider schema/example placeholders in structured choices and mechanics are filtered before rendering, so model parroting like "clear action option" or "short roll/check/combat label" cannot become visible table content.
 - The first real remote browser playtest proved the Cloudflare relay path can connect across machines. The public guest page has been upgraded from a bare form to an app-shaped table shell with party, story, Table Talk, choices, and a visible seated-status line.
+- Remote browser guest reconnect UX is improved: host disconnects now produce a visible reconnect cue in the table deck, action buttons disable while disconnected, and browser-side reconnects honestly re-enter the host seating path when the relay assigns a fresh guest identity.
 
 ### Remaining Trust Risks
 

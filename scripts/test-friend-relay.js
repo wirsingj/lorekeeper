@@ -120,6 +120,15 @@ assert.match(relayGuestPageSource, /class="stage"/, "public guest page should ce
 assert.match(relayGuestPageSource, /class="rail right-rail"/, "public guest page should show Table Talk as a right rail on desktop");
 assert.match(relayGuestPageSource, /class="command-deck"/, "public guest page should keep actions in a bottom command deck");
 assert.match(relayGuestPageSource, /id="party-list"/, "public guest page should render guest-safe party details");
+assert.match(relayGuestPageSource, /id="table-notice"/, "public guest page should show seated guests visible connection/action feedback");
+assert.match(relayGuestPageSource, /setTableConnected/, "public guest page should centralize connected/disconnected action button state");
+assert.match(relayGuestPageSource, /refresh\.textContent = connected \? "Sync" : "Reconnect"/, "public guest Sync button should become Reconnect when the socket is closed");
+assert.match(relayGuestPageSource, /Connection paused\. Press Reconnect/, "public guest page should not strand seated guests on socket close");
+assert.match(relayGuestPageSource, /const guestSocket = socket/, "public guest page should pin reconnect handlers to the socket that created them");
+assert.match(relayGuestPageSource, /if \(socket !== guestSocket\) return;/, "public guest stale socket events should not flip the current table state");
+assert.match(relayGuestPageSource, /Ask the host to click Reconnect Sharing/, "public guest page should tell friends what the host needs to do when the code is inactive");
+assert.match(relayGuestPageSource, /showWaitingTable/, "public guest page should render the table shell immediately after host approval");
+assert.match(relayGuestPageSource, /Rejoin request sent\. The host may need to seat you again\./, "public guest page should be honest when a browser reconnect gets a fresh relay identity");
 assert.match(relayGuestPageSource, /guest\.snapshot\.request/, "public guest page should request guest-safe snapshots after approval");
 assert.match(relayGuestPageSource, /setInterval\(requestSnapshot, 5000\)/, "public guest page should auto-refresh approved guest snapshots");
 assert.match(relayGuestPageSource, /pendingJoin/, "public guest page should remember a pending join across host relay reconnects");
