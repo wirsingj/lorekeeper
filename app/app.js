@@ -2078,7 +2078,6 @@ async function runPostTurnRecovery(reason = "unknown") {
   }
   clearResolvedRecoveredInputDraft(`post_turn_${reason}`);
   await repairStalePromptedCombatTurn(`post_turn_${reason}`);
-  await maybeAutoResolveEnemyCombatTurn();
   await maybeAutoResolveCombatRemoteInputs();
 }
 

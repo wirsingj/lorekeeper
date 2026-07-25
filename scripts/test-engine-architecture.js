@@ -4878,6 +4878,12 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /buildTableTalkProjection/, "table talk rendering should use the tested freshness projection");
   assert.doesNotMatch(appJs, /snapshotTalk\.length > campaignTalk\.length/, "table talk source freshness should not live as inline renderer branching");
   assert.match(appJs, /activeAfterCommit[\s\S]*activeAfterCommit !== current\.id/, "enemy auto-turns should only be marked handled after initiative leaves that enemy");
+  const postTurnRecoverySource = appJs.slice(
+    appJs.indexOf("async function runPostTurnRecovery"),
+    appJs.indexOf("async function repairStalePromptedCombatTurn"),
+  );
+  assert.doesNotMatch(postTurnRecoverySource, /maybeAutoResolveEnemyCombatTurn/, "polling/post-turn recovery must not auto-advance enemy turns on a heartbeat");
+  assert.match(appJs, /function schedulePostImportAutomation[\s\S]*maybeAutoResolveEnemyCombatTurn/, "enemy auto-turn resolution should only run from the explicit post-import automation path");
   assert.doesNotMatch(appJs, /Player character: \$\{formatCharacterBasics\(character\)\}/);
   assert.match(appJs, /wizardControllerSheetFields/);
   assert.match(campaignWizardController, /function wizardControllerSheetFields/, "wizard controller sheet defaults should live outside renderer");
