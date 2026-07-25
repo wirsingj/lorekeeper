@@ -13,7 +13,7 @@ agent-guidance: Preserve human product decisions. Verify implementation claims. 
 
 # LoreKeeper State Of The Table
 
-Updated: 2026-07-04
+Updated: 2026-07-25
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
 
@@ -59,13 +59,59 @@ LoreKeeper should feel like a focused tabletop app, not a utilities dashboard.
 - Settings should become two calmer surfaces: app preferences before play, and table settings while hosting.
 - Every screen should show the next likely action and hide controls that are not relevant to the current phase.
 - Guest flow should prefer one plain LAN link with a table list and seat requests; direct deep links can remain optional power-user shortcuts.
-- Remote guest flow should eventually be one Discord/browser link through a guest-safe tunnel or relay. The host may suffer through setup; guests should not install LoreKeeper, Ollama, provider tools, VPN software, or model runtimes.
+- Remote guest flow should become a browser-only friend-code flow through a guest-safe relay. The host may suffer through setup; guests should not install LoreKeeper, Ollama, provider tools, VPN software, model runtimes, or a tunneling sidecar.
+
+## Biggest Current Concern: Browser Friend Code
+
+The highest product concern is no longer "where do we host the portable zip?" for friends. The real unlock is remote guest access where a friend does not download anything.
+
+Target experience:
+
+- Host runs LoreKeeper locally.
+- Host owns campaign state, provider keys, Ollama/local model access, and table authority.
+- Host clicks Share Remote Table.
+- LoreKeeper creates a short friend code such as `MOSS-7K4P` and/or a browser link.
+- Guest opens a public browser page, enters the friend code, requests a seat, and waits for host approval.
+- Guest never installs LoreKeeper, Ollama, Node, Steam, Tailscale, Hamachi, a VPN, a tunnel client, or a model runtime.
+
+The relay is shared infrastructure, not the host. Multiple small alpha hosts can use the same public relay doorway, but each host still runs their own full LoreKeeper app locally and owns their own campaign, DM brain, Ollama/provider configuration, and provider keys. Do not embed or obfuscate a shared provider key in the shipped app; obfuscation is not protection. The Cloudflare deploy token is deployment-only and must never ship. The host/table name in remote links is cosmetic; the friend code and internal host token are the real boundary.
+
+This is the top near-term product question because it solves both pain points at once:
+
+- Discord/GW2/file-size sharing friction goes away for guests.
+- Remote players can join the host's table without being on the same LAN.
+
+Free/near-free alpha constraint:
+
+- Assume at most 5 guests per table and tiny early usage.
+- Keep the relay dumb and cheap: small JSON messages, guest-safe snapshots, seat requests, Table Talk, staged actions, pass/vote/disconnect/rejoin events.
+- Keep heavy work local: Ollama, provider calls, campaign SQLite, files, diagnostics, model settings, and host/admin controls never go through the guest relay.
+- Add hard limits from day one: short-lived codes, idle timeout, max session duration, max payload size, max guests, no file upload, no raw database/state dumps.
+
+Internal work required:
+
+1. Define a `FriendCodeSession`/remote share model that maps short human codes to unguessable internal tokens and live host sessions.
+2. Split remote guest transport from LAN guest routing while reusing the same guest-safe table/session authority.
+3. Build a host outbound relay client so the host makes the internet-facing connection; guests never reach the LAN server directly.
+4. Add a public guest web entry that can load without the full desktop app and can join by friend code.
+5. Enforce a remote route/message allowlist: guest preview, seat request, approved character action, pass/vote, Table Talk, disconnect/rejoin, and snapshot updates only.
+6. Add abuse/limit rails: code expiry, revoke/stop sharing, idle timeout, payload limit, max guests, session heartbeat, and rejected-action no-mutation tests.
+7. Add UI under Friends And Seats: Local LAN Link, Remote Friend Code, Copy Code, Copy Link, Regenerate, Stop Sharing, waiting guests, and clear "experimental remote sharing" status.
+
+External work required from the human:
+
+1. Choose a relay host/provider for the alpha. Current likely default: Cloudflare Worker/Durable Object style relay because the guest UX is browser-native and tiny usage should fit free/near-free limits better than heavier AWS machinery.
+2. Choose a public domain/subdomain for the guest page, for example `play.lorekeeper.app` or a temporary Cloudflare-provided route.
+3. Create/configure the provider account and keep any relay deploy credentials out of the repo.
+4. Decide whether alpha remote sharing is private-only, invite-only, or visible in the app with an "experimental" label.
+5. Accept that "free for everyone forever" is not a promise; design for free/near-free friend testing first, with quotas and a paid escape hatch later if public use grows.
 
 ### Current Product Decisions
 
 - Side rails may stay open by default. The center story log should dominate, but the table does not need every inch of horizontal space; Party, Notebook, and Table Talk can remain visible when they are calm, useful, and resizable.
 - Guest `/guest` flow should require host approval for requested seats for now. Future trust can remember a returning person/account/IP for a prior seat, but the near-term product should be explicit and safe.
 - LoreKeeper is one app with host and guest access surfaces. Thinclient is retired as a separate product concept; do not revive it as user-facing product or brand language.
+- Remote friend-code guests are browser guests, not app users. Downloadable distro/Steam/Itch solves host distribution; friend code solves guest access.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
 - AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
@@ -89,6 +135,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Common combat resolution owns active actor, initiative, legal options, action economy, and enemy-turn advancement enough to reject provider phrasing that would skip or resolve the wrong actor.
 - Campaign delete is visible from the front door and recycles local SQLite files instead of exposing undeletable backend placeholder campaigns.
 - The hidden Playwright harness uses temp campaign roots, host plus `/guest` tabs, deterministic provider mocks, remote chaos, and failure artifacts so trust bugs do not pollute real campaign files.
+- Provider schema/example placeholders in structured choices and mechanics are filtered before rendering, so model parroting like "clear action option" or "short roll/check/combat label" cannot become visible table content.
 
 ### Remaining Trust Risks
 
@@ -506,11 +553,12 @@ Risks:
 
 ### Critical
 
-1. Continue making common combat action resolution app-owned before provider narration: broader action validation, richer damage/healing/effects, out-of-turn reactions, concentration saves, complex movement, and edge-case initiative handling.
-2. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules.
-3. Continue long-campaign scaling: play-log rendering and core SQLite query helpers are bounded, but more live paths still need to stop hydrating whole snapshots as campaigns age.
-4. Keep future changes out of `app/app.js` and `scripts/serve.js` unless they are glue; extract policy/authority decisions into tested modules first.
-5. Continue strengthening living-world capture after scene endings: consequences, relationship shifts, faction memory, and location scars now have app-owned storage helpers, but meaningful post-scene capture still needs provider soak and eventual app-side summarization.
+1. Build the browser-only Remote Friend Code MVP. This is now the next product step because solo testing cannot prove the table experience, Discord/GW2 file sharing is friction, and guests should join from a browser without installing anything. Keep scope tight: friend code, public guest page, host outbound relay connection, host approval, guest-safe message allowlist, short-lived sessions, and no provider/Ollama/filesystem/admin exposure. Current state: `src/multiplayer/friend-code-session.js` defines tested friend-code/session primitives, internal-token separation, expiry/stop state, public projection, limits, and guest-safe relay message validation; host snapshots and Friends And Seats projections can expose a public Remote Friend Code view without leaking the internal token; the visible Friends UI has a disabled Remote Friend Code panel until a relay provider is connected.
+2. Continue making common combat action resolution app-owned before provider narration when it directly supports multiplayer trust: broader action validation, richer damage/healing/effects, out-of-turn reactions, concentration saves, complex movement, and edge-case initiative handling.
+3. Continue moving recovery decisions out of `app/app.js` into TurnFlow, ProviderOrchestrator, CombatEngine, and multiplayer domain modules, especially where remote guest actions or relay messages could otherwise bypass table authority.
+4. Continue long-campaign scaling: play-log rendering and core SQLite query helpers are bounded, but more live paths still need to stop hydrating whole snapshots as campaigns age.
+5. Keep future changes out of `app/app.js` and `scripts/serve.js` unless they are glue; extract policy/authority decisions into tested modules first.
+6. Continue strengthening living-world capture after scene endings: consequences, relationship shifts, faction memory, and location scars now have app-owned storage helpers, but meaningful post-scene capture still needs provider soak and eventual app-side summarization.
 
 ### High
 
@@ -525,7 +573,7 @@ Risks:
 14. Keep the Maintainer Guide current whenever a new subsystem or debugging path is added.
 15. Simplify app UX toward release quality: split app Settings/Table Settings, hide troubleshooting until needed, reduce always-visible rail controls, make empty-table states more inviting, and make the front door feel like a game launcher instead of a settings hub. Current state: the front door is now Continue Table, Create New Table, Join Table, plus a compact Settings gear; model setup and Ollama guidance live under Settings > Models, but the table still exposes too many knobs for Steam-ready flow.
 16. Keep the host-surface stance explicit: the host is a party member and software-side table owner, not the DM. Host-only controls should collect setup, invites, provider/model access, party ownership, recovery, and tie-breaking without making the main table feel like a DM console.
-17. Add a local table session/invite model and Share Table panel for LAN guest links first, with host approval and explicit guest-safe route boundaries, before any relay implementation. Current state: LAN guest links already use host approval and session-stamped guest requests; multiplayer authority now owns a tested share-session projection with campaign/table/session identity, the LAN `/guest` link, and guest-safe route categories; host snapshots carry that share session, and Friends And Seats renders the boundary for the host. Remaining gap: promote this into a fuller first-class table invite/session lifecycle beyond the current host snapshot/UI contract.
+17. Keep LAN guest Share Table useful as the local fallback, but do not let it block the Remote Friend Code MVP. Current state: LAN guest links already use host approval and session-stamped guest requests; multiplayer authority now owns a tested share-session projection with campaign/table/session identity, the LAN `/guest` link, and guest-safe route categories; host snapshots carry that share session, and Friends And Seats renders the boundary for the host. Remaining gap: promote the same authority model into a remote friend-code lifecycle.
 
 ### Medium
 
@@ -645,6 +693,10 @@ Risks:
 - [x] Normal Guest Links use plain `/guest`; actions/snapshots still validate campaign/table/session identity after registration.
 - [x] Guest snapshots and staged actions reject wrong campaign/table/session identity when supplied.
 - [x] Add host plus `/guest` UI harness coverage for pre-lobby join/adoption, active-table join, leave/rejoin, stale old-session rejection, new-game join, guest/host Table Talk, remote party voting, and remote action staging/resolution.
+- [ ] Build Remote Friend Code MVP so off-LAN guests can join from a public browser page without downloading LoreKeeper. Scope: host outbound relay connection, short friend code, host approval, guest-safe table preview, Table Talk, approved/staged character actions, pass/vote/disconnect/rejoin, and no host/admin/provider/Ollama/filesystem/debug access. Current state: friend-code/session primitives and public projections exist; a Cloudflare Worker/Durable Object relay skeleton exists under `workers/relay`; the alpha relay is deployed at `https://lorekeeper-friend-relay.wirsingj.workers.dev`; public smoke checks pass for root, health, friendly host/table-code links, session lookup, host WebSocket active state, and browser guest join-request relay; the LoreKeeper host UI can create/copy a remote friend code, connect the host relay socket, and register relay join requests into the existing waiting-room flow; no live full guest table page after seating exists yet.
+- [ ] Add remote relay message allowlist and no-mutation tests before exposing any public relay. Rejected/stale/oversized/unauthorized relay messages must not create provider calls, play-log entries, staged inputs, controller transfers, combat changes, recovery changes, or campaign mutations. Current state: guest-safe relay message kind/payload/host-only-field validation exists, and `scripts/test-friend-relay.js` covers relay parser allowlist/rejection behavior; no-mutation tests still need to be attached to actual relay-to-authority handlers.
+- [ ] Add Friends And Seats UI for Remote Friend Code: Copy Code, Copy Link, Regenerate, Stop Sharing, session expiry/idle status, waiting guests, and "experimental remote sharing" copy. Current state: the Friends surface now has Remote Friend Code fields and disabled controls backed by projection; live handlers wait on relay provider configuration.
+- [ ] Add public guest-page entry for friend code: enter code, display name, seat/character draft, waiting approval, disconnected/rejected states, and browser-only play after approval.
 - [ ] Run first real two-machine playtest. Network connectivity and guest table sync were proven; the seat-request lobby needed hardening.
 - [x] Make guest sent/received/resolving/resolved states clearer.
 - [x] Make host "guest waiting" state harder to miss.

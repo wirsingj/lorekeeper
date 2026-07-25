@@ -1863,6 +1863,39 @@ assert.equal(objectChoice.ok, true);
 assert.equal(objectChoice.response.choices.options[0].text, "Counterpunch");
 assert.doesNotMatch(renderTurnResponseForImport(objectChoice.response), /\[object Object\]/);
 
+const schemaPlaceholderLeak = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
+  table: [{
+    speaker: "DM",
+    speakerId: null,
+    role: "dm",
+    kind: "narration",
+    visibility: "table",
+    text: "The crossroads grow quiet as smoke curls from somewhere beyond the trees.",
+  }],
+  sceneStatus: { mode: "exploration", danger: "tense", awaitingPlayer: true },
+  choices: {
+    prompt: "What do you do?",
+    options: [{ id: "A", text: "clear action option" }],
+    allowOther: true,
+  },
+  mechanics: [{
+    type: "status",
+    outcome: "pending",
+    label: "short roll/check/combat label",
+    text: "player-facing roll/math/result, e.g. Attack d20+5 = 17 vs AC 14; Damage 1d8+3 = 8; Wolf HP 12 -> 4",
+  }],
+}), {
+  choicePolicy: { choicesAllowed: true, default: "choice_when_useful" },
+}));
+assert.equal(schemaPlaceholderLeak.ok, true);
+assert.equal(schemaPlaceholderLeak.response.choices.options.length, 0);
+assert.equal(schemaPlaceholderLeak.response.mechanics.length, 0);
+const schemaPlaceholderRender = renderTurnResponseForImport(schemaPlaceholderLeak.response);
+assert.match(schemaPlaceholderRender, /crossroads grow quiet/);
+assert.doesNotMatch(schemaPlaceholderRender, /clear action option/);
+assert.doesNotMatch(schemaPlaceholderRender, /short roll\/check\/combat label/);
+assert.doesNotMatch(schemaPlaceholderRender, /player-facing roll\/math\/result/);
+
 const awaitingWithoutChoices = parseTurnJsonResponse(JSON.stringify(validTurnResponse({
   table: [{ speaker: "DM", speakerId: null, role: "dm", kind: "narration", visibility: "table", text: "Garin patrols the wall as the city settles into a tense quiet." }],
   choices: { prompt: "What now?", options: [], allowOther: true },

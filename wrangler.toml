@@ -1,0 +1,12 @@
+name = "lorekeeper-friend-relay"
+main = "workers/relay/src/index.js"
+compatibility_date = "2026-07-25"
+account_id = "783bfcab2dc3ff9fc1ef44eb6ed4c01b"
+
+[[durable_objects.bindings]]
+name = "TABLE_RELAY"
+class_name = "TableRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TableRelay"]

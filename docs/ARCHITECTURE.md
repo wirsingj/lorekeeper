@@ -168,6 +168,12 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Re-exporting it from `src/multiplayer/local-table.js` is acceptable for server/domain tests, but renderer code should import the browser-safe module directly so Node-only multiplayer authority code does not enter the client bundle.
 - This is not relay/tunnel implementation; it is the local session contract future remote transport should consume.
 
+`FriendCodeSession`
+
+- Lives in `src/multiplayer/friend-code-session.js`.
+- Produces the first remote friend-code contract: human code, unguessable internal token, expiry/stop state, alpha limits, public projection, and guest-safe relay message validation.
+- This is not a relay deployment. It is the local/domain contract that a Cloudflare/AWS/other relay should consume so browser guests can join by code while the host remains authoritative.
+
 `ObservabilityTrace`
 
 - Lives in `src/observability/trace-log.js`.
@@ -319,6 +325,7 @@ Start here when making changes:
 - Character creation/autocomplete: `app/character-autocomplete-controller.js`
 - Binder record dialogs: `app/record-dialog-controller.js`
 - Local multiplayer: `src/multiplayer/local-table.js`, `src/multiplayer/share-table-session.js`, `scripts/serve.js`, `app/multiplayer-session-panel.js`
+- Remote friend-code contract: `src/multiplayer/friend-code-session.js`
 - Renderer campaign adoption/background polling policy: `app/campaign-adoption-controller.js`, `app/table-background-polling-controller.js`
 - Combat: `src/engine/combat-engine.js`, `src/rules/combat-turns.js`, `app/combat-resolution-controller.js`
 - Provider contract/agency: `src/model-contract/turn-json-contract.js`

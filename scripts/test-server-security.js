@@ -86,6 +86,8 @@ const protectedHostRoutes = [
   ["POST", "/api/ollama/pull", false],
   ["POST", "/api/multiplayer/start", true],
   ["POST", "/api/multiplayer/stop", true],
+  ["POST", "/api/multiplayer/remote/start", true],
+  ["POST", "/api/multiplayer/remote/stop", true],
   ["POST", "/api/multiplayer/invite", true],
   ["POST", "/api/multiplayer/invite-character", true],
   ["POST", "/api/multiplayer/invite/revoke", true],

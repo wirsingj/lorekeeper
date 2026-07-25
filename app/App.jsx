@@ -860,6 +860,48 @@ function SetupDialog() {
               <button id="stop-local-table" type="button">Close Guest Lobby</button>
             </div>
           </div>
+          <div className="friend-share-card remote-friend-code-card">
+            <div className="section-title compact-section-title">
+              <h4>Remote Friend Code</h4>
+              <span id="remote-friend-code-state" className="count-pill">Off</span>
+            </div>
+            <label className="field-stack local-table-share">
+              <span>Host/Table Name</span>
+              <input
+                id="remote-host-slug"
+                spellCheck="false"
+                maxLength="48"
+                placeholder="My table"
+              />
+            </label>
+            <label className="field-stack local-table-share">
+              <span>Friend Code</span>
+              <input
+                id="remote-friend-code"
+                readOnly
+                spellCheck="false"
+                placeholder="Remote relay is not configured yet."
+              />
+            </label>
+            <label className="field-stack local-table-share">
+              <span>Browser Link</span>
+              <input
+                id="remote-friend-link"
+                readOnly
+                spellCheck="false"
+                placeholder="Remote browser link appears here when sharing is active."
+              />
+            </label>
+            <p id="remote-friend-code-safety" className="setup-note local-table-share-safety">
+              Remote sharing will use browser guest mode only. Host settings and model setup stay on this machine.
+            </p>
+            <div className="button-stack two-up">
+              <button id="start-remote-sharing" type="button" disabled>Start Remote Sharing</button>
+              <button id="copy-remote-friend-code" type="button" disabled>Copy Code</button>
+              <button id="copy-remote-friend-link" type="button" disabled>Copy Link</button>
+              <button id="stop-remote-sharing" type="button" disabled>Stop Sharing</button>
+            </div>
+          </div>
           <div id="waiting-guests" className="local-table-list"></div>
           <div id="connected-guests" className="local-table-list"></div>
           <div id="pending-inputs" className="local-table-list"></div>

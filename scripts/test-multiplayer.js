@@ -1,5 +1,16 @@
 import assert from "node:assert/strict";
 import {
+  createFriendCodeSession,
+  effectiveFriendCodeStatus,
+  friendCodePublicLink,
+  friendCodeSessionStatus,
+  normalizeFriendCode,
+  publicFriendCodeSession,
+  relayMessageKinds,
+  stopFriendCodeSession,
+  validateGuestRelayMessage,
+} from "../src/multiplayer/friend-code-session.js";
+import {
   approveJoinRequest,
   buildAggregatedPlayerTurn,
   buildShareTableSession,
@@ -24,6 +35,8 @@ import {
   seatWaitingGuest,
   stopLocalTable,
   startLocalTable,
+  startRemoteFriendCodeSession,
+  stopRemoteFriendCodeSession,
   submitGuestAction,
   submitGuestChoiceVote,
   updateMultiplayerSettings,
@@ -40,7 +53,52 @@ function assertTokenShape(label, token, minLength) {
   assert.match(token, base64UrlTokenPattern, `${label} should be URL-safe`);
 }
 
+const friendCodeSession = createFriendCodeSession({
+  campaignId: "campaign-remote",
+  tableId: "table-remote",
+  sessionId: "session-remote",
+  relayBaseUrl: "https://play.lorekeeper.example/",
+  hostSlug: "host-123515123",
+  now: new Date("2026-07-25T12:00:00Z"),
+  code: "m7ss7k4p",
+});
+assert.equal(friendCodeSession.code, "M7SS-7K4P");
+assert.equal(friendCodeSession.hostSlug, "host-123515123");
+assertTokenShape("friend-code internal token", friendCodeSession.internalToken, 32);
+assert.notEqual(friendCodeSession.internalToken, friendCodeSession.code);
+assert.equal(friendCodePublicLink(friendCodeSession), "https://play.lorekeeper.example/host/host-123515123/table-code/M7SS-7K4P");
+assert.equal(normalizeFriendCode(" m7ss 7k4p "), "M7SS-7K4P");
+assert.equal(effectiveFriendCodeStatus(friendCodeSession, { now: new Date("2026-07-25T13:00:00Z") }), friendCodeSessionStatus.ACTIVE);
+assert.equal(effectiveFriendCodeStatus(friendCodeSession, { now: new Date("2026-07-25T15:00:00Z") }), friendCodeSessionStatus.EXPIRED);
+const stoppedFriendCodeSession = stopFriendCodeSession(friendCodeSession, { now: new Date("2026-07-25T13:30:00Z") });
+assert.equal(effectiveFriendCodeStatus(stoppedFriendCodeSession, { now: new Date("2026-07-25T13:31:00Z") }), friendCodeSessionStatus.STOPPED);
+const publicFriendCode = publicFriendCodeSession(friendCodeSession);
+assert.equal(publicFriendCode.code, "M7SS-7K4P");
+assert.equal(publicFriendCode.link, "https://play.lorekeeper.example/host/host-123515123/table-code/M7SS-7K4P");
+assert.equal("internalToken" in publicFriendCode, false);
+assert.match(publicFriendCode.safety, /Host settings, model setup, Ollama, files, diagnostics/);
+
+const validRelayMessage = validateGuestRelayMessage({
+  kind: relayMessageKinds.GUEST_JOIN_REQUEST,
+  code: "M7SS-7K4P",
+  displayName: "Nora",
+  preferredPartyMemberId: "lysa",
+  proposedCharacter: {
+    name: "Nora",
+    roleIntent: "quiet scout",
+  },
+});
+assert.equal(validRelayMessage.valid, true);
+assert.equal(validRelayMessage.kind, relayMessageKinds.GUEST_JOIN_REQUEST);
+assert.equal(validateGuestRelayMessage({ kind: "host.provider.settings.read" }).valid, false);
+assert.match(validateGuestRelayMessage({ kind: relayMessageKinds.GUEST_ACTION_SUBMIT, providerSettings: {} }).errors.join(" "), /host-only field/);
+assert.match(validateGuestRelayMessage({ kind: relayMessageKinds.GUEST_TABLE_TALK_POST, text: "x".repeat(20000) }).errors.join(" "), /exceeds/);
+
 let campaign = testCampaign();
+assert.throws(
+  () => startRemoteFriendCodeSession(campaign, { relayBaseUrl: "https://play.lorekeeper.example" }),
+  /Start Local Table/,
+);
 campaign = startLocalTable(campaign, { host: "0.0.0.0", lanAddress: "192.168.1.24", port: 7347 });
 assert.equal(campaign.multiplayer.localTable.running, true);
 assert.ok(campaign.multiplayer.localTable.tableId);
@@ -58,6 +116,27 @@ assert.equal(shareSession.guestLink, "http://192.168.1.24:7347/guest");
 assert.deepEqual(shareSession.routeBoundary, [...guestSafeShareRouteBoundary]);
 assert.match(shareSession.safety, /Host settings, model setup, Ollama, files, and diagnostics stay on this machine/);
 assert.match(shareSession.safety, /leave\/rejoin, combat participation/);
+const liveRemoteCampaign = startRemoteFriendCodeSession(campaign, { relayBaseUrl: "https://play.lorekeeper.example" });
+assert.equal(liveRemoteCampaign.multiplayer.remoteFriendCodeSession.status, friendCodeSessionStatus.ACTIVE);
+assert.match(liveRemoteCampaign.multiplayer.remoteFriendCodeSession.link || friendCodePublicLink(liveRemoteCampaign.multiplayer.remoteFriendCodeSession), /\/host\/.+\/table-code\//);
+const stoppedRemoteCampaign = stopRemoteFriendCodeSession(liveRemoteCampaign);
+assert.equal(stoppedRemoteCampaign.multiplayer.remoteFriendCodeSession.status, friendCodeSessionStatus.STOPPED);
+campaign.multiplayer.remoteFriendCodeSession = createFriendCodeSession({
+  campaignId: campaign.id,
+  tableId: campaign.multiplayer.localTable.tableId,
+  sessionId: campaign.multiplayer.localTable.sessionId,
+  relayBaseUrl: "https://play.lorekeeper.example",
+  hostSlug: "host-123515123",
+  code: "m7ss7k4p",
+});
+const hostRemoteSnapshot = createHostSnapshot(campaign);
+assert.equal(hostRemoteSnapshot.remoteFriendCode.code, "M7SS-7K4P");
+assert.equal(hostRemoteSnapshot.remoteFriendCode.link, "https://play.lorekeeper.example/host/host-123515123/table-code/M7SS-7K4P");
+assert.equal("internalToken" in hostRemoteSnapshot.remoteFriendCode, false);
+const hostRemoteProjection = buildMultiplayerSessionProjection({ campaign });
+assert.equal(hostRemoteProjection.remoteFriendCode.code, "M7SS-7K4P");
+assert.equal(hostRemoteProjection.remoteFriendCode.link, "https://play.lorekeeper.example/host/host-123515123/table-code/M7SS-7K4P");
+assert.match(hostRemoteProjection.remoteFriendCode.safety, /Ollama, files, diagnostics, provider keys/);
 
 let waitingResult = registerWaitingGuest(campaign, {
   playerName: "Nora",

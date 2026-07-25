@@ -89,6 +89,17 @@ This creates `dist/portable/LoreKeeper.zip`, the one-app portable distribution. 
 
 `release:check` verifies the local portable folder and zip exist, do not contain stale split-client outputs, are newer than packaged source files, and that the generated zip contains the extraction note, executable, guarded launcher, start note, app manifest, and server entry. `smoke:portable` copies the portable folder to a temp directory, starts the packaged executable as the bundled Node runtime, and verifies `/api/runtime` plus `/guest` without mutating the distributable. `hooks:install` points local git hooks at `.githooks`; the pre-commit hook runs the freshness check without rebuilding the distro, and the pre-push hook runs freshness plus smoke when pushing tags. Use `release:tag` for release tags so freshness plus smoke run before the tag is created.
 
+Friend-code relay alpha:
+
+```powershell
+$env:CLOUDFLARE_ACCOUNT_ID = [Environment]::GetEnvironmentVariable('CLOUDFLARE_ACCOUNT_ID', 'User')
+$env:CLOUDFLARE_API_TOKEN = [Environment]::GetEnvironmentVariable('CLOUDFLARE_API_TOKEN', 'User')
+npm run test:friend-relay
+npm run relay:deploy
+```
+
+`relay:deploy` publishes `workers/relay` with Wrangler. Keep Cloudflare credentials in the user environment or shell only; never commit them. The current alpha relay is `https://lorekeeper-friend-relay.wirsingj.workers.dev`; verify it with `/health`, `/host/host-123515123/table-code/M7SS-7K4P`, `/api/session/M7SS-7K4P`, and a short host plus guest WebSocket smoke after deploy. The root `wrangler.toml` mirrors the relay config so Cloudflare GitHub/root deploys publish the intended Worker once this repo state is committed and pushed.
+
 Local server only:
 
 ```powershell
@@ -117,6 +128,7 @@ npm run cleanup
 - Provider contract/agency: `src/model-contract/turn-json-contract.js`
 - Combat authority: `src/engine/combat-engine.js`, `src/rules/combat-turns.js`
 - Multiplayer authority: `src/multiplayer/local-table.js`
+- Remote friend-code contract: `src/multiplayer/friend-code-session.js`
 - Guest auto-resolution policy: `app/guest-auto-resolve-controller.js`
 - Campaign adoption/polling policy: `app/campaign-adoption-controller.js`, `app/table-background-polling-controller.js`
 - SQLite/repository: `src/storage/sqlite-store.js`, `src/storage/campaign-repository.js`, `src/storage/sqlite-migrations.js`

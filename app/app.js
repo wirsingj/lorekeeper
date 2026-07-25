@@ -176,6 +176,8 @@ const apiOllamaTestUrl = "/api/ollama/test";
 const apiMultiplayerSnapshotUrl = "/api/multiplayer/snapshot";
 const apiMultiplayerStartUrl = "/api/multiplayer/start";
 const apiMultiplayerStopUrl = "/api/multiplayer/stop";
+const apiMultiplayerRemoteStartUrl = "/api/multiplayer/remote/start";
+const apiMultiplayerRemoteStopUrl = "/api/multiplayer/remote/stop";
 const apiMultiplayerInviteUrl = "/api/multiplayer/invite";
 const apiMultiplayerInviteCharacterUrl = "/api/multiplayer/invite-character";
 const apiMultiplayerJoinUrl = "/api/multiplayer/join";
@@ -290,6 +292,9 @@ const state = {
   campaignWizardReturnHome: false,
   campaignWizardCreating: false,
   launchInviteError: "",
+  remoteRelaySocket: null,
+  remoteRelaySessionId: "",
+  remoteRelayGuests: new Map(),
 };
 
 window.fetch = (input, init = {}) => nativeFetch(input, withLorekeeperApiAuth(input, init));
@@ -506,6 +511,15 @@ const elements = {
   localTableGuidance: document.querySelector("#local-table-guidance"),
   localTableShareSafety: document.querySelector("#local-table-share-safety"),
   localTableGuestLink: document.querySelector("#local-table-guest-link"),
+  remoteFriendCodeState: document.querySelector("#remote-friend-code-state"),
+  remoteHostSlug: document.querySelector("#remote-host-slug"),
+  remoteFriendCode: document.querySelector("#remote-friend-code"),
+  remoteFriendLink: document.querySelector("#remote-friend-link"),
+  remoteFriendCodeSafety: document.querySelector("#remote-friend-code-safety"),
+  startRemoteSharing: document.querySelector("#start-remote-sharing"),
+  copyRemoteFriendCode: document.querySelector("#copy-remote-friend-code"),
+  copyRemoteFriendLink: document.querySelector("#copy-remote-friend-link"),
+  stopRemoteSharing: document.querySelector("#stop-remote-sharing"),
   localTableInviteOutput: document.querySelector("#local-table-invite-output"),
   requireGuestActionApproval: document.querySelector("#require-guest-action-approval"),
   holdGuestActionsForGroup: document.querySelector("#hold-guest-actions-for-group"),
@@ -915,6 +929,22 @@ elements.copyCharacterInvite?.addEventListener("click", async () => {
 
 elements.copyGuestLink?.addEventListener("click", async () => {
   await copyGuestLinkFromUi();
+});
+
+elements.startRemoteSharing?.addEventListener("click", async () => {
+  await startRemoteSharingFromUi();
+});
+
+elements.copyRemoteFriendCode?.addEventListener("click", async () => {
+  await copyRemoteFriendCodeFromUi();
+});
+
+elements.copyRemoteFriendLink?.addEventListener("click", async () => {
+  await copyRemoteFriendLinkFromUi();
+});
+
+elements.stopRemoteSharing?.addEventListener("click", async () => {
+  await stopRemoteSharingFromUi();
 });
 
 elements.joinCampaign.addEventListener("click", () => {
@@ -3162,6 +3192,194 @@ async function copyGuestLinkFromUi() {
     setProviderActivity(error instanceof Error ? `Share Table failed: ${error.message}` : "Share Table failed", "error");
     return false;
   }
+}
+
+async function startRemoteSharingFromUi() {
+  try {
+    if (!state.campaign?.multiplayer?.localTable?.running) {
+      const localResult = await startLocalTableFromUi();
+      if (!localResult) {
+        return;
+      }
+    }
+    setProviderActivity("Starting remote friend code...", "working");
+    const result = await postJson(apiMultiplayerRemoteStartUrl, localTableAuthorityPayload({
+      hostSlug: remoteHostSlugFromUi(),
+    }));
+    setCampaignFromPayload(result, "remote_friend_code_started");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    connectRemoteRelayHost(result.remoteFriendCodeSession || state.campaign?.multiplayer?.remoteFriendCodeSession);
+    const link = currentRemoteFriendLink();
+    if (link) {
+      await writeClipboardText(link);
+    }
+    setProviderActivity(link ? "Remote friend link copied" : "Remote friend code started", "idle");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Remote sharing failed: ${error.message}` : "Remote sharing failed", "error");
+  }
+}
+
+async function stopRemoteSharingFromUi() {
+  try {
+    closeRemoteRelayHost();
+    setProviderActivity("Stopping remote friend code...", "working");
+    const result = await postJson(apiMultiplayerRemoteStopUrl, localTableAuthorityPayload());
+    setCampaignFromPayload(result, "remote_friend_code_stopped");
+    state.multiplayerSnapshot = result.multiplayer;
+    render();
+    setProviderActivity("Remote friend code stopped", "idle");
+  } catch (error) {
+    setProviderActivity(error instanceof Error ? `Stop remote sharing failed: ${error.message}` : "Stop remote sharing failed", "error");
+  }
+}
+
+async function copyRemoteFriendCodeFromUi() {
+  const code = state.multiplayerSnapshot?.remoteFriendCode?.code || state.campaign?.multiplayer?.remoteFriendCodeSession?.code || "";
+  if (!code) {
+    setProviderActivity("No remote friend code is active yet.", "waiting");
+    return;
+  }
+  const copied = await writeClipboardText(code);
+  setProviderActivity(copied ? "Remote friend code copied" : `Remote friend code: ${code}`, copied ? "idle" : "waiting");
+}
+
+async function copyRemoteFriendLinkFromUi() {
+  const link = currentRemoteFriendLink();
+  if (!link) {
+    setProviderActivity("No remote friend link is active yet.", "waiting");
+    return;
+  }
+  const copied = await writeClipboardText(link);
+  setProviderActivity(copied ? "Remote friend link copied" : `Remote friend link: ${link}`, copied ? "idle" : "waiting");
+}
+
+function currentRemoteFriendLink() {
+  return state.multiplayerSnapshot?.remoteFriendCode?.link
+    || elements.remoteFriendLink?.value
+    || "";
+}
+
+function remoteHostSlugFromUi() {
+  const raw = elements.remoteHostSlug?.value || state.campaign?.title || "LoreKeeper Table";
+  return String(raw)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || "lorekeeper-table";
+}
+
+function connectRemoteRelayHost(session = {}) {
+  const code = String(session?.code || "").trim();
+  const token = String(session?.internalToken || "").trim();
+  const relayBaseUrl = String(session?.relayBaseUrl || "").trim().replace(/\/+$/, "");
+  if (!code || !token || !relayBaseUrl) {
+    return false;
+  }
+  const sessionKey = `${relayBaseUrl}|${code}`;
+  if (state.remoteRelaySocket && state.remoteRelaySessionId === sessionKey && state.remoteRelaySocket.readyState <= 1) {
+    return true;
+  }
+  closeRemoteRelayHost();
+  const wsUrl = `${relayBaseUrl.replace(/^http/i, "ws")}/api/host/connect?code=${encodeURIComponent(code)}&token=${encodeURIComponent(token)}`;
+  const socket = new WebSocket(wsUrl);
+  state.remoteRelaySocket = socket;
+  state.remoteRelaySessionId = sessionKey;
+  socket.addEventListener("open", () => {
+    socket.send(JSON.stringify({
+      kind: "host.hello",
+      code,
+      tableId: session.tableId || "",
+      sessionId: session.sessionId || "",
+    }));
+    socket.send(JSON.stringify({ kind: "host.session.ready", code }));
+    setProviderActivity(`Remote friend code ${code} is live. Guest table UI wiring comes next.`, "idle");
+  });
+  socket.addEventListener("message", (event) => {
+    let message = null;
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (message?.kind === "relay.guest.connected") {
+      setProviderActivity("A remote browser guest reached the relay. Seat approval wiring comes next.", "waiting");
+    }
+    if (message?.kind === "guest.join.request") {
+      handleRemoteGuestJoinRequest(message);
+    }
+    if (message?.kind === "relay.error") {
+      setProviderActivity(`Remote relay rejected a message: ${(message.errors || []).join(", ")}`, "error");
+    }
+  });
+  socket.addEventListener("close", () => {
+    if (state.remoteRelaySocket === socket) {
+      state.remoteRelaySocket = null;
+      state.remoteRelaySessionId = "";
+    }
+  });
+  socket.addEventListener("error", () => {
+    setProviderActivity("Remote relay connection failed.", "error");
+  });
+  return true;
+}
+
+async function handleRemoteGuestJoinRequest(message = {}) {
+  const guestId = String(message.guestId || "");
+  if (!guestId) {
+    return;
+  }
+  const displayName = String(message.displayName || "Remote Friend").slice(0, 40);
+  const clientId = `relay-${guestId}`;
+  try {
+    const result = await postJson(apiMultiplayerWaitingRegisterUrl, {
+      playerName: displayName,
+      clientId,
+      ...localTableAuthorityPayload(),
+    });
+    state.remoteRelayGuests.set(guestId, {
+      waitingGuestId: result.waitingGuest?.id || "",
+      clientId,
+      displayName,
+    });
+    await refreshMultiplayerSnapshot({ quiet: true });
+    render();
+    sendRemoteHostMessage({
+      kind: "host.guest.pending",
+      guestId,
+      displayName,
+      waitingGuestId: result.waitingGuest?.id || "",
+    });
+    setProviderActivity(`${displayName} asked to join through Remote Friend Code. Seat them in Friends.`, "waiting");
+  } catch (error) {
+    sendRemoteHostMessage({
+      kind: "host.error",
+      guestId,
+      message: "The host could not register that join request.",
+    });
+    setProviderActivity(error instanceof Error ? `Remote join failed: ${error.message}` : "Remote join failed", "error");
+  }
+}
+
+function sendRemoteHostMessage(message = {}) {
+  if (!state.remoteRelaySocket || state.remoteRelaySocket.readyState !== WebSocket.OPEN) {
+    return false;
+  }
+  state.remoteRelaySocket.send(JSON.stringify(message));
+  return true;
+}
+
+function closeRemoteRelayHost() {
+  if (state.remoteRelaySocket) {
+    try {
+      state.remoteRelaySocket.close(1000, "host_stopped_remote_sharing");
+    } catch {
+      // Best effort; a fresh Start Remote Sharing creates a new socket.
+    }
+  }
+  state.remoteRelaySocket = null;
+  state.remoteRelaySessionId = "";
 }
 
 function currentLocalGuestLink() {

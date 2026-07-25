@@ -43,6 +43,8 @@ export function buildMultiplayerSessionProjection({
   };
   const campaignId = multiplayer.campaignId || campaign?.id || "";
   const shareSession = multiplayer.shareSession ?? buildShareTableSession({ table, campaignId, locationPort });
+  const remoteFriendCode = multiplayer.remoteFriendCode
+    ?? (multiplayer.remoteFriendCodeSession ? publicRemoteFriendCode(multiplayer.remoteFriendCodeSession) : emptyRemoteFriendCode());
   const guestLink = shareSession.guestLink;
   return {
     mode: "host",
@@ -53,6 +55,7 @@ export function buildMultiplayerSessionProjection({
     canStartLocalTable: true,
     canStopLocalTable: Boolean(table.running),
     canCopyGuestLink: Boolean(guestLink),
+    canStartRemoteSharing: true,
     canSyncGuestTable: false,
     canResolvePartyInputs: readyInputs.length > 0,
     guestLink,
@@ -61,11 +64,44 @@ export function buildMultiplayerSessionProjection({
     requireGuestActionApproval: settings.requireGuestActionApproval,
     holdGuestActionsForGroupInput: settings.holdGuestActionsForGroupInput,
     shareSession,
+    remoteFriendCode,
     shareSafety: shareSession.safety,
     party: campaign?.party ?? [],
     connectedGuests: multiplayer.connections ?? [],
     waitingGuests: multiplayer.waitingGuests ?? [],
     pendingInputs: pendingInputs.map((input) => decoratePendingInput(input, { settings })),
+  };
+}
+
+function emptyRemoteFriendCode() {
+  return {
+    status: "off",
+    code: "",
+    link: "",
+    expiresAt: "",
+    maxGuests: 5,
+    idleTimeoutMs: 10 * 60 * 1000,
+    safety: "Remote friend code is not active. When enabled, browser guests will join through a guest-safe relay while the host keeps provider keys, Ollama, files, diagnostics, and campaign storage local.",
+  };
+}
+
+function publicRemoteFriendCode(session = {}) {
+  const code = String(session.code || "");
+  const relayBaseUrl = String(session.relayBaseUrl || "").trim().replace(/\/+$/, "");
+  const hostSlug = String(session.hostSlug || "host")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 48) || "host";
+  return {
+    status: session.status || "active",
+    code,
+    link: relayBaseUrl && code ? `${relayBaseUrl}/host/${encodeURIComponent(hostSlug)}/table-code/${encodeURIComponent(code)}` : "",
+    expiresAt: session.expiresAt || "",
+    maxGuests: Number(session.limits?.maxGuests) || 5,
+    idleTimeoutMs: Number(session.limits?.idleTimeoutMs) || 10 * 60 * 1000,
+    safety: "Remote friend code shares browser guest mode only: preview, seat request, approved character actions, votes, pass, leave/rejoin, and Table Talk. Host settings, model setup, Ollama, files, diagnostics, provider keys, and campaign storage stay on the host.",
   };
 }
 
@@ -91,6 +127,7 @@ export function renderMultiplayerSessionPanel({
       ? ""
       : "Open the guest lobby to get a Share Table link.";
   }
+  renderRemoteFriendCode(elements, projection.remoteFriendCode);
   elements.startLocalTable.disabled = !projection.canStartLocalTable;
   elements.stopLocalTable.disabled = !projection.canStopLocalTable;
   if (elements.copyGuestLink) {
@@ -112,6 +149,38 @@ export function renderMultiplayerSessionPanel({
   renderWaitingGuests(elements.waitingGuests, projection.waitingGuests, { party: projection.party ?? [], seatWaitingGuest });
   renderConnectedGuests(elements.connectedGuests, projection.connectedGuests, { labelById, approveGuest, denyGuest });
   renderPendingInputs(elements.pendingInputs, projection.pendingInputs);
+}
+
+function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCode()) {
+  const status = remoteFriendCode?.status || "off";
+  const active = status === "active";
+  if (elements.remoteFriendCodeState) {
+    elements.remoteFriendCodeState.textContent = active ? "On" : status === "expired" ? "Expired" : status === "stopped" ? "Stopped" : "Off";
+  }
+  if (elements.remoteFriendCode) {
+    elements.remoteFriendCode.value = remoteFriendCode?.code || "";
+    elements.remoteFriendCode.placeholder = active ? "" : "Remote relay is not configured yet.";
+  }
+  if (elements.remoteFriendLink) {
+    elements.remoteFriendLink.value = remoteFriendCode?.link || "";
+    elements.remoteFriendLink.placeholder = active ? "" : "Remote browser link appears here when sharing is active.";
+  }
+  if (elements.remoteFriendCodeSafety) {
+    elements.remoteFriendCodeSafety.textContent = remoteFriendCode?.safety || "";
+  }
+  if (elements.startRemoteSharing) {
+    elements.startRemoteSharing.disabled = active;
+    elements.startRemoteSharing.title = active ? "Remote sharing is already active." : "Start remote browser sharing through the LoreKeeper relay.";
+  }
+  if (elements.copyRemoteFriendCode) {
+    elements.copyRemoteFriendCode.disabled = !active || !remoteFriendCode?.code;
+  }
+  if (elements.copyRemoteFriendLink) {
+    elements.copyRemoteFriendLink.disabled = !active || !remoteFriendCode?.link;
+  }
+  if (elements.stopRemoteSharing) {
+    elements.stopRemoteSharing.disabled = !active;
+  }
 }
 
 function renderWaitingGuests(container, waitingGuests = [], { party = [], seatWaitingGuest } = {}) {

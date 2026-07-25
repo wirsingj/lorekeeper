@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { touchCampaign } from "../campaign-state/schema.js";
+import { createFriendCodeSession, publicFriendCodeSession, stopFriendCodeSession } from "./friend-code-session.js";
 import { isAllowedInviteHost } from "./invite-security.js";
 import { buildShareTableSession, guestSafeShareRouteBoundary } from "./share-table-session.js";
 export { buildShareTableSession, guestSafeShareRouteBoundary };
@@ -159,6 +160,39 @@ export function stopLocalTable(campaign) {
   next.multiplayer.events = appendEvent(next.multiplayer.events, {
     type: "local_table_stopped",
     summary: "Local table stopped; remote controllers released.",
+  });
+  return touchCampaign(next);
+}
+
+export function startRemoteFriendCodeSession(campaign, { relayBaseUrl = "", hostSlug = "", now = new Date() } = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  const table = next.multiplayer.localTable;
+  if (!table.running) {
+    throw new Error("Start Local Table before starting remote sharing.");
+  }
+  next.multiplayer.remoteFriendCodeSession = createFriendCodeSession({
+    campaignId: next.id,
+    tableId: table.tableId || defaultTableId(next),
+    sessionId: table.sessionId || "",
+    relayBaseUrl,
+    hostSlug: hostSlug || next.title,
+    now,
+  });
+  next.multiplayer.events = appendEvent(next.multiplayer.events, {
+    type: "remote_friend_code_started",
+    summary: `Remote friend code started: ${next.multiplayer.remoteFriendCodeSession.code}.`,
+  });
+  return touchCampaign(next);
+}
+
+export function stopRemoteFriendCodeSession(campaign, { now = new Date() } = {}) {
+  const next = normalizeMultiplayerCampaign(campaign);
+  if (next.multiplayer.remoteFriendCodeSession) {
+    next.multiplayer.remoteFriendCodeSession = stopFriendCodeSession(next.multiplayer.remoteFriendCodeSession, { now });
+  }
+  next.multiplayer.events = appendEvent(next.multiplayer.events, {
+    type: "remote_friend_code_stopped",
+    summary: "Remote friend code stopped.",
   });
   return touchCampaign(next);
 }
@@ -1179,6 +1213,9 @@ export function createHostSnapshot(campaign) {
       table: normalized.multiplayer.localTable,
       campaignId: normalized.id,
     }),
+    remoteFriendCode: normalized.multiplayer.remoteFriendCodeSession
+      ? publicFriendCodeSession(normalized.multiplayer.remoteFriendCodeSession)
+      : null,
     settings: normalized.multiplayer.settings,
     hostTurnState: normalized.multiplayer.hostTurnState,
     party: normalized.party.map((member) => ({
@@ -1571,6 +1608,9 @@ function normalizeMultiplayerState(multiplayer = {}, campaign = {}) {
     tableTalk: Array.isArray(multiplayer.tableTalk)
       ? multiplayer.tableTalk.slice(-tableStateLimits.tableTalk).map(normalizeTableTalkMessage).filter(Boolean)
       : [],
+    remoteFriendCodeSession: multiplayer.remoteFriendCodeSession && typeof multiplayer.remoteFriendCodeSession === "object"
+      ? { ...multiplayer.remoteFriendCodeSession }
+      : null,
     events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
   };
 }

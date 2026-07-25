@@ -55,7 +55,9 @@ import {
   seatWaitingGuest,
   setHostController,
   startLocalTable,
+  startRemoteFriendCodeSession,
   stopLocalTable,
+  stopRemoteFriendCodeSession,
   submitGuestAction,
   submitGuestChoiceVote,
   updateMultiplayerSettings,
@@ -72,6 +74,7 @@ const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === serverM
 const port = Number(process.env.PORT ?? process.argv[2] ?? 4173);
 const bindHost = process.env.LOREKEEPER_BIND_HOST || process.env.HOST || "127.0.0.1";
 const apiToken = process.env.LOREKEEPER_API_TOKEN || "";
+const defaultRemoteRelayBaseUrl = process.env.LOREKEEPER_REMOTE_RELAY_BASE_URL || "https://lorekeeper-friend-relay.wirsingj.workers.dev";
 const builtAppRoot = path.join(defaultProjectRoot, "dist", "app");
 const startedAt = new Date().toISOString();
 const maxJsonBodyBytes = 1024 * 1024;
@@ -395,6 +398,38 @@ const server = createServer(async (request, response) => {
       const payload = await updateActiveCampaign(projectRoot, (campaign) => {
         assertRequestOwnsActiveTable(campaign, body);
         return { campaign: stopLocalTable(campaign) };
+      });
+      sendJson(response, 200, {
+        ...payload,
+        multiplayer: createHostSnapshot(payload.campaign),
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/remote/start" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return {
+          campaign: startRemoteFriendCodeSession(campaign, {
+            relayBaseUrl: body.relayBaseUrl || defaultRemoteRelayBaseUrl,
+            hostSlug: body.hostSlug || campaign.title,
+          }),
+        };
+      });
+      sendJson(response, 200, {
+        ...payload,
+        multiplayer: createHostSnapshot(payload.campaign),
+        remoteFriendCodeSession: payload.campaign.multiplayer?.remoteFriendCodeSession ?? null,
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/multiplayer/remote/stop" && request.method === "POST") {
+      const body = await readJsonBody(request);
+      const payload = await updateActiveCampaign(projectRoot, (campaign) => {
+        assertRequestOwnsActiveTable(campaign, body);
+        return { campaign: stopRemoteFriendCodeSession(campaign) };
       });
       sendJson(response, 200, {
         ...payload,
@@ -1944,6 +1979,8 @@ export function requiresCampaignPin(pathname) {
     "/api/provider/generate-turn",
     "/api/multiplayer/start",
     "/api/multiplayer/stop",
+    "/api/multiplayer/remote/start",
+    "/api/multiplayer/remote/stop",
     "/api/multiplayer/invite",
     "/api/multiplayer/invite-character",
     "/api/multiplayer/invite/revoke",

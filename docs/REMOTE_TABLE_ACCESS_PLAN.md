@@ -41,11 +41,59 @@ Core principle:
 The host can suffer.
 The guest cannot.
 
+## Biggest Product Concern: Friend Code Remote Guest
+
+The most important remote-access problem is not giving every guest a packaged app.
+
+The winning guest experience is browser-only:
+
+1. Host runs LoreKeeper locally.
+2. Host clicks Share Remote Table.
+3. LoreKeeper shows a short friend code such as `MOSS-7K4P`, plus an optional copyable browser link.
+4. Guest opens a public LoreKeeper guest page.
+5. Guest enters the friend code, chooses a name/seat/character draft, and waits for host approval.
+6. Host approves the guest.
+7. Guest plays in the browser.
+
+Guests should not need a shared zip, Steam install, Itch download, Discord file, Google Drive link, Node, Ollama, VPN, Tailscale, Hamachi, tunnel client, or model runtime.
+
+Distribution remains useful for hosts. Friend code is for guests.
+
+Product split:
+
+- Host distribution: portable zip now, maybe Itch/Steam/installer later.
+- Guest access: public browser page plus friend code.
+
+The friend code is product language. Internally it should map to an unguessable token and a live host/relay session.
+
+Suggested alpha constraints:
+
+- at most 5 guests per table,
+- short-lived friend codes,
+- explicit host approval,
+- host can revoke/stop sharing at any time,
+- no file uploads,
+- small JSON payloads only,
+- idle timeout,
+- max session duration,
+- guest-safe route/message allowlist,
+- no campaign database or provider keys stored in the relay.
+
+Multi-host principle:
+
+- The relay is a shared bridge for a small number of simultaneous hosts.
+- A host's local LoreKeeper app owns that host's campaign, table authority, Ollama/provider settings, and provider keys.
+- The Cloudflare deploy token is developer/deployment infrastructure only. It must not ship inside LoreKeeper.
+- A public relay URL may ship as app configuration because it is only the doorway.
+- A friend code plus host/table label identifies a live relay room; it does not grant access to host settings, provider keys, Ollama, filesystem, diagnostics, or raw campaign storage.
+- The host/table label is cosmetic URL language for humans. The friend code and internal host token are the security boundary.
+- Do not hide a shared provider API key inside the app as a product strategy. Obfuscation is not a security boundary. Hosts should use Ollama or configure their own provider key unless a future paid/provisioned provider service exists with real server-side controls.
+
 ## Product Target
 
 The long-term product sentence is:
 
-"I host the table locally. My friends join from Discord with a browser link. My machine runs the DM brain."
+"I host the table locally. My friends join from Discord with a browser link or friend code. My machine runs the DM brain."
 
 That means LoreKeeper is one app with multiple access surfaces:
 
@@ -297,6 +345,66 @@ This gives normal guests the experience they expect:
 
 "Click link and join."
 
+## Phase 3A: Friend Code Relay MVP
+
+Goal:
+
+Make remote play possible for a tiny alpha without requiring guest downloads or raw host networking.
+
+Current repo state:
+
+- Friend-code/session primitives exist in `src/multiplayer/friend-code-session.js`.
+- The module separates the short human friend code from the unguessable internal token.
+- It defines default alpha limits: short-lived code, idle timeout, max session duration, max guests, and max payload size.
+- It validates guest-safe relay message kinds and rejects host-only fields such as provider settings, secrets/tokens, Ollama/local paths, raw provider payloads, diagnostics, and filesystem/debug-shaped data.
+- Host snapshots expose only a public `remoteFriendCode` projection.
+- Friends And Seats has a disabled Remote Friend Code panel so the product surface is visible without pretending the relay exists.
+- A Cloudflare Worker/Durable Object relay skeleton exists under `workers/relay`, with tested message parsing and guest/host allowlists.
+- The alpha relay is deployed at `https://lorekeeper-friend-relay.wirsingj.workers.dev`.
+- Public smoke checks pass for `/`, friendly `/host/:hostSlug/table-code/:code` links, `/health`, and `/api/session/:code`.
+- Host WebSocket connect smoke checks prove a live host flips `/api/session/:code` to `active: true`.
+- The LoreKeeper host UI can create a remote friend-code session, copy the link/code, and open a host relay WebSocket.
+- The public relay guest page can submit a browser `guest.join.request`; relay smoke checks prove the connected host receives that request with a relay guest id.
+- The LoreKeeper host app handles `guest.join.request` by registering the friend into the existing waiting-room flow, so host approval/seating stays local and authoritative.
+- There is no live full guest table page after seating yet; approved guest table snapshots/actions still need relay-to-table bridge work.
+
+Host-facing behavior:
+
+- Friends And Seats shows Local LAN Link and Remote Friend Code as separate share methods.
+- Host clicks Start Remote Sharing.
+- LoreKeeper opens an outbound relay connection.
+- Relay returns a short friend code and optional browser link.
+- Host can Copy Code, Copy Link, Regenerate, and Stop Sharing.
+- Host sees waiting guests and approves/denies/removes them.
+
+Guest-facing behavior:
+
+- Guest opens the public browser page.
+- Guest enters friend code.
+- Guest sees only guest-safe table preview and seat request UI.
+- Guest can submit Table Talk and assigned-character actions after approval.
+- Guest sees clear waiting/rejected/disconnected states.
+
+Internal requirements:
+
+1. `FriendCodeSession` maps human-friendly code to unguessable session token.
+2. Host relay client keeps an outbound connection alive; no inbound LAN exposure is required.
+3. Relay forwards only typed guest-safe messages, not arbitrary HTTP to the host server.
+4. Existing local table session identity remains authoritative: campaign ID, table ID, session ID, guest ID, seat assignment, host approval.
+5. Relay messages must carry identity and be rejected if stale.
+6. Guest actions remain staged requests; the host/app commits or rejects.
+7. Provider settings, provider keys, Ollama/local model endpoints, filesystem/debug routes, campaign management, raw database access, and host/admin controls remain impossible through the relay.
+8. Rejected remote messages must prove no mutation: no provider generation, no play-log entry, no staged input, no controller transfer, no combat/recovery change.
+
+External/human setup for alpha:
+
+1. Pick a relay host. Default recommendation for tiny friend testing is a Cloudflare Worker/Durable Object style relay because the guest is browser-native and early traffic is tiny.
+2. Use the current temporary Workers URL, or later pick a custom route such as `play.lorekeeper.app`.
+3. Create the provider account/project and keep deploy credentials out of Git.
+4. Decide whether the remote share button is hidden/dev-only, private-alpha, or visible with an "experimental" warning.
+5. Decide initial quotas: max guests, max sessions, code lifetime, idle timeout, max session duration, and max payload size.
+6. Accept that free-tier relay is an alpha constraint, not a permanent promise for public scale.
+
 ## Phase 4: Smarter Transport Options
 
 Later, LoreKeeper can evaluate better transport layers.
@@ -412,6 +520,10 @@ Internals can be complex. The product explanation should be simple.
 
 Recommended order:
 
+Current priority note:
+
+Remote Friend Code MVP is now the next product step. LAN guest mode already proves the browser guest surface; more solo polish cannot prove the real table experience. Use the existing LAN/session authority as the base, but aim the next implementation pass at off-LAN browser guests joining by friend code through a guest-safe relay.
+
 ### Step 1: Document the existing LAN guest flow
 
 Capture:
@@ -442,44 +554,55 @@ Add:
 
 - table session ID
 - invite token
+- friend code mapped to an unguessable internal token
 - guest identity
 - guest status
 - guest permissions
 - host approval state
 
-Do this locally first, even before remote relay exists.
+Do this in a way that supports both LAN links and remote friend-code sessions. Friend codes are product-facing; tokens/session ids are internal.
 
-### Step 4: Add "Share Table" UI
+### Step 4: Add "Share Table" / Friends And Seats UI
 
-First version may only show LAN link and future remote placeholder.
+The current LAN link is useful, but the next share surface should establish both local and remote concepts:
 
-It should establish the product concept:
-
-- Start session
-- Copy invite link
-- See connected guests
+- Local LAN Link
+- Remote Friend Code
+- Copy Code
+- Copy Link
+- Regenerate
+- Stop Sharing
+- See waiting/connected guests
 - Approve/remove guests
+- Show expiry/idle/experimental status
 
-### Step 5: Host-side tunnel experiment
+### Step 5: Relay MVP, not guest-installed tunnel tools
 
-Create a documented dev/playtest path for exposing only guest-safe routes.
+Prototype a minimal relay path for friend-code guests:
 
-Do not make this mandatory for all users.
+- host outbound connection,
+- public guest page,
+- friend-code lookup,
+- typed guest-safe messages,
+- host approval,
+- snapshot/action/Table Talk/pass/vote/disconnect/rejoin forwarding,
+- no arbitrary proxying to host routes.
 
-Do not expose host/admin routes.
+Do not make guest-installed tunnel tools part of the product. Host-side tunnel experiments may remain useful for development, but the product path is browser guest plus relay.
 
-### Step 6: Relay spike
+### Step 6: Relay hardening
 
-Prototype a minimal relay:
+Before wider testing, add:
 
-- host outbound websocket
-- guest websocket
-- session mapping
-- message forwarding
-- basic auth/invite token
-- host approval
-
-Keep the relay small.
+- code expiry,
+- idle timeout,
+- max session duration,
+- max guests,
+- payload limits,
+- rate limits,
+- revoke/stop sharing,
+- stale identity rejection,
+- no-mutation tests for rejected relay messages.
 
 ### Step 7: Productize remote guest flow
 

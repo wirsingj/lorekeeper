@@ -46,6 +46,11 @@ const allowedDomains = new Set([
 ]);
 const allowedImportance = new Set(["minor", "normal", "major"]);
 const allowedVisibility = new Set(["player_visible", "dm_only", "system_only"]);
+const schemaExamplePlaceholders = new Set([
+  "clear action option",
+  "short roll/check/combat label",
+  "player-facing roll/math/result, e.g. attack d20+5 = 17 vs ac 14; damage 1d8+3 = 8; wolf hp 12 -> 4",
+]);
 const allowedSectionKinds = new Set([
   "scene_focus",
   "goal_horizon",
@@ -944,7 +949,7 @@ function createResponseFormatSchema() {
             targetActorId: null,
             targetActor: "",
             legalOptionId: null,
-            text: "clear action option",
+            text: "Slip behind the cart and listen for the footsteps.",
           },
         ],
         allowOther: true,
@@ -960,8 +965,8 @@ function createResponseFormatSchema() {
           dc: null,
           reason: "why this mechanic is relevant",
           outcome: "success|failure|mixed|pending|none",
-          label: "short roll/check/combat label",
-          text: "player-facing roll/math/result, e.g. Attack d20+5 = 17 vs AC 14; Damage 1d8+3 = 8; Wolf HP 12 -> 4",
+          label: "Perception check",
+          text: "Perception DC 14 to identify the tracks before the patrol gets closer.",
         },
       ],
       flags: {
@@ -1001,7 +1006,7 @@ function createResponseFormatSchema() {
       "Do not force choices for patrols, travel, investigation progress, NPC replies, atmosphere, consequences, or simple scene continuation.",
       "Offer structured choices only when generation.choicePolicy.choicesAllowed is true or this response establishes immediate danger/combat.",
       "If generation.choicePolicy.choicesAllowed is false, choices.options must be [] unless the response itself starts immediate danger or combat.",
-      "When offering choices, make them separate objects, not a paragraph. Shape: { id: 'A', actorId: null, actor: '', targetActorId: null, targetActor: '', text: 'clear action option', legalOptionId: null }.",
+      "When offering choices, make them separate objects, not a paragraph. Shape: { id: 'A', actorId: null, actor: '', targetActorId: null, targetActor: '', text: 'Slip behind the cart and listen for the footsteps.', legalOptionId: null }.",
       "Use lettered choices: A, B, C, D. The option id should be the letter.",
       "Use choices.options for every listed option. Do not put action options only in table text.",
       "Use choices.scope to identify who is being asked: party for everyone, vote when the host should call a table vote, character for one party member, subset for several named members, combat_actor for the current initiative actor, free for open table input.",
@@ -1094,7 +1099,7 @@ function normalizeTurnResponse(response, options = {}) {
   const table = rawTable.map(normalizeTableEntry).filter((entry) => entry.text);
   const sceneStatus = normalizeSceneStatus(unwrapped.sceneStatus);
   const mechanics = Array.isArray(unwrapped.mechanics)
-    ? unwrapped.mechanics.map(normalizeMechanic).filter((item) => item.text || item.reason)
+    ? unwrapped.mechanics.map(normalizeMechanic).filter((item) => item && (item.text || item.reason))
     : [];
   const proposedChanges = Array.isArray(unwrapped.proposedChanges)
     ? unwrapped.proposedChanges.map(normalizeProposedChange).filter(Boolean)
@@ -1414,7 +1419,7 @@ function normalizeChoices(choices = {}) {
       targetActor: compactWhitespace(option?.targetActor || option?.forActor || ""),
       legalOptionId: option?.legalOptionId ?? null,
       text: compactChoiceText(option?.text ?? option?.label ?? option),
-    })).filter((option) => option.text)
+    })).filter((option) => option.text && !isSchemaExamplePlaceholder(option.text))
     : [];
 
   return {
@@ -1514,6 +1519,11 @@ function normalizeMechanic(item) {
   const rawOutcome = normalizeToken(item?.outcome || "");
   const rollText = formatMechanicRoll(item?.roll);
   const fallbackText = formatMechanicText(item, rollText);
+  const label = compactWhitespace(item?.label || item?.type || "Mechanic");
+  const text = compactWhitespace(item?.text || item?.reason || fallbackText);
+  if (isSchemaExamplePlaceholder(label) || isSchemaExamplePlaceholder(text)) {
+    return null;
+  }
   return {
     type: normalizeMechanicType(rawType),
     actorId: item?.actorId ?? null,
@@ -1524,9 +1534,14 @@ function normalizeMechanic(item) {
     dc: item?.dc ?? null,
     reason: compactWhitespace(item?.reason || ""),
     outcome: normalizeMechanicOutcome(rawOutcome),
-    label: compactWhitespace(item?.label || item?.type || "Mechanic"),
-    text: compactWhitespace(item?.text || item?.reason || fallbackText),
+    label,
+    text,
   };
+}
+
+function isSchemaExamplePlaceholder(value) {
+  const text = compactWhitespace(value).toLowerCase();
+  return schemaExamplePlaceholders.has(text);
 }
 
 function compactChoiceText(value) {

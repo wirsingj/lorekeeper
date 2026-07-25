@@ -1374,6 +1374,21 @@ h3 {
   line-height: 1.35;
 }
 
+.remote-friend-code-card {
+  border-color: rgba(121, 169, 255, 0.18);
+}
+
+.compact-section-title {
+  margin-bottom: 4px;
+}
+
+.compact-section-title h4 {
+  margin: 0;
+  color: #edf2f4;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+}
+
 .setup-note {
   margin: 0;
   color: #aebbc2;
