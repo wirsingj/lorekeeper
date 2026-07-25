@@ -3574,7 +3574,7 @@ async function handleRemoteGuestJoinRequest(message = {}) {
 }
 
 async function handleRemoteRelayGuestSnapshotRequest(message = {}) {
-  await sendRemoteRelayGuestSnapshot(message.guestId, { reason: "snapshot" });
+  await sendRemoteRelayGuestSnapshot(message.guestId, { reason: "snapshot", message });
 }
 
 async function handleRemoteRelayGuestAction(message = {}) {
@@ -3683,10 +3683,11 @@ function remoteRelayGuestActionPayload(message = {}) {
     entry: state.remoteRelayGuests.get(guestId),
     message,
     fallbackAuthority: localTableAuthorityPayload(),
+    activeSession: state.campaign?.multiplayer?.remoteFriendCodeSession,
   });
 }
 
-async function sendRemoteRelayGuestSnapshot(guestId, { reason = "snapshot" } = {}) {
+async function sendRemoteRelayGuestSnapshot(guestId, { reason = "snapshot", message = null } = {}) {
   const entry = state.remoteRelayGuests.get(String(guestId || ""));
   if (!entry?.connectionId || !entry?.connectionSecret) {
     sendRemoteRelayGuestError(guestId, new Error("Remote guest is not seated yet."), "Ask the host to seat you first.");
@@ -3696,7 +3697,9 @@ async function sendRemoteRelayGuestSnapshot(guestId, { reason = "snapshot" } = {
     const query = buildRemoteRelayGuestSnapshotQuery({
       guestId,
       entry,
+      message: message || {},
       fallbackAuthority: localTableAuthorityPayload(),
+      activeSession: message ? state.campaign?.multiplayer?.remoteFriendCodeSession : null,
     });
     const url = new URL(apiMultiplayerGuestSnapshotUrl, window.location.origin);
     for (const [key, value] of Object.entries(query)) {

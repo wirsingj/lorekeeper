@@ -4293,6 +4293,32 @@ function testRemoteRelayController() {
   });
   assert.equal("sessionKey" in payload, false);
 
+  const activePayload = buildRemoteRelayGuestAuthorityPayload({
+    guestId: "guest-approved",
+    entry,
+    message: { guestId: "guest-approved", code: "MOSS-7K4P" },
+    activeSession: { code: "MOSS-7K4P" },
+  });
+  assert.equal(activePayload.connectionId, "conn-approved");
+  assert.throws(
+    () => buildRemoteRelayGuestAuthorityPayload({
+      guestId: "guest-approved",
+      entry,
+      message: { guestId: "guest-approved", code: "OLD1-7K4P" },
+      activeSession: { code: "MOSS-7K4P" },
+    }),
+    /fresh code/i,
+  );
+  assert.throws(
+    () => buildRemoteRelayGuestSnapshotQuery({
+      guestId: "guest-approved",
+      entry,
+      message: { guestId: "guest-approved" },
+      activeSession: { code: "MOSS-7K4P" },
+    }),
+    /fresh code/i,
+  );
+
   const fallbackPayload = buildRemoteRelayGuestAuthorityPayload({
     guestId: "guest-fallback",
     entry: {
@@ -4899,6 +4925,7 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(multiplayerSessionPanel, /regenerateRemoteSharing/, "remote friend-code regenerate availability should be projected with the rest of the share panel");
   assert.match(multiplayerSessionPanel, /remoteFriendCodeDetail\.textContent/, "remote friend-code status detail should be rendered as visible panel copy");
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
+  assert.match(appJs, /activeSession: state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay browser requests should be pinned to the active friend code before using local authority");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestDisconnect/, "host app should clean up local guest authority when a remote browser guest disconnects");
