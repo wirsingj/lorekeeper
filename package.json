@@ -37,6 +37,7 @@
     "smoke:portable": "node ./scripts/smoke-portable-package.js",
     "release:tag": "node ./scripts/tag-release.js",
     "relay:deploy": "npx wrangler deploy --config wrangler.toml",
+    "smoke:relay-page": "node ./scripts/smoke-live-relay-page.js",
     "hooks:install": "node ./scripts/install-git-hooks.js",
     "cleanup": "node ./scripts/cleanup-processes.js",
     "shortcut": "cscript //nologo \"Create LoreKeeper Desktop Shortcut.vbs\""

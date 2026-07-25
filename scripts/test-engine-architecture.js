@@ -4615,9 +4615,14 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.equal(packageJson.scripts["package:host"], "npm run build && node ./scripts/package-portable-host.js", "host packaging should create the full portable app");
   assert.equal(packageJson.scripts["release:check"], "node ./scripts/check-portable-package.js", "release checks should verify the local portable artifact before commits/tags");
   assert.equal(packageJson.scripts["smoke:portable"], "node ./scripts/smoke-portable-package.js", "portable smoke should exercise the packaged app from a temp copy");
+  assert.equal(packageJson.scripts["smoke:relay-page"], "node ./scripts/smoke-live-relay-page.js", "relay page smoke should verify the live browser guest page");
   assert.equal(packageJson.scripts["release:tag"], "node ./scripts/tag-release.js", "release tags should go through the portable freshness check");
   assert.match(rootWrangler, /name = "lorekeeper-friend-relay"/, "root Cloudflare deploy config should target the shared friend-code relay, not a generic lorekeeper worker");
   assert.match(rootWrangler, /main = "workers\/relay\/src\/index\.js"/, "root Cloudflare deploy config should deploy the relay worker entrypoint");
+  const relayPageSmoke = await readFile(path.join("scripts", "smoke-live-relay-page.js"), "utf8");
+  assert.match(relayPageSmoke, /content-security-policy/, "live relay page smoke should verify CSP headers");
+  assert.match(relayPageSmoke, /unsafe-inline/, "live relay page smoke should explicitly reject unsafe-inline CSP");
+  assert.match(relayPageSmoke, /desktop[\s\S]*mobile/, "live relay page smoke should capture desktop and mobile screenshots");
   assert.match(relayWrangler, /name = "lorekeeper-friend-relay"/, "relay-local Cloudflare config should stay aligned with the maintained relay worker name");
   const releaseTagScript = await readFile(path.join("scripts", "tag-release.js"), "utf8");
   const prePushHook = await readFile(path.join(".githooks", "pre-push"), "utf8");
