@@ -218,6 +218,42 @@ try {
   assert.equal(table.running, true);
   assert.ok(table.tableId);
   assert.ok(table.sessionId);
+  const remoteStart = await fetchJson(`${baseUrl}/api/multiplayer/remote/start`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lorekeeper-api-token": token,
+      "x-lorekeeper-campaign-id": created.campaign.id,
+    },
+    body: JSON.stringify({
+      campaignId: created.campaign.id,
+      tableId: table.tableId,
+      sessionId: table.sessionId,
+      hostSlug: "integration-host",
+    }),
+  });
+  assert.equal(remoteStart.multiplayer.remoteFriendCode.status, "active");
+  assert.match(remoteStart.multiplayer.remoteFriendCode.link, /\/host\/integration-host\/table-code\//);
+  assert.equal(remoteStart.campaign.multiplayer.remoteFriendCodeSession.hostSlug, "integration-host");
+  const remoteSnapshot = await fetchJson(`${baseUrl}/api/multiplayer/snapshot`, {
+    headers: { "x-lorekeeper-api-token": token },
+  });
+  assert.equal(remoteSnapshot.remoteFriendCode.status, "active");
+  assert.equal(remoteSnapshot.remoteFriendCode.code, remoteStart.multiplayer.remoteFriendCode.code);
+  const remoteStop = await fetchJson(`${baseUrl}/api/multiplayer/remote/stop`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lorekeeper-api-token": token,
+      "x-lorekeeper-campaign-id": created.campaign.id,
+    },
+    body: JSON.stringify({
+      campaignId: created.campaign.id,
+      tableId: table.tableId,
+      sessionId: table.sessionId,
+    }),
+  });
+  assert.equal(remoteStop.multiplayer.remoteFriendCode.status, "stopped");
   await fetchJson(`${baseUrl}/api/pretable-lobby/publish`, {
     method: "POST",
     headers: {

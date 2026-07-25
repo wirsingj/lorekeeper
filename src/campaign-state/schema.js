@@ -131,6 +131,7 @@ export function createDefaultMultiplayerState() {
     pendingTurnInputs: [],
     choiceVotes: [],
     tableTalk: [],
+    remoteFriendCodeSession: null,
     events: [],
   };
 }
@@ -158,6 +159,9 @@ function normalizeMultiplayerState(multiplayer = {}) {
     pendingTurnInputs: Array.isArray(multiplayer.pendingTurnInputs) ? multiplayer.pendingTurnInputs : [],
     choiceVotes: Array.isArray(multiplayer.choiceVotes) ? multiplayer.choiceVotes : [],
     tableTalk: Array.isArray(multiplayer.tableTalk) ? multiplayer.tableTalk.slice(-120) : [],
+    remoteFriendCodeSession: multiplayer.remoteFriendCodeSession && typeof multiplayer.remoteFriendCodeSession === "object"
+      ? { ...multiplayer.remoteFriendCodeSession }
+      : defaults.remoteFriendCodeSession,
     events: Array.isArray(multiplayer.events) ? multiplayer.events.slice(-100) : [],
   };
 }

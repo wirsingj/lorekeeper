@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { normalizeCampaign } from "../src/campaign-state/schema.js";
 import {
   createFriendCodeSession,
   effectiveFriendCodeStatus,
@@ -119,6 +120,9 @@ assert.match(shareSession.safety, /leave\/rejoin, combat participation/);
 const liveRemoteCampaign = startRemoteFriendCodeSession(campaign, { relayBaseUrl: "https://play.lorekeeper.example" });
 assert.equal(liveRemoteCampaign.multiplayer.remoteFriendCodeSession.status, friendCodeSessionStatus.ACTIVE);
 assert.match(liveRemoteCampaign.multiplayer.remoteFriendCodeSession.link || friendCodePublicLink(liveRemoteCampaign.multiplayer.remoteFriendCodeSession), /\/host\/.+\/table-code\//);
+const normalizedRemoteCampaign = normalizeCampaign(liveRemoteCampaign);
+assert.equal(normalizedRemoteCampaign.multiplayer.remoteFriendCodeSession.status, friendCodeSessionStatus.ACTIVE);
+assert.equal(createHostSnapshot(normalizedRemoteCampaign).remoteFriendCode.status, friendCodeSessionStatus.ACTIVE);
 const stoppedRemoteCampaign = stopRemoteFriendCodeSession(liveRemoteCampaign);
 assert.equal(stoppedRemoteCampaign.multiplayer.remoteFriendCodeSession.status, friendCodeSessionStatus.STOPPED);
 campaign.multiplayer.remoteFriendCodeSession = createFriendCodeSession({

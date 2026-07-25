@@ -3216,8 +3216,20 @@ async function startRemoteSharingFromUi() {
     }
     setProviderActivity(link ? "Remote friend link copied" : "Remote friend code started", "idle");
   } catch (error) {
-    setProviderActivity(error instanceof Error ? `Remote sharing failed: ${error.message}` : "Remote sharing failed", "error");
+    const message = error instanceof Error ? error.message : "";
+    setProviderActivity(
+      isMissingRemoteSharingRouteError(message)
+        ? "Remote sharing needs the latest local server. Restart LoreKeeper, then click Start Remote Sharing again."
+        : message
+          ? `Remote sharing failed: ${message}`
+          : "Remote sharing failed",
+      "error",
+    );
   }
+}
+
+function isMissingRemoteSharingRouteError(message = "") {
+  return /not_found|cannot\s+post|404/i.test(String(message));
 }
 
 async function stopRemoteSharingFromUi() {
