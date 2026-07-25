@@ -114,6 +114,12 @@ const relayGuestPageSource = relaySource.slice(relaySource.indexOf("function ren
 assert.match(relaySource, /playable-browser-guest-alpha/, "relay health should identify the playable browser guest alpha build");
 assert.match(relayGuestPageSource, /id="table-panel"/, "public guest page should include a post-approval table panel");
 assert.match(relayGuestPageSource, /id="send-action"/, "public guest page should let approved guests send actions");
+assert.match(relayGuestPageSource, /class="table-shell"/, "public guest page should use the LoreKeeper table shell instead of a plain form");
+assert.match(relayGuestPageSource, /class="rail left-rail"/, "public guest page should show a party/adventure rail like the full app");
+assert.match(relayGuestPageSource, /class="stage"/, "public guest page should center the story stage like the full app");
+assert.match(relayGuestPageSource, /class="rail right-rail"/, "public guest page should show Table Talk as a right rail on desktop");
+assert.match(relayGuestPageSource, /class="command-deck"/, "public guest page should keep actions in a bottom command deck");
+assert.match(relayGuestPageSource, /id="party-list"/, "public guest page should render guest-safe party details");
 assert.match(relayGuestPageSource, /guest\.snapshot\.request/, "public guest page should request guest-safe snapshots after approval");
 assert.match(relayGuestPageSource, /setInterval\(requestSnapshot, 5000\)/, "public guest page should auto-refresh approved guest snapshots");
 assert.match(relayGuestPageSource, /pendingJoin/, "public guest page should remember a pending join across host relay reconnects");

@@ -114,6 +114,7 @@ External work required from the human:
 - Guest `/guest` flow should require host approval for requested seats for now. Future trust can remember a returning person/account/IP for a prior seat, but the near-term product should be explicit and safe.
 - LoreKeeper is one app with host and guest access surfaces. Thinclient is retired as a separate product concept; do not revive it as user-facing product or brand language.
 - Remote friend-code guests are browser guests, not app users. Downloadable distro/Steam/Itch solves host distribution; friend code solves guest access.
+- Remote friend-code browser guests must see a LoreKeeper table surface, not a relay/debug form. The public Worker page now uses the app-like Adventure/Party rail, center story stage, Table Talk rail, and bottom command deck while still exposing only guest-safe messages.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
 - AI companions should occasionally interject on their own when appropriate and nobody controlled by a host/remote is actively typing, while still respecting agency, cooldowns, and major-decision guardrails.
@@ -138,6 +139,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Campaign delete is visible from the front door and recycles local SQLite files instead of exposing undeletable backend placeholder campaigns.
 - The hidden Playwright harness uses temp campaign roots, host plus `/guest` tabs, deterministic provider mocks, remote chaos, and failure artifacts so trust bugs do not pollute real campaign files.
 - Provider schema/example placeholders in structured choices and mechanics are filtered before rendering, so model parroting like "clear action option" or "short roll/check/combat label" cannot become visible table content.
+- The first real remote browser playtest proved the Cloudflare relay path can connect across machines. The public guest page has been upgraded from a bare form to an app-shaped table shell with party, story, Table Talk, choices, and a visible seated-status line.
 
 ### Remaining Trust Risks
 
@@ -211,6 +213,7 @@ High:
 8. Local-table/guest tools still expose hosting mechanics in places.
 9. Model setup is correctly configuration now, but it still needs more first-run polish around Ollama install, model download, and readiness.
 10. Guest seat requests need more immediate, friendly host-side presentation.
+11. Remote browser guest visual parity is improved, but it still needs a real two-machine visual soak after each relay deploy because it ships from Worker-owned HTML/CSS instead of the Vite app bundle.
 
 Medium:
 

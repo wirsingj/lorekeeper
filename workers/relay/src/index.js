@@ -340,66 +340,239 @@ function renderGuestEntryPage(initialCode) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LoreKeeper Remote Table</title>
   <style>
-    body { margin: 0; min-height: 100vh; background: #101416; color: #edf2f4; font-family: system-ui, sans-serif; }
-    main { width: min(840px, calc(100vw - 32px)); margin: 0 auto; padding: 32px 0; display: grid; gap: 14px; }
-    h1 { margin: 0; font-size: 1.6rem; }
-    p { color: #aebbc2; line-height: 1.45; }
-    label { display: grid; gap: 6px; color: #cbd5da; font-size: .82rem; font-weight: 700; }
-    input, textarea { border-radius: 8px; border: 1px solid #3b474d; background: #151b1f; color: #fff; padding: 10px 12px; font: inherit; }
-    input { min-height: 44px; }
-    textarea { min-height: 96px; resize: vertical; }
-    #code { letter-spacing: .08em; text-transform: uppercase; }
-    button { min-height: 44px; border: 0; border-radius: 8px; background: #8ec6a5; color: #07100b; font-weight: 800; cursor: pointer; }
+    :root {
+      color-scheme: dark;
+      --ink: #e8edf0;
+      --muted: #a5b0b9;
+      --line: rgba(174, 191, 202, 0.16);
+      --stone-dark: #171a1d;
+      --stone-mid: #30363b;
+      --surface: rgba(22, 27, 30, 0.84);
+      --surface-raised: #20262a;
+      --moss: #8ec6a5;
+      --steel: #8fa6b8;
+      --copper: #a8845b;
+      --red: #b36862;
+      --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 16% 8%, rgba(125, 213, 201, 0.1), transparent 24%),
+        radial-gradient(circle at 82% 18%, rgba(168, 132, 91, 0.12), transparent 28%),
+        linear-gradient(135deg, #0e1214, #1a2123 52%, #101316);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, textarea { font: inherit; }
+    button {
+      min-height: 40px;
+      border: 1px solid rgba(174, 191, 202, 0.18);
+      border-radius: 8px;
+      background: linear-gradient(180deg, #4c5962, #343d43);
+      color: #f4f8fa;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+    button.primary { background: linear-gradient(180deg, #9ccfb2, #79a98f); color: #09120d; }
     button:disabled { opacity: .55; cursor: default; }
-    section { border: 1px solid #283237; border-radius: 8px; background: #151b1f; padding: 14px; display: grid; gap: 10px; }
-    section[hidden] { display: none; }
+    input, textarea {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid rgba(174, 191, 202, 0.22);
+      background: #13191c;
+      color: #fff;
+      padding: 10px 12px;
+      outline: none;
+    }
+    input:focus, textarea:focus { border-color: rgba(142, 198, 165, 0.74); }
+    textarea { min-height: 88px; resize: vertical; }
+    label { display: grid; gap: 6px; color: #d8e1e5; font-size: .78rem; font-weight: 850; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 0; font-size: 1.24rem; line-height: 1.1; }
+    h2 { margin-bottom: 0; font-size: .86rem; text-transform: uppercase; color: var(--steel); }
+    p { color: var(--muted); line-height: 1.45; }
+    main { min-height: 100vh; }
+    .join-shell {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .join-card {
+      width: min(760px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 18px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 14px;
+    }
+    .brand-row { display: flex; align-items: center; gap: 10px; }
+    .app-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(180deg, #2f4c48, #202b2d);
+      border: 1px solid rgba(142, 198, 165, 0.28);
+      font-weight: 950;
+    }
     .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .row button { flex: 1 1 140px; }
-    .muted { color: #aebbc2; }
-    .log { display: grid; gap: 8px; max-height: 320px; overflow: auto; }
-    .msg, .talk { border: 1px solid #303b41; border-radius: 8px; padding: 10px; background: #101416; }
-    .msg strong, .talk strong { display: block; margin-bottom: 4px; color: #edf2f4; }
+    #code { letter-spacing: .08em; text-transform: uppercase; }
+    .table-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 236px minmax(420px, 1fr) 252px;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 8px;
+      padding: 12px;
+    }
+    .table-shell[hidden], .join-shell[hidden] { display: none; }
+    .rail, .stage, .command-deck {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 30%),
+        var(--surface);
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+    .rail { padding: 10px; display: grid; align-content: start; gap: 10px; overflow: auto; }
+    .stage { display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+    .table-status {
+      min-height: 40px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-weight: 750;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--moss); box-shadow: 0 0 14px rgba(142, 198, 165, 0.5); }
+    .story-log { padding: 18px; display: grid; align-content: start; gap: 16px; overflow: auto; }
+    .msg {
+      max-width: 850px;
+      border: 1px solid rgba(174, 191, 202, 0.16);
+      border-radius: 8px;
+      background: rgba(32, 38, 42, 0.88);
+      padding: 14px;
+      line-height: 1.5;
+    }
+    .msg strong, .talk strong { display: block; margin-bottom: 6px; color: var(--ink); font-size: .82rem; }
+    .empty { color: var(--muted); border: 1px dashed rgba(174, 191, 202, 0.16); border-radius: 8px; padding: 14px; }
+    .seat-card, .party-card, .talk {
+      border: 1px solid rgba(174, 191, 202, 0.12);
+      border-radius: 8px;
+      background: rgba(32, 38, 42, 0.78);
+      padding: 10px;
+    }
+    .party-card { display: grid; gap: 3px; }
+    .party-card.active { border-color: rgba(142, 198, 165, 0.58); background: rgba(32, 49, 43, 0.72); }
+    .meta { color: var(--muted); font-size: .78rem; }
+    .talk-log { display: grid; gap: 8px; max-height: calc(100vh - 220px); overflow: auto; }
+    .command-deck {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 160px;
+      gap: 10px;
+      padding: 12px;
+      align-items: end;
+    }
+    .command-stack { display: grid; gap: 8px; }
+    .command-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     .choices { display: grid; gap: 8px; }
-    .choice { text-align: left; background: #22312b; color: #eaf8ef; }
-    code { color: #8ec6a5; }
+    .choice { text-align: left; min-height: 38px; background: rgba(34, 49, 43, 0.9); color: #eaf8ef; }
+    .choice-panel {
+      border: 1px solid rgba(142, 198, 165, 0.28);
+      background: rgba(30, 50, 39, 0.66);
+      border-radius: 8px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+    .muted { color: var(--muted); }
+    .mobile-talk { display: none; }
+    @media (max-width: 980px) {
+      .table-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(320px, 1fr) auto auto;
+      }
+      .right-rail { display: none; }
+      .left-rail { max-height: 180px; }
+      .mobile-talk { display: grid; }
+      .desktop-talk { display: none; }
+      .command-deck { grid-column: 1; grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
   <main>
-    <section id="join-panel">
-      <h1>LoreKeeper</h1>
-      <p>Enter a friend code to join a remote table. The host keeps campaign state and the DM brain on their machine.</p>
+    <section id="join-panel" class="join-shell">
+      <div class="join-card">
+      <div class="brand-row">
+        <div class="app-icon">LK</div>
+        <div>
+          <h1>LoreKeeper</h1>
+          <p class="muted">Join a friend's table from your browser.</p>
+        </div>
+      </div>
       <div class="grid">
         <label>Friend Code<input id="code" value="${escapeHtml(code)}" placeholder="M7SS-7K4P" maxlength="9" /></label>
         <label>Your Name<input id="name" value="" placeholder="Player name" maxlength="40" /></label>
       </div>
-      <button id="join">Ask To Join</button>
+      <button id="join" class="primary">Ask To Join</button>
       <p id="status">Remote relay is online.</p>
-    </section>
-    <section id="table-panel" hidden>
-      <h1 id="table-title">LoreKeeper Table</h1>
-      <p id="seat" class="muted">Waiting for a seat.</p>
-      <p id="scene">Waiting for the host table.</p>
-      <div id="choices" class="choices"></div>
-      <label>Your Action<textarea id="action" maxlength="1200" placeholder="What do you do?"></textarea></label>
-      <div class="row">
-        <button id="send-action">Send Action</button>
-        <button id="pass">Pass</button>
-        <button id="refresh">Refresh</button>
       </div>
-      <label>Table Talk<input id="talk" maxlength="800" placeholder="Say something out of character..." /></label>
-      <button id="send-talk">Send Table Talk</button>
-      <h2>Story</h2>
-      <div id="log" class="log"></div>
-      <h2>Table Talk</h2>
-      <div id="talk-log" class="log"></div>
+    </section>
+    <section id="table-panel" class="table-shell" hidden>
+      <aside class="rail left-rail">
+        <h2>Adventure</h2>
+        <div class="seat-card">
+          <h1 id="table-title">LoreKeeper Table</h1>
+          <p id="seat" class="muted">Waiting for a seat.</p>
+        </div>
+        <h2>Party</h2>
+        <div id="party-list" class="choices"></div>
+      </aside>
+      <section class="stage">
+        <div class="table-status"><span class="dot"></span><span id="scene">Waiting for the host table.</span></div>
+        <div id="log" class="story-log"></div>
+      </section>
+      <aside class="rail right-rail">
+        <h2>Table Talk</h2>
+        <div id="talk-log" class="talk-log"></div>
+      </aside>
+      <section class="command-deck">
+        <div class="command-stack">
+          <div id="choices" class="choices"></div>
+          <label>Your Action<textarea id="action" maxlength="1200" placeholder="What do you do?"></textarea></label>
+          <label class="mobile-talk">Table Talk<input id="talk-mobile" maxlength="800" placeholder="Say something out of character..." /></label>
+        </div>
+        <div class="command-stack">
+          <div class="command-buttons">
+            <button id="send-action" class="primary">Send</button>
+            <button id="pass">Pass</button>
+            <button id="refresh">Sync</button>
+          </div>
+          <label class="desktop-talk">Table Talk<input id="talk" maxlength="800" placeholder="Say something out of character..." /></label>
+          <button id="send-talk">Send Table Talk</button>
+          <p id="table-notice" class="muted">Connected.</p>
+        </div>
+      </section>
     </section>
   </main>
   <script>
     const input = document.querySelector("#code");
     const nameInput = document.querySelector("#name");
     const status = document.querySelector("#status");
+    const tableNotice = document.querySelector("#table-notice");
     const join = document.querySelector("#join");
     const joinPanel = document.querySelector("#join-panel");
     const tablePanel = document.querySelector("#table-panel");
@@ -408,9 +581,11 @@ function renderGuestEntryPage(initialCode) {
     const scene = document.querySelector("#scene");
     const log = document.querySelector("#log");
     const talkLog = document.querySelector("#talk-log");
+    const partyList = document.querySelector("#party-list");
     const choices = document.querySelector("#choices");
     const action = document.querySelector("#action");
     const talk = document.querySelector("#talk");
+    const talkMobile = document.querySelector("#talk-mobile");
     const sendAction = document.querySelector("#send-action");
     const sendTalk = document.querySelector("#send-talk");
     const pass = document.querySelector("#pass");
@@ -420,12 +595,16 @@ function renderGuestEntryPage(initialCode) {
     let latestSnapshot = null;
     let snapshotTimer = null;
     let pendingJoin = null;
+    const setStatus = (text) => {
+      status.textContent = text;
+      tableNotice.textContent = text;
+    };
     const send = (message) => {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify(message));
         return true;
       }
-      status.textContent = "Relay connection is closed. Rejoin with a fresh code.";
+      setStatus("Relay connection is closed. Rejoin with a fresh code.");
       return false;
     };
     const requestSnapshot = () => {
@@ -446,11 +625,11 @@ function renderGuestEntryPage(initialCode) {
       const res = await fetch("/api/session/" + encodeURIComponent(code));
       const body = await res.json();
       if (!body.ok) {
-        status.textContent = "That friend code was not recognized.";
+        setStatus("That friend code was not recognized.");
         return;
       }
       if (!body.active) {
-        status.textContent = "That code exists, but the host is not connected right now.";
+        setStatus("That code exists, but the host is not connected right now.");
         return;
       }
       const displayName = nameInput.value.trim() || "Remote Friend";
@@ -458,17 +637,17 @@ function renderGuestEntryPage(initialCode) {
       socket?.close();
       socket = new WebSocket(location.origin.replace(/^http/i, "ws") + "/api/guest/connect?code=" + encodeURIComponent(code));
       join.disabled = true;
-      status.textContent = "Connecting to the host...";
+      setStatus("Connecting to the host...");
       socket.addEventListener("open", () => {
         socket.send(JSON.stringify({ kind: "guest.hello", code, displayName }));
         socket.send(JSON.stringify({ kind: "guest.join.request", code, displayName }));
-        status.textContent = "Join request sent. Waiting for the host to seat you.";
+        setStatus("Join request sent. Waiting for the host to seat you.");
       });
       socket.addEventListener("message", (event) => {
         let message = null;
         try { message = JSON.parse(event.data); } catch {}
         if (message?.kind === "host.guest.pending") {
-          status.textContent = "The host sees your request. Waiting for a seat.";
+          setStatus("The host sees your request. Waiting for a seat.");
         } else if (message?.kind === "host.guest.approved") {
           session = {
             code,
@@ -477,9 +656,9 @@ function renderGuestEntryPage(initialCode) {
             partyMemberId: message.partyMemberId || "",
             characterName: message.characterName || "",
           };
-          status.textContent = message.characterName
+          setStatus(message.characterName
             ? "Joined as " + message.characterName + "."
-            : "Joined the table.";
+            : "Joined the table.");
           joinPanel.hidden = true;
           tablePanel.hidden = false;
           seat.textContent = message.characterName ? "Seated as " + message.characterName + "." : "Seated at the table.";
@@ -490,18 +669,18 @@ function renderGuestEntryPage(initialCode) {
           latestSnapshot = message.snapshot || null;
           renderSnapshot(latestSnapshot);
         } else if (message?.kind === "host.error") {
-          status.textContent = message.message || "The host could not complete that request.";
+          setStatus(message.message || "The host could not complete that request.");
         } else if (message?.kind === "relay.host.ready") {
-          status.textContent = "Host is connected. Sending request...";
+          setStatus("Host is connected. Sending request...");
           if (!session && pendingJoin) {
             socket.send(JSON.stringify({ kind: "guest.join.request", code: pendingJoin.code, displayName: pendingJoin.displayName }));
           } else if (session) {
             requestSnapshot();
           }
         } else if (message?.kind === "relay.host.disconnected") {
-          status.textContent = "The host disconnected. Ask for a fresh code or wait for them to reconnect.";
+          setStatus("The host disconnected. Ask for a fresh code or wait for them to reconnect.");
         } else if (message?.kind === "relay.error") {
-          status.textContent = "Relay rejected the request. Ask the host for a fresh code.";
+          setStatus("Relay rejected the request. Ask the host for a fresh code.");
         }
       });
       socket.addEventListener("close", () => {
@@ -511,7 +690,7 @@ function renderGuestEntryPage(initialCode) {
       socket.addEventListener("error", () => {
         join.disabled = false;
         stopSnapshotPolling();
-        status.textContent = "Could not connect to the relay.";
+        setStatus("Could not connect to the relay.");
       });
     });
     refresh.addEventListener("click", requestSnapshot);
@@ -523,27 +702,29 @@ function renderGuestEntryPage(initialCode) {
     sendAction.addEventListener("click", () => {
       const text = action.value.trim();
       if (!text) {
-        status.textContent = "Write an action first.";
+        setStatus("Write an action first.");
         return;
       }
       if (send({ kind: "guest.action.submit", code: session?.code || input.value.trim().toUpperCase(), text })) {
         action.value = "";
-        status.textContent = "Action sent. Waiting for the host table.";
+        setStatus("Action sent. Waiting for the host table.");
       }
     });
     pass.addEventListener("click", () => {
       if (send({ kind: "guest.pass", code: session?.code || input.value.trim().toUpperCase() })) {
-        status.textContent = "Passed. Waiting for the host table.";
+        setStatus("Passed. Waiting for the host table.");
       }
     });
     sendTalk.addEventListener("click", () => {
-      const text = talk.value.trim();
+      const activeTalk = talkMobile?.offsetParent ? talkMobile : talk;
+      const text = activeTalk.value.trim();
       if (!text) {
         return;
       }
       if (send({ kind: "guest.tableTalk.post", code: session?.code || input.value.trim().toUpperCase(), text })) {
         talk.value = "";
-        status.textContent = "Table Talk sent.";
+        if (talkMobile) talkMobile.value = "";
+        setStatus("Table Talk sent.");
       }
     });
     function renderSnapshot(snapshot) {
@@ -556,16 +737,17 @@ function renderGuestEntryPage(initialCode) {
       const characterName = snapshot.assignedCharacter?.name || session?.characterName || snapshot.connection?.displayName || "Your seat";
       seat.textContent = "You are " + characterName + ".";
       scene.textContent = snapshot.scene?.immediateSituation || snapshot.tableState?.scene?.immediateSituation || "The table is quiet.";
+      renderParty(snapshot.tableState?.party || snapshot.party || []);
       renderMessages(snapshot.messages || snapshot.tableState?.messages || []);
       renderTalk(snapshot.tableTalk || snapshot.tableState?.tableTalk || []);
       renderChoices(snapshot.messages || snapshot.tableState?.messages || []);
       const pending = snapshot.pendingInput || snapshot.tableState?.pendingInput;
       if (pending?.text) {
-        status.textContent = "Your action is queued: " + pending.text;
+        setStatus("Your action is queued: " + pending.text);
       } else if (pending?.passed) {
-        status.textContent = "You passed this turn.";
+        setStatus("You passed this turn.");
       } else {
-        status.textContent = "Connected.";
+        setStatus("Connected.");
       }
     }
     function renderMessages(messages) {
@@ -581,7 +763,33 @@ function renderGuestEntryPage(initialCode) {
         log.append(div);
       }
       if (!log.children.length) {
-        log.textContent = "No story messages yet.";
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "The story log is waiting for the host table.";
+        log.append(empty);
+      }
+    }
+    function renderParty(party) {
+      partyList.innerHTML = "";
+      const assignedId = latestSnapshot?.assignedCharacter?.id || session?.partyMemberId || "";
+      for (const member of party) {
+        const div = document.createElement("div");
+        div.className = "party-card" + (member.id === assignedId ? " active" : "");
+        const name = document.createElement("strong");
+        name.textContent = member.name || "Party member";
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const hp = Number.isFinite(member.hp) && Number.isFinite(member.maxHp) ? "HP " + member.hp + "/" + member.maxHp : "";
+        const role = [member.ancestry, member.characterClass].filter(Boolean).join(" ");
+        meta.textContent = [role, hp, member.id === assignedId ? "You" : ""].filter(Boolean).join(" - ");
+        div.append(name, meta);
+        partyList.append(div);
+      }
+      if (!partyList.children.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "Party details will appear once the host shares the table.";
+        partyList.append(empty);
       }
     }
     function renderTalk(messages) {
@@ -597,16 +805,21 @@ function renderGuestEntryPage(initialCode) {
         talkLog.append(div);
       }
       if (!talkLog.children.length) {
-        talkLog.textContent = "Table Talk is quiet.";
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "Table Talk is quiet.";
+        talkLog.append(empty);
       }
     }
     function renderChoices(messages) {
       choices.innerHTML = "";
+      choices.className = "choices";
       const choiceMessage = [...messages].reverse().find((message) => message?.data?.choices?.options?.length);
       const block = choiceMessage?.data?.choices;
       if (!block) {
         return;
       }
+      choices.className = "choice-panel";
       const prompt = document.createElement("p");
       prompt.textContent = block.prompt || "What do you do?";
       choices.append(prompt);
@@ -625,7 +838,7 @@ function renderGuestEntryPage(initialCode) {
             optionText: option.text || option.label || "",
             prompt: block.prompt || "",
           });
-          status.textContent = "Vote sent.";
+          setStatus("Vote sent.");
         });
         choices.append(button);
       });
