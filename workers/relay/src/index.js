@@ -797,6 +797,15 @@ function renderGuestEntryPage(initialCode) {
       }
     });
     sendAction.addEventListener("click", () => {
+      submitAction();
+    });
+    action.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        submitAction();
+      }
+    });
+    function submitAction() {
       const text = action.value.trim();
       if (!text) {
         setStatus("Write an action first.");
@@ -806,13 +815,26 @@ function renderGuestEntryPage(initialCode) {
         action.value = "";
         setStatus("Action sent. Waiting for the host table.");
       }
-    });
+    }
     pass.addEventListener("click", () => {
       if (send({ kind: "guest.pass", code: session?.code || input.value.trim().toUpperCase() })) {
         setStatus("Passed. Waiting for the host table.");
       }
     });
-    sendTalk.addEventListener("click", () => {
+    sendTalk.addEventListener("click", submitTableTalk);
+    talk.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submitTableTalk();
+      }
+    });
+    talkMobile?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submitTableTalk();
+      }
+    });
+    function submitTableTalk() {
       const activeTalk = talkMobile?.offsetParent ? talkMobile : talk;
       const text = activeTalk.value.trim();
       if (!text) {
@@ -823,7 +845,7 @@ function renderGuestEntryPage(initialCode) {
         if (talkMobile) talkMobile.value = "";
         setStatus("Table Talk sent.");
       }
-    });
+    }
     function renderSnapshot(snapshot) {
       if (!snapshot) {
         return;
@@ -998,7 +1020,7 @@ function renderGuestEntryPage(initialCode) {
         const label = String.fromCharCode(65 + index);
         button.textContent = compactText(label + ". " + (option.text || option.label || "Choice"), 360);
         button.addEventListener("click", () => {
-          send({
+          if (send({
             kind: "guest.choice.vote",
             code: session?.code || input.value.trim().toUpperCase(),
             choiceKey: choiceKey(block),
@@ -1006,10 +1028,17 @@ function renderGuestEntryPage(initialCode) {
             optionLabel: label,
             optionText: compactText(option.text || option.label || "", 360),
             prompt: compactText(block.prompt || "", 360),
-          });
-          setStatus("Vote sent.");
+          })) {
+            disableChoiceButtons();
+            setStatus("Vote sent.");
+          }
         });
         choices.append(button);
+      });
+    }
+    function disableChoiceButtons() {
+      choices.querySelectorAll("button.choice").forEach((button) => {
+        button.disabled = true;
       });
     }
     function choiceKey(block) {

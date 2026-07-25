@@ -135,6 +135,10 @@ assert.match(relayGuestPageSource, /const normalizeCodeInput/, "public guest pag
 assert.match(relayGuestPageSource, /input\.addEventListener\("input"[\s\S]*normalizeCodeInput/, "public guest page should format friend code input immediately");
 assert.match(relayGuestPageSource, /nameInput\.addEventListener\("keydown"[\s\S]*await joinRemoteTable/, "public guest page should submit from the name field with Enter");
 assert.match(relayGuestPageSource, /input\.value\.trim\(\)[\s\S]*nameInput\.focus\(\)/, "direct friend-code links should focus the player's name field");
+assert.match(relayGuestPageSource, /action\.addEventListener\("keydown"[\s\S]*event\.ctrlKey \|\| event\.metaKey[\s\S]*submitAction/, "public guest action composer should submit with Ctrl/Cmd+Enter");
+assert.match(relayGuestPageSource, /talk\.addEventListener\("keydown"[\s\S]*submitTableTalk/, "public guest Table Talk should send with Enter");
+assert.match(relayGuestPageSource, /function disableChoiceButtons/, "public guest page should avoid duplicate choice-vote clicks");
+assert.match(relayGuestPageSource, /disableChoiceButtons\(\)[\s\S]*setStatus\("Vote sent\."\)/, "public guest choice vote should disable visible choices after sending");
 assert.match(relayGuestPageSource, /safeList\(block\.options, 6\)/, "public guest page should bound rendered choice options");
 assert.match(relayGuestPageSource, /compactText\(message\.body \|\| "", 1600\)/, "public guest page should bound rendered story text");
 assert.match(relayGuestPageSource, /refresh\.textContent = connected \? "Sync" : "Reconnect"/, "public guest Sync button should become Reconnect when the socket is closed");
