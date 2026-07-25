@@ -475,6 +475,15 @@ function renderGuestEntryPage(initialCode) {
       background: rgba(32, 38, 42, 0.78);
       padding: 10px;
     }
+    .moment-panel {
+      border: 1px solid rgba(168, 132, 91, 0.24);
+      border-radius: 8px;
+      background: rgba(50, 39, 25, 0.58);
+      padding: 10px;
+      display: grid;
+      gap: 4px;
+    }
+    .moment-panel strong { color: #f4eadb; }
     .party-card { display: grid; gap: 3px; }
     .party-card.active { border-color: rgba(142, 198, 165, 0.58); background: rgba(32, 49, 43, 0.72); }
     .meta { color: var(--muted); font-size: .78rem; }
@@ -540,6 +549,10 @@ function renderGuestEntryPage(initialCode) {
           <h1 id="table-title">LoreKeeper Table</h1>
           <p id="seat" class="muted">Waiting for a seat.</p>
         </div>
+        <div id="moment-panel" class="moment-panel">
+          <strong>Waiting</strong>
+          <span class="meta">The host table is syncing.</span>
+        </div>
         <h2>Party</h2>
         <div id="party-list" class="choices"></div>
       </aside>
@@ -580,6 +593,7 @@ function renderGuestEntryPage(initialCode) {
     const tablePanel = document.querySelector("#table-panel");
     const tableTitle = document.querySelector("#table-title");
     const seat = document.querySelector("#seat");
+    const momentPanel = document.querySelector("#moment-panel");
     const scene = document.querySelector("#scene");
     const log = document.querySelector("#log");
     const talkLog = document.querySelector("#talk-log");
@@ -604,10 +618,10 @@ function renderGuestEntryPage(initialCode) {
     };
     const setTableConnected = (connected) => {
       tablePanel.dataset.connection = connected ? "connected" : "disconnected";
-      sendAction.disabled = !connected;
-      pass.disabled = !connected;
+      action.disabled = !connected;
       sendTalk.disabled = !connected;
       refresh.textContent = connected ? "Sync" : "Reconnect";
+      updateActionAvailability(latestSnapshot);
     };
     const send = (message) => {
       if (socket?.readyState === WebSocket.OPEN) {
@@ -638,6 +652,7 @@ function renderGuestEntryPage(initialCode) {
       renderMessages([]);
       renderTalk([]);
       renderChoices([]);
+      renderMoment(null);
     };
     const openGuestSocket = ({ code, displayName, rejoin = false }) => {
       socket?.close();
@@ -793,11 +808,13 @@ function renderGuestEntryPage(initialCode) {
       const characterName = snapshot.assignedCharacter?.name || session?.characterName || snapshot.connection?.displayName || "Your seat";
       seat.textContent = "You are " + characterName + ".";
       scene.textContent = snapshot.scene?.immediateSituation || snapshot.tableState?.scene?.immediateSituation || "The table is quiet.";
+      renderMoment(snapshot);
       renderParty(snapshot.tableState?.party || snapshot.party || []);
       renderMessages(snapshot.messages || snapshot.tableState?.messages || []);
       renderTalk(snapshot.tableTalk || snapshot.tableState?.tableTalk || []);
       renderChoices(snapshot.messages || snapshot.tableState?.messages || []);
       const pending = snapshot.pendingInput || snapshot.tableState?.pendingInput;
+      updateActionAvailability(snapshot);
       if (pending?.text) {
         setStatus("Your action is queued: " + pending.text);
       } else if (pending?.passed) {
@@ -805,6 +822,76 @@ function renderGuestEntryPage(initialCode) {
       } else {
         setStatus("Connected.");
       }
+    }
+    function updateActionAvailability(snapshot) {
+      const connected = tablePanel.dataset.connection === "connected";
+      const pending = snapshot?.pendingInput || snapshot?.tableState?.pendingInput;
+      const context = actionContext(snapshot);
+      let available = connected && Boolean(snapshot);
+      let reason = connected ? "The table is syncing before actions unlock." : "Reconnect before sending an action.";
+      if (snapshot && !pending?.text && !pending?.passed) {
+        reason = "Describe what your character does.";
+      }
+      if (pending?.text || pending?.passed) {
+        available = false;
+        reason = "Your action is already queued at the host table.";
+      } else if (context.inCombat && context.activeActorId && context.activeActorId !== context.assignedId) {
+        available = false;
+        reason = "Waiting for " + (context.activeActorName || "the active combatant") + "'s combat turn.";
+      } else if (context.inCombat && context.activeActorId === context.assignedId) {
+        reason = "It is your combat turn.";
+      }
+      action.disabled = !available;
+      sendAction.disabled = !available;
+      pass.disabled = !available;
+      action.placeholder = available ? "What do you do?" : reason;
+      sendAction.title = available ? "Send your character action to the host table." : reason;
+      pass.title = available ? "Pass this turn." : reason;
+    }
+    function renderMoment(snapshot) {
+      const context = actionContext(snapshot);
+      const pending = snapshot?.pendingInput || snapshot?.tableState?.pendingInput;
+      let title = "Waiting";
+      let detail = "The host table is syncing.";
+      if (pending?.text) {
+        title = "Action Queued";
+        detail = "The host has your action and will resolve it at the table.";
+      } else if (pending?.passed) {
+        title = "Passed";
+        detail = "You passed. Waiting for the host table.";
+      } else if (context.inCombat && context.activeActorId === context.assignedId) {
+        title = "Your Turn";
+        detail = "Choose your combat action, pass, or use Table Talk.";
+      } else if (context.inCombat && context.activeActorId) {
+        title = "Combat";
+        detail = "Waiting for " + (context.activeActorName || "the active combatant") + ".";
+      } else if (snapshot) {
+        title = "At The Table";
+        detail = "Send an action when you are ready, or use Table Talk.";
+      }
+      momentPanel.replaceChildren();
+      const strong = document.createElement("strong");
+      strong.textContent = title;
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      meta.textContent = detail;
+      momentPanel.append(strong, meta);
+    }
+    function actionContext(snapshot) {
+      const tableState = snapshot?.tableState || snapshot || {};
+      const combat = tableState.combat || snapshot?.combat || null;
+      const assignedId = snapshot?.assignedCharacter?.id || session?.partyMemberId || "";
+      const activeActorId = combat?.currentTurnId || combat?.activeActorId || "";
+      const turnOrder = Array.isArray(combat?.turnOrder) ? combat.turnOrder : [];
+      const activeActor = turnOrder.find((entry) => (entry.id || entry.actorId) === activeActorId)
+        || (tableState.party || snapshot?.party || []).find((member) => member.id === activeActorId)
+        || (combat?.enemies || []).find((enemy) => enemy.id === activeActorId);
+      return {
+        inCombat: Boolean(combat?.inCombat && activeActorId),
+        assignedId,
+        activeActorId,
+        activeActorName: activeActor?.name || "",
+      };
     }
     function renderMessages(messages) {
       log.innerHTML = "";

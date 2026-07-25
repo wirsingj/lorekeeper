@@ -120,8 +120,15 @@ assert.match(relayGuestPageSource, /class="stage"/, "public guest page should ce
 assert.match(relayGuestPageSource, /class="rail right-rail"/, "public guest page should show Table Talk as a right rail on desktop");
 assert.match(relayGuestPageSource, /class="command-deck"/, "public guest page should keep actions in a bottom command deck");
 assert.match(relayGuestPageSource, /id="party-list"/, "public guest page should render guest-safe party details");
+assert.match(relayGuestPageSource, /id="moment-panel"/, "public guest page should show the current table moment");
 assert.match(relayGuestPageSource, /id="table-notice"/, "public guest page should show seated guests visible connection/action feedback");
 assert.match(relayGuestPageSource, /setTableConnected/, "public guest page should centralize connected/disconnected action button state");
+assert.match(relayGuestPageSource, /updateActionAvailability/, "public guest page should project action availability from guest-safe state");
+assert.match(relayGuestPageSource, /The table is syncing before actions unlock/, "public guest actions should stay locked until the first snapshot arrives");
+assert.match(relayGuestPageSource, /Your action is already queued at the host table/, "public guest page should avoid duplicate action submits while pending");
+assert.match(relayGuestPageSource, /Waiting for " \+ \(context\.activeActorName/, "public guest page should tell guests whose combat turn is active");
+assert.match(relayGuestPageSource, /It is your combat turn/, "public guest page should unlock actions with clear combat-turn copy");
+assert.match(relayGuestPageSource, /function actionContext/, "public guest action gating should use guest-safe snapshot context");
 assert.match(relayGuestPageSource, /refresh\.textContent = connected \? "Sync" : "Reconnect"/, "public guest Sync button should become Reconnect when the socket is closed");
 assert.match(relayGuestPageSource, /Connection paused\. Press Reconnect/, "public guest page should not strand seated guests on socket close");
 assert.match(relayGuestPageSource, /const guestSocket = socket/, "public guest page should pin reconnect handlers to the socket that created them");
