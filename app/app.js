@@ -4949,12 +4949,27 @@ function renderMultiplayerPanel() {
       guestSnapshot: state.guestSnapshot,
       hostSnapshot: state.multiplayerSnapshot,
       locationPort: location.port,
+      remoteRelayStatus: currentRemoteRelayConnectionStatus(),
     }),
     labelById: (id) => labelById(state.campaign, id),
     seatWaitingGuest: seatWaitingGuestAtTable,
     approveGuest,
     denyGuest,
   });
+}
+
+function currentRemoteRelayConnectionStatus() {
+  const session = state.campaign?.multiplayer?.remoteFriendCodeSession;
+  if (!isActiveRemoteFriendCodeSession(session)) {
+    return "";
+  }
+  if (state.remoteRelaySocket?.readyState === WebSocket.OPEN) {
+    return "connected";
+  }
+  if (state.remoteRelaySocket?.readyState === WebSocket.CONNECTING) {
+    return "connecting";
+  }
+  return "reconnecting";
 }
 
 function controllerLabel(member) {

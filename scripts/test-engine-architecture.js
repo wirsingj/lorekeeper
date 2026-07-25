@@ -4189,8 +4189,10 @@ function testMultiplayerSessionProjection() {
       },
     },
     locationPort: "4173",
+    remoteRelayStatus: "reconnecting",
   });
   assert.equal(remoteProjection.remoteFriendCode.status, "active");
+  assert.equal(remoteProjection.remoteFriendCode.relayStatus, "reconnecting");
   assert.match(remoteProjection.remoteFriendCode.link, /\/host\/demo-table\/table-code\/MOSS-7K4P$/);
   assert.match(remoteProjection.remoteFriendCode.statusDetail, /Code expires/);
   assert.match(remoteProjection.remoteFriendCode.statusDetail, /Idle timeout 10m/);
@@ -4931,6 +4933,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /remoteRelayReconnectAttemptedAt/, "remote relay reconnect attempts should be throttled");
   assert.match(appJs, /Date\.now\(\) < expiresAt/, "remote relay reconnect should not revive expired friend codes");
   assert.match(appJs, /Remote relay disconnected\. LoreKeeper will try to reconnect/, "unexpected remote relay socket closes should produce a host-visible reconnect cue");
+  assert.match(appJs, /currentRemoteRelayConnectionStatus/, "share panel should receive live relay socket state");
+  assert.match(multiplayerSessionPanel, /Relay reconnecting\. Guests may need to wait or retry\./, "remote share panel should show reconnecting state instead of looking simply on");
   assert.match(appShell, /id="regenerate-remote-sharing"/, "remote friend-code sharing should expose a direct regenerate control");
   assert.match(appShell, /id="remote-friend-code-detail"/, "remote friend-code expiry and idle status should be visible without hover");
   assert.match(appJs, /remoteFriendCodeDetail/, "remote friend-code status detail should be wired into the app shell");

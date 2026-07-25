@@ -7,6 +7,7 @@ export function buildMultiplayerSessionProjection({
   guestSnapshot = null,
   hostSnapshot = null,
   locationPort = "",
+  remoteRelayStatus = "",
 } = {}) {
   const multiplayer = !clientMode && hostSnapshot?.localTable ? hostSnapshot : campaign?.multiplayer ?? {};
   const table = multiplayer.localTable ?? {};
@@ -45,6 +46,9 @@ export function buildMultiplayerSessionProjection({
   const shareSession = multiplayer.shareSession ?? buildShareTableSession({ table, campaignId, locationPort });
   const remoteFriendCode = multiplayer.remoteFriendCode
     ?? (multiplayer.remoteFriendCodeSession ? publicRemoteFriendCode(multiplayer.remoteFriendCodeSession) : emptyRemoteFriendCode());
+  if (remoteFriendCode && remoteRelayStatus) {
+    remoteFriendCode.relayStatus = remoteRelayStatus;
+  }
   const guestLink = shareSession.guestLink;
   return {
     mode: "host",
@@ -159,8 +163,9 @@ export function renderMultiplayerSessionPanel({
 function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCode()) {
   const status = remoteFriendCode?.status || "off";
   const active = status === "active";
+  const relayStatus = remoteFriendCode?.relayStatus || "";
   if (elements.remoteFriendCodeState) {
-    elements.remoteFriendCodeState.textContent = active ? "On" : status === "expired" ? "Expired" : status === "stopped" ? "Stopped" : "Off";
+    elements.remoteFriendCodeState.textContent = remoteFriendCodeStateLabel({ active, status, relayStatus });
     elements.remoteFriendCodeState.title = remoteFriendCode?.statusDetail || "";
   }
   if (elements.remoteFriendCode) {
@@ -172,7 +177,7 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
     elements.remoteFriendLink.placeholder = active ? "" : "Remote browser link appears here when sharing is active.";
   }
   if (elements.remoteFriendCodeDetail) {
-    elements.remoteFriendCodeDetail.textContent = remoteFriendCode?.statusDetail || "Remote sharing is off.";
+    elements.remoteFriendCodeDetail.textContent = remoteFriendCodeStatusLine(remoteFriendCode);
   }
   if (elements.remoteFriendCodeSafety) {
     elements.remoteFriendCodeSafety.textContent = remoteFriendCode?.safety || "";
@@ -196,6 +201,39 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
   if (elements.stopRemoteSharing) {
     elements.stopRemoteSharing.disabled = !active;
   }
+}
+
+function remoteFriendCodeStateLabel({ active = false, status = "off", relayStatus = "" } = {}) {
+  if (!active) {
+    return status === "expired" ? "Expired" : status === "stopped" ? "Stopped" : "Off";
+  }
+  if (relayStatus === "connected") {
+    return "On";
+  }
+  if (relayStatus === "connecting") {
+    return "Connecting";
+  }
+  if (relayStatus === "reconnecting") {
+    return "Reconnecting";
+  }
+  return "On";
+}
+
+function remoteFriendCodeStatusLine(remoteFriendCode = {}) {
+  const detail = remoteFriendCode?.statusDetail || "Remote sharing is off.";
+  if (remoteFriendCode?.status !== "active") {
+    return detail;
+  }
+  if (remoteFriendCode.relayStatus === "connected") {
+    return `Relay connected. ${detail}`;
+  }
+  if (remoteFriendCode.relayStatus === "connecting") {
+    return `Connecting to relay. ${detail}`;
+  }
+  if (remoteFriendCode.relayStatus === "reconnecting") {
+    return `Relay reconnecting. Guests may need to wait or retry. ${detail}`;
+  }
+  return detail;
 }
 
 function remoteFriendCodeStatusDetail(remoteFriendCode = {}) {
