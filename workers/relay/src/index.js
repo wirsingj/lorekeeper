@@ -99,6 +99,9 @@ export class TableRelay {
     if (token.length < 24) {
       return json({ ok: false, error: "host_token_required" }, 403);
     }
+    if (this.session?.hostToken && this.session.hostToken !== token) {
+      return json({ ok: false, error: "invalid_host_token" }, 403);
+    }
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.accept();
@@ -106,8 +109,9 @@ export class TableRelay {
     this.hostSocket = server;
     this.session = {
       code,
-      hostTokenHint: token.slice(0, 4),
-      startedAt: new Date().toISOString(),
+      hostToken: token,
+      startedAt: this.session?.startedAt || new Date().toISOString(),
+      lastHostSeenAt: new Date().toISOString(),
     };
     server.addEventListener("message", (event) => this.onHostMessage(event));
     server.addEventListener("close", () => this.closeHost("host_disconnected", { notifyGuests: true }));

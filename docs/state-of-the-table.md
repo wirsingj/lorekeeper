@@ -126,6 +126,7 @@ External work required from the human:
 - Remote browser seated controls are more natural: Ctrl/Cmd+Enter sends character actions, Enter sends Table Talk from its field, and choice buttons disable after a vote is sent to avoid accidental duplicate clicks.
 - Remote browser seated mobile layout is less cramped: the Adventure/Party rail now participates in normal page scrolling instead of clipping the moment panel and party cards behind a small internal scroll.
 - Remote relay guest socket admission is tighter: fresh guest WebSocket attempts are rejected when no host socket is connected, matching the public page's session check and reducing useless relay occupancy.
+- Remote relay host ownership is tighter: once a host connects a friend-code room, later host reconnects for that code must present the same unshared internal host token, so a guest who only knows the friend code cannot replace the host socket.
 - Create Table remote sharing copy is clearer: the setup-stage button says Start Remote Sharing or Reconnect Sharing instead of implying it opens the guest browser link, and the live status tells the host to keep LoreKeeper open and reconnect if a friend sees host-not-connected.
 - New Adventure should create/load a ready table first, then offer a clear Start control once the host has finished last-minute invites and party edits. That Start should run a strong opening DM narration like a real first session.
 - Visual target: dark tabletop, dungeon, and storybook atmosphere. Avoid sterile admin/app chrome even when the underlying controls are practical.
