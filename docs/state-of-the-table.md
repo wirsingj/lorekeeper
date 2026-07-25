@@ -152,7 +152,7 @@ Current trust score: 6 open "that was weird" risks. Count one point for any rema
 - Remote browser guest action UX is improved: the Worker page now derives action availability from guest-safe snapshot state so friends see why they are waiting before they click Send.
 - Remote browser guest page hardening is improved: client-side rendering has list/text bounds, and Worker HTML responses now include basic browser security headers.
 - Host-side remote sharing copy UX is improved: blocked clipboard writes no longer leave the host guessing whether the friend link copied.
-- Host-side remote relay status UX is improved: sharing controls refresh immediately when the relay socket connects, disconnects, or errors.
+- Host-side remote relay status UX is improved: sharing controls refresh immediately when the relay socket connects, disconnects, or errors, and an active code with no live relay bridge is labeled Needs Reconnect instead of ambiguously On.
 - Remote browser guest entry UX is improved: friends can paste rough codes and use Enter naturally instead of fiddling with exact hyphen/case formatting.
 - Remote browser seated-control UX is improved: common keyboard submission works, choice votes give immediate duplicate-click protection, and the story header tells guests what is happening now and what to do next.
 - Remote relay resource hygiene is improved: direct/fresh guest WebSocket attempts no longer sit open when the host is not connected.

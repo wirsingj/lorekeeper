@@ -4962,6 +4962,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /currentRemoteRelayConnectionStatus/, "share panel should receive live relay socket state");
   assert.match(multiplayerSessionPanel, /Relay reconnecting\. Guests may need to wait or retry\./, "remote share panel should show reconnecting state instead of looking simply on");
   assert.match(multiplayerSessionPanel, /Reconnect Sharing/, "remote share panel should let the host reconnect an active code with a closed relay socket");
+  assert.match(multiplayerSessionPanel, /Needs Reconnect/, "remote share panel should not label an active but disconnected friend code as simply On");
+  assert.match(multiplayerSessionPanel, /Friend code exists, but the live relay bridge is not connected/, "remote share panel should explain why browser guests see host-not-connected");
   assert.match(appJs, /Reconnecting remote friend code/, "Start Remote Sharing should reconnect an active local session instead of forcing a new code");
   assert.match(appShell, /id="regenerate-remote-sharing"/, "remote friend-code sharing should expose a direct regenerate control");
   assert.match(appShell, /id="remote-friend-code-detail"/, "remote friend-code expiry and idle status should be visible without hover");

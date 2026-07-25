@@ -233,7 +233,7 @@ function remoteFriendCodeStateLabel({ active = false, status = "off", relayStatu
   if (relayStatus === "reconnecting") {
     return "Reconnecting";
   }
-  return "On";
+  return "Needs Reconnect";
 }
 
 function remoteFriendCodeStatusLine(remoteFriendCode = {}) {
@@ -250,7 +250,7 @@ function remoteFriendCodeStatusLine(remoteFriendCode = {}) {
   if (remoteFriendCode.relayStatus === "reconnecting") {
     return `Relay reconnecting. Guests may need to wait or retry. ${detail}`;
   }
-  return detail;
+  return `Friend code exists, but the live relay bridge is not connected. Click Reconnect Sharing before sending the link. ${detail}`;
 }
 
 function remoteFriendCodeStatusDetail(remoteFriendCode = {}) {
