@@ -129,6 +129,7 @@ npm run cleanup
 - Combat authority: `src/engine/combat-engine.js`, `src/rules/combat-turns.js`
 - Multiplayer authority: `src/multiplayer/local-table.js`
 - Remote friend-code contract: `src/multiplayer/friend-code-session.js`
+- Remote relay renderer payload policy: `app/remote-relay-controller.js`
 - Guest auto-resolution policy: `app/guest-auto-resolve-controller.js`
 - Campaign adoption/polling policy: `app/campaign-adoption-controller.js`, `app/table-background-polling-controller.js`
 - SQLite/repository: `src/storage/sqlite-store.js`, `src/storage/campaign-repository.js`, `src/storage/sqlite-migrations.js`

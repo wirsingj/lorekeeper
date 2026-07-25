@@ -108,6 +108,11 @@ import {
 } from "./provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "./provider-result-controller.js";
 import { recordDialogConfig, recordLabel, recordNotesValue, recordRoleValue } from "./record-dialog-controller.js";
+import {
+  buildRemoteRelayGuestAuthorityPayload,
+  buildRemoteRelayGuestSnapshotQuery,
+  compactRemoteRelayError,
+} from "./remote-relay-controller.js";
 import { buildReviewPanelProjection, renderReviewPanel } from "./proposed-changes-panel.js";
 import {
   buildRendererDiagnosticsSnapshot,
@@ -3632,20 +3637,12 @@ async function handleRemoteRelayGuestDisconnect(message = {}) {
 
 function remoteRelayGuestActionPayload(message = {}) {
   const guestId = String(message.guestId || "");
-  const entry = state.remoteRelayGuests.get(guestId);
-  if (!entry?.connectionId || !entry?.connectionSecret) {
-    throw new Error("Remote guest is not seated yet.");
-  }
-  return {
-    connectionId: entry.connectionId,
-    clientId: entry.clientId || `relay-${guestId}`,
-    connectionSecret: entry.connectionSecret,
-    characterId: entry.partyMemberId || message.characterId || "",
-    characterName: entry.characterName || "",
-    campaignId: entry.campaignId || state.campaign?.id || "",
-    tableId: entry.tableId || state.campaign?.multiplayer?.localTable?.tableId || "",
-    sessionId: entry.sessionId || state.campaign?.multiplayer?.localTable?.sessionId || "",
-  };
+  return buildRemoteRelayGuestAuthorityPayload({
+    guestId,
+    entry: state.remoteRelayGuests.get(guestId),
+    message,
+    fallbackAuthority: localTableAuthorityPayload(),
+  });
 }
 
 async function sendRemoteRelayGuestSnapshot(guestId, { reason = "snapshot" } = {}) {
@@ -3655,13 +3652,15 @@ async function sendRemoteRelayGuestSnapshot(guestId, { reason = "snapshot" } = {
     return false;
   }
   try {
+    const query = buildRemoteRelayGuestSnapshotQuery({
+      guestId,
+      entry,
+      fallbackAuthority: localTableAuthorityPayload(),
+    });
     const url = new URL(apiMultiplayerGuestSnapshotUrl, window.location.origin);
-    url.searchParams.set("connectionId", entry.connectionId);
-    url.searchParams.set("clientId", entry.clientId || `relay-${guestId}`);
-    url.searchParams.set("connectionSecret", entry.connectionSecret);
-    url.searchParams.set("campaignId", entry.campaignId || state.campaign?.id || "");
-    url.searchParams.set("tableId", entry.tableId || state.campaign?.multiplayer?.localTable?.tableId || "");
-    url.searchParams.set("sessionId", entry.sessionId || state.campaign?.multiplayer?.localTable?.sessionId || "");
+    for (const [key, value] of Object.entries(query)) {
+      url.searchParams.set(key, value);
+    }
     url.searchParams.set("t", String(Date.now()));
     const snapshot = await fetchJson(url.toString());
     sendRemoteHostMessage({
@@ -3695,11 +3694,6 @@ function sendRemoteRelayGuestError(guestId, error, fallbackMessage) {
     message: compactRemoteRelayError(message, fallbackMessage),
   });
   setProviderActivity(`Remote guest request failed: ${compactRemoteRelayError(message, fallbackMessage)}`, "error");
-}
-
-function compactRemoteRelayError(message, fallbackMessage = "Remote request failed.") {
-  const compact = String(message || fallbackMessage).replace(/\s+/g, " ").trim();
-  return compact.slice(0, 240) || fallbackMessage;
 }
 
 function sendRemoteHostMessage(message = {}) {

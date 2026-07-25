@@ -102,6 +102,11 @@ import {
 } from "../app/provider-settings-controller.js";
 import { contractIssueFromProviderResult, providerResultMeta } from "../app/provider-result-controller.js";
 import {
+  buildRemoteRelayGuestAuthorityPayload,
+  buildRemoteRelayGuestSnapshotQuery,
+  compactRemoteRelayError,
+} from "../app/remote-relay-controller.js";
+import {
   buildRendererDiagnosticsSnapshot,
   buildSessionHealthSummary as buildSessionHealthSummaryProjection,
   buildTableTimelineSummaryProjection,
@@ -4227,6 +4232,75 @@ function testMultiplayerSessionProjection() {
   assert.match(guestProjection.pendingInputs[0].statusLabel, /Sent to the table/);
 }
 
+function testRemoteRelayController() {
+  const entry = {
+    connectionId: "conn-approved",
+    clientId: "relay-guest-approved",
+    connectionSecret: "local-connection-secret",
+    partyMemberId: "party-approved",
+    characterName: "Mira",
+    campaignId: "campaign-approved",
+    tableId: "table-approved",
+    sessionId: "session-approved",
+  };
+  const payload = buildRemoteRelayGuestAuthorityPayload({
+    guestId: "guest-approved",
+    entry,
+    message: {
+      guestId: "guest-approved",
+      characterId: "party-attacker-controlled-by-someone-else",
+      sessionKey: "browser-must-not-win",
+    },
+  });
+  assert.deepEqual(payload, {
+    connectionId: "conn-approved",
+    clientId: "relay-guest-approved",
+    connectionSecret: "local-connection-secret",
+    characterId: "party-approved",
+    characterName: "Mira",
+    campaignId: "campaign-approved",
+    tableId: "table-approved",
+    sessionId: "session-approved",
+  });
+  assert.equal("sessionKey" in payload, false);
+
+  const fallbackPayload = buildRemoteRelayGuestAuthorityPayload({
+    guestId: "guest-fallback",
+    entry: {
+      connectionId: "conn-fallback",
+      connectionSecret: "secret-fallback",
+      partyMemberId: "party-fallback",
+    },
+    fallbackAuthority: {
+      campaignId: "campaign-fallback",
+      tableId: "table-fallback",
+      sessionId: "session-fallback",
+    },
+  });
+  assert.equal(fallbackPayload.clientId, "relay-guest-fallback");
+  assert.equal(fallbackPayload.campaignId, "campaign-fallback");
+  assert.equal(fallbackPayload.tableId, "table-fallback");
+  assert.equal(fallbackPayload.sessionId, "session-fallback");
+
+  const query = buildRemoteRelayGuestSnapshotQuery({
+    guestId: "guest-approved",
+    entry,
+  });
+  assert.deepEqual(Object.keys(query).sort(), [
+    "campaignId",
+    "clientId",
+    "connectionId",
+    "connectionSecret",
+    "sessionId",
+    "tableId",
+  ]);
+  assert.throws(
+    () => buildRemoteRelayGuestAuthorityPayload({ guestId: "guest-waiting", entry: {} }),
+    /not seated/i,
+  );
+  assert.equal(compactRemoteRelayError(` ${"x".repeat(500)} `).length, 240);
+}
+
 function testReviewPanelProjection() {
   const pending = buildReviewPanelProjection({
     reviewBatch: {
@@ -4791,6 +4865,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestDisconnect/, "host app should clean up local guest authority when a remote browser guest disconnects");
+  assert.match(appJs, /remote-relay-controller\.js/, "remote relay authority payload policy should live outside app.js");
+  assert.match(appJs, /buildRemoteRelayGuestAuthorityPayload/, "app.js should delegate remote relay local-authority payloads to the controller");
   assert.match(appJs, /sendRemoteRelayGuestSnapshot/, "host app should respond to remote browser guests with guest-safe snapshots");
   assert.match(appJs, /connectionSecret: entry\.connectionSecret/, "remote relay bridge should attach local connection secrets only inside host-local API calls");
   assert.match(appJs, /state\.remoteRelayGuests\.set\(relayEntry\.guestId, relayEntry\)/, "remote relay seating should persist the approved local connection secret back into host relay state");
@@ -4918,6 +4994,7 @@ testPartySuggestionController();
 testChoiceVoteController();
 testMessageBlockController();
 testMultiplayerSessionProjection();
+testRemoteRelayController();
 testReviewPanelProjection();
 testSettingsSurfaceProjection();
 

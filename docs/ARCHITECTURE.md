@@ -174,6 +174,7 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - Produces the first remote friend-code contract: human code, unguessable internal token, expiry/stop state, alpha limits, public projection, and guest-safe relay message validation.
 - The alpha Cloudflare Worker/Durable Object relay lives in `workers/relay/src/index.js` and consumes this contract shape as a dumb public doorway.
 - The host renderer opens an outbound relay WebSocket, registers browser join requests into the existing local waiting room, returns targeted approvals, and bridges approved browser guest snapshot/action/pass/vote/Table Talk messages into the same host-local authority routes used by LAN guests.
+- `app/remote-relay-controller.js` owns the pure renderer-side policy for turning an approved relay guest entry into a host-local guest authority payload. It must prefer the host-stored approved connection/party/session identity over any browser-supplied identity and must never echo `sessionKey`.
 - The relay must stay a mail slot: no campaign canon ownership, no provider/model calls, no host filesystem/debug/admin access, no provider keys, and no long-term campaign storage.
 
 `ObservabilityTrace`
