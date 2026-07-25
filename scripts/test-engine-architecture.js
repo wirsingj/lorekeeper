@@ -4955,6 +4955,10 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /remoteRelayReconnectAttemptedAt/, "remote relay reconnect attempts should be throttled");
   assert.match(appJs, /Date\.now\(\) < expiresAt/, "remote relay reconnect should not revive expired friend codes");
   assert.match(appJs, /Remote relay disconnected\. LoreKeeper will try to reconnect/, "unexpected remote relay socket closes should produce a host-visible reconnect cue");
+  assert.match(appJs, /function refreshRemoteRelayHostUi\(\)/, "remote relay socket events should repaint host sharing controls directly");
+  assert.match(appJs, /socket\.addEventListener\("open"[\s\S]*refreshRemoteRelayHostUi\(\)/, "remote relay open should update the host sharing panel immediately");
+  assert.match(appJs, /socket\.addEventListener\("close"[\s\S]*refreshRemoteRelayHostUi\(\)/, "remote relay close should update the host sharing panel immediately");
+  assert.match(appJs, /socket\.addEventListener\("error"[\s\S]*refreshRemoteRelayHostUi\(\)/, "remote relay errors should update the host sharing panel immediately");
   assert.match(appJs, /currentRemoteRelayConnectionStatus/, "share panel should receive live relay socket state");
   assert.match(multiplayerSessionPanel, /Relay reconnecting\. Guests may need to wait or retry\./, "remote share panel should show reconnecting state instead of looking simply on");
   assert.match(multiplayerSessionPanel, /Reconnect Sharing/, "remote share panel should let the host reconnect an active code with a closed relay socket");

@@ -3517,6 +3517,7 @@ function connectRemoteRelayHost(session = {}) {
     }));
     socket.send(JSON.stringify({ kind: "host.session.ready", code }));
     setProviderActivity(`Remote friend code ${code} is live. Browser guests can ask to join.`, "idle");
+    refreshRemoteRelayHostUi();
   });
   socket.addEventListener("message", (event) => {
     let message = null;
@@ -3560,12 +3561,19 @@ function connectRemoteRelayHost(session = {}) {
       if (isActiveRemoteFriendCodeSession(state.campaign?.multiplayer?.remoteFriendCodeSession)) {
         setProviderActivity("Remote relay disconnected. LoreKeeper will try to reconnect while sharing is still active.", "waiting");
       }
+      refreshRemoteRelayHostUi();
     }
   });
   socket.addEventListener("error", () => {
     setProviderActivity("Remote relay connection failed.", "error");
+    refreshRemoteRelayHostUi();
   });
   return true;
+}
+
+function refreshRemoteRelayHostUi() {
+  renderMultiplayerPanel();
+  renderTableActions();
 }
 
 async function handleRemoteGuestJoinRequest(message = {}) {
