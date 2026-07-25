@@ -119,6 +119,7 @@ assert.match(relayGuestPageSource, /class="rail left-rail"/, "public guest page 
 assert.match(relayGuestPageSource, /class="stage"/, "public guest page should center the story stage like the full app");
 assert.match(relayGuestPageSource, /class="rail right-rail"/, "public guest page should show Table Talk as a right rail on desktop");
 assert.match(relayGuestPageSource, /class="command-deck"/, "public guest page should keep actions in a bottom command deck");
+assert.match(relayGuestPageSource, /\.left-rail \{ max-height: none; overflow: visible; \}/, "public guest mobile page should not clip the Adventure and Party rail");
 assert.match(relayGuestPageSource, /id="party-list"/, "public guest page should render guest-safe party details");
 assert.match(relayGuestPageSource, /id="moment-panel"/, "public guest page should show the current table moment");
 assert.match(relayGuestPageSource, /id="now-cue"/, "public guest page should show a host-app-style Now cue");

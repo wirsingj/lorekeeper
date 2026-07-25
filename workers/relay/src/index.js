@@ -535,7 +535,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         grid-template-rows: auto minmax(320px, 1fr) auto auto;
       }
       .right-rail { display: none; }
-      .left-rail { max-height: 180px; }
+      .left-rail { max-height: none; overflow: visible; }
       .mobile-talk { display: grid; }
       .desktop-talk { display: none; }
       .command-deck { grid-column: 1; grid-template-columns: 1fr; }
