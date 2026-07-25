@@ -5071,6 +5071,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /proposedCharacter:\s*message\.proposedCharacter \|\| null/, "remote relay join requests should preserve browser character drafts into the local waiting room");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
+  assert.match(appJs, /kind:\s*"host\.tableTalk"[\s\S]*status:\s*"delivered"/, "host app should explicitly acknowledge delivered remote Table Talk before relying on snapshot polling");
+  assert.match(appJs, /kind:\s*"host\.tableTalk"[\s\S]*status:\s*"failed"/, "host app should explicitly reject failed remote Table Talk so guests are not left with a silent pending echo");
   assert.match(appJs, /handleRemoteRelayGuestDisconnect/, "host app should clean up local guest authority when a remote browser guest disconnects");
   assert.match(appJs, /remote-relay-controller\.js/, "remote relay authority payload policy should live outside app.js");
   assert.match(appJs, /buildRemoteRelayGuestAuthorityPayload/, "app.js should delegate remote relay local-authority payloads to the controller");

@@ -3681,19 +3681,34 @@ async function handleRemoteRelayGuestChoiceVote(message = {}) {
 
 async function handleRemoteRelayGuestTableTalk(message = {}) {
   const guestId = String(message.guestId || "");
+  const text = String(message.text || "");
   try {
     const payload = remoteRelayGuestActionPayload(message);
     const result = await postJson(apiMultiplayerTableTalkUrl, {
       ...payload,
-      text: message.text || "",
+      text,
     });
     setCampaignFromPayload(result, "remote_relay_table_talk");
     state.multiplayerSnapshot = result.multiplayer;
     render();
+    sendRemoteHostMessage({
+      kind: "host.tableTalk",
+      guestId,
+      status: "delivered",
+      playerName: payload.characterName || payload.displayName || "Remote friend",
+      text,
+    });
     await sendRemoteRelayGuestSnapshot(guestId, { reason: "table_talk" });
     broadcastRemoteRelaySnapshotsExcept(guestId).catch(() => {});
     setProviderActivity("Remote table talk sent", "idle");
   } catch (error) {
+    sendRemoteHostMessage({
+      kind: "host.tableTalk",
+      guestId,
+      status: "failed",
+      text,
+      message: "Table Talk could not be delivered.",
+    });
     sendRemoteRelayGuestError(guestId, error, "Table Talk could not be sent.");
   }
 }

@@ -16,6 +16,7 @@ const hostAllowed = new Set([
   "host.snapshot",
   "host.guest.pending",
   "host.guest.approved",
+  "host.tableTalk",
 ]);
 
 assert.equal(parseRelayMessage(JSON.stringify({
@@ -109,6 +110,20 @@ assert.match(parseRelayMessage(JSON.stringify({
   kind: "host.guest.pending",
 }), hostAllowed, { direction: "host" }).errors.join(" "), /target_guest_required/);
 
+assert.equal(parseRelayMessage(JSON.stringify({
+  kind: "host.tableTalk",
+  guestId: "guest-1",
+  status: "delivered",
+  playerName: "Rowan",
+  text: "hi",
+}), hostAllowed, { direction: "host" }).valid, true);
+
+assert.match(parseRelayMessage(JSON.stringify({
+  kind: "host.tableTalk",
+  status: "delivered",
+  text: "hi",
+}), hostAllowed, { direction: "host" }).errors.join(" "), /target_guest_required/);
+
 assert.match(parseRelayMessage(JSON.stringify({
   kind: "host.snapshot",
   snapshot: { scene: { immediateSituation: "The road is quiet." } },
@@ -177,8 +192,12 @@ assert.match(relayGuestPageSource, /guest\.tableTalk\.post/, "public guest page 
 assert.match(relayGuestPageSource, /pendingTableTalk/, "public guest page should keep local pending Table Talk echoes");
 assert.match(relayGuestPageSource, /rememberPendingTableTalk\(text\)/, "public guest Table Talk should render immediately after send");
 assert.match(relayGuestPageSource, /reconcilePendingTableTalk/, "public guest Table Talk should reconcile local echoes with host snapshots");
+assert.match(relayGuestPageSource, /handleTableTalkAck/, "public guest page should handle targeted Table Talk delivery acknowledgements");
+assert.match(relayGuestPageSource, /Table Talk delivered\./, "public guest Table Talk should confirm when the host accepted the message");
+assert.match(relayGuestPageSource, /markPendingTableTalkFailed/, "public guest page should visibly fail optimistic Table Talk if the host rejects it");
 assert.match(relayGuestPageSource, /Table Talk sent\. Syncing with the host table\./, "public guest Table Talk status should explain the sync step");
 assert.match(relayGuestPageSource, /talk\.pending/, "public guest page should visibly mark optimistic Table Talk messages");
+assert.match(relayGuestPageSource, /talk\.failed/, "public guest page should visibly mark rejected optimistic Table Talk messages");
 assert.match(relayGuestPageSource, /guest\.disconnect/, "public guest page should notify the host when the browser tab leaves");
 assert.match(relaySource, /relay\.host\.disconnected/, "relay should notify guests when the host socket disconnects");
 assert.match(relaySource, /if \(!this\.hostSocket\) \{[\s\S]*host_not_connected/, "relay should reject fresh guest sockets when no host is connected");

@@ -30,6 +30,7 @@ const TARGET_REQUIRED_HOST_KINDS = new Set([
   "host.guest.pending",
   "host.guest.approved",
   "host.guest.denied",
+  "host.tableTalk",
   "host.error",
 ]);
 
@@ -518,6 +519,15 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       color: var(--muted);
       font-weight: 700;
     }
+    .talk.failed {
+      border-color: rgba(179, 104, 98, 0.42);
+      background: rgba(58, 34, 34, 0.78);
+    }
+    .talk.failed strong::after {
+      content: " not delivered";
+      color: var(--red);
+      font-weight: 700;
+    }
     .moment-panel {
       border: 1px solid rgba(168, 132, 91, 0.24);
       border-radius: 8px;
@@ -784,6 +794,8 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
           latestSnapshot = message.snapshot || null;
           setTableConnected(true);
           renderSnapshot(latestSnapshot);
+        } else if (message?.kind === "host.tableTalk") {
+          handleTableTalkAck(message);
         } else if (message?.kind === "host.error") {
           setStatus(message.message || "The host could not complete that request.");
         } else if (message?.kind === "relay.host.ready") {
@@ -957,6 +969,23 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
         renderTalk(latestSnapshot?.tableTalk || latestSnapshot?.tableState?.tableTalk || []);
         setStatus("Table Talk sent. Syncing with the host table.");
         window.setTimeout(requestSnapshot, 700);
+      }
+    }
+    function handleTableTalkAck(message) {
+      if (message.status === "delivered") {
+        reconcilePendingTableTalk([{
+          playerName: message.playerName || session?.characterName || nameInput.value.trim() || "You",
+          text: message.text || "",
+        }]);
+        renderTalk(latestSnapshot?.tableTalk || latestSnapshot?.tableState?.tableTalk || []);
+        setStatus("Table Talk delivered.");
+        requestSnapshot();
+        return;
+      }
+      if (message.status === "failed") {
+        markPendingTableTalkFailed(message.text || "");
+        renderTalk(latestSnapshot?.tableTalk || latestSnapshot?.tableState?.tableTalk || []);
+        setStatus(message.message || "Table Talk could not be delivered.");
       }
     }
     function renderSnapshot(snapshot) {
@@ -1137,7 +1166,7 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
       talkLog.innerHTML = "";
       for (const message of safeList([...messages, ...pendingTableTalk], 12)) {
         const div = document.createElement("div");
-        div.className = "talk" + (message.pending ? " pending" : "");
+        div.className = "talk" + (message.pending ? " pending" : "") + (message.failed ? " failed" : "");
         const title = document.createElement("strong");
         title.textContent = compactText(message.playerName || "Table", 80);
         const body = document.createElement("div");
@@ -1175,6 +1204,15 @@ function renderGuestEntryPage(initialCode, cspNonce = "") {
           compactCompareText(entry.text || "") === compactCompareText(message.text || "")
         );
         return !delivered.has(key) && !textOnlyDelivered;
+      });
+    }
+    function markPendingTableTalkFailed(text) {
+      const failedText = compactCompareText(text || "");
+      pendingTableTalk = pendingTableTalk.map((message) => {
+        if (failedText && compactCompareText(message.text || "") !== failedText) {
+          return message;
+        }
+        return { ...message, pending: false, failed: true };
       });
     }
     function renderChoices(messages) {
