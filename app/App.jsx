@@ -905,6 +905,9 @@ function SetupDialog() {
                 placeholder="Remote browser link appears here when sharing is active."
               />
             </label>
+            <p id="remote-friend-code-detail" className="setup-note local-table-share-status">
+              Remote sharing is off.
+            </p>
             <p id="remote-friend-code-safety" className="setup-note local-table-share-safety">
               Remote sharing will use browser guest mode only. Host settings and model setup stay on this machine.
             </p>

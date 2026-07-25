@@ -1374,6 +1374,11 @@ h3 {
   line-height: 1.35;
 }
 
+.local-table-share-status {
+  color: #d7e4dc;
+  font-weight: 700;
+}
+
 .remote-friend-code-card {
   border-color: rgba(121, 169, 255, 0.18);
 }

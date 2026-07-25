@@ -521,6 +521,7 @@ const elements = {
   remoteHostSlug: document.querySelector("#remote-host-slug"),
   remoteFriendCode: document.querySelector("#remote-friend-code"),
   remoteFriendLink: document.querySelector("#remote-friend-link"),
+  remoteFriendCodeDetail: document.querySelector("#remote-friend-code-detail"),
   remoteFriendCodeSafety: document.querySelector("#remote-friend-code-safety"),
   startRemoteSharing: document.querySelector("#start-remote-sharing"),
   copyRemoteFriendCode: document.querySelector("#copy-remote-friend-code"),

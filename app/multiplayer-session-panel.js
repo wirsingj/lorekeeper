@@ -171,6 +171,9 @@ function renderRemoteFriendCode(elements, remoteFriendCode = emptyRemoteFriendCo
     elements.remoteFriendLink.value = remoteFriendCode?.link || "";
     elements.remoteFriendLink.placeholder = active ? "" : "Remote browser link appears here when sharing is active.";
   }
+  if (elements.remoteFriendCodeDetail) {
+    elements.remoteFriendCodeDetail.textContent = remoteFriendCode?.statusDetail || "Remote sharing is off.";
+  }
   if (elements.remoteFriendCodeSafety) {
     elements.remoteFriendCodeSafety.textContent = remoteFriendCode?.safety || "";
   }
