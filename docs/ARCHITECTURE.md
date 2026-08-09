@@ -13,7 +13,7 @@ agent-guidance: Distinguish current implementation, declared intent, transitiona
 
 # LoreKeeper Architecture
 
-Updated: 2026-07-25
+Updated: 2026-08-08
 
 This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers, `docs/REMOTE_TABLE_ACCESS_PLAN.md` is the host/guest remote-access doctrine, and `docs/living-world.md` explains long-term continuity memory.
 
@@ -182,8 +182,8 @@ Provider text can enrich play, but provider text alone should not silently mutat
 - The alpha Cloudflare Worker/Durable Object relay lives in `workers/relay/src/index.js` and consumes this contract shape as a dumb public doorway.
 - The same Worker owns the public browser guest page for the remote alpha. That page should visually behave like a guest-safe LoreKeeper table surface, collect only a compact guest character draft before seating, and remain a thin relay client: render guest-safe snapshots, send allowed guest messages, and avoid host/provider/settings/debug concepts.
 - The host renderer opens an outbound relay WebSocket, registers browser join requests and compact character drafts into the existing local waiting room, returns targeted approvals, and bridges approved browser guest snapshot/action/pass/vote/Table Talk messages into the same host-local authority routes used by LAN guests.
-- `app/remote-relay-controller.js` owns the pure renderer-side policy for turning an approved relay guest entry into a host-local guest authority payload. It must prefer the host-stored approved connection/party/session identity over any browser-supplied identity and must never echo `sessionKey`.
-- Remote relay snapshots must be compacted before crossing the Worker WebSocket. The host app keeps full campaign/story canon locally, while browser guests receive a bounded recent table window small enough for the relay payload cap.
+- `app/remote-relay-controller.js` owns the pure renderer-side policy for turning relay guest messages into host-local authority payloads and bounded browser payloads. It owns active friend-code assertion, compact join-request projection, approved-guest authority payloads, guest snapshot queries, and final snapshot compaction/redaction. It must prefer the host-stored approved connection/party/session identity over any browser-supplied identity and must never echo `sessionKey`.
+- Remote relay snapshots must be compacted and defense-in-depth redacted before crossing the Worker WebSocket. The host app keeps full campaign/story canon locally, while browser guests receive a bounded recent table window small enough for the relay payload cap.
 - The relay must stay a mail slot: no campaign canon ownership, no provider/model calls, no host filesystem/debug/admin access, no provider keys, and no long-term campaign storage.
 
 `ObservabilityTrace`

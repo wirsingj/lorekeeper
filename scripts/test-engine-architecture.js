@@ -4361,7 +4361,13 @@ function testRemoteRelayController() {
       code: "MOSS-7K4P",
       displayName: "A very long remote player name that should be compacted at the relay boundary",
       preferredPartyMemberId: "party-rowan",
-      proposedCharacter: { name: "Rowan", characterClass: "Rogue" },
+      proposedCharacter: {
+        name: "Rowan",
+        characterClass: "Rogue",
+        backstory: "b".repeat(1200),
+        providerSettings: { selectedModel: "private" },
+        connectionSecret: "must-not-enter-waiting-room",
+      },
     },
     activeSession: { code: "MOSS-7K4P" },
   });
@@ -4370,6 +4376,9 @@ function testRemoteRelayController() {
   assert.equal(joinPayload.displayName.length, 40);
   assert.equal(joinPayload.preferredPartyMemberId, "party-rowan");
   assert.equal(joinPayload.proposedCharacter.name, "Rowan");
+  assert.equal(joinPayload.proposedCharacter.backstory.length, 900);
+  assert.equal("providerSettings" in joinPayload.proposedCharacter, false);
+  assert.equal("connectionSecret" in joinPayload.proposedCharacter, false);
   assert.throws(
     () => buildRemoteRelayJoinRequestPayload({
       guestId: "guest-join",
@@ -5107,8 +5116,8 @@ async function testNewCampaignPreTableJoinerWiring() {
   assert.match(appJs, /guest\.snapshot\.request/, "remote relay browser guests should be able to request a guest-safe table snapshot");
   assert.match(appJs, /activeSession: state\.campaign\?\.multiplayer\?\.remoteFriendCodeSession/, "remote relay browser requests should be pinned to the active friend code before using local authority");
   assert.match(appJs, /buildRemoteRelayJoinRequestPayload[\s\S]*apiMultiplayerWaitingRegisterUrl/, "remote relay join requests should be projected by the controller before entering the local waiting room");
-  assert.match(remoteRelayController, /proposedCharacter:\s*message\.proposedCharacter \|\| null/, "remote relay join projection should preserve browser character drafts into the local waiting room");
-  assert.match(remoteRelayController, /preferredPartyMemberId:\s*String\(message\.preferredPartyMemberId \|\| ""\)/, "remote relay rejoin projection should preserve preferred seat hints without granting authority");
+  assert.match(remoteRelayController, /proposedCharacter:\s*compactRemoteRelayProposedCharacter\(message\.proposedCharacter\)/, "remote relay join projection should preserve browser character drafts through a compact guest-safe projection");
+  assert.match(remoteRelayController, /preferredPartyMemberId:\s*compactRemoteRelayText\(message\.preferredPartyMemberId, 160\)\.trim\(\)/, "remote relay rejoin projection should preserve bounded preferred seat hints without granting authority");
   assert.match(appJs, /handleRemoteRelayGuestAction/, "host app should bridge remote relay actions into local guest authority routes");
   assert.match(appJs, /handleRemoteRelayGuestTableTalk/, "host app should bridge remote relay Table Talk into local guest authority routes");
   assert.match(appJs, /kind:\s*"host\.tableTalk"[\s\S]*status:\s*"delivered"/, "host app should explicitly acknowledge delivered remote Table Talk before relying on snapshot polling");

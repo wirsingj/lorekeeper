@@ -36,12 +36,13 @@ export function assertRemoteRelayMessageMatchesActiveSession({ message = {}, act
 export function buildRemoteRelayJoinRequestPayload({ guestId = "", message = {}, activeSession = null } = {}) {
   const normalizedGuestId = String(guestId || message.guestId || "");
   assertRemoteRelayMessageMatchesActiveSession({ message, activeSession });
+  const displayName = compactRemoteRelayText(message.displayName || "Remote Friend", 40).trim() || "Remote Friend";
   return {
     guestId: normalizedGuestId,
-    displayName: String(message.displayName || "Remote Friend").slice(0, 40),
+    displayName,
     clientId: `relay-${normalizedGuestId}`,
-    preferredPartyMemberId: String(message.preferredPartyMemberId || ""),
-    proposedCharacter: message.proposedCharacter || null,
+    preferredPartyMemberId: compactRemoteRelayText(message.preferredPartyMemberId, 160).trim(),
+    proposedCharacter: compactRemoteRelayProposedCharacter(message.proposedCharacter),
   };
 }
 
@@ -80,7 +81,7 @@ export function buildRemoteRelaySnapshotPayload(snapshot = {}) {
   }
   const tableState = snapshot.tableState && typeof snapshot.tableState === "object"
     ? {
-        ...snapshot.tableState,
+        ...compactRemoteRelayObject(snapshot.tableState, 500),
         party: [],
         messages: [],
         tableTalk: [],
@@ -138,14 +139,16 @@ function compactRemoteRelayObject(value, stringLimit = 800) {
   if (Array.isArray(value)) {
     return value.slice(0, 8).map((item) => compactRemoteRelayObject(item, Math.max(180, Math.floor(stringLimit / 2))));
   }
-  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
-    key,
-    typeof entry === "string"
-      ? compactRemoteRelayText(entry, stringLimit)
-      : Array.isArray(entry) || (entry && typeof entry === "object")
-        ? compactRemoteRelayObject(entry, Math.max(240, Math.floor(stringLimit / 2)))
-        : entry,
-  ]));
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !isRemoteRelayHostOnlyKey(key))
+    .map(([key, entry]) => [
+      key,
+      typeof entry === "string"
+        ? compactRemoteRelayText(entry, stringLimit)
+        : Array.isArray(entry) || (entry && typeof entry === "object")
+          ? compactRemoteRelayObject(entry, Math.max(240, Math.floor(stringLimit / 2)))
+          : entry,
+    ]));
 }
 
 function compactRemoteRelayText(value, limit = 800) {
@@ -154,4 +157,38 @@ function compactRemoteRelayText(value, limit = 800) {
     return text;
   }
   return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
+function compactRemoteRelayProposedCharacter(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  return {
+    name: compactRemoteRelayText(value.name, 80).trim(),
+    ancestry: compactRemoteRelayText(value.ancestry, 80).trim(),
+    characterClass: compactRemoteRelayText(value.characterClass, 80).trim(),
+    level: compactRemoteRelayText(value.level || "1", 2).trim() || "1",
+    roleIntent: compactRemoteRelayText(value.roleIntent, 160).trim(),
+    backstory: compactRemoteRelayText(value.backstory, 900).trim(),
+  };
+}
+
+function isRemoteRelayHostOnlyKey(key) {
+  const normalized = String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalized.includes("secret")
+    || normalized.includes("token")
+    || normalized.includes("password")
+    || normalized.includes("apikey")
+    || normalized.includes("authorization")
+    || normalized.includes("credential")
+    || normalized === "provider"
+    || normalized === "providersettings"
+    || normalized === "ollama"
+    || normalized === "sqlitepath"
+    || normalized === "localpath"
+    || normalized === "filepath"
+    || normalized === "rawresponse"
+    || normalized === "rawprompt"
+    || normalized === "diagnostics"
+    || normalized === "debug";
 }
