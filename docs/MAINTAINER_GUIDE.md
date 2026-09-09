@@ -6,8 +6,10 @@ purpose: Current commands, diagnostics, package/release procedures, important fi
 belongs-here: setup, verified commands, focused checks, dev server/desktop/package flows, diagnostics, release guardrails, operational troubleshooting.
 not-here: product direction, durable architecture rationale, complete history, speculative procedures.
 durability: current-only; remove dead commands and obsolete paths.
+budget: About 3000 words for a core document loaded every session; a working target, subject to verified procedures that must stay.
 read-with: LoreKeeper State Of The Table; LoreKeeper Architecture.
 update-when: commands, scripts, diagnostics, packaging, release checks, local setup, or failure playbooks change.
+last-verified: not established; claims not rechecked in this refresh.
 agent-guidance: Verify command claims when practical. Mark environment-dependent procedures. Keep this useful for a fresh maintainer under time pressure.
 ---
 

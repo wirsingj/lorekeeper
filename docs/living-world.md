@@ -6,8 +6,10 @@ purpose: Durable model for world memory, consequences, relationships, factions, 
 belongs-here: continuity memory concepts, retrieval priorities, living-world engines, provider proposal expectations, long-campaign memory rules.
 not-here: general product priorities, command reference, remote table doctrine, complete campaign lore.
 durability: durable; update when the continuity memory model or ownership boundaries change.
+budget: About 1200 words for a focused supporting model document; a working target, not a length to fill.
 read-with: LoreKeeper State Of The Table; LoreKeeper Architecture.
 update-when: living-world storage, retrieval, proposal, or review semantics change.
+last-verified: not established; claims not rechecked in this refresh.
 agent-guidance: Preserve the distinction between app-owned canon and provider expression. Do not treat provider memory as canon.
 ---
 

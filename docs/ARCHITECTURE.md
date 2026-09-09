@@ -6,8 +6,10 @@ purpose: Durable system shape, ownership boundaries, invariants, transitional ar
 belongs-here: product/runtime shape, data and authority boundaries, major components, invariants, danger zones, intended architecture, retired concepts.
 not-here: current priority queue, command reference, complete file inventory, chronological progress notes.
 durability: durable; update when architecture or boundaries change materially.
+budget: About 3000 words for a core document loaded every session; currently about 3150 words, at threshold, so prune stale or superseded shape before adding.
 read-with: LoreKeeper State Of The Table; LoreKeeper Maintainer Guide.
 update-when: responsibilities, authority rules, runtime surfaces, storage, multiplayer, recovery, provider, or release boundaries change.
+last-verified: not established; claims not rechecked in this refresh.
 agent-guidance: Distinguish current implementation, declared intent, transitional paths, and obsolete approaches. Do not revive retired Thinclient/split-client concepts.
 ---
 

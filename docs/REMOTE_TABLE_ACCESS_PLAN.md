@@ -6,8 +6,10 @@ purpose: Host/guest remote-access doctrine, guest-safe route boundaries, and fut
 belongs-here: host/guest product principles, remote/LAN guest access strategy, guest-safe route audit, invite/session safety doctrine, relay constraints.
 not-here: implementation of a relay, provider/model setup details, generic architecture inventory, ordinary maintainer command reference.
 durability: durable product/security doctrine; update when host/guest access strategy or route boundaries change.
+budget: About 3000 words for a supporting doctrine document loaded on demand; currently about 3440 words, roughly 440 over. Compress superseded route-audit detail before adding, and keep declared doctrine and guest-safety constraints even if an overage remains.
 read-with: LoreKeeper State Of The Table; LoreKeeper Architecture; LoreKeeper Maintainer Guide.
 update-when: LAN guest model, remote sharing doctrine, guest-safe route policy, invite/session authority, or relay plans change.
+last-verified: not established; claims not rechecked in this refresh.
 agent-guidance: Preserve "the host can suffer; the guest cannot." Do not add relay/tunnel/VPN/provider code merely because this plan exists.
 ---
 

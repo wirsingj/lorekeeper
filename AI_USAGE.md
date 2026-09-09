@@ -9,6 +9,7 @@ durability: medium; update when AI-use disclosure expectations or provenance pra
 budget: About 300 words; keep concise.
 read-with: SoT; Maintainer Guide when release, publishing, generated artifacts, or disclosure practices change.
 update-when: AI tooling, generated-output provenance, publishing disclosure, or human review expectations materially change.
+last-verified: not established; claims not rechecked in this refresh.
 agent-guidance: Preserve the disclosure without expanding it into legal assurance. Do not record private prompts, secrets, or sensitive transcripts here.
 ---
 # AI Usage

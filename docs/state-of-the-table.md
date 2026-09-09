@@ -6,8 +6,11 @@ purpose: Current product state, engineering direction, priorities, risks, and us
 belongs-here: current product direction, verified capabilities, active trust risks, UX priorities, working checklist, playtest lessons, near-term context.
 not-here: durable architecture boundaries, command reference, exhaustive history, implementation details that no longer affect current work.
 durability: volatile; synthesize and prune aggressively.
+budget: About 3000 words; a working target for a session-loaded SoT, not a length to fill.
+budget-overage: About 22080 words as of 2026-09-08, roughly 19000 over target. Cause is accumulated work-diary content, mainly Working Checklist (~3900 words), New Notes Inbox (~3300 words), and Current State Snapshot (~7600 words). Recorded, not compressed, during a convention refresh; a reduction this large is a separate maintainer-reviewed pruning pass that synthesizes those sections into current capabilities, active risks, and lessons and leaves completed work in Git history.
 read-with: LoreKeeper Architecture; LoreKeeper Maintainer Guide.
 update-when: direction, verified behavior, risks, priorities, acceptance criteria, or material lessons change.
+last-verified: not established; claims not rechecked in this refresh.
 agent-guidance: Preserve human product decisions. Verify implementation claims. Mark uncertainty. Remove resolved active risks instead of appending a diary.
 ---
 
