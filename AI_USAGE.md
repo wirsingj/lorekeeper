@@ -1,3 +1,16 @@
+---
+yaiml: 0.2
+role: ai-usage-disclosure
+title: LoreKeeper AI Usage
+purpose: Disclose AI-assisted development and provenance expectations for generated assets, reports, media, or other material AI outputs.
+belongs-here: AI assistance disclosure, human review responsibility, provenance expectations for material AI-generated outputs.
+not-here: project architecture, implementation details, legal advice, secrets, private prompts, raw transcripts.
+durability: medium; update when AI-use disclosure expectations or provenance practice changes.
+budget: About 300 words; keep concise.
+read-with: SoT; Maintainer Guide when release, publishing, generated artifacts, or disclosure practices change.
+update-when: AI tooling, generated-output provenance, publishing disclosure, or human review expectations materially change.
+agent-guidance: Preserve the disclosure without expanding it into legal assurance. Do not record private prompts, secrets, or sensitive transcripts here.
+---
 # AI Usage
 
 This repository is maintained with AI-assisted development.
