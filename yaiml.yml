@@ -20,6 +20,8 @@ supporting:
     role: remote-table-access-doctrine
   - path: docs/living-world.md
     role: living-world-memory-model
+  - path: AI_USAGE.md
+    role: ai-usage-disclosure
 
 reference:
   yaiml:

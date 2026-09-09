@@ -32,6 +32,8 @@ Phrases such as "update YAIML", "updated YAIML", "check new YAIML", "refresh YAI
 
 Do not rewrite LoreKeeper-specific memory during a YAIML convention refresh. Preserve the current SoT, architecture facts, maintainer commands, project-specific risks, human decisions, local naming choices, and supporting documents that contain real LoreKeeper knowledge. Use the separate "update project memory" flow only after meaningful LoreKeeper work changes current state, risks, commands, or architecture.
 
+Phrases such as "clean up YAIML", "compress YAIML", "compact project memory", "prune project memory", or "prune SoT" mean to remove stale or repetitive memory while preserving current truth, evidence, direction, uncertainty, and governed retention. Do not inflate budgets or delete useful project knowledge just to make a document shorter; report unresolved overages when pruning would lose important context.
+
 ## Daily Commands
 
 ```powershell

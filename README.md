@@ -6,6 +6,10 @@ LoreKeeper is one app that can be experienced as a local host app, provider-back
 
 The default rules profile is D&D 5e-lite: HP, AC, ability scores, checks, saves, initiative, conditions, abilities, spells, inventory, and combat turns are tracked where the app has enough information. LoreKeeper is not trying to become a full virtual tabletop; it is trying to make a campaign feel durable, coherent, and easy to resume.
 
+## AI Usage
+
+This project is maintained with AI-assisted development. See [AI_USAGE.md](AI_USAGE.md) for the disclosure and provenance expectations.
+
 ## Product Shape
 
 Provider chats are good at improvising, but weak at owning the campaign. Long campaigns outgrow a single chat. Context dumps drift, inventories and stats get lost, combat formatting needs to be repeated, and campaign canon falls behind actual play.
@@ -46,7 +50,7 @@ Provider output is treated as a DM contribution, not as authority over campaign 
 
 ## Project Structure
 
-- `yaiml.yml`: YAIML discovery file for LoreKeeper project memory and the portable YAIML refresh note.
+- `yaiml.yml`: YAIML discovery file for LoreKeeper project memory and convention-refresh hints.
 - `docs/ARCHITECTURE.md`: current architecture, ownership boundaries, and code landmarks.
 - `docs/state-of-the-table.md`: working product state, priorities, checklist, and playtest notes.
 - `docs/REMOTE_TABLE_ACCESS_PLAN.md`: remote table access strategy, product doctrine, and route safety rules.
@@ -81,7 +85,7 @@ npm run dev
 Import an existing campaign folder:
 
 ```bash
-npm run import:folder -- "C:\Users\wirsi\OneDrive\Desktop\Veil of the Towers"
+npm run import:folder -- "C:\Path\To\Your Campaign Folder"
 ```
 
 Run the full test suite and production build:
