@@ -28,13 +28,15 @@ This guide is the practical "what do I run and where do I look?" map.
 
 ## YAIML Maintenance
 
-Provide the YAIML reference from the human prompt, workspace context, or a team-approved source at run time. Do not commit machine-specific reference paths, local drive names, user profile paths, `file://` URIs, localhost URLs, private workspace URLs, secrets, private transcripts, or raw sensitive logs into versioned project memory.
+Follow the synthesis rules in `AGENTS.md`: update the existing account of changed facts, remove superseded claims and resolved items, and retain completed work only as capability, constraint, decision, or an actionable lesson. Keep one detailed home per fact; never relocate run history just to shorten the core.
 
-Phrases such as "update YAIML", "updated YAIML", "check new YAIML", "refresh YAIML", or "run a YAIML update" mean convention refresh, not an ordinary project-memory rewrite. For this repository, compare local YAIML scaffolding against the provided reference and update only compatible prompts, templates, discovery hints, agent-instruction pointers, or YAIML-maintenance guidance. Preserve project memory and the existing discovery layout unless a human explicitly authorizes a layout migration.
+Keep routine memory edits passage-scoped and preserve unrelated wording and structure. Broad compression belongs in separately scoped work. Memory describes this checkout, so distinguish proposed, implemented, and deployed. For PR/MR work, reconcile memory against the actual target branch and combined meaning, even after a clean textual merge; preserve independent contributions and route dependent conflicts to the repository's existing review authority.
 
-Phrases such as "clean up YAIML", "compress YAIML", "compact project memory", "prune project memory", or "prune SoT" mean to remove stale or repetitive memory while preserving current truth, evidence, human direction, decisions, unresolved conflicts, and uncertainty. Do not pad documents to meet budgets or delete necessary governed knowledge just to reduce word count.
+For convention refreshes, use the human-provided, workspace-local, or team-approved reference; request one if absent. Compare its update and init guidance with local instructions and maintenance notes. Preserve project knowledge, discovery layout/version, local names, budgets, custom fields, and review rules. Do not add prompt/template copies without a concrete workflow need.
 
-This repository does not need local YAIML prompt or template copies unless it already keeps them for a concrete workflow. Do not add `prompts/` or `templates/` just because the reference has them. Preserve project-specific SoT, Architecture, Maintainer Guide, risks, commands, naming, and supporting documents unless the reference changes how future agents should maintain YAIML here.
+For refreshes and compression, measure whole-document whitespace-delimited words before and after; compress affected memory safely first. Preserve human direction, evidence scope, uncertainty, unresolved conflicts, and governed retention. Report necessary growth, retained overages, and next actions in the task response, not memory. Never pad, inflate budgets, or delete necessary knowledge to meet a number.
+
+Verify discovery paths, links, stable headers, instruction activation, and sensitive-content handling. Repeat the same-reference refresh and leave healthy files unchanged. Report configured persistence separately from observed session loading. Keep reference revisions in task results and private reference locations, credentials, personal details, private transcripts, and raw sensitive logs out of committed memory.
 
 ## Daily Commands
 

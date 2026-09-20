@@ -1,34 +1,55 @@
 # Instructions For Agents
 
+Use YAIML as LoreKeeper project memory, not as a replacement for task-specific instructions.
+
 ## YAIML Project Memory
 
-Before meaningful work, read `yaiml.yml` and its core documents: SoT for current state, Architecture for system boundaries, and Maintainer Guide for procedures. Read each selected document's stable header before its body. Load supporting material only when task-relevant, reuse already-loaded context while current, and verify consequential claims against the repository.
+Before meaningful work, read yaiml.yml and its three core documents.
+Read each selected document’s stable header before its body.
+Load supporting documents only when relevant to the task.
+Reuse already-loaded context while current; refresh it after relevant changes.
+Verify consequential claims against the repository.
 
-Before finishing material work, update affected memory and prune stale state without waiting for a separate YAIML request. Respect read-only task scope; report pending updates when writing is unavailable. Leave unchanged memory alone. Preserve declared direction, evidence scope, uncertainty, and unresolved contributor disagreements. Do not append a work diary.
+Before finishing material work, update affected memory without a separate
+YAIML request. Preserve human direction and unresolved conflicts. Respect
+read-only scope and review rules; report pending updates when writing is
+unavailable. Leave unchanged memory alone.
 
-Memory is versioned with this repository and may be public or become public. Never write drive letters, home or profile directories, local workspace paths, personal account URLs, credentials, tokens, or private personal detail into it. Describe sensitive evidence by location and owner instead of copying it.
+For each material memory update, replace the existing account of changed facts;
+do not append a session summary. Remove superseded claims and resolved active
+items in affected sections. Keep completed work only as a current capability,
+still-relevant decision or constraint, or lesson that changes future action.
+Keep one detailed home per fact; link from other roles. Do not move run history
+into new supporting files merely to shorten the core.
 
-"Update YAIML", "updated YAIML", "check new YAIML", or "run a YAIML update" means refresh convention guidance from a human-provided, workspace-local, or team-approved reference. Preserve project memory and the existing discovery layout.
+Keep routine edits within the smallest affected passages; preserve unrelated
+wording and structure. Broad compression belongs in separately scoped work.
+Memory describes this checkout; distinguish proposed, implemented, and
+deployed. With a PR/MR, reconcile affected memory against the actual target and
+combined changes before integration, including clean textual merges. Preserve
+independent contributions; never choose an entire conflicting document by side.
+Keep decision conflicts visible and route dependent choices to existing review
+authority. Recheck affected claims and evidence after integration changes;
+report unavailable target context or unrun checks. Follow repository branch
+permissions.
 
-"Clean up YAIML", "compress YAIML", "compact project memory", "prune project memory", or "prune SoT" means remove stale or repetitive memory while preserving current truth, direction, evidence, and uncertainty.
+Preserve human direction, evidence scope, uncertainty, unresolved conflicts,
+and governed records. Measure affected documents before/after and check budgets;
+compress safely first.
+Necessary growth is allowed, but report net growth and why the added knowledge
+must remain, plus any overage and next action. Do not pad or inflate budgets.
+Keep counts and pruning reports in the task response, not a memory work log.
 
-See the Maintainer Guide for local YAIML maintenance.
+Memory follows repository privacy and retention policy and may become public.
+Exclude machine-specific paths, private account URLs, credentials, and personal
+detail. Use sanitized evidence references and owners rather than sensitive values.
 
-Use YAIML as LoreKeeper project memory, not as a replacement for these instructions.
+“Update YAIML”, “updated YAIML”, or “check new YAIML” means compare the local
+convention guidance against a human-provided or workspace-local reference,
+preserving project memory and the existing discovery layout.
 
-Before meaningful work:
+“Clean up YAIML”, “compress YAIML”, “compact project memory”,
+“prune project memory”, or “prune SoT” means remove stale or repetitive
+memory while preserving current truth, evidence, direction, and uncertainty.
 
-1. Read `yaiml.yml`.
-2. Read the stable header of each declared core YAIML document before its body.
-3. Read the core YAIML documents declared in `yaiml.yml`:
-   - SoT for current product state, direction, risk, uncertainty, and priorities.
-   - Architecture for durable system shape, ownership boundaries, and invariants.
-   - Maintainer Guide for commands, diagnostics, package/release notes, and failure playbooks.
-4. Load supporting YAIML documents only when the current task touches their domain.
-5. Verify task-relevant claims against repository reality. Do not treat inference as verified implementation.
-
-Before finishing material work, update affected YAIML documents when project state, risks, commands, or architecture changed. Prune stale or repeated memory before adding more, while preserving current facts, human direction, evidence limits, and unresolved conflicts.
-
-Phrases such as "update YAIML", "updated YAIML", "check new YAIML", or "refresh YAIML" mean: compare this repository's local YAIML scaffolding against a human-provided, workspace-provided, or team-approved YAIML reference, refresh compatible convention prompts/templates/guidance/pointers, and preserve LoreKeeper-specific project memory.
-
-Phrases such as "clean up YAIML", "compress YAIML", "compact project memory", "prune project memory", or "prune SoT" mean: remove stale or repetitive memory while preserving current truth, evidence, direction, uncertainty, and governed retention. See `docs/MAINTAINER_GUIDE.md` for local YAIML maintenance.
+See `docs/MAINTAINER_GUIDE.md` for local YAIML maintenance.
