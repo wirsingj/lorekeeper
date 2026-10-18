@@ -9,7 +9,7 @@ durability: volatile; synthesize and prune aggressively.
 budget: About 3000 words; a working target for a session-loaded SoT, not a length to fill.
 read-with: LoreKeeper Architecture; LoreKeeper Maintainer Guide.
 update-when: direction, verified behavior, risks, priorities, acceptance criteria, or material lessons change.
-last-verified: not established; claims not rechecked in this refresh.
+last-verified: 2026-10-17 for the checks scoped in the Maintainer Guide; unrelated claims retain prior evidence limits.
 agent-guidance: Preserve human product decisions. Verify implementation claims. Mark uncertainty. Remove resolved active risks instead of appending a diary.
 ---
 

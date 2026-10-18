@@ -9,11 +9,13 @@ durability: current-only; remove dead commands and obsolete paths.
 budget: About 3000 words for a core document loaded every session; a working target, subject to verified procedures that must stay.
 read-with: LoreKeeper State Of The Table; LoreKeeper Architecture.
 update-when: commands, scripts, diagnostics, packaging, release checks, local setup, or failure playbooks change.
-last-verified: not established; claims not rechecked in this refresh.
+last-verified: 2026-10-17; current checks and limits are recorded below; unrelated claims retain their prior scope.
 agent-guidance: Verify command claims when practical. Mark environment-dependent procedures. Keep this useful for a fresh maintainer under time pressure.
 ---
 
 # LoreKeeper Maintainer Guide
+
+On 2026-10-17, Windows/Node 22.22.3 passed `npm test` (all eight subsystem groups, including local server integration), `npm run build`, and `npm run test:ui -- --scenario home-baseline --skip-build` (1/1). Portable packaging, freshness and runtime smoke also passed with Windows PowerShell's built-in module path. Other UI scenarios, live providers and deployed relay were not revalidated.
 
 Updated: 2026-06-18
 
@@ -28,15 +30,11 @@ This guide is the practical "what do I run and where do I look?" map.
 
 ## YAIML Maintenance
 
-Follow the synthesis rules in `AGENTS.md`: update the existing account of changed facts, remove superseded claims and resolved items, and retain completed work only as capability, constraint, decision, or an actionable lesson. Keep one detailed home per fact; never relocate run history just to shorten the core.
+Read and follow [Using YAIML](../.yaiml/YAIML_GUIDE.md) and the [skill catalog](../.yaiml/skills/INDEX.md) for ordinary context/maintenance and requested workflows, including Git actions. Root `AGENTS.md` connects these methods; twelve `.agents/skills/` entries forward arguments. Dormant starters support offline memory creation/repair; instantiate them only for a concrete need. Preserve local facts, authority, budgets, privacy, retention and discovery layout. Coordinate concurrent writers; re-reading is not a lock. Reconcile combined meaning against the actual integration target and common ancestor.
 
-Keep routine memory edits passage-scoped and preserve unrelated wording and structure. Broad compression belongs in separately scoped work. Memory describes this checkout, so distinguish proposed, implemented, and deployed. For PR/MR work, reconcile memory against the actual target branch and combined meaning, even after a clean textual merge; preserve independent contributions and route dependent conflicts to the repository's existing review authority.
+Source: [YAIML](https://github.com/wirsingj/YAIML), published revision `89c883d9a66dffc3b8671d975f7fa6c46535d676`. The 27-resource bundle SHA-256 is `3958b3c802cef951147d316c41a48e0aa7ad6c2aa72c84954c3cac003c169e07` (sorted package-relative paths, NUL, Git blob bytes; CRLF/LF differences verified). The pre-upgrade baseline was unavailable; local guidance remains preserved.
 
-For convention refreshes, use the human-provided, workspace-local, or team-approved reference; request one if absent. Compare its update and init guidance with local instructions and maintenance notes. Preserve project knowledge, discovery layout/version, local names, budgets, custom fields, and review rules. Do not add prompt/template copies without a concrete workflow need.
-
-For refreshes and compression, measure whole-document whitespace-delimited words before and after; compress affected memory safely first. Preserve human direction, evidence scope, uncertainty, unresolved conflicts, and governed retention. Report necessary growth, retained overages, and next actions in the task response, not memory. Never pad, inflate budgets, or delete necessary knowledge to meet a number.
-
-Verify discovery paths, links, stable headers, instruction activation, and sensitive-content handling. Repeat the same-reference refresh and leave healthy files unchanged. Report configured persistence separately from observed session loading. Keep reference revisions in task results and private reference locations, credentials, personal details, private transcripts, and raw sensitive logs out of committed memory.
+The [notice](../.yaiml/YAIML_NOTICE.md) covers copied resources, permits commercial/client use with credit and preserves earlier grants; the application license is unchanged. Refresh from the recorded or an authorized newer source. No startup polling or automatic backlog work. Resource/link/native-entry and ShepAIrd discovery checks passed on 2026-10-17. Fresh-session activation remains untested here; current checks are recorded in this guide. Repeat reconciliation must leave healthy files unchanged.
 
 ## Daily Commands
 
@@ -82,6 +80,8 @@ npm run desktop
 ```
 
 Windows portable package:
+
+If a host-injected `PSModulePath` makes the child Windows PowerShell load incompatible bundled modules, scope `PSModulePath` to `$env:SystemRoot\System32\WindowsPowerShell\v1.0\Modules` in the packaging process, then rerun packaging and freshness/smoke checks. This resolved the observed Archive module load failure; no machine execution policy was changed.
 
 ```powershell
 npm run package:portable

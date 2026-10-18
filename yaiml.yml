@@ -22,6 +22,16 @@ supporting:
     role: living-world-memory-model
   - path: AI_USAGE.md
     role: ai-usage-disclosure
+  - path: .yaiml/YAIML_GUIDE.md
+    role: operating-guide
+  - path: .yaiml/skills/INDEX.md
+    role: skills
+  - path: .yaiml/YAIMLACP.md
+    role: yaimlacp
+  - path: .yaiml/BOOTSTRAP.md
+    role: bootstrap
+  - path: .yaiml/YAIML_NOTICE.md
+    role: notice
 
 reference:
   yaiml:
