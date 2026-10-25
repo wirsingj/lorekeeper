@@ -1,4 +1,5 @@
 ---
+yaiml-revision: "0.1.8663cf053128383d"
 yaiml: 0.2
 role: supporting
 title: LoreKeeper Living World

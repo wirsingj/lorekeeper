@@ -50,7 +50,7 @@ Provider output is treated as a DM contribution, not as authority over campaign 
 
 ## Project Structure
 
-- `yaiml.yml`: YAIML discovery file for LoreKeeper project memory and convention-refresh hints.
+- `.yaiml/yaiml.yml`: YAIML discovery file for LoreKeeper project memory and reusable methods.
 - `docs/ARCHITECTURE.md`: current architecture, ownership boundaries, and code landmarks.
 - `docs/state-of-the-table.md`: working product state, priorities, checklist, and playtest notes.
 - `docs/REMOTE_TABLE_ACCESS_PLAN.md`: remote table access strategy, product doctrine, and route safety rules.

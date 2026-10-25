@@ -1,4 +1,5 @@
 ---
+yaiml-revision: "0.1.8663cf053128383d"
 yaiml: 0.2
 role: sot
 title: LoreKeeper State Of The Table
@@ -18,6 +19,8 @@ agent-guidance: Preserve human product decisions. Verify implementation claims. 
 Updated: 2026-08-08
 
 This is the sliding-window working doc for LoreKeeper's current product state, goal, and improvement checklist. When we say "keep working through the state-of-the-table," this is the doc to use first.
+
+Current revision and pending corrections are located through [LoreKeeper Changes](../.yaiml/changes.md); older checklist evidence retains its stated limits.
 
 This file has absorbed the old tabletop reality checks, playtest notes, model I/O notes, deep-audit notes, authority/session-isolation notes, and recovery checklists that used to live as separate temporary docs. The long-lived companion docs are `docs/ARCHITECTURE.md` for ownership boundaries, `docs/MAINTAINER_GUIDE.md` for commands/debugging/failure playbooks, `docs/REMOTE_TABLE_ACCESS_PLAN.md` for host/guest remote-access doctrine, and `docs/living-world.md` for continuity memory.
 

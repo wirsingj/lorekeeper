@@ -1,4 +1,5 @@
 ---
+yaiml-revision: "0.1.8663cf053128383d"
 yaiml: 0.2
 role: architecture
 title: LoreKeeper Architecture
@@ -18,6 +19,8 @@ agent-guidance: Distinguish current implementation, declared intent, transitiona
 Updated: 2026-08-08
 
 This is the durable architecture guide for LoreKeeper. Keep this file and `docs/state-of-the-table.md` as the main references. The State of the Table is the working checklist; this file explains where code lives, who owns what, and which boundaries matter most. `docs/MAINTAINER_GUIDE.md` is the practical command/debug/playbook map for future maintainers, `docs/REMOTE_TABLE_ACCESS_PLAN.md` is the host/guest remote-access doctrine, and `docs/living-world.md` explains long-term continuity memory.
+
+Current revision and pending corrections are located through [LoreKeeper Changes](../.yaiml/changes.md).
 
 ## Product Shape
 

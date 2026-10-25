@@ -1,4 +1,5 @@
 ---
+yaiml-revision: "0.1.01b3573c87d5279e"
 yaiml: 0.2
 role: legal-or-compliance
 title: Legal Or Compliance Memory

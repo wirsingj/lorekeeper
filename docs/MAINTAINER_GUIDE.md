@@ -1,4 +1,5 @@
 ---
+yaiml-revision: "0.1.8663cf053128383d"
 yaiml: 0.2
 role: maintainer
 title: LoreKeeper Maintainer Guide
@@ -9,7 +10,7 @@ durability: current-only; remove dead commands and obsolete paths.
 budget: About 3000 words for a core document loaded every session; a working target, subject to verified procedures that must stay.
 read-with: LoreKeeper State Of The Table; LoreKeeper Architecture.
 update-when: commands, scripts, diagnostics, packaging, release checks, local setup, or failure playbooks change.
-last-verified: 2026-10-17; current checks and limits are recorded below; unrelated claims retain their prior scope.
+last-verified: 2026-10-24 for YAIML discovery/resource checks; application checks retain their 2026-10-17 scope.
 agent-guidance: Verify command claims when practical. Mark environment-dependent procedures. Keep this useful for a fresh maintainer under time pressure.
 ---
 
@@ -17,10 +18,12 @@ agent-guidance: Verify command claims when practical. Mark environment-dependent
 
 On 2026-10-17, Windows/Node 22.22.3 passed `npm test` (all eight subsystem groups, including local server integration), `npm run build`, and `npm run test:ui -- --scenario home-baseline --skip-build` (1/1). Portable packaging, freshness and runtime smoke also passed with Windows PowerShell's built-in module path. Other UI scenarios, live providers and deployed relay were not revalidated.
 
-Updated: 2026-06-18
+Updated: 2026-10-24
 
 Start with:
 
+- `.yaiml/yaiml.yml`: discovery for four core roles, including the change audit.
+- `.yaiml/changes.md`: consolidated revision and pending record navigation.
 - `docs/state-of-the-table.md`: current product state, priorities, and checklist.
 - `docs/ARCHITECTURE.md`: durable ownership boundaries and important files.
 - `docs/REMOTE_TABLE_ACCESS_PLAN.md`: remote table access product/security doctrine.
@@ -30,11 +33,11 @@ This guide is the practical "what do I run and where do I look?" map.
 
 ## YAIML Maintenance
 
-Read and follow [Using YAIML](../.yaiml/YAIML_GUIDE.md) and the [skill catalog](../.yaiml/skills/INDEX.md) for ordinary context/maintenance and requested workflows, including Git actions. Root `AGENTS.md` connects these methods; twelve `.agents/skills/` entries forward arguments. Dormant starters support offline memory creation/repair; instantiate them only for a concrete need. Preserve local facts, authority, budgets, privacy, retention and discovery layout. Coordinate concurrent writers; re-reading is not a lock. Reconcile combined meaning against the actual integration target and common ancestor.
+Read and follow [Using YAIML](../.yaiml/YAIML_GUIDE.md) for ordinary context and maintenance; select specialized methods from the [skill catalog](../.yaiml/skills/INDEX.md) or host metadata. Root `AGENTS.md` connects these methods; twelve `.agents/skills/` entries forward arguments. The legacy `documents.*.path` map moved to `.yaiml/yaiml.yml`; core product documents remain under `docs/`, including this guide because portable packaging reads this path. [Changes](../.yaiml/changes.md) is the fourth core role, with retained records in `.yaiml/changes/`. Preserve local facts, authority, budgets, privacy and retention. Coordinate concurrent writers; re-reading is not a lock. Reconcile combined meaning against the actual integration target and common ancestor.
 
-Source: [YAIML](https://github.com/wirsingj/YAIML), published revision `89c883d9a66dffc3b8671d975f7fa6c46535d676`. The 27-resource bundle SHA-256 is `3958b3c802cef951147d316c41a48e0aa7ad6c2aa72c84954c3cac003c169e07` (sorted package-relative paths, NUL, Git blob bytes; CRLF/LF differences verified). The pre-upgrade baseline was unavailable; local guidance remains preserved.
+Source: [YAIML](https://github.com/wirsingj/YAIML), release candidate `0.5.0`, resolved public `main` commit `db1dcd120ede0b59ebef16ed82f77ee7ea8cabaa`. The earlier applied revision was `89c883d9a66dffc3b8671d975f7fa6c46535d676`; installed reusable files matched that base after line-ending normalization. The new bundle adds release, versioning, change-record guidance and a fourth core starter. LoreKeeper's first local revision is prospective; earlier task lineage was not reconstructed.
 
-The [notice](../.yaiml/YAIML_NOTICE.md) covers copied resources, permits commercial/client use with credit and preserves earlier grants; the application license is unchanged. Refresh from the recorded or an authorized newer source. No startup polling or automatic backlog work. Resource/link/native-entry and ShepAIrd discovery checks passed on 2026-10-17. Fresh-session activation remains untested here; current checks are recorded in this guide. Repeat reconciliation must leave healthy files unchanged.
+The [notice](../.yaiml/YAIML_NOTICE.md) covers copied resources, permits commercial/client use with credit and preserves earlier grants; the application license is unchanged. Init/refresh resolves the public upstream `main` once per invocation unless the human specifies another source or ref. No startup polling or automatic backlog work. This fresh session received root `AGENTS.md` instructions and native YAIML skill metadata, and read the init method; that does not prove future sessions, every native invocation, or another host will load them. Repeat reconciliation should leave healthy files unchanged.
 
 ## Daily Commands
 

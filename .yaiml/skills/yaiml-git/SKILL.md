@@ -1,6 +1,8 @@
 ---
 name: yaiml-git
 description: Carry out requested Git work such as reviewing changes, committing, branching, syncing or resolving conflicts while preserving project context and existing work.
+metadata:
+  yaiml-revision: "0.21.07ad3d8af566e501"
 ---
 
 # yaiml-git
@@ -11,12 +13,18 @@ Inspect the repository root, status, staged and unstaged changes, current branch
 
 For review/status requests, explain consequential changes and divergence without mutating them. For a requested commit, inspect the intended diff and existing staged work; stage only the authorized files or hunks. Keep unrelated changes intact, including within a shared file. Reconcile affected YAIML memory and run checks appropriate to the change before finalizing the commit. Describe the resulting behavior and relevant validation in its message; report the commit and remaining worktree state. Do not include secrets, local snapshots or generated output merely because they are untracked.
 
+For “prepare for commit/MR” or a requested commit, review the intended diff against its purpose, actual target/common ancestor where relevant, authority and project constraints. Check affected behavior, current verification claims, links, complete affected-path records and parent lineage; identify unrelated work, generated/private material and unresolved decisions. Consolidate pending memory only with established sole ownership, then recheck the final diff and intended index contents. Report ready, ready with explicit limits, or blocked on a named dependency. Preparation alone neither stages nor commits, pushes or opens an MR. Apply this through the existing skill; no hook or separate checklist artifact is required.
+
 For branch creation or switching, establish the intended starting state. Preserve dirty files and index intent; use an appropriate isolated checkout when necessary and authorized. Do not silently stash, discard or move work to make a switch succeed. Branch cleanup, destructive resets and rewriting shared history need the specific human scope that covers their consequences.
 
 For sync, pull, merge or rebase, inspect the actual target and common ancestor where available. Fetch relevant remote state when needed for the requested action and access is authorized. Choose the repository's established integration strategy; if divergent intent leaves a consequential choice unresolved, prepare the comparison before asking. A clean textual merge still needs meaning review. Resolve conflicts by preserving independent contributions and current human direction, then recheck affected behavior and memory; never select whole files by side as a shortcut. Stop dependent integration on an unresolved decision while continuing independent authorized work.
 
-For YAIML conflicts, compare claims by responsibility: SoT current state and decisions, Architecture boundaries, Maintainer procedures and verification. Preserve each claim's evidence and authority; a newer timestamp alone does not resolve conflicting intent. Reconcile summaries with their detailed owners after integration so a clean merge cannot leave contradictory project memory. A semantic merge tool may assist comparison, but its output still needs this evidence and authority review.
+Use [change-record consolidation](../../CHANGE_RECORDS.md#consolidate-and-check) for pending or incoming records. Establish sole integration ownership, preserve exact history, reconcile against the actual target and update the receipt only after checks. Uncertain ownership defers consolidation; report that limit.
+
+For YAIML conflicts, compare claims by responsibility: SoT current state and decisions, Architecture boundaries, Maintainer procedures and verification. Preserve each claim's evidence and authority; a newer timestamp alone does not resolve conflicting intent. Reconcile summaries with their detailed owners after integration so a clean merge cannot leave contradictory project memory. Follow [revision lineage](../../VERSIONING.md#concurrent-work-and-integration): preserve both branches' audit entries, connect a completed reconciliation to both heads, and assign a counter above both known lineages. A fast-forward needs no invented iteration. Keep revision IDs through squash/cherry-pick and record reverts as new changes. A semantic merge tool may assist comparison, but its output still needs this evidence and authority review.
+
+Before finalizing a revert, inspect its actual inverse diff: Git can delete the reverted change's record and roll the receipt backward. Preserve the prior record bytes, reconcile the receipt with current snapshots and later recorded reversals, and add a new linked revert record. A reversed record remains accounted for; do not make it pending again. Restore the intended project state without resurrecting unrelated obsolete claims.
 
 For a requested push, verify the destination, branch, outgoing commits and expected remote state. A rejection is evidence to inspect, not permission to force or retry blindly. Preserve current work on access failures or changed remote history and report the precise blocker. Publication, deployment and unrelated repository changes remain separate actions.
 
-Finish with what ran, resulting branch/commit state, verification scope and anything unresolved. Use `yaiml-maintain` for material project understanding; a routine Git action alone does not require a memory diary. No new Git wrapper, hosting service or background process is required.
+Finish with what ran, resulting branch/commit state, verification scope and anything unresolved. Use the shared maintenance step for material project understanding; a routine Git action alone does not require a memory diary. No new Git wrapper, hosting service or background process is required.

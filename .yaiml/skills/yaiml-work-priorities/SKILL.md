@@ -1,6 +1,8 @@
 ---
 name: yaiml-work-priorities
 description: Compatibility name for yaiml-to-do; complete the requested number of project priorities.
+metadata:
+  yaiml-revision: "0.1.01b3573c87d5279e"
 ---
 # Work Priorities
 

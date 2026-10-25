@@ -1,14 +1,14 @@
 ---
 name: yaiml-maintain
 description: Persist material project understanding after work or confirmed conversational decisions; update our SoT.
+metadata:
+  yaiml-revision: "0.19.c34127f5dc031f2f"
 ---
 
 # yaiml-maintain
 
-Read [Using YAIML](../../YAIML_GUIDE.md) for shared context, evidence, authority and retention rules; reuse it and current core memory if already loaded. Identify changed understanding and its existing owner: SoT for current state/direction/priorities, Architecture for boundaries/design, Maintainer Guide for procedures and their verification status. A project-specific reusable method belongs in a skill only when it has recurring value; use `yaiml-grow` for that need.
+Follow [Using YAIML — Maintain Before Finishing](../../YAIML_GUIDE.md#maintain-before-finishing), reusing current context. That section owns ordinary maintenance, including conversational decisions, verification headers, activation evidence, retention and revision records; do not load other skills merely to complete the loop.
 
-New verification evidence changes understanding even without implementation changes. Compare material observations and check results from the task with relevant existing verification claims, including setup/activation notes. Identify which claims the evidence resolves, narrows, contradicts or leaves unchanged. Update their owning passages, not just task status in the SoT: replace a superseded "untested" or "not yet observed" claim with what actually ran or was observed, its result and consequential environment/revision limits. Preserve still-untested scope and unresolved contrary evidence; configuration, file presence, agent self-report or unrelated passing checks do not prove behavior. Check affected summaries for the same stale claim. Do not expand into unrelated checks or a repository-wide cleanup.
+For an explicit maintenance request, compare supplied evidence with its owners and check consistency. Under the shared consolidation rule, repair affected passages/headers and summaries when ownership permits; otherwise preserve those corrections in the pending record. Report unknowns rather than filling gaps. Read-only scope yields findings; unchanged understanding yields no edits.
 
-Re-read affected concurrent changes and update the smallest coherent passages. Replace superseded accounts and remove resolved active items. Preserve approved direction, meaningful local structure, remaining evidence limits, conflicts, uncertainty and governed records. Distinguish proposed, implemented, merged and deployed facts. Do not append a session log or move history into new supporting documents.
-
-Check pointers and consequential summaries; measure affected whole-document words before/after and report growth reasons or overages outside memory. Include material corrections with the related change, including decisions made without code edits. Read-only tasks produce findings without writes; unchanged understanding produces no maintenance edit. Broad cleanup uses `yaiml-compress` within its own scope. Report what changed and what remains unknown.
+Example: a newly passed local unit check replaces the corresponding “untested” claim and header scope; it does not establish browser behavior or interactive skill discovery. A confirmed local-only decision belongs in current direction and the change record even without code edits.

@@ -1,6 +1,8 @@
 ---
 name: yaiml-refresh
-description: Update YAIML methods and guidance from the recorded or supplied reference while preserving project memory and local skills.
+description: Update YAIML methods and guidance while preserving project memory and local skills.
+metadata:
+  yaiml-revision: "0.1.8663cf053128383d"
 ---
 
 Read and follow the canonical [yaiml-refresh](../../../.yaiml/skills/yaiml-refresh/SKILL.md) skill. Pass the user's requested actions, count, perspectives, scope and other arguments unchanged. Resolve further references from the canonical location. Reuse current task context; this entry does not launch a worker. Report missing access without inventing guidance.

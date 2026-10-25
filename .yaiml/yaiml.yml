@@ -1,0 +1,47 @@
+yaiml: "0.2"
+
+project:
+  id: lorekeeper
+  name: LoreKeeper
+
+documents:
+  sot:
+    path: ../docs/state-of-the-table.md
+    title: LoreKeeper State Of The Table
+  architecture:
+    path: ../docs/ARCHITECTURE.md
+    title: LoreKeeper Architecture
+  maintainer:
+    path: ../docs/MAINTAINER_GUIDE.md
+    title: LoreKeeper Maintainer Guide
+  changes:
+    path: changes.md
+    title: LoreKeeper Changes
+
+supporting:
+  - path: ../docs/REMOTE_TABLE_ACCESS_PLAN.md
+    role: remote-table-access-doctrine
+  - path: ../docs/living-world.md
+    role: living-world-memory-model
+  - path: ../AI_USAGE.md
+    role: ai-usage-disclosure
+  - path: YAIML_GUIDE.md
+    role: operating-guide
+  - path: VERSIONING.md
+    role: revision-guide
+  - path: RELEASE.md
+    role: release-identity
+  - path: CHANGE_RECORDS.md
+    role: change-record-guide
+  - path: skills/INDEX.md
+    role: skills
+  - path: YAIMLACP.md
+    role: yaimlacp
+  - path: BOOTSTRAP.md
+    role: bootstrap
+  - path: YAIML_NOTICE.md
+    role: notice
+
+reference:
+  yaiml:
+    note: Use the current public YAIML main for init and refresh; record the applied commit in the Maintainer Guide.

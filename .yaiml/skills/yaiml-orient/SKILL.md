@@ -1,10 +1,12 @@
 ---
 name: yaiml-orient
 description: Recover project context for meaningful work or a new session, selecting only relevant memory.
+metadata:
+  yaiml-revision: "0.3.e5a6701538b64592"
 ---
 
 # yaiml-orient
 
-Read [Using YAIML](../../YAIML_GUIDE.md) for shared context, evidence, authority and retention rules; reuse it and current core memory if already loaded. Locate applicable host instructions and the actual discovery map. Read core headers before bodies, then relevant specialist memory. Establish the task, human direction, existing state, boundaries, priorities, risks and consequential unknowns. Verify claims needed for this task against current evidence; avoid a full repository audit by default.
+Follow [Using YAIML — Start And Select](../../YAIML_GUIDE.md#start-and-select). Use this method for explicit orientation, handoff recovery or missing context; ordinary work can use the guide directly.
 
-Report a brief working understanding and material gaps, then continue the requested work. Missing discovery does not justify replacing useful documentation. Context loading grants no permission for out-of-scope reads or work. Ordinary startup uses saved local resources; it does not rerun bootstrap or refresh upstream.
+Recover current direction, constraints, state and consequential unknowns from the actual project. Reconcile stale remembered context with the checkout. Report a brief working understanding when useful, then continue the requested task. Missing discovery calls for locating established owners, not regenerating them or acquiring upstream guidance.

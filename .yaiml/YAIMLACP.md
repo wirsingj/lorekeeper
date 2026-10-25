@@ -1,4 +1,5 @@
 ---
+yaiml-revision: "0.1.01b3573c87d5279e"
 yaiml: 0.2
 kind: coordination-guide
 title: YAIMLACP — Agent Context Protocol
